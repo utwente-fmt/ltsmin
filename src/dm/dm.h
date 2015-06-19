@@ -47,6 +47,8 @@ extern int          dm_close_group (permutation_group_t *);
 extern int          dm_apply_permutation_group (matrix_header_t *,
                                                 const permutation_group_t *);
 
+extern void         dm_create_permutation_groups (permutation_group_t **, int *, const int *, const int);
+
 typedef struct matrix {
     int                 rows;
     int                 cols;

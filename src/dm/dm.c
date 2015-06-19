@@ -304,6 +304,36 @@ dm_apply_permutation_group (matrix_header_t *p, const permutation_group_t *o)
 }
 
 void
+dm_create_permutation_groups (permutation_group_t **g, int *num_groups, const int *p, const int size)
+{
+    permutation_group_t* groups = (permutation_group_t*) RTmalloc(sizeof(permutation_group_t) * size);
+    *num_groups = 0;
+    int rot[size];
+    int done[size];
+    int num_done = 0;
+    memset(done, 0, sizeof(int[size]));
+    for (int i = 0; i < size && num_done < size; i++) {
+        int c = 0;
+        int cur = p[i];
+        while (!done[cur]) {
+            rot[c++] = cur;
+            done[cur] = 1;
+            num_done++;
+            cur = p[cur];
+        }
+        if (c > 0) {
+            dm_create_permutation_group(&groups[*num_groups], c, NULL);
+            for (int i = 0; i < c; i++) {
+                dm_add_to_permutation_group(&groups[*num_groups], rot[i]);
+            }
+            (*num_groups)++;
+        }
+    }
+    groups = (permutation_group_t*) RTrealloc(groups, sizeof(permutation_group_t) * *num_groups);
+    *g = groups;
+}
+
+void
 dm_print_perm (const matrix_header_t *p)
 {
     int                 i;
