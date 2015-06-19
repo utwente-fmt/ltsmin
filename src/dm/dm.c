@@ -217,7 +217,7 @@ dm_set (matrix_t *m, int row, int col)
     int                 colp = m->col_perm.data[col].becomes;
 
     // calculate bit number
-    int                 bitnr = rowp * (m->bits_per_row) + colp;
+    size_t              bitnr = (size_t) rowp * (m->bits_per_row) + colp;
 
     // counts
     if (!bitvector_is_set (&(m->bits), bitnr)) {
@@ -236,7 +236,7 @@ dm_unset (matrix_t *m, int row, int col)
     int                 colp = m->col_perm.data[col].becomes;
 
     // calculate bit number
-    int                 bitnr = rowp * (m->bits_per_row) + colp;
+    size_t              bitnr = (size_t) rowp * (m->bits_per_row) + colp;
 
     // counts
     if (bitvector_is_set (&(m->bits), bitnr)) {
@@ -256,7 +256,7 @@ dm_is_set (const matrix_t *m, int row, int col)
     int                 colp = m->col_perm.data[col].becomes;
 
     // calculate bit number
-    int                 bitnr = rowp * (m->bits_per_row) + colp;
+    size_t              bitnr = (size_t) rowp * (m->bits_per_row) + colp;
     return bitvector_is_set (&(m->bits), bitnr);
 }
 
