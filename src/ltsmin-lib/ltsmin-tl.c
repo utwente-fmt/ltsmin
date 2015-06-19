@@ -1813,7 +1813,7 @@ ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t in)
 
     // step 3: translate the tableaux
     ltsmin_expr_t mu = tableaux_translate_syntax_tree(t, &t->root);
-    ltsmin_expr_print_mu(mu, buf);
+    if (log_active(infoLong)) ltsmin_expr_print_mu(mu, buf);
     Warning(infoLong, "** %s **", buf);
 
     tableaux_destroy(t);
