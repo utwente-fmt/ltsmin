@@ -25,19 +25,18 @@
 #    
 #
 
-
-# dependency matrix lib
-SUBDIRS  = dm
-# bignum lib
-SUBDIRS += bignum
-
 # hybrid runtime environment lib
-SUBDIRS += hre-io
+SUBDIRS = hre-io
 SUBDIRS += util-lib
 SUBDIRS += hre
 if HAVE_MPI
 SUBDIRS += hre-mpi
 endif
+
+# dependency matrix lib
+SUBDIRS += dm
+# bignum lib
+SUBDIRS += bignum
 
 SUBDIRS += gcf-tool
 
