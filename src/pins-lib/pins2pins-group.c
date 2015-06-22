@@ -804,6 +804,9 @@ GBregroup (model_t model)
 
         Print1(info, "Initializing regrouping layer");
 
+        rt_timer_t t = RTcreateTimer();
+        RTstartTimer(t);
+
         // note: context information is available via matrix, doesn't need to
         // be stored again
         matrix_t           *r       = RTmalloc (sizeof (matrix_t));
@@ -1044,6 +1047,9 @@ GBregroup (model_t model)
                 news0[i] = s0[ctx->statemap[i]];
             GBsetInitialState (group, news0);
         }
+
+        RTstopTimer(t);
+        RTprintTimer(infoShort, t, "Regrouping took");
 
         // who is responsible for freeing matrix_t dm_info in group?
         // probably needed until program termination
