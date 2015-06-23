@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <math.h>
 
 #include <dm/dm.h>
 #include <hre/unix.h>
@@ -202,20 +203,38 @@ group_chunk_pretty_print (model_t self, int i, int chunk_no)
     return GBchunkPrettyPrint(parent, ctx->statemap[i], chunk_no);
 }
 
-int
-max_row_first (matrix_t *r, matrix_t *w, int rowa, int rowb)
+typedef struct __attribute__((__packed__)) {
+    matrix_t*   r;
+    matrix_t*   mayw;
+    matrix_t*   mustw;
+} rw_info_t;
+
+static void
+inf_copy_row_headers(const matrix_t *src, rw_info_t *tgt)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(w) &&
-                dm_nrows(r) == dm_nrows(w), "matrix sizes do not match");
-    
+    if (src != tgt->r) dm_copy_row_info(src, tgt->r);
+    if (src != tgt->mayw) dm_copy_row_info(src, tgt->mayw);
+    if (src != tgt->mustw) dm_copy_row_info(src, tgt->mustw);
+}
+
+static void
+inf_copy_col_headers(const matrix_t *src, rw_info_t *tgt)
+{
+    if (src != tgt->r) dm_copy_col_info(src, tgt->r);
+    if (src != tgt->mayw) dm_copy_col_info(src, tgt->mayw);
+    if (src != tgt->mustw) dm_copy_col_info(src, tgt->mustw);
+}
+
+int
+max_row_first (matrix_t *m, int rowa, int rowb)
+{
     int                 i,
                         raw,
                         rbw;
 
-    for (i = 0; i < dm_ncols (w); i++) {
-        raw = dm_is_set (w, rowa, i);
-        rbw = dm_is_set (w, rowb, i);
+    for (i = 0; i < dm_ncols (m); i++) {
+        raw = dm_is_set (m, rowa, i);
+        rbw = dm_is_set (m, rowb, i);
 
         if (((raw) && (rbw)) || (!raw && !rbw))
             continue;
@@ -226,17 +245,15 @@ max_row_first (matrix_t *r, matrix_t *w, int rowa, int rowb)
 }
 
 int
-max_col_first (matrix_t *r, matrix_t *w, int cola, int colb)
+max_col_first (matrix_t *m, int cola, int colb)
 {
-    HREassert(dm_ncols(r) == dm_ncols(w) && dm_nrows(r) == dm_nrows(w), "matrix sizes do not match");
-
     int                 i,
                         car,
                         cbr;
 
-    for (i = 0; i < dm_nrows (w); i++) {
-        car = dm_is_set (w, i, cola);
-        cbr = dm_is_set (w, i, colb);
+    for (i = 0; i < dm_nrows (m); i++) {
+        car = dm_is_set (m, i, cola);
+        cbr = dm_is_set (m, i, colb);
 
         if ((car && cbr) || (!car && !cbr))
             continue;
@@ -247,40 +264,32 @@ max_col_first (matrix_t *r, matrix_t *w, int cola, int colb)
 }
 
 int
-write_before_read (matrix_t *r, matrix_t *w, int rowa, int rowb)
+write_before_read (matrix_t *m, int rowa, int rowb)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(w) &&
-                dm_nrows(r) == dm_nrows(w), "matrix sizes do not match");
-
     int i;
 
     int ra = 0;
     int rb = 0;
 
-    for (i = 0; i < dm_ncols (r); i++) {
-        if (dm_is_set (w, rowa, i)) ra += (i);
-        if (dm_is_set (w, rowb, i)) rb += (i);
+    for (i = 0; i < dm_ncols (m); i++) {
+        if (dm_is_set (m, rowa, i)) ra += (i);
+        if (dm_is_set (m, rowb, i)) rb += (i);
     }
 
     return rb - ra;
 }
 
 int
-read_before_write (matrix_t *r, matrix_t *w, int cola, int colb)
+read_before_write (matrix_t *m, int cola, int colb)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(w) &&
-                dm_nrows(r) == dm_nrows(w), "matrix sizes do not match");
-    
     int i;
 
     int ca = 0;
     int cb = 0;
 
-    for (i = 0; i < dm_nrows (r); i++) {
-        if (dm_is_set (r, i, cola)) ca += (i);
-        if (dm_is_set (r, i, colb)) cb += (i);
+    for (i = 0; i < dm_nrows (m); i++) {
+        if (dm_is_set (m, i, cola)) ca += (i);
+        if (dm_is_set (m, i, colb)) cb += (i);
     }
 
     return cb - ca;
@@ -288,6 +297,8 @@ read_before_write (matrix_t *r, matrix_t *w, int cola, int colb)
 
 struct group_info {
     guard_t **guards;
+    uint64_t *combined;
+    int num_ints_per;
 };
 
 static int
@@ -308,134 +319,171 @@ eq_guards(guard_t** guards, int i, int j, matrix_t *m) {
 }
 
 static int
-eq_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, void *context) {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+is_equal(struct group_info *context, int ia, int ib) {
+    for (int j = 0; j < context->num_ints_per; j++) {
 
-    struct group_info *ctx = (struct group_info*)context;
-    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb, r)) {
+        // compute the location of the 64-bit integer.
+        const int at = ia * context->num_ints_per + j;
+        const int bt = ib * context->num_ints_per + j;
+        const uint64_t a = *(context->combined + at);
+        const uint64_t b = *(context->combined + bt);
+        if (a != b) return 0;   // not equal
+    }
+    return 1;                   // equal
+}
 
-        if (
-                dm_ones_in_row (r, rowa) != dm_ones_in_row (r, rowb) ||
-                dm_ones_in_row (mayw, rowa) != dm_ones_in_row (mayw, rowb) ||
-                dm_ones_in_row (mustw, rowa) != dm_ones_in_row (mustw, rowb))
-            return 0;
-
-        int                 i;
-        for (i = 0; i < dm_ncols (r); i++) {
-            int                 ar = dm_is_set (r, rowa, i);
-            int                 br = dm_is_set (r, rowb, i);
-            int                 amayw = dm_is_set (mayw, rowa, i);
-            int                 bmayw = dm_is_set (mayw, rowb, i);
-            int                 amustw = dm_is_set (mustw, rowa, i);
-            int                 bmustw = dm_is_set (mustw, rowb, i);
-            if (ar != br || amayw != bmayw || amustw != bmustw)
-                return 0;                  // unequal
-        }
-        return 1;                          // equal
+static int
+eq_rows(matrix_t *m, int rowa, int rowb, void *context)
+{
+    struct group_info *ctx = (struct group_info*) context;
+    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb, m)) {
+        return is_equal(ctx, m->row_perm.data[rowa].becomes, m->row_perm.data[rowb].becomes);
     }
     return 0;                              // unequal
 }
 
-int
-subsume_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, void *context) {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+static int
+is_subsumed(struct group_info *context, int ia, int ib) {
+    for (int j = 0; j < context->num_ints_per; j++) {
 
+        // compute the location of the 64-bit integer.
+        const int at = ia * context->num_ints_per + j;
+        const int bt = ib * context->num_ints_per + j;
+        const uint64_t a = *(context->combined + at);
+        const uint64_t b = *(context->combined + bt);
+
+        /* Here the idea for subsumption is that
+         * if "b" modifies a bit in "a" then a
+         * is not larger than or equal to b. */
+        if ((a | b) != a) return 0; // not subsumed
+    }
+    return 1;                       // subsumed
+}
+
+int
+subsume_rows(matrix_t *m, int rowa, int rowb, void *context)
+{
     struct group_info *ctx = (struct group_info*)context;
-    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb, r)) {
+    if (ctx->guards == NULL || eq_guards(ctx->guards, rowa, rowb, m)) {
+        return is_subsumed(ctx, m->row_perm.data[rowa].becomes, m->row_perm.data[rowb].becomes);
+    }
+    return 0; // not subsumed
+}
 
-        int                 i;
-        for (i = 0; i < dm_ncols (r); i++) {
-            int a = 4;
-            if (dm_is_set(mayw, rowa, i)) a |= 1;
-            if (dm_is_set(mustw, rowa, i)) a = 1;
-            if (dm_is_set(r, rowa, i)) a |= 6;
+int
+eq_cols(matrix_t *m, int cola, int colb, void *context)
+{
+    struct group_info *ctx = (struct group_info*) context;
+    return is_equal(ctx, m->col_perm.data[cola].becomes, m->col_perm.data[colb].becomes);
+}
 
-            int b = 4;
-            if (dm_is_set(mayw, rowb, i)) b |= 1;
-            if (dm_is_set(mustw, rowb, i)) b = 1;
-            if (dm_is_set(r, rowb, i)) b |= 6;
+int
+subsume_cols(matrix_t *m, int cola, int colb, void *context)
+{
+    struct group_info *ctx = (struct group_info*)context;
+    return is_subsumed(ctx, m->col_perm.data[cola].becomes, m->col_perm.data[colb].becomes);
+}
+    }
+}
 
-            if (a < (a|b))
-                return 0;                  // not subsumed
+static const uint16_t READ  = 0x0001; // right most bit denotes read
+static const uint16_t WRITE = 0x0002; // middle bit denotes write
+static const uint16_t COPY  = 0x0004; // left most bit denotes copy
+
+/* To compare rows with each other may be quadratic in the number of rows.
+ * This can be quite expensive. This function allocates 64-bit integers for all rows
+ * so that at least every row comparison can by done quickly.
+ * In other words, we don't have to compare every individual column of matrices; we
+ * can use operations on 64-bit integers. */
+static void
+prepare_row_compare(rw_info_t *inf, struct group_info* context)
+{
+    // compute the number of bits per row in the dependency matrix
+    const int num_bits = dm_ncols(inf->old_mayw) * 3;
+
+    /* Compute the number of 8-bit integers required to store all the required bits.
+     * Also add extra 8-bit integers so that the result is divisible by 64.
+     * This allows to compare rows by using 64-bit integers. */
+    const int num_ints_per_row = ceil(num_bits / 64.0) * 8;
+    context->num_ints_per = num_ints_per_row / 8;
+    uint8_t* combined = (uint8_t*) RTalignZero(CACHE_LINE_SIZE, dm_nrows(inf->old_mayw) * sizeof(uint8_t[num_ints_per_row]));
+    context->combined = (uint64_t*) combined;
+
+    for (int i = 0; i < dm_nrows(inf->old_mayw); i++) {
+        for (int j = 0; j < dm_ncols(inf->old_mayw); j++) {
+            /* We temporarily store the three bits in an
+             * 16-bit integer, because an 8-bit integer overflows for every third column. */
+            uint16_t val = 0;
+
+            /* The offset in the 16-bit integer.
+             * For every column the three bits will be shifted left by offset. */
+            const int offset = (j * 3) % 8;
+
+            // first set the write bit, so that it can be overwritten if the copy bit is not set.
+            if (dm_is_set(inf->old_mustw, i, j)) val |= WRITE << offset;
+
+            // if the may-write entry is set we must set the copy and write bit
+            else if (dm_is_set(inf->old_mayw, i, j)) val = val | COPY << offset | WRITE << offset;
+
+            // if the read entry is set we must set the copy and read bit
+            if (dm_is_set(inf->old_r, i, j)) val = val | COPY << offset | READ << offset;
+
+            // if a variable is not written we set the copy bit
+            else if (!dm_is_set(inf->old_mustw, i, j) && !dm_is_set(inf->old_mayw, i, j)) val |= COPY << offset;
+
+            const int b = inf->old_r->row_perm.data[i].becomes;
+
+            // compute the first 8-bit integer and store val
+            const int num_int = (b * num_ints_per_row) + ((j * 3) / 8);
+            uint8_t* p = combined + num_int;
+            *p |= (uint8_t) val;
+
+            // compute the second 8-bit integer and store the remainder of val
+            if (offset >= 6) {
+                p++;
+                *p |= (uint8_t) (val >> 8);
+            }
         }
-        return 1;                          // subsumed
     }
-    return 0;                              // not subsumed
 }
 
-int
-eq_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
+/* Idem for columns. */
+static void
+prepare_col_compare(rw_info_t *inf, struct group_info* context)
+{
+    const int num_bits = dm_nrows(inf->old_mayw) * 3;
+    const int num_ints_per_col = ceil(num_bits / 64.0) * 8;
+    context->num_ints_per = num_ints_per_col / 8;
+    uint8_t* combined = (uint8_t*) RTalignZero(CACHE_LINE_SIZE, dm_ncols(inf->old_mayw) * sizeof(uint8_t[num_ints_per_col]));
+    context->combined = (uint64_t*) combined;
 
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-
-    if (
-            dm_ones_in_col (r, cola) != dm_ones_in_col (r, colb) ||
-            dm_ones_in_col (mayw, cola) != dm_ones_in_col (mayw, colb) ||
-            dm_ones_in_col (mustw, cola) != dm_ones_in_col (mustw, colb))
-        return 0;
-
-    int                 i;
-    for (i = 0; i < dm_nrows (r); i++) {
-        int                 ar = dm_is_set (r, i, cola);
-        int                 br = dm_is_set (r, i, colb);
-        int                 amayw = dm_is_set (mayw, i, cola);
-        int                 bmayw = dm_is_set (mayw, i, colb);
-        int                 amustw = dm_is_set (mustw, i, cola);
-        int                 bmustw = dm_is_set (mustw, i, colb);
-        if (ar != br || amayw != bmayw || amustw != bmustw)
-            return 0;                  // unequal
+    for (int i = 0; i < dm_ncols(inf->old_mayw); i++) {
+        for (int j = 0; j < dm_nrows(inf->old_mayw); j++) {
+            uint16_t val = 0;
+            const int offset = (j * 3) % 8;
+            if (dm_is_set(inf->old_mustw, j, i)) val |= WRITE << offset;
+            else if (dm_is_set(inf->old_mayw, j, i)) val = val | COPY << offset | WRITE << offset;
+            if (dm_is_set(inf->old_r, j, i)) val = val | COPY << offset | READ << offset;
+            else if (!dm_is_set(inf->old_mustw, j, i) && !dm_is_set(inf->old_mayw, j, i)) val |= COPY << offset;
+            const int num_int = (i * num_ints_per_col) + ((j * 3) / 8);
+            uint8_t* p = combined + num_int;
+            *p |= (uint8_t) val;
+            if (offset >= 6) {
+                p++;
+                *p |= (uint8_t) (val >> 8);
+            }
+        }
     }
-    return 1;                          // equal
-}
-
-int
-subsume_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
-
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-
-    int                 i;
-    for (i = 0; i < dm_nrows (r); i++) {
-        int a = 4;
-        if (dm_is_set(mayw, i, cola)) a |= 1;
-        if (dm_is_set(mustw, i, cola)) a = 1;
-        if (dm_is_set(r, i, cola)) a |= 6;
-
-        int b = 4;
-        if (dm_is_set(mayw, i, colb)) b |= 1;
-        if (dm_is_set(mustw, i, colb)) b = 1;
-        if (dm_is_set(r, i, colb)) b |= 6;
-
-        if (a < (a|b))
-            return 0;                  // not subsumed
-    }
-    return 1;                          // equal
 }
 
 static void
-apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *spec_, guard_t **guards, const char* sep)
+apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const char* sep)
 {
-    
     HREassert(
-            dm_ncols(r) == dm_ncols(mayw) &&
-            dm_nrows(r) == dm_nrows(mayw) &&
-            dm_ncols(r) == dm_ncols(mustw) &&
-            dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
+            dm_ncols(inf->r) == dm_ncols(inf->mayw) &&
+            dm_nrows(inf->r) == dm_nrows(inf->mayw) &&
+            dm_ncols(inf->r) == dm_ncols(inf->mustw) &&
+            dm_nrows(inf->r) == dm_nrows(inf->mustw), "matrix sizes do not match");
     
     // parse regrouping arguments
     if (spec_ != NULL) {
@@ -449,79 +497,98 @@ apply_regroup_spec (matrix_t* r, matrix_t* mayw, matrix_t* mustw, const char *sp
         while ((tok = strsep (&spec, sep)) != NULL) {
             if (strcasecmp (tok, "w2W") == 0) {
                 Print1 (info, "Regroup over-approximate must-write to may-write");
-                dm_clear(mustw);
+                dm_clear(inf->mustw);
             } else if (strcasecmp (tok, "r2+") == 0) {
                 Print1 (info, "Regroup over-approximate read to read + write");
-                dm_apply_or(mayw, r);
+                dm_apply_or(inf->mayw, inf->r);
             } else if (strcmp (tok, "W2+") == 0) {
                 Print1 (info, "Regroup over-approximate may-write \\ must-write to read + write");
-                matrix_t *w = RTmalloc(sizeof(matrix_t));
-                dm_copy(mayw, w);
-                dm_apply_xor(w, mustw);
-                dm_apply_or(r, w);
-                dm_free(w);
+                matrix_t w;
+                dm_copy(inf->mayw, &w);
+                dm_apply_xor(&w, inf->mustw);
+                dm_apply_or(inf->r, &w);
+                dm_free(&w);
             } else if (strcmp (tok, "w2+") == 0) {
                 Print1 (info, "Regroup over-approximate must-write to read + write");
-                dm_apply_or(r, mustw);
+                dm_apply_or(inf->r, inf->mustw);
             } else if (strcasecmp (tok, "rb4w") == 0) {
                 Print1 (info, "Regroup Read BeFore Write");
-                dm_sort_cols (r, mayw, mustw, &read_before_write);
-                dm_sort_rows (r, mayw, mustw, &write_before_read);
+                dm_sort_cols (inf->r, &read_before_write);
+                inf_copy_col_headers(inf->r, inf);
+                dm_sort_rows (inf->mayw, &write_before_read);
+                inf_copy_row_headers(inf->mayw, inf);
             } else if (strcasecmp (tok, "cs") == 0) {
                 Print1 (info, "Regroup Column Sort");
-                dm_sort_cols (r, mayw, mustw, &max_col_first);
+                dm_sort_cols (inf->mayw, &max_col_first);
+                inf_copy_col_headers(inf->mayw, inf);
             } else if (strcasecmp (tok, "cn") == 0) {
                 Print1 (info, "Regroup Column Nub");
-                dm_nub_cols (r, mayw, mustw, &eq_cols);
+                prepare_col_compare(inf, &context);
+                dm_nub_cols (inf->r, &eq_cols, &context);
+                RTfree(context.combined);
+                inf_copy_col_headers(inf->r, inf);
             } else if (strcasecmp (tok, "csa") == 0) {
                 Print1 (info, "Regroup Column swap with Simulated Annealing");
-                dm_anneal (r, mayw, mustw);
+                dm_anneal (inf->mayw);
+                inf_copy_col_headers(inf->mayw, inf);
             } else if (strcasecmp (tok, "cw") == 0) {
                 Print1 (info, "Regroup Column sWaps");
-                if ((cw_max_cols < 0 || dm_ncols(mayw) <= cw_max_cols) && (cw_max_rows < 0 || dm_nrows(mayw) <= cw_max_rows)) {
-                    dm_optimize (r, mayw, mustw);
+                if ((cw_max_cols < 0 || dm_ncols(inf->mayw) <= cw_max_cols) && (cw_max_rows < 0 || dm_nrows(inf->mayw) <= cw_max_rows)) {
+                    dm_optimize (inf->mayw);
+                    inf_copy_col_headers(inf->mayw, inf);
                 } else {
                     Print1 (infoLong, "May-write matrix too large for \"cw\" (%d (>%d) columns, (%d (>%d) rows)",
-                            dm_ncols(mayw), cw_max_cols, dm_nrows(mayw), cw_max_rows);
+                            dm_ncols(inf->mayw), cw_max_cols, dm_nrows(inf->mayw), cw_max_rows);
                 }
             } else if (strcasecmp (tok, "ca") == 0) {
                 Print1 (info, "Regroup Column All permutations");
-                dm_all_perm (r, mayw, mustw);
+                dm_all_perm(inf->mayw);
+                inf_copy_col_headers(inf->mayw, inf);
             } else if (strcasecmp (tok, "rs") == 0) {
                 Print1 (info, "Regroup Row Sort");
-                dm_sort_rows (r, mayw, mustw, &max_row_first);
+                dm_sort_rows (inf->mayw, &max_row_first);
+                inf_copy_row_headers(inf->mayw, inf);
             } else if (strcasecmp (tok, "rn") == 0) {
                 Print1 (info, "Regroup Row Nub");
-                dm_nub_rows (r, mayw, mustw, &eq_rows, &context);
+                prepare_row_compare(inf, &context);
+                dm_nub_rows (inf->r, &eq_rows, &context);
+                RTfree(context.combined);
+                inf_copy_row_headers(inf->r, inf);
             } else if (strcasecmp (tok, "ru") == 0) {
                 Print1 (info, "Regroup Row sUbsume");
-                dm_subsume_rows (r, mayw, mustw, &subsume_rows, &context);
+                prepare_row_compare(inf, &context);
+                dm_subsume_rows (inf->r, &subsume_rows, &context);
+                RTfree(context.combined);
+                inf_copy_row_headers(inf->r, inf);
             } else if (strcasecmp (tok, "hf") == 0) {
                 Print1 (info, "Reqroup Horizontal Flip");
-                dm_horizontal_flip (r, mayw, mustw);
+                dm_horizontal_flip (inf->r);
+                inf_copy_row_headers(inf->r, inf);
             } else if (strcasecmp (tok, "vf") == 0) {
                 Print1 (info, "Reqroup Vertical Flip");
-                dm_vertical_flip (r, mayw, mustw);
+                dm_vertical_flip (inf->r);
+                inf_copy_col_headers(inf->r, inf);
+            }
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (inf, macro, guards, sep);
             } else if (strcasecmp (tok, "gs") == 0) {
                 const char         *macro = "gc,gr,cw,rs";
                 Print1 (info, "Regroup macro Group Safely: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (inf, macro, guards, sep);
             } else if (strcasecmp (tok, "ga") == 0) {
                 const char         *macro = "ru,gc,rs,cw,rs";
                 Print1 (info, "Regroup macro Group Aggressively: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (inf, macro, guards, sep);
             } else if (strcasecmp (tok, "gc") == 0) {
                 const char         *macro = "cs,cn";
                 Print1 (info, "Regroup macro Cols: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (inf, macro, guards, sep);
             } else if (strcasecmp (tok, "gr") == 0) {
                 const char         *macro = "rs,rn";
                 Print1 (info, "Regroup macro Rows: %s", macro);
-                apply_regroup_spec (r, mayw, mustw, macro, guards, sep);
+                apply_regroup_spec (inf, macro, guards, sep);
             } else if (tok[0] != '\0') {
                 Fatal (1, error, "Unknown regrouping specification: '%s'",
                        tok);
@@ -583,20 +650,30 @@ GBregroup (model_t model)
         dm_copy (original_may_write, mayw);
         dm_copy (original_must_write, mustw);
 
-        Print1 (info, "Regroup specification: %s", regroup_spec);
         if (GBgetUseGuards(model)) {
             dm_copy (GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), r);
-            apply_regroup_spec (r, mayw, mustw, regroup_spec, GBgetGuardsInfo(model), ",");
         } else {
             dm_copy (GBgetDMInfoRead(model), r);
-            apply_regroup_spec (r, mayw, mustw, regroup_spec, NULL, ",");
+        }
+
+        rw_info_t inf;
+        memset(&inf, 0, sizeof(rw_info_t));
+        inf.r = r;
+        inf.mayw = mayw;
+        inf.mustw = mustw;
+
+        Print1 (info, "Regroup specification: %s", regroup_spec);
+        if (GBgetUseGuards(model)) {
+            apply_regroup_spec (&inf, regroup_spec, GBgetGuardsInfo(model), ",");
+        } else {
+            apply_regroup_spec (&inf, regroup_spec, NULL, ",");
         }
 
         // post processing regroup specification
         // undo column grouping
-        dm_ungroup_cols(r);
-        dm_ungroup_cols(mayw);
-        dm_ungroup_cols(mustw);
+        dm_ungroup_cols(inf.r);
+        dm_ungroup_cols(inf.mayw);
+        dm_ungroup_cols(inf.mustw);
 
         // create new model
         model_t             group = GBcreateBase ();
@@ -648,7 +725,7 @@ GBregroup (model_t model)
                 ctx->transbegin[i] = p;
                 int                 n = 0;
                 do {
-    
+
                     // for each old transition group set for each slot whether the value
                     // needs to be copied. The value needs to be copied if the new dependency
                     // is a may-write (W) and the old dependency is a copy (-).
@@ -672,7 +749,6 @@ GBregroup (model_t model)
             ctx->transbegin[newNgroups] = p;
 
         }
-
 
         lts_type_t ltstype=GBgetLTStype (model);
         if (log_active(debug)){
@@ -702,7 +778,7 @@ GBregroup (model_t model)
             dm_create(read, dm_nrows (r), dm_ncols (r));
             combine_rows(read, GBgetDMInfoRead (model), dm_nrows (r), ctx->transbegin,
                              ctx->transmap);
-            dm_copy_header(&(r->col_perm), &(read->col_perm));
+            dm_copy_col_info(r, read);
             GBsetDMInfoRead(group, read);
             GBsetExpandMatrix(group, r);
         } else { // we have transformed the read matrix
@@ -712,7 +788,7 @@ GBregroup (model_t model)
             dm_create(read, dm_nrows (r), dm_ncols (r));
             combine_rows(read, GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), dm_nrows (r), ctx->transbegin,
                              ctx->transmap);
-            dm_copy_header(&(r->col_perm), &(read->col_perm));
+            dm_copy_col_info(r, read);
             GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, read, PINS_MAY_SET,
                         PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
             // set the new read matrix
@@ -732,11 +808,10 @@ GBregroup (model_t model)
         if (GBgetStateLabelInfo(model) != NULL) {
             dm_copy (GBgetStateLabelInfo (model), s);
 
-            HREassert (dm_ncols(m) == dm_ncols(s), "Error in DM copy");
-
-            // probably better to write some functions to do this,
-            // i.e. dm_get_column_permutation
-            dm_copy_header(&(r->col_perm), &(s->col_perm));
+            if (dm_copy_col_info(r, s)) {
+                HREmessage(error, "Error in DM copy");
+                HREexit(LTSMIN_EXIT_FAILURE);
+            }
 
             GBsetStateLabelInfo(group, s);
         }

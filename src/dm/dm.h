@@ -28,7 +28,6 @@ typedef struct {
 } matrix_header_t;
 
 extern int          dm_create_header (matrix_header_t *, int);
-extern int          dm_copy_header (const matrix_header_t *, matrix_header_t *);
 extern void         dm_free_header (matrix_header_t *);
 
 typedef struct {
@@ -58,14 +57,14 @@ typedef struct matrix {
     bitvector_t         bits;
 } matrix_t;
 
-extern int          dm_copy_row_header (const matrix_t *, matrix_t *);
-extern int          dm_copy_col_header (const matrix_t *, matrix_t *);
+extern int          dm_copy_row_info (const matrix_t *, matrix_t *);
+extern int          dm_copy_col_info (const matrix_t *, matrix_t *);
 
-typedef int         (*dm_comparator_fn) (matrix_t *, matrix_t *, int, int);
-typedef int         (*dm_subsume_rows_fn) (matrix_t *, matrix_t *, matrix_t *, int, int, void *);
-typedef int         (*dm_nub_rows_fn) (matrix_t *, matrix_t *, matrix_t *, int, int, void *);
-typedef int         (*dm_subsume_cols_fn) (matrix_t *, matrix_t *, matrix_t *, int, int);
-typedef int         (*dm_nub_cols_fn) (matrix_t *, matrix_t *, matrix_t *, int, int);
+typedef int         (*dm_comparator_fn) (matrix_t *, const int, const int);
+typedef int         (*dm_subsume_rows_fn) (matrix_t *, const int, const int, void *);
+typedef int         (*dm_nub_rows_fn) (matrix_t *, const int, const int, void *);
+typedef int         (*dm_subsume_cols_fn) (matrix_t *, const int, const int, void *);
+typedef int         (*dm_nub_cols_fn) (matrix_t *, const int, const int, void *);
 
 extern int          dm_create (matrix_t *, const int, const int);
 extern void         dm_free (matrix_t *);
@@ -80,22 +79,22 @@ extern int          dm_is_set (const matrix_t *, int, int);
 extern int          dm_permute_rows (matrix_t *, const permutation_group_t *);
 extern int          dm_permute_cols (matrix_t *, const permutation_group_t *);
 
-extern int          dm_swap_rows (matrix_t *, int, int);
-extern int          dm_swap_cols (matrix_t *, int, int);
+extern int          dm_swap_rows (matrix_t *, const int, const int);
+extern int          dm_swap_cols (matrix_t *, const int, const int);
 
 extern int          dm_copy (const matrix_t *, matrix_t *);
 
 extern int          dm_make_sparse (matrix_t *);
 extern int          dm_flatten (matrix_t *);
 
-extern int          dm_sort_rows (matrix_t *, matrix_t *, matrix_t *, const dm_comparator_fn);
-extern int          dm_sort_cols (matrix_t *, matrix_t *, matrix_t *, const dm_comparator_fn);
+extern int          dm_sort_rows (matrix_t *, const dm_comparator_fn);
+extern int          dm_sort_cols (matrix_t *, const dm_comparator_fn);
 
-extern int          dm_nub_rows (matrix_t *, matrix_t *, matrix_t *, const dm_nub_rows_fn, void *);
-extern int          dm_nub_cols (matrix_t *, matrix_t *, matrix_t *, const dm_nub_cols_fn);
+extern int          dm_nub_rows (matrix_t *, const dm_nub_rows_fn, void *);
+extern int          dm_nub_cols (matrix_t *, const dm_nub_cols_fn, void *);
 
-extern int          dm_subsume_rows (matrix_t *, matrix_t *, matrix_t *, const dm_subsume_rows_fn, void *);
-extern int          dm_subsume_cols (matrix_t *, matrix_t *, matrix_t *, const dm_subsume_cols_fn);
+extern int          dm_subsume_rows (matrix_t *, const dm_subsume_rows_fn, void *);
+extern int          dm_subsume_cols (matrix_t *, const dm_subsume_cols_fn, void *);
 
 extern int          dm_ungroup_rows (matrix_t *);
 extern int          dm_ungroup_cols (matrix_t *);
@@ -104,12 +103,12 @@ extern int          dm_print (FILE *, const matrix_t *);
 extern int          dm_print_combined (FILE * f, const matrix_t *, const matrix_t *, const matrix_t *);
 
 
-extern int          dm_anneal (matrix_t *, matrix_t *, matrix_t *);
-extern int          dm_optimize (matrix_t *, matrix_t *, matrix_t *);
-extern int          dm_all_perm (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_anneal (matrix_t *);
+extern int          dm_optimize (matrix_t *);
+extern int          dm_all_perm (matrix_t *);
 
-extern int          dm_horizontal_flip (matrix_t *, matrix_t *, matrix_t *);
-extern int          dm_vertical_flip (matrix_t *, matrix_t *, matrix_t *);
+extern int          dm_horizontal_flip (matrix_t *);
+extern int          dm_vertical_flip (matrix_t *);
 
 /**
  * return the matrix as index table per row/col
