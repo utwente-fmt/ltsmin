@@ -3376,7 +3376,7 @@ init_model(char *file)
     HREbarrier(HREglobal());
 
     GBloadFile(model, file);
-    model = GBaddMutex(model);
+    if (!SPEC_MT_SAFE) model = GBaddMutex(model);
     model = GBwrapModel(model);
 
     HREbarrier(HREglobal());
