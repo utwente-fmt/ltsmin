@@ -16,6 +16,7 @@
 static const char      *regroup_spec = NULL;
 static int              cw_max_cols = -1;
 static int              cw_max_rows = -1;
+static const char      *col_ins = NULL;
 
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
@@ -23,6 +24,7 @@ struct poptOption group_options[] = {
           "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w", "<(T,)+>" },
     { "cw-max-cols", 0, POPT_ARG_INT, &cw_max_cols, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> columns", "<num>" },
     { "cw-max-rows", 0, POPT_ARG_INT, &cw_max_rows, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> rows", "<num>" },
+    { "col-ins", 0, POPT_ARG_STRING, &col_ins, 0, "insert column C before column C'", "<(C.C',)+>" },
     POPT_TABLEEND
 };
 
@@ -203,10 +205,21 @@ group_chunk_pretty_print (model_t self, int i, int chunk_no)
     return GBchunkPrettyPrint(parent, ctx->statemap[i], chunk_no);
 }
 
+typedef struct {
+    int src;
+    int tgt;
+} pair_t;
+
 typedef struct __attribute__((__packed__)) {
     matrix_t*   r;
     matrix_t*   mayw;
     matrix_t*   mustw;
+    matrix_t*   old_r;
+    matrix_t*   old_mayw;
+    matrix_t*   old_mustw;
+    pair_t*     pairs;
+    int         num_pairs;
+    pair_t*     sorted_pairs;
 } rw_info_t;
 
 static void
@@ -215,6 +228,9 @@ inf_copy_row_headers(const matrix_t *src, rw_info_t *tgt)
     if (src != tgt->r) dm_copy_row_info(src, tgt->r);
     if (src != tgt->mayw) dm_copy_row_info(src, tgt->mayw);
     if (src != tgt->mustw) dm_copy_row_info(src, tgt->mustw);
+    if (src != tgt->old_r) dm_copy_row_info(src, tgt->old_r);
+    if (src != tgt->old_mayw) dm_copy_row_info(src, tgt->old_mayw);
+    if (src != tgt->old_mustw) dm_copy_row_info(src, tgt->old_mustw);
 }
 
 static void
@@ -498,9 +514,11 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
             if (strcasecmp (tok, "w2W") == 0) {
                 Print1 (info, "Regroup over-approximate must-write to may-write");
                 dm_clear(inf->mustw);
+                dm_clear(inf->old_mustw);
             } else if (strcasecmp (tok, "r2+") == 0) {
                 Print1 (info, "Regroup over-approximate read to read + write");
                 dm_apply_or(inf->mayw, inf->r);
+                dm_apply_or(inf->old_mayw, inf->old_r);
             } else if (strcmp (tok, "W2+") == 0) {
                 Print1 (info, "Regroup over-approximate may-write \\ must-write to read + write");
                 matrix_t w;
@@ -508,9 +526,16 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 dm_apply_xor(&w, inf->mustw);
                 dm_apply_or(inf->r, &w);
                 dm_free(&w);
+
+                matrix_t old_w;
+                dm_copy(inf->old_mayw, &old_w);
+                dm_apply_xor(&old_w, inf->old_mustw);
+                dm_apply_or(inf->old_r, &old_w);
+                dm_free(&old_w);
             } else if (strcmp (tok, "w2+") == 0) {
                 Print1 (info, "Regroup over-approximate must-write to read + write");
                 dm_apply_or(inf->r, inf->mustw);
+                dm_apply_or(inf->old_r, inf->old_mustw);
             } else if (strcasecmp (tok, "rb4w") == 0) {
                 Print1 (info, "Regroup Read BeFore Write");
                 dm_sort_cols (inf->r, &read_before_write);
@@ -630,10 +655,152 @@ combine_rows(matrix_t *matrix_new, matrix_t *matrix_old, int new_rows,
     bitvector_free(&row_old);
 }
 
+static int
+compare_pair(const void *a, const void *b)
+{
+    const pair_t *pa = (const pair_t *) a;
+    const pair_t *pb = (const pair_t *) b;
+
+    return ((*pa).src > (*pb).src) - ((*pa).src < (*pb).src);
+}
+
+static pair_t* parse_pair_spec(int* num_pairs, const char *spec_, const int max) {
+    pair_t* pairs = NULL;
+    char *spec = strdup(spec_);
+    char *pair_;
+    while ((pair_ = strsep (&spec, ",")) != NULL) {
+        char *pair = strdup(pair_);
+        char *src = strsep(&pair, ".");
+        if (src == NULL) Abort("Invalid pair spec %s", spec_);
+        char *tgt = strsep(&pair, ".");
+        free(pair);
+        if (tgt == NULL) Abort("Invalid pair spec %s", spec_);
+        if (pair != NULL)  Abort("Invalid pair spec %s", spec_);
+        int s = atoi(src);
+        int t = atoi(tgt);
+        if (s < 0) s += max;
+        if (t < 0) t += max;
+        if (s < 0 || s >= max) Abort("Invalid source %d in pair %s", s, pair_);
+        if (t < 0 || t >= max) Abort("Invalid target %d in pair %s", t, pair_);
+        // if (s == t) Abort("Source and target can not be equal: %s", pair_);
+        for (int i = 0; i < *num_pairs; i++) {
+            if (pairs[i].src == s) Abort("Source %d in pair %s already given previously", s, pair_);
+            // if (pairs[i].tgt == t) Abort("Target %d in pair %s already given previously", t, pair_);
+            // if (pairs[i].src == t && pairs[i].tgt == s) Abort("Pair %s already given previously as %d.%d", pair_, pairs[i].src, pairs[i].tgt);
+        }
+        (*num_pairs)++;
+        pairs = (pair_t*) RTrealloc(pairs, sizeof(pair_t[*num_pairs]));
+        pairs[(*num_pairs)-1].src = s;
+        pairs[(*num_pairs)-1].tgt = t;
+    }
+    free(spec);
+    return pairs;
+}
+
+static void
+split_matrices(rw_info_t* inf)
+{
+    if (inf->num_pairs > 0) {
+        inf->r = (matrix_t*) RTmalloc(sizeof(matrix_t));
+        inf->mayw = (matrix_t*) RTmalloc(sizeof(matrix_t));
+        inf->mustw = (matrix_t*) RTmalloc(sizeof(matrix_t));
+        dm_create(inf->r, dm_nrows(inf->old_r), dm_ncols(inf->old_r) - inf->num_pairs);
+        dm_create(inf->mayw, dm_nrows(inf->old_mayw), dm_ncols(inf->old_mayw) - inf->num_pairs);
+        dm_create(inf->mustw, dm_nrows(inf->old_mustw), dm_ncols(inf->old_mustw) - inf->num_pairs);
+
+        // split the old matrices in two.
+        for (int i = 0; i < dm_nrows(inf->old_r); i++) {
+            int c = 0;
+            for (int j = 0; j < dm_ncols(inf->old_r); j++) {
+                if (c < inf->num_pairs && inf->sorted_pairs[c].src == j) c++;
+                else {
+                    if (dm_is_set(inf->old_r, i, j)) dm_set(inf->r, i, j - c);
+                    if (dm_is_set(inf->old_mayw, i, j)) dm_set(inf->mayw, i, j - c);
+                    if (dm_is_set(inf->old_mustw, i, j)) dm_set(inf->mustw, i, j - c);
+                }
+            }
+        }
+    } else {
+        inf->r = inf->old_r;
+        inf->mayw = inf->old_mayw;
+        inf->mustw = inf->old_mustw;
+        inf->old_r = (matrix_t*) RTmalloc(sizeof(matrix_t));
+        inf->old_mayw = (matrix_t*) RTmalloc(sizeof(matrix_t));
+        inf->old_mustw = (matrix_t*) RTmalloc(sizeof(matrix_t));
+        dm_copy(inf->r, inf->old_r);
+        dm_copy(inf->mayw, inf->old_mayw);
+        dm_copy(inf->mustw, inf->old_mustw);
+    }
+}
+
+static void
+merge_matrices(rw_info_t* inf)
+{
+    if (inf->num_pairs > 0) {
+        int offsets[dm_ncols(inf->r)];
+        for (int i = 0, c = 0; i < dm_ncols(inf->old_r); i++) {
+            if (c < inf->num_pairs && inf->sorted_pairs[c].src == i) c++;
+            offsets[i - c] = i;
+        }
+
+        int col_perm[dm_ncols(inf->r)];
+        for (int i = 0; i < dm_ncols(inf->r); i++) col_perm[i] = i;
+        for (int i = 0; i < dm_ncols(inf->r); i++) {
+            col_perm[offsets[i]] = offsets[inf->r->col_perm.data[i].becomes];
+        }
+
+        permutation_group_t* pg;
+        int n;
+        dm_create_permutation_groups(&pg, &n, col_perm, dm_ncols(inf->r));
+
+        dm_free(inf->r);
+        dm_free(inf->mayw);
+        dm_free(inf->mustw);
+        RTfree(inf->r);
+        RTfree(inf->mayw);
+        RTfree(inf->mustw);
+
+        for (int i = 0; i < n; i++) {
+            dm_permute_cols(inf->old_r, &(pg[i]));
+            dm_permute_cols(inf->old_mayw, &(pg[i]));
+            dm_permute_cols(inf->old_mustw, &(pg[i]));
+        }
+
+        for (int i = 0; i < inf->num_pairs; i++) {
+            const int src = inf->old_r->col_perm.data[inf->pairs[i].src].at;
+            const int tgt = inf->pairs[i].tgt;
+            const int diff = abs(src - tgt);
+            permutation_group_t pg;
+            int rot[diff + 1];
+            dm_create_permutation_group(&pg, diff + 1, rot);
+            dm_add_to_permutation_group(&pg, tgt);
+            for (int j = src; j != tgt; src < tgt ? j++ : j--) {
+                dm_add_to_permutation_group(&pg, j);
+            }
+            dm_close_group(&pg);
+            dm_permute_cols(inf->old_r, &pg);
+            dm_permute_cols(inf->old_mayw, &pg);
+            dm_permute_cols(inf->old_mustw, &pg);
+            dm_free_permutation_group(&pg);
+        }
+    } else {
+        dm_free(inf->old_r);
+        dm_free(inf->old_mayw);
+        dm_free(inf->old_mustw);
+        RTfree(inf->old_r);
+        RTfree(inf->old_mayw);
+        RTfree(inf->old_mustw);
+        inf->old_r = inf->r;
+        inf->old_mayw = inf->mayw;
+        inf->old_mustw = inf->mustw;
+    }
+}
+
+
 model_t
 GBregroup (model_t model)
 {
-    if (regroup_spec != NULL) {
+    if (regroup_spec != NULL || col_ins != NULL) {
 
         Print1(info, "Initializing regrouping layer");
 
@@ -658,15 +825,29 @@ GBregroup (model_t model)
 
         rw_info_t inf;
         memset(&inf, 0, sizeof(rw_info_t));
-        inf.r = r;
-        inf.mayw = mayw;
-        inf.mustw = mustw;
 
-        Print1 (info, "Regroup specification: %s", regroup_spec);
-        if (GBgetUseGuards(model)) {
-            apply_regroup_spec (&inf, regroup_spec, GBgetGuardsInfo(model), ",");
-        } else {
-            apply_regroup_spec (&inf, regroup_spec, NULL, ",");
+        if (col_ins != NULL) {
+            Print1(info, "Column insert: %s", col_ins);
+            inf.pairs = parse_pair_spec(&(inf.num_pairs), col_ins, dm_ncols(r));
+            if (inf.num_pairs > 0) {
+                // sort by src; makes it easer to split and merge matrices later
+                inf.sorted_pairs = (pair_t*) RTmalloc(sizeof(pair_t[inf.num_pairs]));
+                memcpy(inf.sorted_pairs, inf.pairs, sizeof(pair_t[inf.num_pairs]));
+                qsort(inf.sorted_pairs, inf.num_pairs, sizeof(pair_t), compare_pair);
+            } else Abort("option --col-ins requires at least one pair");
+        }
+        inf.old_r = r;
+        inf.old_mayw = mayw;
+        inf.old_mustw = mustw;
+        split_matrices(&inf);
+
+        if (regroup_spec != NULL) {
+            Print1 (info, "Regroup specification: %s", regroup_spec);
+            if (GBgetUseGuards(model)) {
+                apply_regroup_spec (&inf, regroup_spec, GBgetGuardsInfo(model), ",");
+            } else {
+                apply_regroup_spec (&inf, regroup_spec, NULL, ",");
+            }
         }
 
         // post processing regroup specification
@@ -675,6 +856,16 @@ GBregroup (model_t model)
         dm_ungroup_cols(inf.mayw);
         dm_ungroup_cols(inf.mustw);
 
+        merge_matrices(&inf);
+
+        if (col_ins != NULL) {
+            RTfree(inf.pairs);
+            RTfree(inf.sorted_pairs);
+        }
+
+        r = inf.old_r;
+        mayw = inf.old_mayw;
+        mustw = inf.old_mustw;
         // create new model
         model_t             group = GBcreateBase ();
         GBcopyChunkMaps (group, model);
