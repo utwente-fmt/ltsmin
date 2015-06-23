@@ -39,6 +39,7 @@ etf2lts_dist_SOURCES   = ../pins2lts-dist.c
 etf2lts_dist_SOURCES  += ../../pins-lib/etf-pins.c ../../pins-lib/etf-pins.h
 etf2lts_dist_LDADD     = $(PINS_LIBS)
 etf2lts_dist_CPPFLAGS  = -DETF $(DIST_CPPFLAGS)
+nodist_EXTRA_etf2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # mapa2lts-dist
 mapa2lts_dist_SOURCES   = ../pins2lts-dist.c
@@ -46,6 +47,7 @@ mapa2lts_dist_LDADD     = ../../pins-lib/libmapa-pins.la
 mapa2lts_dist_LDADD    += $(PINS_LIBS) -lscoop
 mapa2lts_dist_LDFLAGS   = -Wl,-rpath,$(DESTDIR)$(pkglibdir) $(SCOOP_LDFLAGS) -L${top_builddir}/scoop/src $(AM_LDFLAGS) -Wl,-lscoop
 mapa2lts_dist_CPPFLAGS  = -DMAPA $(DIST_CPPFLAGS)
+nodist_EXTRA_mapa2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # pins2lts-dist
 pins2lts_dist_SOURCES   = ../pins2lts-dist.c
@@ -55,6 +57,7 @@ pins2lts_dist_CPPFLAGS  = -DPINS_DLL $(DIST_CPPFLAGS)
 if !BUILD_OS_IS_DARWIN
 pins2lts_dist_LDFLAGS   = -Wl,-E
 endif
+nodist_EXTRA_pins2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # lpo2lts-dist
 lpo2lts_dist_SOURCES   = ../pins2lts-dist.c
@@ -88,6 +91,7 @@ dve2lts_dist_LDADD     = $(PINS_LIBS)
 dve2lts_dist_LDADD    += $(DVEC_LIBS)
 dve2lts_dist_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(DIST_CPPFLAGS)
 dve2lts_dist_LDFLAGS   = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_dve2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # prom2lts-dist
 prom2lts_dist_SOURCES  = ../pins2lts-dist.c
@@ -96,3 +100,4 @@ prom2lts_dist_LDADD    = $(PINS_LIBS)
 prom2lts_dist_LDADD   += $(SPINS_LIBS)
 prom2lts_dist_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(DIST_CPPFLAGS)
 prom2lts_dist_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_prom2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL

@@ -49,6 +49,7 @@ etf2lts_mc_SOURCES   = $(mc_sources)
 etf2lts_mc_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
 etf2lts_mc_LDADD     = $(MC_LIBS) 
 etf2lts_mc_CPPFLAGS  = -DETF $(MC_CPPFLAGS)
+nodist_EXTRA_etf2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # pins2lts-mc
 pins2lts_mc_SOURCES   = $(mc_sources)
@@ -58,6 +59,7 @@ pins2lts_mc_CPPFLAGS  = -DPINS_DLL $(MC_CPPFLAGS)
 if !BUILD_OS_IS_DARWIN
 pins2lts_mc_LDFLAGS  = -Wl,-E
 endif
+nodist_EXTRA_pins2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 ## lpo2lts-mc
 lpo2lts_mc_SOURCES   = $(mc_sources)
@@ -87,6 +89,7 @@ dve2lts_mc_SOURCES  += ../pins-lib/dve-pins.c ../pins-lib/dve-pins.h
 dve2lts_mc_LDADD     = $(MC_LIBS) $(DVEC_LIBS)
 dve2lts_mc_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(MC_CPPFLAGS)
 dve2lts_mc_LDFLAGS   = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_dve2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # prom2lts-mc
 prom2lts_mc_SOURCES  = $(mc_sources)
@@ -94,9 +97,11 @@ prom2lts_mc_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
 prom2lts_mc_LDADD    = $(MC_LIBS) $(SPINS_LIBS)
 prom2lts_mc_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(MC_CPPFLAGS)
 prom2lts_mc_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)
+nodist_EXTRA_prom2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # opaal2lts-mc
 opaal2lts_mc_SOURCES   = $(mc_sources)
 opaal2lts_mc_SOURCES  += ../pins-lib/opaal-pins.c ../pins-lib/opaal-pins.h
 opaal2lts_mc_LDADD     = $(MC_LIBS) $(OPAAL_LDFLAGS) 
 opaal2lts_mc_CPPFLAGS  = -DOPAAL $(MC_CPPFLAGS)
+nodist_EXTRA_opaal2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL

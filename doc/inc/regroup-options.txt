@@ -62,3 +62,28 @@ W2+;;
 
 rb4w;;
   Use special heuristics to move read dependencies before write dependences. Often a win in symbolic state space generation.
+  
+bg;;
+  Use a bipartite graph (default) for *bcm*, *bk*, *bs*, *vcm*, *vacm* and *vgps*.
+
+tg;;
+  Create a total graph of the bipartite graph for *bcm*, *bk*, *bs*, *vcm*, *vacm* and *vgps*.
+  This adds more vertices and edges thus increasing computation time, but sometimes provides a better ordering.
+  
+bcm;;
+  Apply Boost's Cuthill-McKee ordering.
+  
+bk;;
+  Apply Boost's King ordering.
+
+bs;;
+  Apply Boost's Sloan ordering.
+  
+vcm;;
+  Apply ViennaCL's Cuthill-McKee ordering.
+  
+vacm;;
+  Apply ViennaCL's advanced Cuthill-McKee ordering.
+  
+vgps;;
+  Apply ViennaCl's Gibbs-Poole-Stockmeyer ordering.

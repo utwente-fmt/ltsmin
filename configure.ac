@@ -396,6 +396,14 @@ if test "x$with_scoop" == xyes; then
     [have_scoop="yes"]
 fi
 
+AX_BOOST_BASE([1.48],[have_boost="yes"],)
+AX_PATH_VIENNACL(1.5.1, no)
+if (test x$HAVE_VIENNACL = x1); then
+    have_viennacl="yes"
+else
+    AC_MSG_WARN([no acceptable ViennaCL installation found.])
+fi
+
 AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
@@ -423,6 +431,8 @@ AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
 AM_CONDITIONAL([HAVE_PROFILER], [test x"$acx_profiler" = xyes])
+AM_CONDITIONAL([HAVE_BOOST], [test x"$have_boost" = xyes])
+AM_CONDITIONAL([HAVE_VIENNACL], [test x"$have_viennacl" = xyes])
 
 AM_CONDITIONAL(BUILD_OS_IS_DARWIN,
 [case "${build_os}" in
@@ -505,5 +515,7 @@ Configuration:
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
     SYLVAN   = ${have_sylvan:-NO, only on 64-bit systems (override with --with-sylvan)}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
+    BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
+    VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
 ======================================================================
 EOM
