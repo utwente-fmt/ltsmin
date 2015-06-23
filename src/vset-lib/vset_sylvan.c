@@ -255,7 +255,7 @@ check_state(const int *e, unsigned int N)
  * Make sure size(arr) is statebits*state_length
  */
 static void
-state_to_cube(const int* state, size_t state_length, char *arr)
+state_to_cube(const int* state, size_t state_length, uint8_t *arr)
 {
     for (size_t i=0; i<state_length; i++) {
         for (int j=0; j<statebits; j++) {
@@ -278,7 +278,7 @@ set_add(vset_t set, const int* e)
     check_state(e, set->dom->shared.size);
 
     // create cube
-    char cube[set->dom->shared.size * statebits];
+    uint8_t cube[set->dom->shared.size * statebits];
     state_to_cube(e, set->dom->shared.size, cube);
 
     // get Lace infrastructure
@@ -312,7 +312,7 @@ set_member(vset_t set, const int* e)
     check_state(e, set->dom->shared.size);
 
     // create cube
-    char cube[set->dom->shared.size * statebits];
+    uint8_t cube[set->dom->shared.size * statebits];
     state_to_cube(e, set->dom->shared.size, cube);
 
     // get Lace infrastructure
@@ -435,7 +435,7 @@ set_example(vset_t set, int *e)
 
     memset(e, 0, sizeof(int)*set->vector_size);
 
-    char* cube = (char*)alloca(set->vector_size*statebits*sizeof(char));
+    uint8_t* cube = (uint8_t*)alloca(set->vector_size*statebits*sizeof(uint8_t));
     sylvan_sat_one(set->bdd, set->state_variables, cube);
 
     size_t i;
@@ -669,7 +669,7 @@ rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const in
     check_state(dst, rel->w_k);
 
     // make cube of src
-    char src_cube[rel->r_k * statebits];
+    uint8_t src_cube[rel->r_k * statebits];
     state_to_cube(src, (size_t)rel->r_k, src_cube);
     BDD src_bdd = bdd_refs_push(sylvan_cube(rel->state_variables, src_cube));
 
@@ -698,7 +698,7 @@ rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const in
     bdd_refs_push(dst_bdd);
 
     // make cube of action
-    char act_cube[actionbits];
+    uint8_t act_cube[actionbits];
     for (int i=0; i<actionbits; i++) {
         act_cube[i] = (act & (1LL<<(actionbits-i-1))) ? 1 : 0;
     }
@@ -733,7 +733,7 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
     check_state(dst, rel->w_k);
 
     // make cube of src
-    char src_cube[rel->r_k * statebits];
+    uint8_t src_cube[rel->r_k * statebits];
     state_to_cube(src, (size_t)rel->r_k, src_cube);
     BDD src_bdd = bdd_refs_push(sylvan_cube(rel->state_variables, src_cube));
 
