@@ -59,32 +59,56 @@ dm_free_header (matrix_header_t *p)
     }
 }
 
-int
-dm_copy_header (const matrix_header_t *src, matrix_header_t *tgt)
+static int
+copy_header_(const matrix_header_t *src, matrix_header_t *tgt)
 {
-    if (tgt->data != NULL)
-        free(tgt->data);
-    if (tgt->count != NULL)
-        free(tgt->count);
-    tgt->size = src->size;
-    tgt->data = malloc (sizeof (header_entry_t) * tgt->size);
-    // TODO: null ptr exception
+    if (tgt->data == NULL && tgt->count == NULL) {
+        tgt->size = src->size;
+        tgt->data = malloc (sizeof (header_entry_t) * tgt->size);
+        if (tgt->data == NULL) return 1;
+        tgt->count = malloc (sizeof (int) * tgt->size);
+        if (tgt->count == NULL) {
+            free(tgt->data);
+            return 1;
+        }
+        memcpy (tgt->count, src->count, sizeof (int) * tgt->size);
+    } else if (src->size != tgt->size) return 1;
     memcpy (tgt->data, src->data, sizeof (header_entry_t) * tgt->size);
-    tgt->count = malloc (sizeof (int) * tgt->size);
-    memcpy (tgt->count, src->count, sizeof (int) * tgt->size);
-    return (tgt->data == NULL);
+    return 0;
 }
 
 int
-dm_copy_row_header (const matrix_t *src, matrix_t *tgt)
+dm_copy_row_info (const matrix_t *src, matrix_t *tgt)
 {
-    return dm_copy_header(&(src->row_perm), &(tgt->row_perm));
+    if (copy_header_(&(src->row_perm), &(tgt->row_perm))) return 1;
+    if (tgt->rows != src->rows) {
+        for (int i = 0; i < dm_ncols(tgt); i++) {
+            const int b = tgt->col_perm.data[i].becomes;
+            tgt->col_perm.count[b] = 0;
+            for (int j = 0; j < dm_nrows(src); j++) {
+                if (dm_is_set(tgt, j, i)) tgt->col_perm.count[b]++;
+            }
+        }
+    }
+    tgt->rows = src->rows;
+    return 0;
 }
 
 int
-dm_copy_col_header (const matrix_t *src, matrix_t *tgt)
+dm_copy_col_info (const matrix_t *src, matrix_t *tgt)
 {
-    return dm_copy_header(&(src->col_perm), &(tgt->col_perm));
+    if (copy_header_(&(src->col_perm), &(tgt->col_perm))) return 1;
+    if (tgt->cols != src->cols) {
+        for (int i = 0; i < dm_nrows(tgt); i++) {
+            const int b = tgt->row_perm.data[i].becomes;
+            tgt->row_perm.count[b] = 0;
+            for (int j = 0; j < dm_ncols(src); j++) {
+                if (dm_is_set(tgt, i, j)) tgt->row_perm.count[b]++;
+            }
+        }
+    }
+    tgt->cols = src->cols;
+    return 0;
 }
 
 int
@@ -371,7 +395,7 @@ dm_permute_cols (matrix_t *m, const permutation_group_t *o)
 
 
 int
-dm_swap_rows (matrix_t *m, int rowa, int rowb)
+dm_swap_rows (matrix_t *m, const int rowa, const int rowb)
 {
     // swap header
     permutation_group_t o;
@@ -385,7 +409,7 @@ dm_swap_rows (matrix_t *m, int rowa, int rowb)
 }
 
 int
-dm_swap_cols (matrix_t *m, int cola, int colb)
+dm_swap_cols (matrix_t *m, const int cola, const int colb)
 {
     // swap header
     permutation_group_t o;
@@ -410,13 +434,13 @@ dm_copy (const matrix_t *src, matrix_t *tgt)
     tgt->col_perm.count = NULL;
     tgt->bits.data = NULL;
 
-    if (dm_copy_header (&(src->row_perm), &(tgt->row_perm))) {
+    if (copy_header_ (&(src->row_perm), &(tgt->row_perm))) {
         dm_free (tgt);
         return -1;
     }
 
 
-    if (dm_copy_header (&(src->col_perm), &(tgt->col_perm))) {
+    if (copy_header_ (&(src->col_perm), &(tgt->col_perm))) {
         dm_free (tgt);
         return -1;
     }
@@ -502,7 +526,7 @@ dm_print_combined (FILE * f, const matrix_t *r, const matrix_t *mayw, const matr
 
 
 static void
-sift_down_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, int root, int bottom, dm_comparator_fn cmp,
+sift_down_ (matrix_t *m, int root, int bottom, dm_comparator_fn cmp,
             int (*dm_swap_fn) (matrix_t *, int, int))
 {
     int                 child;
@@ -510,13 +534,11 @@ sift_down_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, int root, int bottom, 
     while ((root * 2 + 1) <= bottom) {
         child = root * 2 + 1;
 
-        if (child + 1 <= bottom && cmp (r, mayw, child, child + 1) < 0)
+        if (child + 1 <= bottom && cmp (m, child, child + 1) < 0)
             child++;
 
-        if (cmp (r, mayw, root, child) < 0) {
-            dm_swap_fn (r, root, child);
-            dm_swap_fn (mayw, root, child);
-            dm_swap_fn (mustw, root, child);
+        if (cmp (m, root, child) < 0) {
+            dm_swap_fn (m, root, child);
             root = child;
         } else {
             return;
@@ -525,34 +547,31 @@ sift_down_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, int root, int bottom, 
 }
 
 static int
-sort_ (matrix_t *r, matrix_t *mayw, matrix_t *mustw, dm_comparator_fn cmp, int size,
-       int (*dm_swap_fn) (matrix_t *, int, int))
+sort_ (matrix_t *m, dm_comparator_fn cmp, int size, int (*dm_swap_fn) (matrix_t *, int, int))
 {
     // heapsort
     int                 i;
 
     for (i = (size / 2) - 1; i >= 0; i--)
-        sift_down_ (r, mayw, mustw, i, size - 1, cmp, dm_swap_fn);
+        sift_down_ (m, i, size - 1, cmp, dm_swap_fn);
 
     for (i = size - 1; i >= 0; i--) {
-        dm_swap_fn (r, i, 0);
-        dm_swap_fn (mayw, i, 0);
-        dm_swap_fn (mustw, i, 0);
-        sift_down_ (r, mayw, mustw, 0, i - 1, cmp, dm_swap_fn);
+        dm_swap_fn (m, i, 0);
+        sift_down_ (m, 0, i - 1, cmp, dm_swap_fn);
     }
     return 0;
 }
 
 int
-dm_sort_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw, dm_comparator_fn cmp)
+dm_sort_rows (matrix_t *m, dm_comparator_fn cmp)
 {
-    return sort_ (r, mayw, mustw, cmp, dm_nrows (mayw), dm_swap_rows);
+    return sort_ (m, cmp, dm_nrows (m), dm_swap_rows);
 }
 
 int
-dm_sort_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw, dm_comparator_fn cmp)
+dm_sort_cols (matrix_t *m, dm_comparator_fn cmp)
 {
-    return sort_ (r, mayw, mustw, cmp, dm_ncols (mayw), dm_swap_cols);
+    return sort_ (m, cmp, dm_ncols (m), dm_swap_cols);
 }
 
 static int
@@ -660,7 +679,6 @@ merge_rows_ (matrix_t *m, int rowa, int rowb)
 
     // remove the last row from the matrix
     m->rows--;
-
     return 0;
 }
 
@@ -779,7 +797,6 @@ merge_cols_ (matrix_t *m, int cola, int colb)
 
     // remove the last col from the matrix
     m->cols--;
-
     return 0;
 }
 
@@ -826,21 +843,14 @@ unmerge_col_ (matrix_t *m, int col)
 }
 
 int
-dm_nub_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_nub_rows_fn fn, void *context)
+dm_nub_rows (matrix_t *m, const dm_nub_rows_fn fn, void *context)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
     int                 i,
                         j;
-    for (i = 0; i < dm_nrows (r); i++) {
-        for (j = i + 1; j < dm_nrows (r); j++) {
-            if (fn(r, mayw, mustw, i, j, context)) {
-                merge_rows_ (r, i, j);
-                merge_rows_ (mayw, i, j);
-                merge_rows_ (mustw, i, j);
+    for (i = 0; i < dm_nrows (m); i++) {
+        for (j = i + 1; j < dm_nrows (m); j++) {
+            if (fn(m, i, j, context)) {
+                merge_rows_ (m, i, j);
                 // now row j is removed, don't increment it in the for
                 // loop
                 j--;
@@ -851,34 +861,22 @@ dm_nub_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_nub_rows_fn 
 }
 
 int
-dm_subsume_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_subsume_rows_fn fn, void *context)
+dm_subsume_rows (matrix_t *m, const dm_subsume_rows_fn fn, void *context)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-    
-    int                 i,
-                        j;
-    for (i = 0; i < dm_nrows (r); i++) {
+    for (int i = 0; i < dm_nrows (m); i++) {
 
         int row_i_removed = 0;
-        for (j = i + 1; j < dm_nrows (r); j++) {
+        for (int j = i + 1; j < dm_nrows (m); j++) {
             // is row j subsumed by row i?
-            if (fn (r, mayw, mustw, i, j, context)) {
-                merge_rows_ (r, i, j);
-                merge_rows_ (mayw, i, j);
-                merge_rows_ (mustw, i, j);
+            if (fn (m, i, j, context)) {
+                merge_rows_ (m, i, j);
                 // now row j is removed, don't increment it in the for
                 // loop
                 j--;
             } else {
                 // is row i subsumed by row j?
-                if (fn (r, mayw, mustw, j, i, context)) {
-                    merge_rows_ (r, j, i);
-                    merge_rows_ (mayw, j, i);
-                    merge_rows_ (mustw, j, i);
+                if (fn (m, j, i, context)) {
+                    merge_rows_ (m, j, i);
                     // now row i is removed, don't increment it in the for
                     // loop
                     row_i_removed=1;
@@ -889,26 +887,19 @@ dm_subsume_rows (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_subsume_
 
         if (row_i_removed) i--;
     }
+
     return 0;
 }
 
 int
-dm_nub_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_nub_cols_fn fn)
+dm_nub_cols (matrix_t *m, const dm_nub_cols_fn fn, void *context)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-
     int                 i,
                         j;
-    for (i = 0; i < dm_ncols (r); i++) {
-        for (j = i + 1; j < dm_ncols (r); j++) {
-            if (fn (r, mayw, mustw, i, j)) {
-                merge_cols_ (r, i, j);
-                merge_cols_ (mayw, i, j);
-                merge_cols_ (mustw, i, j);
+    for (i = 0; i < dm_ncols (m); i++) {
+        for (j = i + 1; j < dm_ncols (m); j++) {
+            if (fn (m, i, j, context)) {
+                merge_cols_ (m, i, j);
                 // now row j is removed, don't increment it in the for loop
                 j--;
             }
@@ -918,32 +909,22 @@ dm_nub_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_nub_cols_fn 
 }
 
 int
-dm_subsume_cols (matrix_t *r, matrix_t *mayw, matrix_t *mustw, const dm_subsume_cols_fn fn)
+dm_subsume_cols (matrix_t *m, const dm_subsume_cols_fn fn, void *context)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-
     int                 i,
                         j;
-    for (i = 0; i < dm_ncols (r); i++) {
+    for (i = 0; i < dm_ncols (m); i++) {
         int col_i_removed;
-        for (j = i + 1; j < dm_ncols (r); j++) {
+        for (j = i + 1; j < dm_ncols (m); j++) {
             // is col i subsumed by row j?
-            if (fn (r, mayw, mustw, i, j)) {
-                merge_cols_ (r, i, j);
-                merge_cols_ (mayw, i, j);
-                merge_cols_ (mustw, i, j);
+            if (fn (m, i, j, context)) {
+                merge_cols_ (m, i, j);
                 // now col j is removed, don't increment it in the for loop
                 col_i_removed=1;
             } else {
                 // is col j subsumed by row i?
-                if (fn (r, mayw, mustw, j, i)) {
-                    merge_cols_ (r, j, i);
-                    merge_cols_ (mayw, j, i);
-                    merge_cols_ (mustw, j, i);
+                if (fn (m, j, i, context)) {
+                    merge_cols_ (m, j, i);
                     // now col j is removed, don't increment it in the for loop
                     j--;
                 }
@@ -1024,16 +1005,10 @@ static double E          = 2.71828;
 static double K          = 0.01;
 
 int
-dm_anneal (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
+dm_anneal (matrix_t *m)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-    
-    int ncols = dm_ncols(mayw);
-    double cur_cost = cost_(mayw);
+    int ncols = dm_ncols(m);
+    double cur_cost = cost_(m);
     double temp = INIT_TEMP;
 
     srandom(time(NULL));
@@ -1055,13 +1030,11 @@ dm_anneal (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                 for (int k = i; k != j; k += d)
                     dm_add_to_permutation_group(&rot, k);
                 dm_add_to_permutation_group(&rot, j);
-                dm_permute_cols(r, &rot);
-                dm_permute_cols(mayw, &rot);
-                dm_permute_cols(mustw, &rot);
+                dm_permute_cols(m, &rot);
                 dm_free_permutation_group(&rot);
             }
 
-            double delta = cost_(mayw) - cur_cost;
+            double delta = cost_(m) - cur_cost;
 
             if (delta < 0) {
                 cur_cost += delta;
@@ -1082,9 +1055,7 @@ dm_anneal (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
                     for (int k = j; k != i; k += -d)
                         dm_add_to_permutation_group(&rot, k);
                     dm_add_to_permutation_group(&rot, i);
-                    dm_permute_cols(r, &rot);
-                    dm_permute_cols(mayw, &rot);
-                    dm_permute_cols(mustw, &rot);
+                    dm_permute_cols(m, &rot);
                     dm_free_permutation_group(&rot);
                 }
             }
@@ -1158,40 +1129,34 @@ estimate_cost(matrix_t *m, int i, int j, int firsts[], int lasts[]) {
 }
 
 int
-dm_optimize (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
+dm_optimize (matrix_t *m)
 {
-    HREassert(
-                dm_ncols(r) == dm_ncols(mayw) &&
-                dm_nrows(r) == dm_nrows(mayw) &&
-                dm_ncols(r) == dm_ncols(mustw) &&
-                dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-
-    int                 d_rot[dm_ncols (mayw)];
+    int                 d_rot[dm_ncols (m)];
     permutation_group_t rot;
 
     int best_i = 0,
     best_j = 0,
-    min = cost_ (mayw),
+    min = cost_ (m),
     last_min = 0;
     int i, j, c, k, d;
 
-    int firsts[dm_nrows(mayw)];
-    int lasts[dm_nrows(mayw)];
+    int firsts[dm_nrows(m)];
+    int lasts[dm_nrows(m)];
 
     while (last_min != min) {
         last_min = min;
 
         // initialize first and last integers per row
-        for (i=0; i<dm_nrows(mayw); i++) {
-            firsts[i] = first_(mayw,i);
-            lasts[i]  = last_(mayw,i);
+        for (i=0; i<dm_nrows(m); i++) {
+            firsts[i] = first_(m,i);
+            lasts[i]  = last_(m,i);
         }
 
         // find best rotation
-        for (i = 0; i < dm_ncols (mayw); i++) {
-            for (j = 0; j < dm_ncols (mayw); j++) {
+        for (i = 0; i < dm_ncols (m); i++) {
+            for (j = 0; j < dm_ncols (m); j++) {
                 if (i != j) {
-                    c=estimate_cost(mayw,i,j,firsts,lasts);
+                    c=estimate_cost(m,i,j,firsts,lasts);
                     if (c < min) {
                         min = c;
                         best_i = i;
@@ -1204,13 +1169,11 @@ dm_optimize (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
         // rotate
         if (best_i != best_j) {
             d = best_i < best_j ? 1 : -1;
-            dm_create_permutation_group (&rot, dm_ncols (mayw), d_rot);
+            dm_create_permutation_group (&rot, dm_ncols (m), d_rot);
             for (k = best_i; k != best_j; k += d)
                 dm_add_to_permutation_group (&rot, k);
             dm_add_to_permutation_group (&rot, best_j);
-            dm_permute_cols (r, &rot);
-            dm_permute_cols (mayw, &rot);
-            dm_permute_cols (mustw, &rot);
+            dm_permute_cols (m, &rot);
             dm_free_permutation_group (&rot);
 
             DMDBG (printf("best rotation: %d-%d, costs %d\n", best_i, best_j, min));
@@ -1246,16 +1209,17 @@ current_all_perm_ (int *p, int size)
 }
 
 int
-dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
+dm_all_perm (matrix_t *m)
 {
+
     // http://www.freewebz.com/permute/soda_submit.html
-    int                 len = dm_ncols (mayw);
+    int                 len = dm_ncols (m);
     int                 perm[len];
     int                 best_perm[len];
     int                 min,
                         last_min;
 
-    min = cost_ (mayw);
+    min = cost_ (m);
 
     int                 i,
                         j;
@@ -1265,7 +1229,7 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
     }
 
     while (1) {
-        last_min = cost_ (mayw);
+        last_min = cost_ (m);
         if (last_min < min) {
             memcpy (best_perm, perm, len * sizeof (int));
             min = last_min;
@@ -1294,9 +1258,7 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
             newkey--;
 
         swap_ (perm, key, newkey);
-        dm_swap_cols (r, key, newkey);
-        dm_swap_cols (mayw, key, newkey);
-        dm_swap_cols (mustw, key, newkey);
+        dm_swap_cols (m, key, newkey);
 
 
         i = len - 1;
@@ -1307,9 +1269,7 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
 
         while (i > key) {
             swap_ (perm, i, key);
-            dm_swap_cols (r, i, key);
-            dm_swap_cols (mayw, i, key);
-            dm_swap_cols (mustw, i, key);
+            dm_swap_cols (m, i, key);
             key++;
             i--;
         }
@@ -1327,9 +1287,7 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
             if (best_perm[i] == perm[j]) {
                 DMDBG (printf ("swap %d, %d\n", i, j));
                 swap_ (perm, i, j);
-                dm_swap_cols (r, i, j);
-                dm_swap_cols (mayw, i, j);
-                dm_swap_cols (mustw, i, j);
+                dm_swap_cols (m, i, j);
                 break;
             }
         }
@@ -1341,35 +1299,19 @@ dm_all_perm (matrix_t *r, matrix_t *mayw, matrix_t *mustw)
     return 0;
 }
 
-int dm_horizontal_flip (matrix_t* r, matrix_t* mayw, matrix_t* mustw)
+int dm_horizontal_flip (matrix_t *m)
 {
-    HREassert(
-        dm_ncols(r) == dm_ncols(mayw) &&
-        dm_nrows(r) == dm_nrows(mayw) &&
-        dm_ncols(r) == dm_ncols(mustw) &&
-        dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-
-    for (int i = 0; i < dm_nrows(r) / 2; i++) {
-        dm_swap_rows(r, i, dm_nrows(r) - i - 1);
-        dm_swap_rows(mayw, i, dm_nrows(mayw) - i - 1);
-        dm_swap_rows(mustw, i, dm_nrows(mustw) - i - 1);
+    for (int i = 0; i < dm_nrows(m) / 2; i++) {
+        dm_swap_rows(m, i, dm_nrows(m) - i - 1);
     }
 
     return 0;
 }
 
-int dm_vertical_flip (matrix_t* r, matrix_t* mayw, matrix_t* mustw)
+int dm_vertical_flip (matrix_t *m)
 {
-    HREassert(
-        dm_ncols(r) == dm_ncols(mayw) &&
-        dm_nrows(r) == dm_nrows(mayw) &&
-        dm_ncols(r) == dm_ncols(mustw) &&
-        dm_nrows(r) == dm_nrows(mustw), "matrix sizes do not match");
-
-    for (int i = 0; i < dm_ncols(r) / 2; i++) {
-        dm_swap_cols(r, i, dm_ncols(r) - i - 1);
-        dm_swap_cols(mayw, i, dm_ncols(mayw) - i - 1);
-        dm_swap_cols(mustw, i, dm_ncols(mustw) - i - 1);
+    for (int i = 0; i < dm_ncols(m) / 2; i++) {
+        dm_swap_cols(m, i, dm_ncols(m) - i - 1);
     }
 
     return 0;
