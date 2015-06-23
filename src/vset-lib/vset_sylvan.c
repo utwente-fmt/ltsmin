@@ -86,6 +86,8 @@ set_create(vdom_t dom, int k, int* proj)
     set->dom = dom;
     set->bdd = sylvan_false; // Initialize with an empty BDD
 
+    sylvan_protect(&set->bdd);
+
     if (k>=0 && k<dom->shared.size) {
         // We are creating a projection
         set->vector_size = k;
@@ -116,7 +118,7 @@ set_create(vdom_t dom, int k, int* proj)
 static void
 set_destroy(vset_t set) 
 {
-    sylvan_deref(set->bdd);
+    sylvan_unprotect(&set->bdd);
     sylvan_deref(set->projection);
     sylvan_deref(set->state_variables);
     RTfree(set);
@@ -293,11 +295,9 @@ set_add(vset_t set, const int* e)
     bdd_refs_pop(1);
 
     // add to set
-    BDD prev = set->bdd;
     bdd_refs_push(bdd);
-    set->bdd = sylvan_ref(sylvan_or(prev, bdd));
+    set->bdd = sylvan_or(set->bdd, bdd);
     bdd_refs_pop(1);
-    sylvan_deref(prev);
 }
 
 /**
@@ -358,7 +358,6 @@ set_equal(vset_t set1, vset_t set2)
 static void
 set_clear(vset_t set) 
 {
-    sylvan_deref(set->bdd);
     set->bdd = sylvan_false;
 }
 
@@ -370,8 +369,7 @@ static void
 set_copy(vset_t dst, vset_t src)
 {
     assert(dst->projection == src->projection);
-    sylvan_deref(dst->bdd);
-    dst->bdd = sylvan_ref(src->bdd);
+    dst->bdd = src->bdd;
 }
 
 /**
@@ -496,14 +494,7 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int*match)
     }
 
     bdd_refs_push(match_bdd);
-    BDD old = dst->bdd;
-    if (src != dst) {
-        sylvan_deref(old);
-        dst->bdd = sylvan_ref(sylvan_and(match_bdd, src->bdd));
-    } else {
-        dst->bdd = sylvan_ref(sylvan_and(match_bdd, src->bdd));
-        sylvan_deref(old);
-    }
+    dst->bdd = sylvan_and(match_bdd, src->bdd);
     bdd_refs_pop(1);
 }
 
@@ -532,9 +523,7 @@ set_union(vset_t dst, vset_t src)
     LACE_ME;
 
     if (dst != src) {
-        BDD old = dst->bdd;
-        dst->bdd = sylvan_ref(sylvan_or(dst->bdd, src->bdd));
-        sylvan_deref(old);
+        dst->bdd = sylvan_or(dst->bdd, src->bdd);
     }
 }
 
@@ -547,9 +536,7 @@ set_intersect(vset_t dst, vset_t src)
     LACE_ME;
 
     if (dst != src) {
-        BDD old = dst->bdd;
-        dst->bdd = sylvan_ref(sylvan_and(dst->bdd, src->bdd));
-        sylvan_deref(old);
+        dst->bdd = sylvan_and(dst->bdd, src->bdd);
     }
 }
 
@@ -562,11 +549,8 @@ set_minus(vset_t dst, vset_t src)
     LACE_ME;
 
     if (dst != src) {
-        BDD old = dst->bdd;
-        dst->bdd = sylvan_ref(sylvan_diff(dst->bdd, src->bdd));
-        sylvan_deref(old);
+        dst->bdd = sylvan_diff(dst->bdd, src->bdd);
     } else {
-        sylvan_deref(dst->bdd);
         dst->bdd = sylvan_false;
     }
 }
@@ -582,14 +566,7 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
     // defined on same variables?
     assert(dst->state_variables == src->state_variables);
 
-    if (dst != src) {
-        sylvan_deref(dst->bdd);
-        dst->bdd = sylvan_ref(sylvan_relnext(src->bdd, rel->bdd, rel->all_variables));
-    } else {
-        BDD old = dst->bdd;
-        dst->bdd = sylvan_ref(sylvan_relnext(src->bdd, rel->bdd, rel->all_variables));
-        sylvan_deref(old);
-    }
+    dst->bdd = sylvan_relnext(src->bdd, rel->bdd, rel->all_variables);
 } 
 
 /**
@@ -607,16 +584,8 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
         Abort("Do not call set_prev with dst == univ");
     }
 
-    if (dst != src) {
-        sylvan_deref(dst->bdd);
-        dst->bdd = sylvan_ref(sylvan_relprev(rel->bdd, src->bdd, rel->all_variables));
-        set_intersect(dst, univ);
-    } else {
-        BDD old = dst->bdd;
-        dst->bdd = sylvan_ref(sylvan_relprev(rel->bdd, src->bdd, rel->all_variables));
-        sylvan_deref(old);
-        set_intersect(dst, univ);
-    }
+    dst->bdd = sylvan_relprev(rel->bdd, src->bdd, rel->all_variables);
+    set_intersect(dst, univ);
 }
 
 /**
@@ -625,13 +594,11 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 static void
 set_project(vset_t dst, vset_t src)
 {
-    sylvan_deref(dst->bdd);
-
     if (dst->projection != src->projection) {
         LACE_ME;
-        dst->bdd = sylvan_ref(sylvan_exists(src->bdd, dst->projection));
+        dst->bdd = sylvan_exists(src->bdd, dst->projection);
     } else {
-        dst->bdd = sylvan_ref(src->bdd);
+        dst->bdd = src->bdd;
     }
 }
 
@@ -651,10 +618,11 @@ set_zip(vset_t dst, vset_t src)
 
     BDD tmp1 = dst->bdd;
     BDD tmp2 = src->bdd;
-    dst->bdd = sylvan_ref(sylvan_or(tmp1, tmp2));
-    src->bdd = sylvan_ref(sylvan_diff(tmp2, tmp1));
-    sylvan_deref(tmp1);
-    sylvan_deref(tmp2);
+    bdd_refs_push(tmp1);
+    bdd_refs_push(tmp2);
+    dst->bdd = sylvan_or(tmp1, tmp2);
+    src->bdd = sylvan_diff(tmp2, tmp1);
+    bdd_refs_pop(2);
 }
 
 /**
@@ -869,7 +837,8 @@ set_load(FILE* f, vdom_t dom)
 
     LACE_ME;
 
-    set->bdd = sylvan_ref(sylvan_serialize_get_reversed(bdd));
+    sylvan_protect(&set->bdd);
+    set->bdd = sylvan_serialize_get_reversed(bdd);
     set->state_variables = sylvan_ref(sylvan_serialize_get_reversed(state_vars));
     set->projection = sylvan_ref(sylvan_set_removeall(dom->state_variables, set->state_variables));
 
