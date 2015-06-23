@@ -205,7 +205,7 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
         }
     }
     rel->all_variables = sylvan_ref(sylvan_set_fromarray(all_vars, statebits * a_k * 2));
-    rel->all_action_variables = sylvan_ref(sylvan_or(rel->all_variables, rel->dom->action_variables));
+    rel->all_action_variables = sylvan_ref(sylvan_set_addall(rel->all_variables, rel->dom->action_variables));
 
     /* Compute cur_is_next for variables in ro_proj */
     BDD cur_is_next = sylvan_true;
