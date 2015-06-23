@@ -1431,7 +1431,9 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
     long double e_count;
     
     if (sat_strategy == NO_SAT || log_active (infoLong)) {
-        Print(infoShort, "level %d is finished", level);
+        if ((strategy != CHAIN && strategy != CHAIN_P) || level % nGrps == 0 || log_active (infoLong)) {
+            Print(infoShort, "level %d is finished", level);
+        }
     }
     if (log_active (infoLong)) {
         if (current != NULL) {
@@ -2678,12 +2680,13 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 
     LACE_ME;
     while (!vset_is_empty(new_states)) {
-        stats_and_progress_report(new_states, visited, level);
-        level++;
         if (dlk_detect) vset_copy(deadlocks, new_states);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(visited);
+
+            stats_and_progress_report(new_states, visited, level);
+            level++;
 
             vset_copy(new_reduced, new_states);
             learn_guards_reduce(new_reduced, i, guard_count, guard_maybe, false_states, maybe_states, tmp);
@@ -2762,12 +2765,14 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     LACE_ME;
     while (!vset_equal(visited, old_vis)) {
         vset_copy(old_vis, visited);
-        stats_and_progress_report(NULL, visited, level);
-        level++;
         if (dlk_detect) vset_copy(deadlocks, visited);
         for (int i = 0; i < nGrps; i++) {
             if (!bitvector_is_set(reach_groups, i)) continue;
             if (trc_output != NULL) save_level(visited);
+
+            stats_and_progress_report(NULL, visited, level);
+            level++;
+
             vset_copy(new_reduced, visited);
             learn_guards_reduce(new_reduced, i, guard_count, guard_maybe, false_states, maybe_states, tmp);
             expand_group_next(i, new_reduced);
