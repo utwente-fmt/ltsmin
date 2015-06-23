@@ -8,6 +8,14 @@ LIBS += ../util-lib/libutil.la
 LIBS += ../ltsmin-lib/libltsmin.la
 LIBS += ../dm/libdm.la
 
+if HAVE_BOOST
+LIBS += ../dm/libdm_boost.la
+endif
+
+if HAVE_VIENNACL
+LIBS += ../dm/libdm_viennacl.la
+endif
+
 noinst_LTLIBRARIES  = libpins.la
 
 pkginclude_HEADERS = dlopen-api.h pins.h

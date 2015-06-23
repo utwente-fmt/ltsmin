@@ -13,6 +13,14 @@
 #include <util-lib/dynamic-array.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 
+#ifdef HAVE_BOOST
+#include <dm/dm_boost.h>
+#endif
+
+#ifdef HAVE_VIENNACL
+#include <dm/dm_viennacl.h>
+#endif
+
 static const char      *regroup_spec = NULL;
 static int              cw_max_cols = -1;
 static int              cw_max_rows = -1;
@@ -21,7 +29,17 @@ static const char      *col_ins = NULL;
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
           "apply transformations to the dependency matrix: "
-          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w", "<(T,)+>" },
+          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w"
+#if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
+      ", bg, tg"
+#endif
+#ifdef HAVE_BOOST
+      ", bcm, bk, bs"
+#endif
+#ifdef HAVE_VIENNACL
+      ", vcm, vacm, vgps"
+#endif
+          , "<(T,)+>" },
     { "cw-max-cols", 0, POPT_ARG_INT, &cw_max_cols, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> columns", "<num>" },
     { "cw-max-rows", 0, POPT_ARG_INT, &cw_max_rows, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> rows", "<num>" },
     { "col-ins", 0, POPT_ARG_STRING, &col_ins, 0, "insert column C before column C'", "<(C.C',)+>" },
@@ -399,8 +417,36 @@ subsume_cols(matrix_t *m, int cola, int colb, void *context)
     struct group_info *ctx = (struct group_info*)context;
     return is_subsumed(ctx, m->col_perm.data[cola].becomes, m->col_perm.data[colb].becomes);
 }
+
+#if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
+static void
+apply_permutation(rw_info_t *inf, int* row_perm, int* col_perm)
+{
+    if (row_perm != NULL) {
+        permutation_group_t* groups;
+        int n;
+        dm_create_permutation_groups(&groups, &n, row_perm, dm_nrows(inf->r));
+        for (int i = 0; i < n; i++) {
+            dm_permute_rows(inf->r, &groups[i]);
+            dm_free_permutation_group(&groups[i]);
+        }
+        inf_copy_row_headers(inf->r, inf);
+        RTfree(groups);
+    }
+
+    if (col_perm != NULL) {
+        permutation_group_t* groups;
+        int n;
+        dm_create_permutation_groups(&groups, &n, col_perm, dm_ncols(inf->r));
+        for (int i = 0; i < n; i++) {
+            dm_permute_cols(inf->r, &groups[i]);
+            dm_free_permutation_group(&groups[i]);
+        }
+        inf_copy_col_headers(inf->r, inf);
+        RTfree(groups);
     }
 }
+#endif
 
 static const uint16_t READ  = 0x0001; // right most bit denotes read
 static const uint16_t WRITE = 0x0002; // middle bit denotes write
@@ -509,6 +555,10 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
         struct group_info context;
         context.guards = guards;
 
+#if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
+        int total_graph = 0;
+#endif
+
         char               *tok;
         while ((tok = strsep (&spec, sep)) != NULL) {
             if (strcasecmp (tok, "w2W") == 0) {
@@ -594,6 +644,79 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 dm_vertical_flip (inf->r);
                 inf_copy_col_headers(inf->r, inf);
             }
+#if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
+            else if (strcasecmp (tok, "tg") == 0) {
+                Print1 (info, "Regroup Total graph");
+                total_graph = 1;
+            } else if (strcasecmp (tok, "bg") == 0) {
+                Print1 (info, "Regroup Bipartite Graph");
+                total_graph = 0;
+            }
+#endif
+#ifdef HAVE_BOOST
+            else if (strcasecmp (tok, "bcm") == 0) {
+                Print1 (info, "Regroup Boost's Cuthill McKee");
+                int row_perm[dm_nrows(inf->mayw)];
+                int col_perm[dm_ncols(inf->mayw)];
+                boost_ordering(inf->mayw, row_perm, col_perm, BOOST_CM, total_graph);
+                apply_permutation(inf, row_perm, col_perm);
+            } else if (strcasecmp (tok, "bs") == 0) {
+                Print1 (info, "Regroup Boost's Sloan");
+                int row_perm[dm_nrows(inf->mayw)];
+                int col_perm[dm_ncols(inf->mayw)];
+                boost_ordering(inf->mayw, row_perm, col_perm, BOOST_SLOAN, total_graph);
+                apply_permutation(inf, row_perm, col_perm);
+            } else if (strcasecmp (tok, "bk") == 0) {
+                Print1 (info, "Regroup Boost's King");
+                int row_perm[dm_nrows(inf->mayw)];
+                int col_perm[dm_ncols(inf->mayw)];
+                boost_ordering(inf->mayw, row_perm, col_perm, BOOST_KING, total_graph);
+                apply_permutation(inf, row_perm, col_perm);
+            }
+#endif
+#ifdef HAVE_VIENNACL
+            else if (strcasecmp (tok, "vcm") == 0) {
+                Print1 (info, "Regroup ViennaCL's Cuthill McKee");
+                int row_perm[dm_nrows(inf->mayw)];
+                int col_perm[dm_ncols(inf->mayw)];
+                viennacl_reorder(inf->mayw, row_perm, col_perm, VIENNACL_CM, total_graph);
+                apply_permutation(inf, row_perm, col_perm);
+            } else if (strcasecmp (tok, "vacm") == 0) {
+                Print1 (info, "Regroup ViennaCL's Advanced Cuthill McKee");
+                int row_perm[dm_nrows(inf->mayw)];
+                int col_perm[dm_ncols(inf->mayw)];
+                viennacl_reorder(inf->mayw, row_perm, col_perm, VIENNACL_ACM, total_graph);
+                apply_permutation(inf, row_perm, col_perm);
+            } else if (strcasecmp (tok, "vgps") == 0) {
+                Print1 (info, "Regroup ViennaCL's Gibbs Poole Stockmeyer");
+                int row_perm[dm_nrows(inf->mayw)];
+                int col_perm[dm_ncols(inf->mayw)];
+                viennacl_reorder(inf->mayw, row_perm, col_perm, VIENNACL_GPS, total_graph);
+                apply_permutation(inf, row_perm, col_perm);
+            }
+#endif
+            else if (strcasecmp (tok, "wi") == 0) {
+                Print1 (info, "Regroup may-Write Info") {
+                    matrix_info_t i;
+                    dm_compute_info(inf->mayw, &i);
+                    dm_print_info(stderr, &i);
+                }
+            } else if (strcasecmp (tok, "ri") == 0) {
+                Print1 (info, "Regroup Read Info") {
+                    matrix_info_t i;
+                    dm_compute_info(inf->r, &i);
+                    dm_print_info(stderr, &i);
+                }
+            } else if (strcasecmp (tok, "ci") == 0) {
+                Print1 (info, "Regroup Combined Info") {
+                    matrix_t c;
+                    dm_copy(inf->r, &c);
+                    dm_apply_or(&c, inf->mayw);
+                    matrix_info_t i;
+                    dm_compute_info(&c, &i);
+                    dm_print_info(stderr, &i);
+                    dm_free(&c);
+                }
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
