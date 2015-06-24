@@ -4411,20 +4411,22 @@ VOID_TASK_1(actual_main, void*, arg)
         long   n_count;
         double e_count;
 
-        long total_count = 0;
-        long explored_total_count = 0;
+        long total_node_count = 0;
+        long explored_total_node_count = 0;
+        long explored_total_vector_count = 0;
         for(int i=0; i<nGrps; i++) {
 
             vrel_count(group_next[i], &n_count, &e_count);
             Print(infoLong, "group_next[%d]: %.*g short vectors %ld nodes", i, DBL_DIG, e_count, n_count);
-            total_count += n_count;
+            total_node_count += n_count;
 
             vset_count(group_explored[i], &n_count, &e_count);
-            Print(infoLong, "group_explored[%d]: %.*g states, %ld nodes", i, DBL_DIG, e_count, n_count);
-            explored_total_count += n_count;
+            Print(infoLong, "group_explored[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
+            explored_total_node_count += n_count;
+            explored_total_vector_count += e_count;
         }
-        Print(infoLong, "group_next: %ld nodes total", total_count);
-        Print(infoLong, "group_explored: %ld nodes total", explored_total_count);
+        Print(infoLong, "group_next: %ld nodes total", total_node_count);
+        Print(infoLong, "group_explored: %ld nodes, %ld short vectors total", explored_total_node_count, explored_total_vector_count);
 
         if (GBgetUseGuards(model)) {
             long total_false = 0;
