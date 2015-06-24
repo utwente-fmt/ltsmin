@@ -76,6 +76,18 @@ dm_copy_header (const matrix_header_t *src, matrix_header_t *tgt)
 }
 
 int
+dm_copy_row_header (const matrix_t *src, matrix_t *tgt)
+{
+    return dm_copy_header(&(src->row_perm), &(tgt->row_perm));
+}
+
+int
+dm_copy_col_header (const matrix_t *src, matrix_t *tgt)
+{
+    return dm_copy_header(&(src->col_perm), &(tgt->col_perm));
+}
+
+int
 dm_create_permutation_group (permutation_group_t *o, int size, int *data)
 {
     // initialize

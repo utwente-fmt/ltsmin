@@ -58,6 +58,9 @@ typedef struct matrix {
     bitvector_t         bits;
 } matrix_t;
 
+extern int          dm_copy_row_header (const matrix_t *, matrix_t *);
+extern int          dm_copy_col_header (const matrix_t *, matrix_t *);
+
 typedef int         (*dm_comparator_fn) (matrix_t *, matrix_t *, int, int);
 typedef int         (*dm_subsume_rows_fn) (matrix_t *, matrix_t *, matrix_t *, int, int, void *);
 typedef int         (*dm_nub_rows_fn) (matrix_t *, matrix_t *, matrix_t *, int, int, void *);
