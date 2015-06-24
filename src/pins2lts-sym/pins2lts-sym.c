@@ -4495,6 +4495,8 @@ VOID_TASK_1(actual_main, void*, arg)
     /* in case other Lace threads were still suspended... */
     if (vset_default_domain!=VSET_Sylvan && vset_default_domain!=VSET_LDDmc) {
         lace_resume();
+    } else if (SYLVAN_STATS) {
+        sylvan_stats_report(stderr, 0);
     }
 
     GBExit(model);
