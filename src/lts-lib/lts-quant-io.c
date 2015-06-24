@@ -56,13 +56,14 @@ static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t
             uint32_t label[NE];
             TreeUnfold(lts->edge_idx,lts->label[j],(int*)label);
             uint32_t group=label[group_pos];
-            if (j==lts->begin[i]){
             if (label[action_pos]==tau){
                 fprintf(imca,state_fmt,first+i);
                 fprintf(imca," tau");
             } else if (label[action_pos]==rate) {
+                if(j==lts->begin[i]){
                     fprintf(imca,state_fmt,first+i);
                     fprintf(imca," !");
+                }
             } else {
                 chunk label_c=VTgetChunk(lts->values[action_type],label[action_pos]);
                 char label_s[label_c.len*2+6];
@@ -72,9 +73,8 @@ static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t
             }
             if (reward_pos>=0 && label[reward_pos]!=0){
                 fprintf(imca," %.15e\n",((float)label[reward_pos])/(float)label[reward_pos+1]);
-            } else {
-                fprintf(imca,"\n");
-            }
+            } else if((label[action_pos]==rate && j==lts->begin[i]) || (label[action_pos]!=rate)) {
+                fprintf(imca," \n");
             }
             do {
                 fprintf(imca,"* ");
@@ -87,7 +87,7 @@ static void write_imca_trans(FILE* imca,const char* state_fmt,lts_t lts,uint32_t
         }
         //fprintf(imca,"\n");
     }
-  
+
 }
 
 
@@ -105,9 +105,9 @@ void lts_read_tra(const char*tra_name,lts_t lts){
     if (!lab_test && !sta_test){
         Abort("Neither %s nor %s exist.",lab_name,sta_name);
     }
-    
+
     lts_set_type(lts,LTS_LIST);
-      
+
     Print(infoShort,"reading %s/%s",tra_name,lab_test?lab_name:sta_name);
     FILE* tra=fopen(tra_name,"r");
     if (tra == NULL) {
@@ -253,7 +253,7 @@ void lts_read_tra(const char*tra_name,lts_t lts){
         lts->dest[i]=dst;
         lts->label[i]=TreeFold(lts->edge_idx,(int32_t*)labels);
     }
-    
+
 
     uint32_t labels[no];
     if (lab_test){
@@ -445,7 +445,7 @@ void lts_write_imca(const char*imca_name,lts_t lts){
     Warning(info,"tau = %u",tau);
     uint32_t rate=(uint32_t)VTputChunk(lts->values[action_type],chunk_str("rate"));
     Warning(info,"rate = %u",rate);
-    
+
     fprintf(imca,"#INITIALS\n");
     for(uint32_t i=0;i<lts->root_count;i++){
       fprintf(imca,IMCA_STATE_FMT "\n",lts->root_list[i]);
@@ -462,5 +462,3 @@ void lts_write_imca(const char*imca_name,lts_t lts){
     write_imca_trans(imca,IMCA_STATE_FMT,lts,0);
     fclose(imca);
 }
-
-
