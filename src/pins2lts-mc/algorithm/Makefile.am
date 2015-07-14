@@ -29,10 +29,16 @@ libalgorithm_la_SOURCES += owcty.c
 libalgorithm_la_SOURCES += owcty.h
 libalgorithm_la_SOURCES += reach.c
 libalgorithm_la_SOURCES += reach.h
+libalgorithm_la_SOURCES += renault-tarjan.c
+libalgorithm_la_SOURCES += renault-tarjan.h
+libalgorithm_la_SOURCES += tarjan-scc.c
+libalgorithm_la_SOURCES += tarjan-scc.h
 libalgorithm_la_SOURCES += timed-cndfs.c
 libalgorithm_la_SOURCES += timed-cndfs.h
 libalgorithm_la_SOURCES += timed.c
 libalgorithm_la_SOURCES += timed.h
+libalgorithm_la_SOURCES += ufscc.c
+libalgorithm_la_SOURCES += ufscc.h
 
 libalgorithm_la_CPPFLAGS = $(AM_CPPFLAGS)
 libalgorithm_la_LIBADD   = $(MC_LIBS) ../parallel/libparallel.la

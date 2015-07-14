@@ -235,7 +235,7 @@ int
 ndfs_state_seen (void *ptr, ref_t ref, int seen)
 {
     wctx_t             *ctx = (wctx_t *) ptr;
-    return nn_color_eq(nn_get_color(&ctx->local->color_map, ref), NNWHITE);
+    return !nn_color_eq(nn_get_color(&ctx->local->color_map, ref), NNWHITE);
     (void) seen;
 }
 
