@@ -509,7 +509,7 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info,"avg scc size:          %.3f", ((double)reduced->unique_states) / reduced->scc_count);
     Warning(info,"re-explorations:       %.3f", ((double)run->total.explored) / reduced->unique_states);
     Warning(info,"re-tried transitions:  %.3f", ((double)reduced->trans_tried) / reduced->unique_trans);
-    Warning(info,"unions [turned off]:   %.3f (%.3f success)", ((double)reduced->unique_states) / reduced->union_count,
+    Warning(info,"unions:                %.3f (%.3f success)", ((double)reduced->unique_states) / reduced->union_count,
                                                                ((double)reduced->unique_states) / reduced->union_success);
     Warning(info," ");
 
