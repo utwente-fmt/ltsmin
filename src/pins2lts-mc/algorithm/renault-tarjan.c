@@ -12,20 +12,19 @@
 #include <util-lib/fast_set.h>
 
 
-//#define SCC_STATE  GRED
-
 typedef enum tarjan_set_e {
     STACK_STATE,
     TARJAN_STATE
 } tarjan_set_t;
 
+
 // SCC state info struct
-typedef struct tarjan_state_s { // TODO: make relative serializer / deserializer
-    //state_info_t        info;               // order of variables is important
+typedef struct tarjan_state_s {
     uint32_t            tarjan_index;
     uint32_t            tarjan_lowlink;
     tarjan_set_t        set;
 } tarjan_state_t;
+
 
 typedef struct counter_s {
     uint32_t            unique_states_count;
@@ -35,16 +34,18 @@ typedef struct counter_s {
     uint32_t            tarjan_counter;       // Counter used for tarjan_index
 } counter_t;
 
+
 // SCC information for each worker (1 in sequential Tarjan)
 struct alg_local_s {
     dfs_stack_t         stack;                // Successor stack
     dfs_stack_t         tarjan;               // Tarjan stack
     fset_t             *states;               // states point to stack entries
-    counter_t           cnt;
-    tarjan_state_t      state_tarjan;
-    state_info_t       *target;
-    tarjan_state_t      target_tarjan;
+    counter_t           cnt;                  // Counter for SCC information
+    tarjan_state_t      state_tarjan;         // Stores tarjan info for ctx->state
+    state_info_t       *target;               // Stores the successor state
+    tarjan_state_t      target_tarjan;        // Stores tarjan info for loc->target
 };
+
 
 typedef struct uf_alg_shared_s {
     r_uf_t               *uf;                  // Renault Union-Find structure
@@ -58,11 +59,13 @@ renault_tarjan_scc_global_init   (run_t *run, wctx_t *ctx)
     (void) run; (void) ctx;
 }
 
+
 void
 renault_tarjan_scc_global_deinit   (run_t *run, wctx_t *ctx)
 {
     (void) run; (void) ctx;
 }
+
 
 void
 renault_tarjan_scc_local_init   (run_t *run, wctx_t *ctx)
@@ -94,6 +97,7 @@ renault_tarjan_scc_local_init   (run_t *run, wctx_t *ctx)
     (void) run; 
 }
 
+
 void
 renault_tarjan_scc_local_deinit   (run_t *run, wctx_t *ctx)
 {
@@ -105,73 +109,84 @@ renault_tarjan_scc_local_deinit   (run_t *run, wctx_t *ctx)
     (void) run;
 }
 
+
 static void
 tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti, int seen)
 {
+    // this method gets called by the permutor for every successor of ctx->state
     wctx_t              *ctx    = (wctx_t *) arg;
     alg_local_t         *loc    = ctx->local;
     r_uf_alg_shared_t   *shared = (r_uf_alg_shared_t*) ctx->run->shared;
 
     ctx->counters->trans++;
 
+    // return if we encounter a self-loop
     if (ctx->state->ref == successor->ref) {
         loc->cnt.self_loop_count++;
         return;
     }
 
+    // return if the successor is dead
     if (r_uf_is_dead(shared->uf, successor->ref))
         return;
 
+    // TODO: remove?
     //if (state_store_has_color(successor->ref, SCC_STATE, 0)) { // SCC
     //    return;
     //}
 
+    // search for the successor in the set of states (has this state been found before?)
     raw_data_t         *addr;
     hash32_t            hash = ref_hash (successor->ref);
     int found = fset_find (loc->states, &hash, &successor->ref, (void **)&addr, false);
 
-    if (found) { // stack state or Tarjan stack state (handle immediately)
+    // cycle found : stack state or Tarjan stack state (handle immediately)
+    if (found) {
 
-        // NB: Renault merges on finding cycle (and while backtracking)
+        // unite explored state and its successor (because the successor lies on the stack)
         r_uf_union(shared->uf, ctx->state->ref, successor->ref);
 
+        // Update the successor's tarjan info (its lowlink value)
         state_info_deserialize (loc->target, *addr);
         loc->cnt.cycle_count += loc->target_tarjan.set == STACK_STATE;
-
         if (loc->state_tarjan.tarjan_lowlink > loc->target_tarjan.tarjan_lowlink) {
             loc->state_tarjan.tarjan_lowlink = loc->target_tarjan.tarjan_lowlink;
         }
-
-    } else { // NEW
-
+    } else {
+        // 'new' state : push the state on the successor stack
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
         state_info_serialize (successor, stack_loc);
-
     }
 
     (void) ti; (void) seen;
 }
 
+
 static inline void
 explore_state (wctx_t *ctx)
 {
+    // this method gets called by the main run method when we encounter a 'new' state
     alg_local_t            *loc = ctx->local;
 
+    // create a new stackframe (go one step deeper in the search as we explore ctx->state)
     dfs_stack_enter (loc->stack);
     increase_level (ctx->counters);
 
-    Debug ("Exploring %zu (%d, %d)", ctx->state->ref, loc->cnt.tarjan_counter, loc->cnt.tarjan_counter)
+    Debug ("Exploring %zu (%d, %d)", ctx->state->ref, loc->cnt.tarjan_counter, loc->cnt.tarjan_counter);
+
+    // add all successors of ctx->state to the new stackframe
     permute_trans (ctx->permute, ctx->state, tarjan_handle, ctx);
 
     work_counter_t     *cnt = ctx->counters;
     run_maybe_report1 (ctx->run, cnt, "");
 }
 
+
 static void
 renault_tarjan_scc_init  (wctx_t *ctx)
 {
     // put the initial state on the stack
-    transition_info_t       ti = GB_NO_TRANSITION;
+    transition_info_t        ti = GB_NO_TRANSITION;
     tarjan_handle (ctx, ctx->initial, &ti, 0);
 
     // reset explored and transition count
@@ -185,9 +200,10 @@ update_parent (wctx_t *ctx, uint32_t low_child)
 {
     alg_local_t            *loc = ctx->local;
 
-    if (dfs_stack_nframes(loc->stack) == 0) return; // no parent
+    // check if there actually is a parent
+    if (dfs_stack_nframes(loc->stack) == 0) return;
 
-    // update the lowlink of the predecessor state
+    // update the lowlink of the predecessor state (so from the previous stackframe)
     raw_data_t state_data = dfs_stack_peek_top (loc->stack, 1);
     state_info_deserialize (loc->target, state_data);
     if (loc->target_tarjan.tarjan_lowlink > low_child) {
@@ -197,19 +213,22 @@ update_parent (wctx_t *ctx, uint32_t low_child)
     }
 }
 
-// Move a DFS stack state to the Tarjan stack
+
 static void
 move_tarjan (wctx_t *ctx, state_info_t *state, raw_data_t state_data)
 {
+    // this method is called by the main run while backtracking from an
+    //   active SCC. Thus we move the state from the successor stack to
+    //   the tarjan stack
     alg_local_t            *loc = ctx->local;
     raw_data_t             *addr;
 
-    // Add to Tarjan incomplete SCC stack
+    // add the state to the tarjan stack
     loc->state_tarjan.set = TARJAN_STATE; // set before serialize
     raw_data_t tarjan_loc = dfs_stack_push (loc->tarjan, NULL);
     state_info_serialize (state, tarjan_loc);
 
-    // Update reference to new stack
+    // update the reference to the new stack
     hash32_t            hash    = ref_hash (state->ref);
     int found = fset_find (loc->states, &hash, &state->ref, (void**)&addr, false);
     HREassert (*addr == state_data, "Wrong addr?");
@@ -217,10 +236,11 @@ move_tarjan (wctx_t *ctx, state_info_t *state, raw_data_t state_data)
     *addr = tarjan_loc;
 }
 
-// Move a stack state to the SCC set
+
 static void
 move_scc (wctx_t *ctx, ref_t state)
 {
+    // called by the pop_scc method, removes the state from the set of states
     alg_local_t            *loc = ctx->local;
     Debug ("Marking %zu as SCC", state);
 
@@ -228,33 +248,39 @@ move_scc (wctx_t *ctx, ref_t state)
     int success = fset_delete (loc->states, &hash, &state);
     HREassert (success, "Could not remove SCC state from set");
 
-
-    //state_store_try_color (state, SCC_STATE, 0); // set SCC globally!
+    //TODO: remove! state_store_try_color (state, SCC_STATE, 0); // set SCC globally!
 }
 
 static void
 pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
 {
+    // called by the main run upon backtracking when index == lowlink
+
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
     r_uf_alg_shared_t      *shared = (r_uf_alg_shared_t*) ctx->run->shared;
     Debug ("Found SCC with root %zu", root);
 
-    // Mark SCC!
+    // take all states from the tarjan stack (or until we break out of it)
+    //   and put these in the same UF set as the root of the SCC
     while (( state_data = dfs_stack_top (loc->tarjan) )) {
 
-        state_info_deserialize (loc->target, state_data); // update dummy
+        // if lowlink < root.lowlink : state is part of different SCC, thus break
+        state_info_deserialize (loc->target, state_data);
         if (loc->target_tarjan.tarjan_lowlink < root_low) break;
 
+        // unite the root of the SCC with the current state from the tarjan stack
         r_uf_union(shared->uf, root, loc->target->ref);
 
-
+        // remove the state from the set of states and pop it from the tarjan stack
         move_scc (ctx, loc->target->ref);
         dfs_stack_pop (loc->tarjan);
     }
-    move_scc (ctx, root); // move the root!
+    // also remove the root from the set of states
+    move_scc (ctx, root);
 
-    if (r_uf_mark_dead(shared->uf, root)) // mark SCC dead!
+    // mark the SCC globally dead in the UF structure
+    if (r_uf_mark_dead(shared->uf, root))
         loc->cnt.scc_count++;
 
 }
@@ -272,72 +298,99 @@ renault_tarjan_scc_run  (run_t *run, wctx_t *ctx)
 
     while ( !run_is_stopped(run) ) {
 
+        // get the top state from the dfs stack
         state_data = dfs_stack_top (loc->stack);
+
+        // we still have states on the current stackframe
         if (state_data != NULL) {
 
+            // store the state in ctx
             state_info_deserialize (ctx->state, state_data);
 
+            // get claim: CLAIM_FIRST (initialized), CLAIM_SUCCESS (LIVE state), CLAIM_DEAD (DEAD state)
             char claim = r_uf_make_claim(shared->uf, ctx->state->ref);
 
+            // if state is DEAD: disregard state and continue with next one
             if (claim == CLAIM_DEAD) {
                 dfs_stack_pop (loc->stack);
                 continue;
             }
+
+            // TODO: remove comment?
             //if (state_store_has_color (ctx->state->ref, SCC_STATE, 0)) { // SCC
             //    dfs_stack_pop (loc->stack);
             //    continue;
             //}
 
-            hash32_t            hash = ref_hash (ctx->state->ref);
-            on_stack = fset_find (loc->states, &hash, &ctx->state->ref, (void **)&addr, true);
+            // search for the state on the set of states (has this state been found before?)
+            hash32_t hash = ref_hash (ctx->state->ref);
+            on_stack      = fset_find (loc->states, &hash, &ctx->state->ref, (void **)&addr, true);
 
-            if (!on_stack) { // NEW state
+            // we have not encountered this state before
+            if (!on_stack) {
 
+                // initialize information about this state and store it on the set of states
                 HREassert (loc->cnt.tarjan_counter != UINT32_MAX);
                 loc->state_tarjan.tarjan_index   = ++loc->cnt.tarjan_counter;
                 loc->state_tarjan.tarjan_lowlink = loc->cnt.tarjan_counter;
                 loc->state_tarjan.set            = STACK_STATE;
                 *addr = state_data; // point fset data to stack
 
+                // go a frame deeper and store the successors for ctx->state on it
                 explore_state (ctx);
+
+                // count the number of uniquely encountered states (combined for all workers)
                 if (claim == CLAIM_FIRST)
                     ctx->counters->explored ++;
 
                 if (loc->cnt.tarjan_counter != loc->state_tarjan.tarjan_lowlink) {
                     Debug ("Forward %zu from low %d --> %d", ctx->state->ref, loc->cnt.tarjan_counter, loc->state_tarjan.tarjan_lowlink);
                 }
+
+                // store the information back on the successor stack
                 state_info_serialize (ctx->state, state_data);
-
-            } else {
-
-                state_info_deserialize (ctx->state, *addr); // necessary as it might be on Tarjan stack! (actually it can only be there)
-                update_parent (ctx, loc->state_tarjan.tarjan_lowlink);
-                dfs_stack_pop (loc->stack);
-
             }
+            // we have seen the state before, so from another successor (of this state's parent)
+            //   we found a cycle including this state. Since we have backtracked afterwards and
+            //   this state is not marked DEAD, it must lie in an 'active' tarjan stack. So we
+            //   do not have to explore this state and only update the parent for this state
+            // TODO: check if this is necessary
+            else {
 
-        } else {  // backtrack
+                // update this parent's tarjan info and remove the state from the successor stack
+                state_info_deserialize (ctx->state, *addr);
+                update_parent (ctx, loc->state_tarjan.tarjan_lowlink); // TODO possibly remove
+                dfs_stack_pop (loc->stack);
+            }
+        }
+        // the stackframe is empty: we need to backtrack to the parent and pop that state
+        else {
 
+            // return if we backtrack from the initial state
             if (0 == dfs_stack_nframes (loc->stack))
                 break;
+
+            // go one frame higher on the successor stack
             dfs_stack_leave (loc->stack);
             ctx->counters->level_cur--;
 
+            // we have just explored all successors from the current stack_top (the parent)
             state_data = dfs_stack_top (loc->stack);
-            state_info_deserialize (ctx->state, state_data); // Stack state
+            state_info_deserialize (ctx->state, state_data);
             Debug ("Backtracking %zu (%d, %d)", ctx->state->ref, loc->state_tarjan.tarjan_index, loc->state_tarjan.tarjan_lowlink)
 
+            // if we backtrack from the root of the SCC (index == lowlink) : report it
             if (loc->state_tarjan.tarjan_index == loc->state_tarjan.tarjan_lowlink) {
-
                 pop_scc (ctx, ctx->state->ref, loc->state_tarjan.tarjan_lowlink);
-
-            } else {
-
+            }
+            // if otherwise we backtrack from an active SCC (since index > lowlink) :
+            //   we move the state to the tarjan stack and update the parent for this state
+            else {
                 move_tarjan (ctx, ctx->state, state_data);
                 update_parent (ctx, loc->state_tarjan.tarjan_lowlink);
-
             }
 
+            // remove the state from the successor stack
             dfs_stack_pop (loc->stack);
         }
     }
