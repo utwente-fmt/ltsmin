@@ -30,7 +30,7 @@ typedef struct counter_s {
     uint32_t            unique_states_count;
     uint32_t            cycle_count;          // Counts the number of simple cycles (backedges)
     uint32_t            self_loop_count;      // Counts the number of self-loops
-    uint32_t            scc_count;            // TODO: Counts the number of SCCs
+    uint32_t            scc_count;            // Counts the number of SCCs
     uint32_t            tarjan_counter;       // Counter used for tarjan_index
 } counter_t;
 
@@ -129,11 +129,6 @@ tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti, int se
     // return if the successor is dead
     if (r_uf_is_dead(shared->uf, successor->ref))
         return;
-
-    // TODO: remove?
-    //if (state_store_has_color(successor->ref, SCC_STATE, 0)) { // SCC
-    //    return;
-    //}
 
     // search for the successor in the set of states (has this state been found before?)
     raw_data_t         *addr;
@@ -247,15 +242,12 @@ move_scc (wctx_t *ctx, ref_t state)
     hash32_t            hash    = ref_hash (state);
     int success = fset_delete (loc->states, &hash, &state);
     HREassert (success, "Could not remove SCC state from set");
-
-    //TODO: remove! state_store_try_color (state, SCC_STATE, 0); // set SCC globally!
 }
 
 static void
 pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
 {
     // called by the main run upon backtracking when index == lowlink
-
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
     r_uf_alg_shared_t      *shared = (r_uf_alg_shared_t*) ctx->run->shared;
@@ -263,7 +255,7 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
 
     // take all states from the tarjan stack (or until we break out of it)
     //   and put these in the same UF set as the root of the SCC
-    while (( state_data = dfs_stack_top (loc->tarjan) )) {
+    while ( (state_data = dfs_stack_top (loc->tarjan)) ) {
 
         // if lowlink < root.lowlink : state is part of different SCC, thus break
         state_info_deserialize (loc->target, state_data);
@@ -315,12 +307,6 @@ renault_tarjan_scc_run  (run_t *run, wctx_t *ctx)
                 dfs_stack_pop (loc->stack);
                 continue;
             }
-
-            // TODO: remove comment?
-            //if (state_store_has_color (ctx->state->ref, SCC_STATE, 0)) { // SCC
-            //    dfs_stack_pop (loc->stack);
-            //    continue;
-            //}
 
             // search for the state on the set of states (has this state been found before?)
             hash32_t hash = ref_hash (ctx->state->ref);
@@ -377,7 +363,7 @@ renault_tarjan_scc_run  (run_t *run, wctx_t *ctx)
             // we have just explored all successors from the current stack_top (the parent)
             state_data = dfs_stack_top (loc->stack);
             state_info_deserialize (ctx->state, state_data);
-            Debug ("Backtracking %zu (%d, %d)", ctx->state->ref, loc->state_tarjan.tarjan_index, loc->state_tarjan.tarjan_lowlink)
+            Debug ("Backtracking %zu (%d, %d)", ctx->state->ref, loc->state_tarjan.tarjan_index, loc->state_tarjan.tarjan_lowlink);
 
             // if we backtrack from the root of the SCC (index == lowlink) : report it
             if (loc->state_tarjan.tarjan_index == loc->state_tarjan.tarjan_lowlink) {
@@ -394,7 +380,7 @@ renault_tarjan_scc_run  (run_t *run, wctx_t *ctx)
             dfs_stack_pop (loc->stack);
         }
     }
-    
+
     if (!run_is_stopped(run) && dfs_stack_size(loc->tarjan) != 0)
         Warning (info, "Tarjan stack not empty: %zu (stack %zu)", dfs_stack_size(loc->tarjan), dfs_stack_size(loc->stack));
     if (!run_is_stopped(run) && fset_count(loc->states) != 0)
@@ -420,20 +406,17 @@ void
 renault_tarjan_scc_print_stats   (run_t *run, wctx_t *ctx)
 {
     counter_t              *reduced = (counter_t *) run->reduced;
-    r_uf_alg_shared_t      *shared  = (r_uf_alg_shared_t*) ctx->run->shared;
 
     // SCC statistics
     Warning(info,"unique states found:   %d", reduced->unique_states_count);
-    //Warning(info,"simple cycle count:    %d", reduced->cycle_count);
     Warning(info,"self-loop count:       %d", reduced->self_loop_count);
     Warning(info,"scc count:             %d", reduced->scc_count);
     Warning(info,"avg scc size:          %.3f", ((double)reduced->unique_states_count) / reduced->scc_count);
     Warning(info," ");
 
-    //if (ctx->id==0) // TODO: make this more elegant
-    //    r_uf_free(shared->uf);
-
     run_report_total (run);
+
+    (void) ctx;
 }
 
 void

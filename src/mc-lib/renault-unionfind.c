@@ -8,20 +8,19 @@ typedef enum r_uf_status_e {
     r_UF_UNSEEN     = 0, // initial
     r_UF_INIT       = 1,
     r_UF_LIVE       = 2,
-    r_UF_LOCKED     = 3,
-    r_UF_DEAD       = 4
+    r_UF_DEAD       = 3
 } r_uf_status;
 
 struct r_uf_node_s {
     ref_t           parent;                 // The parent in the UF tree
     unsigned char   rank;                   // The height of the UF tree
-    unsigned char   r_uf_status;              // {UNSEEN, INIT, LIVE, LOCKED, DEAD}
+    unsigned char   r_uf_status;            // {UNSEEN, INIT, LIVE, LOCKED, DEAD}
 };
 
 typedef struct r_uf_node_s r_uf_node_t;
 
 struct r_uf_s {
-    r_uf_node_t      *array;   // array: [ref_t] -> uf_node
+    r_uf_node_t      *array;                // array: [ref_t] -> uf_node
 };
 
 r_uf_t *
@@ -38,20 +37,19 @@ r_uf_create ()
 char     
 r_uf_make_claim (const r_uf_t* uf, ref_t state)
 {
-    // Is the state unseen? ==> Initialize it
+    // if the state is UNSEEN : initialize it
     if (cas(&uf->array[state].r_uf_status, r_UF_UNSEEN, r_UF_INIT)) {
-        // create state and add worker
 
+        // create state and set it to LIVE
         atomic_write (&uf->array[state].parent, state);
         atomic_write (&uf->array[state].r_uf_status, r_UF_LIVE);
-
         return CLAIM_FIRST;
     }
 
-    // Is someone currently initializing the state?
+    // wait if someone currently initializing the state
     while (atomic_read (&uf->array[state].r_uf_status) == r_UF_INIT);
 
-    // Is the state dead?
+    // check if the state is DEAD, otherwise return SUCCESS
     if (r_uf_is_dead(uf, state))
         return CLAIM_DEAD;
     else 
@@ -63,87 +61,49 @@ r_uf_find (const r_uf_t* uf, ref_t state)
 {
     // recursively find and update the parent (path compression)
     ref_t parent = atomic_read(&uf->array[state].parent);
+
     if (parent == state)
         return parent;
+
     ref_t root = r_uf_find (uf, parent);
+
     if (root != parent)
-        atomic_write(&uf->array[state].parent, root);
+        atomic_write (&uf->array[state].parent, root);
+
     return root;
 }
-/*
-ref_t
-r_uf_waitfree_find (const uf_t* uf, ref_t state) // wait-free uf impl.
+
+bool
+r_uf_sameset (const r_uf_t* uf, ref_t a, ref_t b)
 {
-    ref_t x = state;
-    ref_t y = state;
-    ref_t parent = atomic_read(&uf->array[x].parent);
-    
-    while (x != parent) {
-        x = parent;
-        parent = atomic_read(&uf->array[x].parent);
-    }
+    ref_t a_r = r_uf_find (uf, a);
+    ref_t b_r = r_uf_find (uf, b);
 
-    while (uf->array[y].rank < uf->array[x].rank) {
-        parent = atomic_read(&uf->array[y].parent);
-        cas(&uf->array[y].parent, parent, x);
-        y = parent;
-    }
+    // return true if the representatives are equal
+    if (a_r == b_r)
+        return 1;
 
-    return x;
+    // return false if the parent for a has not been updated
+    if (atomic_read (&uf->array[a_r].parent) == a)
+        return 0;
+
+    // otherwise retry
+    else
+        return r_uf_sameset (uf, a_r, b_r);
 }
-
-bool
-r_uf_waitfree_sameset (const r_uf_t* uf, ref_t state_x, ref_t state_y)
-{
-    ref_t x = state_x;
-    ref_t y = state_y;
-
-    while (1) {
-        x = r_uf_waitfree_find (uf, x);
-        y = r_uf_waitfree_find (uf, y);
-
-        if (x == y) return true;
-        if (atomic_read(&uf->array[x].parent) != x) return false;
-
-    }
-}*/
-
-bool
-r_uf_sameset (const r_uf_t* uf, ref_t state_x, ref_t state_y)
-{
-retry:{
-    // TODO check if correct
-    ref_t x_f = r_uf_find(uf, state_x);
-    ref_t y_f = r_uf_find(uf, state_y);
-
-    // x_f may change during find(y), 
-    // - if so, try again
-    // - otherwise, x_f is unchanged after finding y_f => sameset holds
-    ref_t x_p = atomic_read(&uf->array[x_f].parent);
-    ref_t y_p = atomic_read(&uf->array[y_f].parent); // should not be needed
-
-    if ( x_f != x_p || y_f != y_p) {
-        // if parent got updated, try again
-        state_x = x_p;
-        state_y = y_p;
-        goto retry;
-    }
-
-    return x_f == y_f;
-}}
 
 void
 r_uf_union (const r_uf_t* uf, ref_t state_x, ref_t state_y)
 {
-    bool result     = false;
     ref_t x_f, y_f, root, other;
 
-
-    while (!result) {
+    while (1) {
         x_f = r_uf_find(uf, state_x);
         y_f = r_uf_find(uf, state_y);
 
-        if (x_f == y_f) return; // SameSet(x,y)
+        // x and y are in the same set
+        if (x_f == y_f)
+            return;
 
         root  = x_f;
         other = y_f;
@@ -154,16 +114,28 @@ r_uf_union (const r_uf_t* uf, ref_t state_x, ref_t state_y)
             other = x_f;
         } 
 
-        // set other.parent = root
-        result = cas(&uf->array[other].parent, other, root);
-        if (uf->array[root].parent != root) result = false;
-        if (!result) continue;
+        // if ranks are equal:
+        else if (uf->array[x_f].rank == uf->array[y_f].rank && y_f < x_f) {
+            root  = y_f;
+            other = x_f;
+        }
 
-        // increment the rank if it is equal
+        // try to set other.parent = root
+        if (!cas(&uf->array[other].parent, other, root))
+            continue;
+
+        // check if root.parent has changed, otherwise change back and try again
+        if (uf->array[root].parent != root)
+            atomic_write (&uf->array[other].parent, other);
+            continue;
+
+        // successful merge: increment the rank if it is equal
         if (uf->array[root].rank == uf->array[other].rank) {
             uf->array[root].rank ++;
         }
     }
+
+    HREassert (r_uf_sameset(uf, state_x, state_y), "states should be merged after a union");
 }
 
 
@@ -187,7 +159,7 @@ r_uf_mark_dead (const r_uf_t* uf, ref_t state)
     }
 
 
-    //HREassert (r_uf_is_dead(uf, state), "state should be dead");
+    HREassert (r_uf_is_dead(uf, state), "state should be dead");
 
     return result;
 }
@@ -200,53 +172,6 @@ r_uf_is_dead (const r_uf_t* uf, ref_t state)
         return false;
     ref_t f = r_uf_find(uf, state); 
     return atomic_read(&uf->array[f].r_uf_status) == r_UF_DEAD;
-}
-
-
-// locking
-
-ref_t      
-r_uf_lock (const r_uf_t* uf, ref_t state_x, ref_t state_y)
-{
-    ref_t a = state_x;
-    ref_t b = state_y;
-    while (1) {
-        a = r_uf_find(uf, state_x);
-        b = r_uf_find(uf, state_y);
-
-        // SameSet(a,b)
-        if (a == b) {
-            return false;
-        }   
-
-        if (a > b) { // SWAP(a,b)
-            ref_t tmp = a;
-            a = b;
-            b = tmp;
-        }
-
-        // lock smallest ref first
-        if (cas(&uf->array[a].r_uf_status, r_UF_LIVE, r_UF_LOCKED)) {
-            if (atomic_read(&uf->array[a].parent) == a) {
-                // a is successfully locked
-                if (cas(&uf->array[b].r_uf_status, r_UF_LIVE, r_UF_LOCKED)) {
-                    if (atomic_read(&uf->array[b].parent) == b) {
-                        // b is successfully locked
-                        return true;
-                    } 
-                    atomic_write (&uf->array[b].r_uf_status, r_UF_LIVE);
-                } 
-            } 
-            atomic_write (&uf->array[a].r_uf_status, r_UF_LIVE);
-        }
-    }
-}
-
-void      
-r_uf_unlock (const r_uf_t* uf, ref_t state)
-{
-    HREassert(uf->array[state].r_uf_status == r_UF_LOCKED)
-    atomic_write (&uf->array[state].r_uf_status, r_UF_LIVE);
 }
 
 // testing
