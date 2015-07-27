@@ -11,13 +11,14 @@ typedef enum uf_status_e {
     UF_INIT       = 1,
     UF_LIVE       = 2,
     UF_LOCKED     = 3,
-    UF_DEAD       = 4
+    UF_DEAD       = 4,
+    UF_BUSY       = 5
 } uf_status;
 
 typedef enum list_status_e {
     LIST_LIVE     = 0, // initial
     LIST_BUSY     = 1,
-    LIST_TOMBSTONE  = 2
+    LIST_TOMBSTONE= 2
 } list_status;
 
 typedef uint64_t sz_w;
@@ -29,7 +30,6 @@ struct uf_node_s {
     sz_w            p_set;                  // Set of worker IDs (one bit for each worker)
     ref_t           parent;                 // The parent in the UF tree
     ref_t           list_next;              // next list `pointer' (we could also use a standard pointer)
-    ref_t           list_last;              // last list entry
     unsigned char   rank;                   // The height of the UF tree
     unsigned char   uf_status;              // {UNSEEN, INIT, LIVE, LOCKED, DEAD}
     unsigned char   list_status;            // {LIVE, BUSY, TOMBSTONE}
@@ -45,8 +45,8 @@ struct uf_s {
 uf_t *
 uf_create ()
 {
-    HREassert (sizeof(uf_node_t) == sizeof(int[10]), "Improper structure packing for uf_node_t. Expected: size = %zu", sizeof(int[8]));
-    //HREassert (sizeof(sz_w)*8 >= W, "Too many workers for the current structure; please redefine sz_w to a larger size");
+    //T//HREassert (sizeof(uf_node_t) == sizeof(int[8]), "Improper structure packing for uf_node_t. Expected: size = %zu", sizeof(int[8]));
+    ////T//HREassert (sizeof(sz_w)*8 >= W, "Too many workers for the current structure; please redefine sz_w to a larger size");
     uf_t           *uf = RTmalloc (sizeof(uf_t));
     uf->array          = RTalignZero ( sizeof(int[10]),
                                        sizeof(uf_node_t) * (1ULL << dbs_size) );
@@ -55,10 +55,81 @@ uf_create ()
 
 // successor handling
 
+
+/**
+ * return -1 for states owner by other workers
+ * return 1 for states locally owned
+ */
+int
+uf_owner (const uf_t *uf, ref_t state, size_t worker)
+{
+    sz_w            w_id = 1ULL << worker;
+    sz_w            W = atomic_read (&uf->array[state].p_set);
+    return W & w_id ? 1 : (W & ~w_id ? -1 : 0);
+}
+
+
+bool
+uf_is_in_list (const uf_t* uf, ref_t state)
+{
+    return atomic_read (&uf->array[state].list_status) != LIST_TOMBSTONE;
+}
+
+
 pick_e
 uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
 {
-    HREassert (atomic_read(&uf->array[state].list_status) == LIST_TOMBSTONE);
+    ref_t a, b, c;
+    //T//HREassert (atomic_read (&uf->array[state].list_status) == LIST_TOMBSTONE);
+
+    // a -> b -> c
+    a = state;
+    b = atomic_read (&uf->array[a].list_next);
+
+    while (!uf_sameset (uf, a, b))
+        b = atomic_read (&uf->array[a].list_next);
+
+    ////T//HREassert (uf_sameset (uf, a, b));
+
+    while (1) {
+
+        if (atomic_read (&uf->array[b].list_status) == LIST_LIVE) {
+            *ret = b;
+            return PICK_SUCCESS;
+        }
+
+        c = atomic_read (&uf->array[b].list_next);
+        while (!uf_sameset (uf, a, c))
+            c = atomic_read (&uf->array[b].list_next);
+
+        ////T//HREassert (uf_sameset (uf, a, c)); //T//HREassert (uf_sameset (uf, b, c));
+
+        if (a == c) {
+            if (uf_mark_dead (uf, a)) {
+                //Warning(info, "marked %zu (and %zu) dead", a, b);
+                return PICK_MARK_DEAD;
+            }
+            return PICK_DEAD;
+        }
+
+        // list is at least size 3
+
+        // make the list shorter
+        if (atomic_read (&uf->array[a].parent) != a &&
+            atomic_read (&uf->array[b].parent) != b) {
+            cas (&uf->array[a].list_next, b,  c);
+        }
+
+        a = b;
+        b = c;
+    }
+}
+
+
+pick_e
+uf_pick_from_list_lock (const uf_t* uf, ref_t state, ref_t *ret)
+{
+    //T//HREassert (atomic_read(&uf->array[state].list_status) == LIST_TOMBSTONE);
 
     // a -> b -> c
     ref_t a     = state;
@@ -67,8 +138,11 @@ uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
 
     // a -> a (single state TOMBSTONE => dead SCC)
     if (a == b) {
-        if (uf_mark_dead (uf, a))
+        if (uf_mark_dead (uf, a)) {
+            //Warning(info, "marked singleton %zu dead", a);
+            ////T//HREassert(0, "we should not get singleton reports");
             return PICK_MARK_DEAD;
+        }
         return PICK_DEAD;
     }
 
@@ -77,13 +151,24 @@ uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
 
         // a -> b -> a (representative and last state both TOMBSTONE => dead SCC)
         if (a == c) {
-            if (uf_mark_dead (uf, a))
+            if (uf_mark_dead (uf, a)) {
+                //Warning(info, "marked %zu (and %zu) dead", a, b);
                 return PICK_MARK_DEAD;
+            }
             return PICK_DEAD;
         }
 
-        if (atomic_read(&uf->array[b].parent) != b && atomic_read(&uf->array[c].parent != c)) {
-            atomic_write(&uf->array[a].list_next, c);
+        // both b and c may not be the representative
+        if (atomic_read(&uf->array[a].parent) != a &&
+            atomic_read(&uf->array[b].parent) != b) {
+
+            //uf_debug(uf, a);
+
+            //Warning(info, "removing state from list: %zu -> %zu -> %zu", a, b, c);
+            cas(&uf->array[a].list_next, b,  c);
+
+            //uf_debug(uf, a);
+
         }
         a = b; // TODO optimize
         b = c;
@@ -94,104 +179,7 @@ uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
 }
 
 
-
-pick_e
-uf_pick_from_list_old (const uf_t* uf, ref_t state, ref_t *node)
-{
-
-    HREassert (atomic_read(&uf->array[state].list_status) == LIST_TOMBSTONE);
-
-    // compress list by lazily removing tombstone sequences
-    ref_t s     = state;
-    ref_t n1    = atomic_read(&uf->array[s].list_next);
-    ref_t n2;
-
-    while (atomic_read(&uf->array[s].list_status) == LIST_TOMBSTONE) {
-
-        if (s == n1) {
-            if (uf_mark_dead (uf, state))
-                return PICK_MARK_DEAD;
-            return PICK_DEAD;
-        }
-
-        // [s|T] -> [n1|T] -> [n2|?] (iff s==TOMB && n1==TOMB)
-        // [s|T] -----------> [n2|?] (update next pointer from s)
-        list_status n1_status = atomic_read(&uf->array[n1].list_status);
-        if (n1_status == LIST_TOMBSTONE) {
-            n2 = atomic_read(&uf->array[n1].list_next);
-            if (s == n2) {
-                if (uf_mark_dead(uf, state))
-                    return PICK_MARK_DEAD;
-                return PICK_DEAD;
-            }
-            atomic_write (&uf->array[s].list_next, n2);
-            s  = n2;
-            n1 = atomic_read(&uf->array[s].list_next);
-        } else { 
-            // list_status == ( LIST_LIVE | LIST_BUSY ) (no need to check)
-            s = n1;
-            break;
-        }
-    }
-    atomic_write (&uf->array[state].list_next, s);
-
-    while (atomic_read(&uf->array[s].list_status) == LIST_BUSY) ; // wait for busy states 
-
-    *node = s; // set the node reference
-    return PICK_SUCCESS;
-}
-
-
-ref_t
-uf_pick_from_list2 (const uf_t* uf, ref_t state) 
-{
-
-    //HREassert (atomic_read(&uf->array[state].list_status) != LIST_LIVE);
-
-    // compress list by lazily removing tombstone sequences
-    ref_t s     = state;
-    ref_t n1    = atomic_read(&uf->array[s].list_next);
-    ref_t n2;
-
-    while (atomic_read(&uf->array[s].list_status) != LIST_LIVE) {
-
-        list_status s_status = atomic_read(&uf->array[s].list_status);
-        if (s == n1 ) {
-            if (s_status == LIST_TOMBSTONE)
-                return REF_ERROR;
-        }
-
-        // [s|T] -> [n1|T] -> [n2|?] (iff s==TOMB && n1==TOMB)
-        // [s|T] -----------> [n2|?] (update next pointer from s)
-        list_status n1_status = atomic_read(&uf->array[n1].list_status);
-        if (n1_status != LIST_LIVE) {
-
-            n2 = atomic_read(&uf->array[n1].list_next);
-            if (s == n2) {
-                if (s_status == LIST_TOMBSTONE)
-                    return REF_ERROR;
-            }
-
-            if (s_status == LIST_TOMBSTONE && n1_status == LIST_TOMBSTONE) {
-                atomic_write (&uf->array[s].list_next, n2);
-            }
-
-            s  = n2;
-            n1 = atomic_read(&uf->array[s].list_next);
-        } else { 
-
-            s = n1;
-            break;
-        }
-    }
-    atomic_write (&uf->array[state].list_next, s);
-
-    //while (atomic_read(&uf->array[s].list_status) == LIST_BUSY) ; // wait for busy states 
-
-    return s;
-}
-
-bool    
+bool
 uf_remove_from_list (const uf_t* uf, ref_t state)
 {
     // only remove if it has LIST_LIVE , otherwise (LIST_BUSY) wait
@@ -206,23 +194,6 @@ uf_remove_from_list (const uf_t* uf, ref_t state)
     }
 }
 
-/**
- * return -1 for states owner by other workers
- * return 1 for states locally owned
- */
-int
-uf_owner (const uf_t *uf, ref_t state, size_t worker)
-{
-    sz_w            w_id = 1ULL << worker;
-    sz_w            W = atomic_read (&uf->array[state].p_set);
-    return W & w_id ? 1 : (W & ~w_id ? -1 : 0);
-}
-
-bool    
-uf_is_in_list (const uf_t* uf, ref_t state)
-{
-    return atomic_read (&uf->array[state].list_status) != LIST_TOMBSTONE;
-}
 
 char     
 uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
@@ -273,6 +244,7 @@ uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
 
 
 
+
 // 'basic' union find
 
 ref_t
@@ -291,389 +263,71 @@ uf_find (const uf_t* uf, ref_t state)
 bool
 uf_sameset (const uf_t* uf, ref_t a, ref_t b)
 {
-    ref_t a_r = uf_find (uf, a_r);
-    ref_t b_r = uf_find (uf, b_r);
+    ref_t a_r = uf_find (uf, a);
+    ref_t b_r = uf_find (uf, b);
 
     if (a_r == b_r)
         return 1;
+
     if (atomic_read (&uf->array[a_r].parent) == a)
         return 0;
-    else
-        return uf_sameset (uf, a_r, b_r);
+
+    return uf_sameset (uf, a_r, b_r);
 }
 
-// lockless union-find
-
-void     
-uf_merge_list2(const uf_t* uf, ref_t x, ref_t y)
-{
-    HREassert(atomic_read(&uf->array[x].list_status) == LIST_BUSY);
-    HREassert(atomic_read(&uf->array[y].list_status) == LIST_BUSY);
-
-    // SWAP (x.next, y.next)
-    ref_t tmp = atomic_read(&uf->array[x].list_next);
-    atomic_write(&uf->array[x].list_next, atomic_read(&uf->array[y].list_next));
-    atomic_write(&uf->array[y].list_next, tmp);
-
-
-    atomic_write(&uf->array[x].list_status, LIST_LIVE);
-    atomic_write(&uf->array[y].list_status, LIST_LIVE);
-}
-
-ref_t
-pick_list_live (const uf_t *uf, ref_t state) 
-{
-    // helper method for lock_lists
-    // ensures that returned state is LIVE, not TOMB nor BUSY
-    ref_t s = state;
-
-    while (1) {
-        // check if state is not dead
-        if ( uf_is_dead(uf, s) )
-            return REF_ERROR;
-
-        list_status l_status = atomic_read(&uf->array[s].list_status);
-
-        if (l_status == LIST_LIVE) {
-            return s;
-        } 
-        else { // TOMB or BUSY
-            s = atomic_read(&uf->array[s].list_next);
-            // TODO: use uf_pick_from_list for this (but don't mark dead!)
-        }
-    }
-}
-
-bool 
-lock_lists (const uf_t *uf, ref_t list_a, ref_t list_b, ref_t *locked_a, ref_t *locked_b)
-{
-    // lock list entries alphabetically
-    // returns  true   <====>  locked both entries (we may have SameSet(a,b))
-    // returns  false  <====>  SameSet(a,b) (and no lock is placed)
-
-    // get LIVE entries for lists a and b
-    // order these entries alphabetically and lock these in order
-    // if fail: (unlock and) retry
-
-    ref_t a = list_a;
-    ref_t b = list_b;
-
-    while (1) {
-        bool lock_a = false;
-        bool lock_b = false;
-
-        if (uf_sameset (uf, a, b)) return false;
-
-        // get live states for a and b
-        a = uf_pick_from_list2 (uf, a);
-        b = uf_pick_from_list2 (uf, b);
-    
-        if (a == REF_ERROR || b == REF_ERROR) { // DEAD check
-            if (!uf_sameset(uf, list_a, list_b)) {
-                HREassert ( false );
-            }
-            return false;
-        }
-
-        if (a > b) { // SWAP(a,b)
-            ref_t tmp = a;
-            a = b;
-            b = tmp;
-        }
-
-        // lock a
-        if (atomic_read (&uf->array[a].list_status) == LIST_LIVE) {
-            lock_a = cas (&uf->array[a].list_status, LIST_LIVE, LIST_BUSY);
-        }
-
-        // lock b
-        if (lock_a) {
-            if (atomic_read (&uf->array[b].list_status) == LIST_LIVE) {
-                lock_b = cas (&uf->array[b].list_status, LIST_LIVE, LIST_BUSY);
-            }
-
-            if (lock_b) { // locked both a and b
-                *locked_a = a;
-                *locked_b = b;
-                return true;
-            } else {
-                // if lock_b failed: unlock a
-                atomic_write (&uf->array[a].list_status, LIST_LIVE);
-            }
-        }
-
-    }
-}
 
 bool
-uf_union2 (const uf_t *uf, ref_t state_x, ref_t state_y)
+uf_lock (const uf_t* uf, ref_t a, ref_t b)
 {
-    // 1. Lock list entries
-    // 2. Update UF parent  ==> SameSet(x,y)
-    // 3. Update Pset (may be outdated)
-    // 4. Update rank (may be outdated)
-    // 5. Merge lists and unlock list entries
-
-    bool result = false;
-    ref_t x_f, y_f, root, other;
-    ref_t locked_a = state_x;
-    ref_t locked_b = state_y;
-    sz_w workers;
-
-    // check if both states are not dead
-    HREassert ( !uf_is_dead (uf, state_x) );
-    HREassert ( !uf_is_dead (uf, state_y) );
-
-    // 1. lock list entries for x and y
-    if (!lock_lists (uf, state_x, state_y, &locked_a, &locked_b)) {
-        HREassert (uf_sameset (uf, state_x, state_y));
-        return false;
-    }
-
-    HREassert(atomic_read(&uf->array[locked_a].list_status) == LIST_BUSY);
-    HREassert(atomic_read(&uf->array[locked_b].list_status) == LIST_BUSY);
-
-
-    while (!result) {
-        x_f = uf_find (uf, state_x);
-        y_f = uf_find (uf, state_y);
-
-        if (x_f == y_f) { // SameSet(x,y)
-            atomic_write (&uf->array[locked_a].list_status, LIST_LIVE);
-            atomic_write (&uf->array[locked_b].list_status, LIST_LIVE);
-            return false;
-        }
-        
-        root  = x_f;
-        other = y_f;
-
-        // swap(root,other) if root.rank < other.rank
-        if (uf->array[x_f].rank < uf->array[y_f].rank) { 
-            root  = y_f;
-            other = x_f;
-        } 
-
-        // 2. set other.parent = root
-        if (atomic_read (&uf->array[other].parent) == other) {
-            result = cas(&uf->array[other].parent, other, root);
-            if (uf->array[root].parent != root) 
-                result = false;
-        }
-    }
-
-    HREassert (uf_sameset (uf, root, other));
-
-    // 3. combine the worker sets and update rank
-    workers = uf->array[root].p_set | uf->array[other].p_set;
-    atomic_write (&uf->array[root].p_set, workers);
-
-    // 4. increment the rank if it is equal
-    if (uf->array[root].rank == uf->array[other].rank) {
-        uf->array[root].rank ++;
-    }
-
-    // 5. merge the lists (and unlock)
-    uf_merge_list2 (uf, locked_a, locked_b);
-
-    return true;
-}
-
-
-// original union-find
-
-
-static inline ref_t
-lock_node (const uf_t* uf, ref_t x)
-{
-    while (true) {
-        while (atomic_read(&uf->array[x].list_status) == LIST_TOMBSTONE) {
-            pick_e result = uf_pick_from_list (uf, x, &x);
-
-            if (result == PICK_DEAD || result == PICK_MARK_DEAD) {
-                return REF_ERROR;
-            }
-        }
-
-        // No other workers can merge lists (states are locked)
-        //HREassert(atomic_read(&uf->array[x].list_status) != LIST_BUSY);
-
-        if (cas(&uf->array[x].list_status, LIST_LIVE, LIST_BUSY)) {
-            return x;
-        }
-        else {
-            if ( uf_is_dead(uf, x) )
-                return REF_ERROR;
-        }
-    }
-}
-
-void     
-uf_merge_list(const uf_t* uf, ref_t list_x, ref_t list_y)
-{
-    // assert \exists x' \in List(x) (also for y) 
-    // - because states are locked and union(x,y) did not take place yet
-
-    HREassert(atomic_read(&uf->array[list_x].uf_status) == UF_LOCKED);
-    HREassert(atomic_read(&uf->array[list_y].uf_status) == UF_LOCKED);
-    HREassert(uf_find(uf, list_x) != uf_find(uf, list_y));
-
-    ref_t x = list_x;
-    ref_t y = list_y;
-
-    x = lock_node (uf, x);
-    //if (x == REF_ERROR) return; 
-    // no merge needed (x became empty, which might happen 
-    // if other threads united these lists and subsequently processed them)
-    y = lock_node (uf, y);
-    HREassert (x != REF_ERROR && y != REF_ERROR, "Contradiction: non-tombstone x was locked");
-
-    HREassert(atomic_read(&uf->array[x].list_status) == LIST_BUSY);
-    HREassert(atomic_read(&uf->array[y].list_status) == LIST_BUSY);
-
-    //swap (uf->array[x].list_next, uf->array[y].list_next);
-    // unsure if swap preserves atomic operations - therefore just do it 
-    ref_t tmp = atomic_read(&uf->array[x].list_next);
-    atomic_write(&uf->array[x].list_next, atomic_read(&uf->array[y].list_next));
-    atomic_write(&uf->array[y].list_next, tmp);
-
-
-    atomic_write(&uf->array[x].list_status, LIST_LIVE);
-    atomic_write(&uf->array[y].list_status, LIST_LIVE);
-}
-
-
-ref_t      
-uf_lock (const uf_t* uf, ref_t state_x, ref_t state_y)
-{
-    ref_t a = state_x;
-    ref_t b = state_y;
-    while (1) {
-        a = uf_find(uf, state_x);
-        b = uf_find(uf, state_y);
-
-        // SameSet(a,b)
-        if (a == b) {
-            return false;
-        }   
-
-        if (a > b) { // SWAP(a,b)
-            ref_t tmp = a;
-            a = b;
-            b = tmp;
-        }
-
-        // lock smallest ref first
-        if (atomic_read(&uf->array[a].uf_status) == UF_LIVE) {
-            if (cas(&uf->array[a].uf_status, UF_LIVE, UF_LOCKED)) {
-                if (atomic_read(&uf->array[a].parent) == a) {
-                    // a is successfully locked
-                    if (atomic_read(&uf->array[b].uf_status) == UF_LIVE) {
-                        if (cas(&uf->array[b].uf_status, UF_LIVE, UF_LOCKED)) {
-                            if (atomic_read(&uf->array[b].parent) == b) {
-                                // b is successfully locked
-                                return true;
-                            } 
-                            atomic_write (&uf->array[b].uf_status, UF_LIVE);
-                        } 
-                    }
-                } 
-                atomic_write (&uf->array[a].uf_status, UF_LIVE);
-            }
-        }
-    }
-}
-
-void      
-uf_unlock (const uf_t* uf, ref_t state)
-{
-    HREassert(uf->array[state].uf_status == UF_LOCKED)
-    atomic_write (&uf->array[state].uf_status, UF_LIVE);
-}
-
-
-void
-uf_union_aux (const uf_t* uf, ref_t root, ref_t other)
-{
-    // don't need CAS because the states are locked
-    uf->array[root].p_set   |= uf->array[other].p_set;
-    atomic_write(&uf->array[other].parent, root);
-}
-
-bool
-uf_union_orig (const uf_t* uf, ref_t state_x, ref_t state_y)
-{
-    if (uf_lock(uf, state_x, state_y)) {
-        HREassert(!uf_is_dead(uf, state_x));
-        HREassert(!uf_is_dead(uf, state_y));
-        //HREassert (!uf_sameset(uf, state_x, state_y), "uf_union: states should not be in the same set");
-
-        ref_t x_f = uf_find(uf, state_x);
-        ref_t y_f = uf_find(uf, state_y);
-
-        // Combine the successors BEFORE the union 
-        // - ensures that there is a successor v with list_status != LIST_REMOVED
-
-        uf_merge_list(uf, x_f, y_f);
-
-        if (x_f > y_f) {
-            uf_union_aux(uf, x_f, y_f); // x_f is the new root
-        } else {
-            uf_union_aux(uf, y_f, x_f); // y_f is the new root
-        }
-
-        /*if (uf->array[x_f].rank > uf->array[y_f].rank) {
-            uf_union_aux(uf, x_f, y_f); // x_f is the new root
-        } else { 
-            uf_union_aux(uf, y_f, x_f); // y_f is the new root
-
-            // increment the rank if it is equal
-            if (uf->array[x_f].rank == uf->array[y_f].rank) {
-                uf->array[y_f].rank ++;
-            }
-        }*/
-
-
-        uf_unlock(uf, x_f);
-        uf_unlock(uf, y_f);
-        HREassert (uf_sameset(uf, state_x, state_y), "uf_union: states should be in the same set");
-        return 1;
-    }
-    else {
-        HREassert (uf_sameset(uf, state_x, state_y), "uf_union: states should be in the same set");
-        return 0;
-    }
-}
-
-// new approach
-
-
-ref_t
-uf_lock2 (const uf_t* uf, ref_t a, ref_t b)
-{
-    ref_t a_l = a;
-    ref_t b_l = b;
+    ref_t a_r = a;
+    ref_t b_r = b;
 
     if (a < b) {
-        a_l = b;
-        b_l = a;
+        a_r = b;
+        b_r = a;
     }
 
-    if (atomic_read(&uf->array[a_l].uf_status) == UF_LIVE) {
-       if (cas(&uf->array[a_l].uf_status, UF_LIVE, UF_LOCKED)) {
-           if (atomic_read(&uf->array[b_l].uf_status) == UF_LIVE) {
-               if (cas(&uf->array[b_l].uf_status, UF_LIVE, UF_LOCKED)) {
+    if (atomic_read (&uf->array[a_r].uf_status) == UF_LIVE) {
+       if (cas (&uf->array[a_r].uf_status, UF_LIVE, UF_LOCKED)) {
+           if (atomic_read (&uf->array[b_r].uf_status) == UF_LIVE) {
+               if (cas (&uf->array[b_r].uf_status, UF_LIVE, UF_LOCKED)) {
                    return 1;
                }
            }
-           atomic_write (&uf->array[a_l].uf_status, UF_LIVE);
+           atomic_write (&uf->array[a_r].uf_status, UF_LIVE);
        }
     }
     return 0;
 }
 
 
+bool
+uf_lock_q (const uf_t* uf, ref_t a)
+{
+    if (atomic_read (&uf->array[a].uf_status) == UF_LIVE) {
+       if (cas (&uf->array[a].uf_status, UF_LIVE, UF_BUSY)) {
+           // successfully locked
+           // ensure that we actually locked the representative
+           if (atomic_read (&uf->array[a].parent) == a)
+               return 1;
+           // otherwise unlock and try again
+           atomic_write (&uf->array[a].uf_status, UF_LIVE);
+       }
+    }
+    return 0;
+}
+
 void
-uf_unlock2 (const uf_t* uf, ref_t a, ref_t b)
+uf_unlock_q (const uf_t* uf, ref_t a)
+{
+    //T//HREassert (atomic_read (&uf->array[a].uf_status) == UF_BUSY,
+    //        "We may only unlock locked states");
+    atomic_write (&uf->array[a].uf_status, UF_LIVE);
+}
+
+
+void
+uf_unlock (const uf_t* uf, ref_t a, ref_t b)
 {
     atomic_write (&uf->array[a].uf_status, UF_LIVE);
     atomic_write (&uf->array[b].uf_status, UF_LIVE);
@@ -683,61 +337,233 @@ uf_unlock2 (const uf_t* uf, ref_t a, ref_t b)
 bool
 uf_union (const uf_t* uf, ref_t a, ref_t b)
 {
-	ref_t a_r = uf_find (uf, a);
-	ref_t b_r = uf_find (uf, a);
+    ref_t a_r, b_r, r, q, r_n, q_n;
 
-	// return if already united
-	if (a_r = b_r)
-		return 0;
+    while (1) {
+        // 1. find the representatives
+        a_r = uf_find (uf, a);
+        b_r = uf_find (uf, b);
+        if (a_r == b_r)
+            return 0;
 
-	// lock a and b (or retry if fail)
-	if (!uf_lock2(uf, a_r, b_r))
-		return uf_union (uf, a_r, b_r);
+        // 2. decide on the new root (deterministically)
+        r = a_r;
+        q = b_r;
+        if (a_r < b_r) { // take the highest index as root
+            r = b_r;
+            q = a_r;
+        }
 
-	// unlock if a_r and b_r if we did not lock the representatives
-	if (a_r != uf->array[a_r].parent || b_r != uf->array[b_r].parent) {
-		uf_unlock2 (uf, a_r, b_r);
-	}
+        // 3. lock the non-root
+        if (!uf_lock_q (uf, q))
+            continue;
 
-	// we have now locked the representatives for uf[a] and uf[b]
+        // 4. check that the non-root is a representative
+        if (atomic_read (&uf->array[q].parent) != q) {
+            uf_unlock_q (uf, q);
+            continue;
+        }
 
-	// decide new representative by rank (or pick a_r and update rank if equal)
-	if (uf->array[a_r].rank > uf->array[b_r].rank) {
-	    ref_t tmp = a_r;
-	    a_r = b_r;
-	    b_r = tmp;
-    } else if (uf->array[a_r].rank > uf->array[b_r].rank) {
+        break;
+    }
+
+    // we can now ensure that q is a representative
+    //   and no other worker may change this
+
+    // reason for check in (5):
+    //
+    // t   s   r   q --> sn
+    //    /   /              sn != s.next => r.next will get modified
+    // tn   sn  rn  qn                       goes wrong if q completes union
+
+
+    while (1) {
+        // 5. check if r_n is in the same set as r (once true, this is always true)
+        r_n = atomic_read (&uf->array[r].list_next);
+        while (uf_find (uf, r_n) != r) {
+            // either some other worker is busy (or has finished) with union(r,s)
+            r = uf_find (uf, r);
+            r_n = atomic_read (&uf->array[r].list_next);
+        }
+
+        // 6. set q.next --> r_n
+        q_n = atomic_read (&uf->array[q].list_next);
+        while (1) {
+
+            /*// 6.1 set q_n to busy (it might point to some s_n)
+            if (q != q_n) {
+                if (!atomic_read (&uf->array[q_n].uf_status) == UF_LIVE)
+                    continue;
+                if (!cas (&uf->array[q_n].uf_status, UF_LIVE, UF_BUSY))
+                    continue;
+            }
+            // ensures that we have set the lock*/
+
+            // 6.2 set q.next --> r_n
+            if (uf_find (uf, q_n) == q) { // not sure if this is necessary
+                if (cas (&uf->array[q].list_next, q_n, r_n))
+                    break;
+            }
+
+            // 6.3 if fail, reset and retry
+            //if (q != q_n)
+            //    atomic_write (&uf->array[q_n].uf_status, UF_LIVE);
+            q_n = atomic_read (&uf->array[q].list_next);
+        }
+
+        // assert: q_n remains 'second' item of q's set and won't be removed
+
+        // 7. set r.next --> q_n
+        if (!cas (&uf->array[r].list_next, r_n, q_n)) {
+            // r_n got updated after (5)
+            if (!cas (&uf->array[q].list_next, r_n, q_n))
+                HREassert(0, "resetting q.next --> q_n should not fail");
+            //if (q != q_n)
+            //    atomic_write (&uf->array[q_n].uf_status, UF_LIVE);
+            continue;
+        }
+
+        // 8. check if r is still the representative (r might not be in uf[r]'s list)
+        if (atomic_read (&uf->array[r].parent) != r) {
+            // r got updated, so reset and retry
+            if (!cas (&uf->array[r].list_next, q_n, r_n))
+                HREassert(0, "resetting r.next --> r_n should not fail");
+            if (!cas (&uf->array[q].list_next, r_n, q_n))
+                HREassert(0, "resetting q.next --> q_n should not fail");
+            //if (q != q_n)
+            //    atomic_write (&uf->array[q_n].uf_status, UF_LIVE);
+            continue;
+        }
+
+        break;
+    }
+
+    // 9. update worker set
+    sz_w q_w = atomic_read (&uf->array[q].p_set);
+    or_fetch (&uf->array[r].p_set, q_w);
+
+
+    // 10. update parent
+    if (!cas (&uf->array[q].parent, q, r)) {
+        HREassert(0, "parent for q shouldn't change while locked");
+    }
+
+    // 11. unlock
+    //if (q != q_n)
+    //    atomic_write (&uf->array[q_n].uf_status, UF_LIVE);
+    atomic_write (&uf->array[q].uf_status, UF_LIVE);
+
+    //T//HREassert (uf_sameset(uf, a, b), "states should be merged after a union");
+    return 1;
+}
+
+
+bool
+uf_union_lock (const uf_t* uf, ref_t a, ref_t b)
+{
+    ref_t a_r, b_r;
+
+    // do this in a while loop
+    // recursion causes segfault (a lot of iterations)
+    while(1) {
+        a_r = uf_find (uf, a);
+        b_r = uf_find (uf, b);
+
+        //Warning(info, "union(%zu, %zu)", a, b); // DEBUG
+        //Warning(info, "union(%zu, %zu)", a_r, b_r); // DEBUG
+
+
+        /*Warning(info, " - printing list for a_r = %zu", a_r);
+        uf_print_list(uf, a_r); // DEBUG
+        Warning(info, " - printing list for b_r = %zu", b_r);
+        uf_print_list(uf, b_r); // DEBUG
+        uf_debug(uf, a_r,0);
+        uf_debug(uf, b_r);*/
+
+        // return if already united
+        if (a_r == b_r) {
+            //T//HREassert (uf_sameset(uf, a, b), "uf_union: states should be in the same set");
+            return 0;
+        }
+
+        //T//HREassert (!uf_is_dead (uf, a) && !uf_is_dead (uf, b),
+        //        "uf_union(%d, %d): states should not be dead",
+        //        uf_debug(uf,a), uf_debug(uf,b));
+
+
+        // lock a and b (or retry if fail)
+        if (!uf_lock(uf, a_r, b_r))
+            continue;
+
+
+
+        // unlock if a_r and b_r if we did not lock the representatives
+        if (a_r != uf->array[a_r].parent || b_r != uf->array[b_r].parent) {
+            uf_unlock (uf, a_r, b_r);
+            continue;
+        }
+
+        break;
+    }
+
+    // we have now locked the representatives for uf[a] and uf[b]
+
+    //T//HREassert (atomic_read (&uf->array[a_r].uf_status) == UF_LOCKED, "a_r:%zu must be locked %d", a_r, uf_debug(uf,a_r));
+    //T//HREassert (atomic_read (&uf->array[b_r].uf_status) == UF_LOCKED, "b_r:%zu must be locked %d", b_r, uf_debug(uf,b_r));
+
+    //uf_debug(uf, a);
+    //uf_debug(uf, b);
+
+
+
+    // decide new representative by rank (or pick a_r and update rank if equal)
+    if (uf->array[a_r].rank < uf->array[b_r].rank) {
+        //Warning(info, "switching a_r and b_r"); // DEBUG
+        ref_t tmp = a_r;
+        a_r = b_r;
+        b_r = tmp;
+    } else if (uf->array[a_r].rank == uf->array[b_r].rank) {
+        //Warning(info, "increasing rank"); // DEBUG
         uf->array[a_r].rank ++;
     }
 
-	// a_r is chosen as the new representative
+    // a_r is chosen as the new representative
 
-    ref_t a_l = uf->array[a_r].list_last;
-    ref_t b_l = uf->array[b_r].list_last;
+
+    ref_t b_n = atomic_read (&uf->array[b_r].list_next);
+    ref_t a_n = atomic_read (&uf->array[a_r].list_next);
+
+
+    // Update b_r -> a_n
+        atomic_write (&uf->array[b_r].list_next, a_n);
+
+    // Update a_r -> b_n
+        atomic_write (&uf->array[a_r].list_next, b_n);
+
+    // 2. parent for b_r is updated
+    // Do this last so states won't get marked TOMBSTONE too soon
+    //T//HREassert (atomic_read (&uf->array[b_r].parent) == b_r,
+    //        "Locked parent should not change %zu, %d", b_r, uf_debug(uf, b_r));
+    atomic_write (&uf->array[b_r].parent, a_r);
+
 
     // 1. worker set for a_r is updated
     sz_w workers = uf->array[a_r].p_set | uf->array[b_r].p_set;
     atomic_write (&uf->array[a_r].p_set, workers);
 
-    // 2. parent for b_r is updated
-    atomic_write (&uf->array[b_r].parent, a_r);
-
-    // 3. last pointer for a_r is updated to b_l
-    atomic_write (&uf->array[b_r].list_last, b_l);
-
-    // 4. next pointer for a_l is updated to b_r
-    atomic_write (&uf->array[a_l].list_next, b_r);
-
-    // 5. create cyclic list again ( b_l -> a_r )
-    atomic_write (&uf->array[b_l].list_next, a_r);
 
     // 6. unlock a_r (and b_r)
-    uf_unlock2 (uf, a_r, b_r);
+    uf_unlock (uf, a_r, b_r);
 
-    HREassert (uf_sameset(uf, a, b), "uf_union: states should be in the same set");
+
+    //Warning(info, "after union(%zu, %zu)", a_r, b_r); // DEBUG
+    //uf_debug(uf, a_r);
+    //uf_debug(uf, b_r);
+    ////T//HREassert (0);
+
+    //T//HREassert (uf_sameset(uf, a, b), "uf_union: states should be in the same set");
     return 1;
 }
-
 
 
 // dead
@@ -745,34 +571,23 @@ uf_union (const uf_t* uf, ref_t a, ref_t b)
 bool
 uf_mark_dead (const uf_t* uf, ref_t state) 
 {
-    // returns if it has marked the state dead
-    bool result = false;
 
-    ref_t f = uf_find(uf, state); 
+    ref_t f          = uf_find(uf, state);
+    //Warning(info,"\x1B[40mmark dead: %zu %zu %d\x1B[0m", state, f, uf_debug(uf,state));
+    bool result      = false;
 
-    /*while (!uf_is_dead(uf, f)) {
-        f = uf_find(uf, f); 
+    // wait for possible unions to completely finish
+    // (part between last parent update and unlock)
+    while (atomic_read (&uf->array[f].uf_status) == UF_LOCKED);
 
-        uf_status tmp = atomic_read (&uf->array[f].uf_status);
-        if (tmp == UF_LIVE) {
-            result = cas (&uf->array[f].uf_status, tmp, UF_DEAD);
-        }
-    }*/
-    uf_status tmp = atomic_read (&uf->array[f].uf_status);
+    while (atomic_read (&uf->array[f].uf_status) != UF_DEAD)
+        result = cas (&uf->array[f].uf_status, UF_LIVE, UF_DEAD);
 
-    while (tmp == UF_LOCKED) {
-        tmp = atomic_read (&uf->array[f].uf_status);
-    }
-    
-    HREassert (tmp != UF_LOCKED); // this can fail
+    //T//HREassert (atomic_read (&uf->array[f].parent) == f,
+    //        "representative should not change while marking dead %d", uf_debug(uf,f));
 
-
-    if (tmp == UF_LIVE) 
-        result = cas (&uf->array[f].uf_status, tmp, UF_DEAD);
-
-    HREassert (atomic_read (&uf->array[f].parent) == f);
-
-    HREassert (uf_is_dead(uf, state), "state should be dead");
+    //T//HREassert (uf_is_dead(uf, f),     "state should be dead");
+    //T//HREassert (uf_is_dead(uf, state), "state should be dead");
 
     return result;
 }
@@ -787,7 +602,7 @@ uf_is_dead (const uf_t* uf, ref_t state)
 // testing
 
 bool
-uf_mark_undead (const uf_t* uf, ref_t state) 
+uf_mark_undead (const uf_t *uf, ref_t state)
 {
     // only used for testing
 
@@ -821,7 +636,7 @@ uf_print_list(const uf_t* uf, ref_t state)
     Warning(info, "Start: [%zu | %d] Dead: %d", state, l_status, uf_is_dead(uf, state));
 
     int cntr = 0;
-    while (cntr++ < 50) {
+    while (cntr++ < 5) {
         l_status            = atomic_read(&uf->array[next].list_status);
         next                = atomic_read(&uf->array[next].list_next);
         Warning(info, "Next:  [%zu | %d]", next, l_status);
@@ -829,20 +644,93 @@ uf_print_list(const uf_t* uf, ref_t state)
     return 0;
 }
 
-int         
-uf_debug (const uf_t* uf, ref_t state) 
+
+char*
+uf_print_list_status (list_status ls)
+{
+    if (ls == LIST_LIVE)      return "LIVE";
+    if (ls == LIST_BUSY)      return "BUSY";
+    if (ls == LIST_TOMBSTONE) return "TOMB";
+    else                      return "????";
+}
+
+char*
+uf_print_uf_status (uf_status us)
+{
+    if (us == UF_UNSEEN) return "UNSN";
+    if (us == UF_INIT)   return "INIT";
+    if (us == UF_LIVE)   return "LIVE";
+    if (us == UF_LOCKED) return "LOCK";
+    if (us == UF_DEAD)   return "DEAD";
+    else                 return "????";
+}
+
+void
+uf_debug_aux (const uf_t* uf, ref_t state, int depth)
 { 
-    Warning(info, "state:  %zu\t, parent: %zu\t, rank:   %d\t, uf_status: %d\t, list_status: %d\t",
-        state, 
+    if (depth == 0) {
+        Warning(info, "\x1B[45mParent structure:\x1B[0m");
+        Warning(info, "\x1B[45m%5s %10s %10s %6s %7s %7s %10s\x1B[0m",
+                "depth",
+                "state",
+                "parent",
+                "rank",
+                "uf_s",
+                "list_s",
+                "next");
+    }
+
+    Warning(info, "\x1B[44m%5d %10zu %10zu %6d %7s %7s %10zu\x1B[0m",
+        depth,
+        state,
         atomic_read(&uf->array[state].parent),  
         atomic_read(&uf->array[state].rank),  
-        atomic_read(&uf->array[state].uf_status),  
-        atomic_read(&uf->array[state].list_status));
+        uf_print_uf_status(atomic_read(&uf->array[state].uf_status)),
+        uf_print_list_status(atomic_read(&uf->array[state].list_status)),
+        atomic_read(&uf->array[state].list_next));
+
+
+
     if (uf->array[state].parent != state) {
-        uf_debug (uf, uf->array[state].parent); 
+        uf_debug_aux (uf, uf->array[state].parent, depth+1);
     }
-    return 0;
 }
+
+void
+uf_debug_list (const uf_t* uf, ref_t start, ref_t state, int depth)
+{
+    if (depth == 10) {
+        Warning(info, "\x1B[40mreached depth 10\x1B[0m");
+        return;
+    }
+    if (depth == 0) {
+        Warning(info, "\x1B[40mList structure:\x1B[0m");
+        Warning(info, "\x1B[40m%5s %10s %10s\x1B[0m",
+                    "depth",
+                    "state",
+                    "next");
+    }
+
+    Warning(info, "\x1B[41m%5d %10zu %10zu\x1B[0m",
+        depth,
+        state,
+        atomic_read(&uf->array[state].list_next));
+
+    if (uf->array[state].list_next != start) {
+        uf_debug_list (uf, start, uf->array[state].list_next, depth+1);
+    }
+}
+
+int
+uf_debug (const uf_t* uf, ref_t state)
+{
+    uf_debug_aux (uf, state, 0);
+    //ref_t f = uf_find(uf, state);
+    //uf_debug_list (uf, state, state, 0);
+
+    return 1;
+}
+
 
 void         
 uf_free (uf_t* uf)
