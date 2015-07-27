@@ -102,10 +102,9 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti, int see
 
     if (ctx->state->ref == successor->ref) {
         loc->cnt.self_loop_count++;
-        /*if (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state))) {
-            // DONE
-            ndfs_report_cycle (ctx->run, ctx->model, loc->dstack, successor);
-        }*/
+        // LTL
+        // if (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)))
+        //     ndfs_report_cycle (ctx->run, ctx->model, loc->dstack, successor);
         return;
     }
 
@@ -149,7 +148,7 @@ ufscc_init  (wctx_t *ctx)
 {
     alg_local_t            *loc        = ctx->local;
     uf_alg_shared_t        *shared     = (uf_alg_shared_t*) ctx->run->shared;
-    transition_info_t       ti = GB_NO_TRANSITION;
+    transition_info_t       ti         = GB_NO_TRANSITION;
 
     // put the initial state on the stack
     ufscc_handle (ctx, ctx->initial, &ti, 0);
@@ -162,7 +161,7 @@ ufscc_init  (wctx_t *ctx)
     }
 }
 
-bool
+/*bool
 getNextSuccessor (wctx_t *ctx, state_info_t *si, size_t *next_group) 
 {
     // Iterates over the pins groups and searches for successors
@@ -179,7 +178,7 @@ getNextSuccessor (wctx_t *ctx, state_info_t *si, size_t *next_group)
     do {
         count = permute_next (ctx->permute, si, *next_group, ufscc_handle, ctx); 
 
-        HREassert(count <= 1, "TODO: implement handling multiple states in group");
+        //T//HREassert(count <= 1, "TODO: implement handling multiple states in group");
 
         // slight improvement: increment with relative prime of nGroups
         
@@ -194,11 +193,11 @@ getNextSuccessor (wctx_t *ctx, state_info_t *si, size_t *next_group)
         }
     } while (*next_group != loc->start_group);
 
-    HREassert(*next_group == loc->start_group);
+    //T//HREassert(*next_group == loc->start_group);
 
     *next_group = nGroups;
     return false;
-}
+}*/
 
 void 
 print_worker_stats (wctx_t *ctx)
@@ -209,14 +208,13 @@ print_worker_stats (wctx_t *ctx)
     Warning(info, "Union count:               %d", loc->cnt.union_count);
     Warning(info, "Removed from list count:   %d", loc->cnt.removed_from_list_count);
     Warning(info, "Marked dead count:         %d", loc->cnt.marked_dead_count);
-
 }
 
 
 void
 successor (wctx_t *ctx)
 {
-    alg_local_t            *loc = ctx->local;
+    alg_local_t            *loc    = ctx->local;
     uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
 
     raw_data_t state_data = dfs_stack_peek_top (loc->dstack, 1);
@@ -283,9 +281,9 @@ successor (wctx_t *ctx)
         state_info_deserialize (loc->root, root_data); // Roots Stack TOP
         //Warning(info, "CLAIM_FOUND Roots top = %zu", loc->root->ref);
 
-        HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref),
-            "Root: %d\nState: %d", uf_debug(shared->uf, loc->root->ref),
-            uf_debug(shared->uf, loc->target->ref)); 
+        //T//HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref),
+        //    "Root: %d\nState: %d", uf_debug(shared->uf, loc->root->ref),
+        //    uf_debug(shared->uf, loc->target->ref));
 
         // not SameSet(FROM,TO) ==> unite cycle
         while (!uf_sameset(shared->uf, ctx->state->ref, loc->target->ref)) {
@@ -297,17 +295,25 @@ successor (wctx_t *ctx)
             
             dfs_stack_pop (loc->rstack); // UF Stack POP
 
-            HREassert(dfs_stack_size(loc->rstack) != 0);
+            //T//HREassert(dfs_stack_size(loc->rstack) != 0);
 
             root_data = dfs_stack_top (loc->rstack);
             state_info_deserialize (loc->root, root_data); // Roots Stack TOP
 
             //Warning(info, "Union(F:%zu, T:%zu)", loc->root->ref, loc->target->ref);
 
-            /*if (GBbuchiIsAccepting(ctx->model, state_info_state(loc->root)) ||
-                GBbuchiIsAccepting(ctx->model, state_info_state(loc->target))) {
-                // DONE
-                ndfs_report_cycle (ctx->run, ctx->model, loc->dstack, loc->root);
+            // LTL
+            // if (GBbuchiIsAccepting(ctx->model, state_info_state(loc->root)) ||
+            //     GBbuchiIsAccepting(ctx->model, state_info_state(loc->target)))
+            //     ndfs_report_cycle (ctx->run, ctx->model, loc->dstack, loc->root);
+
+
+            /*if (uf_is_dead (shared->uf, loc->root->ref) ||
+                uf_is_dead (shared->uf, loc->target->ref)) {
+                //T//HREassert (uf_sameset(shared->uf, loc->root->ref, loc->target->ref),
+                    "Dead states cannot be united %d %d",
+                    uf_debug(shared->uf, loc->root->ref),
+                    uf_debug(shared->uf, loc->target->ref));
             }*/
 
             loc->cnt.union_count ++;
@@ -315,12 +321,12 @@ successor (wctx_t *ctx)
                 loc->cnt.union_success ++;
             }
 
-
-            HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref));
+            //T//HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref),
+            //        "%d %d", uf_debug(shared->uf, loc->root->ref), uf_debug(shared->uf, loc->target->ref));
 
         }
-        HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref)); 
-        HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref)); 
+        //T//HREassert(uf_sameset(shared->uf, loc->root->ref, ctx->state->ref));
+        //T//HREassert(uf_sameset(shared->uf, loc->root->ref, loc->target->ref));
         //Warning(info, "UNIONED Roots top = %zu", loc->root->ref);
 
         // cycle is now merged (and DFS stack is unchanged)
@@ -376,7 +382,7 @@ backtrack (wctx_t *ctx)
         //Warning(info, "DOT: A%zu [color=gray,style=filled];", v);
         //Warning(info, "State %zu is DEAD;", v);
 
-        HREassert(uf_is_dead(shared->uf, v));
+        //T//HREassert(uf_is_dead(shared->uf, v));
 
         // were we the one that marked it dead?
         if (pick == PICK_MARK_DEAD) {
@@ -399,24 +405,24 @@ backtrack (wctx_t *ctx)
         state_info_deserialize (loc->root, root_data);      // Roots Stack TOP
         //Warning(info, "DEAD Roots top = %zu", loc->root->ref);
 
-        HREassert(uf_sameset(shared->uf, v, loc->root->ref), "%d != %d",
-            uf_debug(shared->uf, v), uf_debug(shared->uf, loc->root->ref));
+        //T//HREassert(uf_sameset(shared->uf, v, loc->root->ref), "%d != %d",
+        //    uf_debug(shared->uf, v), uf_debug(shared->uf, loc->root->ref));
 
         // pop from Roots
         while (uf_sameset(shared->uf, v, loc->root->ref)) {
             dfs_stack_pop (loc->rstack);                    // Roots Stack POP
 
-            HREassert(dfs_stack_size(loc->rstack) != 0);
+            //T//HREassert(dfs_stack_size(loc->rstack) != 0);
 
             root_data = dfs_stack_top (loc->rstack);
             state_info_deserialize (loc->root, root_data);  // Roots Stack TOP
         }
         //Warning(info, "UNDEAD Roots top = %zu", loc->root->ref);
-        if (!uf_sameset(shared->uf, loc->target->ref, loc->root->ref)) {
+        /*if (!uf_sameset(shared->uf, loc->target->ref, loc->root->ref)) {
             uf_debug(shared->uf, loc->target->ref);
             uf_debug(shared->uf, loc->root->ref);
-        }
-        HREassert(uf_sameset(shared->uf, loc->target->ref, loc->root->ref));
+        }*/
+        //T//HREassert(uf_sameset(shared->uf, loc->target->ref, loc->root->ref));
     }
     else {
         // Found w \in List(v) ==> push w on stack and search its successors
@@ -499,7 +505,7 @@ void
 ufscc_print_stats   (run_t *run, wctx_t *ctx)
 {
     counter_t              *reduced = (counter_t *) run->reduced;
-    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
+    //uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
 
     // SCC statistics
     Warning(info,"unique states found:   %d", reduced->unique_states);
@@ -521,6 +527,8 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     //    uf_free(shared->uf);
 
     run_report_total (run);
+
+    (void) ctx;
 }
 
 int
