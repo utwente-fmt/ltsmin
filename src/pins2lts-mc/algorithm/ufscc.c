@@ -15,6 +15,13 @@
 #include <util-lib/fast_set.h>
 #include <pins2lts-mc/algorithm/ltl.h>
 
+
+//#if HAVE_PROFILER
+#include <gperftools/profiler.h>
+//#endif
+
+
+
 typedef struct counter_s {
     uint32_t            self_loop_count;         // Counts the number of self-loops
     uint32_t            scc_count;               // Counts the number of SCCs
@@ -445,7 +452,15 @@ ufscc_run  (run_t *run, wctx_t *ctx)
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
 
+
+//#if HAVE_PROFILER
+    if (ctx->id == 0)
+        Warning(info, "Using the profiler");
+    ProfilerStart("ufscc.perf");
+//#endif
+
     ufscc_init (ctx);
+
 
     // explore initial state
     state_data = dfs_stack_top (loc->dstack);
@@ -470,6 +485,11 @@ ufscc_run  (run_t *run, wctx_t *ctx)
     }
 
 
+//#if HAVE_PROFILER
+    if (ctx->id == 0)
+        Warning(info, "Done profiling");
+    ProfilerStop();
+//#endif
 
     //print_worker_stats(ctx);
 
