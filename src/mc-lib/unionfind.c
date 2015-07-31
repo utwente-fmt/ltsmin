@@ -58,7 +58,7 @@ uf_create ()
             "Improper structure packing for uf_node_t. Expected: size = %zu", sizeof(int[8]));
 #endif
     uf_t           *uf = RTmalloc (sizeof(uf_t));
-    uf->array          = RTalignZero ( sizeof(int[10]),
+    uf->array          = RTalignZero ( sizeof(int[8]),
                                        sizeof(uf_node_t) * (1ULL << dbs_size) );
     return uf;
 }
@@ -115,7 +115,7 @@ uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
 
             atomic_write (&uf->array[state].parent, state);
             atomic_write (&uf->array[state].list_next, state);
-            uf->array[state].p_set = w_id;
+            atomic_write (&uf->array[state].p_set, w_id);
             atomic_write (&uf->array[state].uf_status, UF_LIVE);
 
             return CLAIM_FIRST;
@@ -123,15 +123,15 @@ uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
     }
 
     // Is someone currently initializing the state?
-    while (atomic_read(&uf->array[state].uf_status) == UF_INIT);
+    while (atomic_read (&uf->array[state].uf_status) == UF_INIT);
     ref_t f = uf_find(uf, state); 
 
     // Is the state dead?
-    if (atomic_read(&uf->array[f].uf_status) == UF_DEAD)
+    if (atomic_read (&uf->array[f].uf_status) == UF_DEAD)
         return CLAIM_DEAD;
 
     // Did I already explore `this' state?
-    if (((uf->array[f].p_set) & w_id ) != 0) {
+    if ((atomic_read (&uf->array[f].p_set) & w_id ) != 0) {
         return CLAIM_FOUND;
         // NB: cycle is possibly missed (in case f got updated)
         // - but next iterations should fix this
@@ -139,12 +139,10 @@ uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
 
     // Add our worker ID to the set (and make sure it is the UF representative)
     or_fetch (&uf->array[f].p_set, w_id);
-    while (atomic_read(&uf->array[f].parent) != f ||
-            atomic_read(&uf->array[f].uf_status) == UF_LOCKED) {
-        f = atomic_read(&uf->array[f].parent);
-        //while (uf->array[f].uf_status == UF_LOCKED); // not sure if this helps
+    while (atomic_read (&uf->array[f].parent) != f) {
+        f = atomic_read (&uf->array[f].parent);
         or_fetch (&uf->array[f].p_set, w_id);
-        if (atomic_read(&uf->array[f].uf_status) == UF_DEAD) {
+        if (atomic_read (&uf->array[f].uf_status) == UF_DEAD) {
             return CLAIM_DEAD;
         }
     }
@@ -218,7 +216,7 @@ uf_mark_dead (const uf_t* uf, ref_t state)
 
     // wait for possible unions to completely finish
     // (part between last parent update and unlock)
-    while (atomic_read (&uf->array[f].uf_status) == UF_LOCKED);
+    //while (atomic_read (&uf->array[f].uf_status) == UF_LOCKED);
 
     while (atomic_read (&uf->array[f].uf_status) != UF_DEAD)
         result = cas (&uf->array[f].uf_status, UF_LIVE, UF_DEAD);
