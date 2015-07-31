@@ -7,7 +7,7 @@
 
 //#define UFDEBUG
 
-#define UFVERSION 1
+#define UFVERSION 4
 /*
  * UFVERSION 1 = original version (4 locks, also list locks)
  * UFVERSION 2 = newer version (2 locks)
@@ -839,18 +839,25 @@ uf_union (const uf_t* uf, ref_t a, ref_t b)
         // 7. set r.next --> q_n
         if (!cas (&uf->array[r].list_next, r_n, q_n)) {
             // r_n got updated after (5)
-            if (!cas (&uf->array[q].list_next, r_n, q_n))
-                HREassert(0, "resetting q.next --> q_n should not fail");
+#ifdef UFDEBUG
+            HREassert(atomic_read (&uf->array[q].list_next) == r_n,
+                    "resetting q.next --> q_n should not fail");
+#endif
+            atomic_write (&uf->array[q].list_next, q_n);
             continue;
         }
 
         // 8. check if r is still the representative (r might not be in uf[r]'s list)
         if (atomic_read (&uf->array[r].parent) != r) {
             // r got updated, so reset and retry
-            if (!cas (&uf->array[r].list_next, q_n, r_n))
-                HREassert(0, "resetting r.next --> r_n should not fail");
-            if (!cas (&uf->array[q].list_next, r_n, q_n))
-                HREassert(0, "resetting q.next --> q_n should not fail");
+#ifdef UFDEBUG
+            HREassert(atomic_read (&uf->array[r].list_next) == q_n,
+                    "resetting r.next --> r_n should not fail");
+            HREassert(atomic_read (&uf->array[q].list_next) == r_n,
+                    "resetting q.next --> q_n should not fail");
+#endif
+            atomic_write (&uf->array[r].list_next, r_n);
+            atomic_write (&uf->array[q].list_next, q_n);
             continue;
         }
 
@@ -861,11 +868,12 @@ uf_union (const uf_t* uf, ref_t a, ref_t b)
     sz_w q_w = atomic_read (&uf->array[q].p_set);
     or_fetch (&uf->array[r].p_set, q_w);
 
-
     // 10. update parent
-    if (!cas (&uf->array[q].parent, q, r)) {
-        HREassert(0, "parent for q shouldn't change while locked");
-    }
+#ifdef UFDEBUG
+    HREassert(atomic_read (&uf->array[q].parent) == q,
+            "parent for q shouldn't change while locked");
+#endif
+    atomic_write (&uf->array[q].parent, r);
 
     // 11. unlock
     atomic_write (&uf->array[q].uf_status, UF_LIVE);
@@ -873,6 +881,177 @@ uf_union (const uf_t* uf, ref_t a, ref_t b)
 #ifdef UFDEBUG
     HREassert (uf_sameset(uf, a, b), "states should be merged after a union");
 #endif
+    return 1;
+}
+
+#endif
+
+
+#if UFVERSION == 4
+
+pick_e
+uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
+{
+    // INVARIANT: every consecutive non-BUSY state is in the same set
+
+    ref_t a, b, c;
+    list_status a_status, b_status;
+
+    a = state;
+    // if we exit this loop, status = TOMBSTONE or we returned a LIVE state
+    while (1) {
+        a_status = atomic_read (&uf->array[a].list_status);
+
+        // return directly if a is LIVE
+        if (a_status == LIST_LIVE) {
+            *ret = a;
+            return PICK_SUCCESS;
+        }
+
+        // otherwise wait until a is TOMBSTONE (it might be BUSY now)
+        else if (a_status == LIST_TOMBSTONE)
+            break;
+    }
+
+    // find next state: a --> b
+    b = atomic_read (&uf->array[a].list_next);
+
+    while (1) {
+
+        // if a is TOMBSTONE and only element, then the SCC is DEAD
+        if (a == b) {
+            if (uf_mark_dead (uf, a))
+                return PICK_MARK_DEAD;
+            return PICK_DEAD;
+        }
+
+        // if we exit this loop, status = TOMBSTONE or we returned a LIVE state
+        while (1) {
+            b_status = atomic_read (&uf->array[b].list_status);
+
+            // return directly if b is LIVE
+            if (b_status == LIST_LIVE) {
+                *ret = b;
+                return PICK_SUCCESS;
+            }
+
+            // otherwise wait until b is TOMBSTONE (it might be BUSY now)
+            else if (b_status == LIST_TOMBSTONE)
+                break;
+        }
+
+        c = atomic_read (&uf->array[b].list_next);
+
+        // make the list shorter
+        cas (&uf->array[a].list_next, b,  c);
+
+        a = b;
+        b = c;
+    }
+}
+
+bool
+uf_lock (const uf_t* uf, ref_t a)
+{
+    if (atomic_read (&uf->array[a].uf_status) == UF_LIVE) {
+       if (cas (&uf->array[a].uf_status, UF_LIVE, UF_BUSY)) {
+           // successfully locked
+           // ensure that we actually locked the representative
+           if (atomic_read (&uf->array[a].parent) == a)
+               return 1;
+           // otherwise unlock and try again
+           atomic_write (&uf->array[a].uf_status, UF_LIVE);
+       }
+    }
+    return 0;
+}
+
+void
+uf_unlock (const uf_t* uf, ref_t a)
+{
+    atomic_write (&uf->array[a].uf_status, UF_LIVE);
+}
+
+bool
+uf_lock_list (const uf_t *uf, ref_t a, ref_t *a_l)
+{
+    ref_t tmp; // TODO: test this without tmp
+    pick_e pick_status;
+    while (1) {
+        // don't try to pick the roots
+        pick_status = uf_pick_from_list (uf, a, &tmp);
+        if (pick_status != PICK_SUCCESS)
+            return 0;
+        else if (cas (&uf->array[tmp].list_status, LIST_LIVE, LIST_BUSY)) {
+            *a_l = tmp;
+            return 1;
+        }
+    }
+}
+
+void
+uf_unlock_list (const uf_t *uf, ref_t a_l)
+{
+    atomic_write (&uf->array[a_l].list_status, LIST_LIVE);
+}
+
+bool
+uf_union (const uf_t* uf, ref_t a, ref_t b)
+{
+    ref_t a_r, b_r, a_l, b_l, a_n, b_n, r, q;
+
+    while (1) {
+        // 1. find the representatives
+        a_r = uf_find (uf, a);
+        b_r = uf_find (uf, b);
+
+        if (a_r == b_r) {
+            return 0;
+        }
+
+        // 2. decide on the new root (deterministically)
+        r = a_r;
+        q = b_r;
+        if (a_r < b_r) { // take the highest index as root
+            r = b_r;
+            q = a_r;
+        }
+
+        // 3. lock the non-root
+        if (!uf_lock (uf, q))
+            continue;
+
+        break;
+    }
+
+    // lock the list entries
+    if (!uf_lock_list (uf, a, &a_l))
+        return 0;
+    if (!uf_lock_list (uf, b, &b_l)) {
+        uf_unlock_list (uf, a_l);
+        return 0;
+    }
+
+    // swap the list entries
+
+    a_n = atomic_read (&uf->array[a_l].list_next);
+    b_n = atomic_read (&uf->array[b_l].list_next);
+
+    atomic_write (&uf->array[a_l].list_next, b_n);
+    atomic_write (&uf->array[b_l].list_next, a_n);
+
+    // 9. update worker set
+    sz_w q_w = atomic_read (&uf->array[q].p_set);
+    or_fetch (&uf->array[r].p_set, q_w); // might not be root anymore
+
+    // 10. update parent
+    atomic_write (&uf->array[q].parent, r);
+
+    // 11. unlock
+    uf_unlock_list (uf, a_l);
+    uf_unlock_list (uf, b_l);
+    uf_unlock (uf, q);
+
     return 1;
 }
 
