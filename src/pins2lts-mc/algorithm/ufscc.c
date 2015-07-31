@@ -16,9 +16,9 @@
 #include <pins2lts-mc/algorithm/ltl.h>
 
 
-//#if HAVE_PROFILER
+#if HAVE_PROFILER
 #include <gperftools/profiler.h>
-//#endif
+#endif
 
 
 
@@ -453,11 +453,11 @@ ufscc_run  (run_t *run, wctx_t *ctx)
     raw_data_t              state_data;
 
 
-//#if HAVE_PROFILER
+#if HAVE_PROFILER
     if (ctx->id == 0)
         Warning(info, "Using the profiler");
     ProfilerStart("ufscc.perf");
-//#endif
+#endif
 
     ufscc_init (ctx);
 
@@ -485,11 +485,11 @@ ufscc_run  (run_t *run, wctx_t *ctx)
     }
 
 
-//#if HAVE_PROFILER
+#if HAVE_PROFILER
     if (ctx->id == 0)
         Warning(info, "Done profiling");
     ProfilerStop();
-//#endif
+#endif
 
     //print_worker_stats(ctx);
 
