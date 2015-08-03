@@ -24,7 +24,10 @@ typedef struct {
 typedef struct {
     int size;
     header_entry_t* data;
+    // cache for count, min and max
     int* count;
+    int* min;
+    int* max;
 } matrix_header_t;
 
 extern void dm_create_header(matrix_header_t* p, const int size);
@@ -41,7 +44,6 @@ extern void dm_create_permutation_group(permutation_group_t* o, const int size, 
 extern void dm_free_permutation_group(permutation_group_t* o);
 extern void dm_add_to_permutation_group(permutation_group_t* o, const int);
 extern void dm_close_group(permutation_group_t* o);
-extern void dm_apply_permutation_group(matrix_header_t* p, const permutation_group_t *);
 
 extern void dm_create_permutation_groups(permutation_group_t** ps, int* num_groups, const int* p, const int size);
 
@@ -108,6 +110,9 @@ extern void dm_vertical_flip(matrix_t* m);
 
 extern int dm_first(const matrix_t* const m, const int row);
 extern int dm_last(const matrix_t* const m, const int row);
+
+extern int dm_top(const matrix_t* const m, const int col);
+extern int dm_bottom(const matrix_t* const m, const int col);
 
 /**
  * return the matrix as index table per row/col
