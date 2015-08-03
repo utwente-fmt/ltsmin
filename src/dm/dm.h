@@ -106,6 +106,9 @@ extern void dm_all_perm(matrix_t* m);
 extern void dm_horizontal_flip(matrix_t* m);
 extern void dm_vertical_flip(matrix_t* m);
 
+extern int dm_first(const matrix_t* const m, const int row);
+extern int dm_last(const matrix_t* const m, const int row);
+
 /**
  * return the matrix as index table per row/col
  * result[row/col] = pointer to struct (count, index0, .. , index_[count])
