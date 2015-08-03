@@ -1601,3 +1601,98 @@ dm_is_empty(const matrix_t* m)
 
     return 1;
 }
+
+int*
+dm_row_bandwidths(const matrix_t* const m, int* const bandwidths)
+{
+    for (int i = 0; i < dm_nrows(m); i++) {
+        const int f = dm_first(m, i);
+        const int l = dm_last(m, i);
+        if (f == -1 || l == -1) bandwidths[i] = 0;
+        else bandwidths[i] = max(abs(i - f), abs(i - l)) + 1;
+    }
+
+    return bandwidths;
+}
+
+int*
+dm_col_bandwidths(const matrix_t* const m, int* const bandwidths)
+{
+    for (int i = 0; i < dm_ncols(m); i++) {
+        const int t = dm_top(m, i);
+        const int b = dm_bottom(m, i);
+        if (t == -1 || b == -1) bandwidths[i] = 0;
+        else bandwidths[i] = max(abs(i - t), abs(i - b)) + 1;
+    }
+
+    return bandwidths;
+}
+
+int*
+dm_row_spans(const matrix_t* const m, int* const spans)
+{
+    for (int i = 0; i < dm_nrows(m); i++) {
+        const int f = dm_first(m, i);
+        const int l = dm_last(m, i);
+        if (f == -1 || l == -1) spans[i] = 0;
+        else spans[i] = l - f + 1;
+    }
+
+    return spans;
+}
+
+int*
+dm_col_spans(const matrix_t* const m, int* const spans)
+{
+    for (int i = 0; i < dm_ncols(m); i++) {
+        const int t = dm_top(m, i);
+        const int b = dm_bottom(m, i);
+        if (t == -1 || b == -1) spans[i] = 0;
+        else spans[i] = b - t + 1;
+    }
+
+    return spans;
+}
+
+int*
+dm_row_wavefronts(const matrix_t* const m, int* const wavefronts)
+{
+    int wavefront = 0;
+    int col_active[dm_ncols(m)];
+    memset(col_active, 0, sizeof(int[dm_ncols(m)]));
+    for (int i = 0; i < dm_nrows(m); i++) {
+        for (int j = 0; j < dm_ncols(m); j++) {
+            if (dm_is_set(m, i, j)) {
+                if (!col_active[j]) {
+                    wavefront++;
+                    col_active[j] = 1;
+                }
+            }
+        }
+        wavefronts[i] = wavefront;
+    }
+
+    return wavefronts;
+}
+
+int*
+dm_col_wavefronts(const matrix_t* const m, int* const wavefronts)
+{
+    int wavefront = 0;
+    int row_active[dm_nrows(m)];
+    memset(row_active, 0, sizeof(int[dm_nrows(m)]));
+    for (int i = 0; i < dm_ncols(m); i++) {
+        for (int j = 0; j < dm_nrows(m); j++) {
+            if (dm_is_set(m, j, i)) {
+                if (!row_active[j]) {
+                    wavefront++;
+                    row_active[j] = 1;
+                }
+            }
+        }
+        wavefronts[i] = wavefront;
+    }
+
+    return wavefronts;
+}
+
