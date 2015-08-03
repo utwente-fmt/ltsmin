@@ -10,6 +10,10 @@ TAGS
 config.h.in
 .libs/
 .metadata/
+.project
+.cproject
+.settings
+*.dirstamp
 aclocal.m4
 autom4te.cache/
 autotools/
