@@ -188,6 +188,15 @@ extern int dm_is_empty(const matrix_t* m);
 extern void dm_bitvector_row(bitvector_t* bv, const matrix_t* m, int row);
 extern void dm_bitvector_col(bitvector_t* bv, const matrix_t* m, int col);
 
+extern int* dm_row_bandwidths(const matrix_t* const m, int* const bandwidths);
+extern int* dm_col_bandwidths(const matrix_t* const m, int* const bandwidths);
+
+extern int* dm_row_spans(const matrix_t* const m, int* const spans);
+extern int* dm_col_spans(const matrix_t* const m, int* const spans);
+
+extern int* dm_row_wavefronts(const matrix_t* const m, int* const wavefronts);
+extern int* dm_col_wavefronts(const matrix_t* const m, int* const wavefronts);
+
 #ifdef __cplusplus
 }
 #endif
