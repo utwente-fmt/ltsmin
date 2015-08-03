@@ -80,13 +80,13 @@ uf_owner (const uf_t *uf, ref_t state, size_t worker)
 }
 
 bool
-uf_is_in_list (const uf_t* uf, ref_t state)
+uf_is_in_list (const uf_t *uf, ref_t state)
 {
     return atomic_read (&uf->array[state].list_status) != LIST_TOMBSTONE;
 }
 
 bool
-uf_remove_from_list (const uf_t* uf, ref_t state)
+uf_remove_from_list (const uf_t *uf, ref_t state)
 {
     // only remove if it has LIST_LIVE , otherwise (LIST_BUSY) wait
     while (true) {
@@ -100,16 +100,18 @@ uf_remove_from_list (const uf_t* uf, ref_t state)
     }
 }
 
+
 char     
-uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
+uf_make_claim (const uf_t *uf, ref_t state, size_t worker)
 {
 #ifdef UFDEBUG
     HREassert (worker < WORKER_BITS);
 #endif
     sz_w            w_id = 1ULL << worker;
+    uf_status       uf_s = atomic_read (&uf->array[state].uf_status);
 
     // Is the state unseen? ==> Initialize it
-    if (atomic_read(&uf->array[state].uf_status) == UF_UNSEEN) {
+    if (uf_s == UF_UNSEEN) {
         if (cas(&uf->array[state].uf_status, UF_UNSEEN, UF_INIT)) {
             // create state and add worker
 
@@ -123,7 +125,9 @@ uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
     }
 
     // Is someone currently initializing the state?
-    while (atomic_read (&uf->array[state].uf_status) == UF_INIT);
+    while (uf_s == UF_INIT)
+        uf_s = atomic_read (&uf->array[state].uf_status);
+
     ref_t f = uf_find(uf, state); 
 
     // Is the state dead?
@@ -153,21 +157,21 @@ uf_make_claim (const uf_t* uf, ref_t state, size_t worker)
 // 'basic' union find
 
 ref_t
-uf_find (const uf_t* uf, ref_t state)
+uf_find (const uf_t *uf, ref_t state)
 {
     // recursively find and update the parent (path compression)
-    ref_t parent = uf->array[state].parent;
+    ref_t parent = atomic_read (&uf->array[state].parent);
     if (parent == state)
         return parent;
     ref_t root = uf_find (uf, parent);
     if (root != parent)
-        uf->array[state].parent = root;
+        atomic_write (&uf->array[state].parent, root);
     return root;
 }
 
 #ifdef USE_PATH_HALVING
 ref_t
-uf_find (const uf_t* uf, ref_t a)
+uf_find (const uf_t *uf, ref_t a)
 {
     // recursively find and update the parent (path halving)
     ref_t state, parent, grandparent;
@@ -190,7 +194,7 @@ uf_find (const uf_t* uf, ref_t a)
 #endif
 
 bool
-uf_sameset (const uf_t* uf, ref_t a, ref_t b)
+uf_sameset (const uf_t *uf, ref_t a, ref_t b)
 {
     ref_t a_r = uf_find (uf, a);
     ref_t b_r = uf_find (uf, b);
@@ -207,7 +211,7 @@ uf_sameset (const uf_t* uf, ref_t a, ref_t b)
 // dead
 
 bool
-uf_mark_dead (const uf_t* uf, ref_t state)
+uf_mark_dead (const uf_t *uf, ref_t state)
 {
 
     ref_t f          = uf_find(uf, state);
@@ -233,7 +237,7 @@ uf_mark_dead (const uf_t* uf, ref_t state)
 }
 
 bool
-uf_is_dead (const uf_t* uf, ref_t state)
+uf_is_dead (const uf_t *uf, ref_t state)
 {
     ref_t f = uf_find(uf, state);
     return atomic_read(&uf->array[f].uf_status) == UF_DEAD;
@@ -244,7 +248,7 @@ uf_is_dead (const uf_t* uf, ref_t state)
 #if UFVERSION == 1
 
 pick_e
-uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *node)
+uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *node)
 {
 
 #ifdef UFDEBUG
@@ -346,7 +350,7 @@ lock_lists (const uf_t *uf, ref_t list_a, ref_t list_b, ref_t *locked_a, ref_t *
 }
 
 static inline ref_t
-lock_node (const uf_t* uf, ref_t x)
+lock_node (const uf_t *uf, ref_t x)
 {
     while (true) {
         while (atomic_read(&uf->array[x].list_status) == LIST_TOMBSTONE) {
@@ -373,7 +377,7 @@ lock_node (const uf_t* uf, ref_t x)
 }
 
 void
-uf_merge_list(const uf_t* uf, ref_t list_x, ref_t list_y)
+uf_merge_list(const uf_t *uf, ref_t list_x, ref_t list_y)
 {
     // assert \exists x' \in List(x) (also for y)
     // - because states are locked and union(x,y) did not take place yet
@@ -411,7 +415,7 @@ uf_merge_list(const uf_t* uf, ref_t list_x, ref_t list_y)
 }
 
 ref_t
-uf_lock (const uf_t* uf, ref_t state_x, ref_t state_y)
+uf_lock (const uf_t *uf, ref_t state_x, ref_t state_y)
 {
     ref_t a = state_x;
     ref_t b = state_y;
@@ -452,7 +456,7 @@ uf_lock (const uf_t* uf, ref_t state_x, ref_t state_y)
 }
 
 void
-uf_unlock (const uf_t* uf, ref_t state)
+uf_unlock (const uf_t *uf, ref_t state)
 {
 #ifdef UFDEBUG
     HREassert(uf->array[state].uf_status == UF_LOCKED);
@@ -461,7 +465,7 @@ uf_unlock (const uf_t* uf, ref_t state)
 }
 
 void
-uf_union_aux (const uf_t* uf, ref_t root, ref_t other)
+uf_union_aux (const uf_t *uf, ref_t root, ref_t other)
 {
     // don't need CAS because the states are locked
     uf->array[root].p_set   |= uf->array[other].p_set;
@@ -469,7 +473,7 @@ uf_union_aux (const uf_t* uf, ref_t root, ref_t other)
 }
 
 bool
-uf_union (const uf_t* uf, ref_t state_x, ref_t state_y)
+uf_union (const uf_t *uf, ref_t state_x, ref_t state_y)
 {
     if (uf_lock(uf, state_x, state_y)) {
 #ifdef UFDEBUG
@@ -516,7 +520,7 @@ uf_union (const uf_t* uf, ref_t state_x, ref_t state_y)
 #if UFVERSION == 2
 
 pick_e
-uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
+uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
 {
 #ifdef UFDEBUG
     HREassert (atomic_read(&uf->array[state].list_status) == LIST_TOMBSTONE);
@@ -566,7 +570,7 @@ uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
 }
 
 bool
-uf_lock (const uf_t* uf, ref_t a, ref_t b)
+uf_lock (const uf_t *uf, ref_t a, ref_t b)
 {
     ref_t a_r = a;
     ref_t b_r = b;
@@ -590,14 +594,14 @@ uf_lock (const uf_t* uf, ref_t a, ref_t b)
 }
 
 void
-uf_unlock (const uf_t* uf, ref_t a, ref_t b)
+uf_unlock (const uf_t *uf, ref_t a, ref_t b)
 {
     atomic_write (&uf->array[a].uf_status, UF_LIVE);
     atomic_write (&uf->array[b].uf_status, UF_LIVE);
 }
 
 bool
-uf_union (const uf_t* uf, ref_t a, ref_t b)
+uf_union (const uf_t *uf, ref_t a, ref_t b)
 {
     ref_t a_r, b_r;
 
@@ -694,7 +698,7 @@ uf_union (const uf_t* uf, ref_t a, ref_t b)
 #if UFVERSION == 3
 
 pick_e
-uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
+uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
 {
     ref_t a, b, c;
 #ifdef UFDEBUG
@@ -749,7 +753,7 @@ uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
 }
 
 bool
-uf_lock (const uf_t* uf, ref_t a)
+uf_lock (const uf_t *uf, ref_t a)
 {
     if (atomic_read (&uf->array[a].uf_status) == UF_LIVE) {
        if (cas (&uf->array[a].uf_status, UF_LIVE, UF_BUSY)) {
@@ -765,13 +769,13 @@ uf_lock (const uf_t* uf, ref_t a)
 }
 
 void
-uf_unlock (const uf_t* uf, ref_t a)
+uf_unlock (const uf_t *uf, ref_t a)
 {
     atomic_write (&uf->array[a].uf_status, UF_LIVE);
 }
 
 bool
-uf_union (const uf_t* uf, ref_t a, ref_t b)
+uf_union (const uf_t *uf, ref_t a, ref_t b)
 {
     ref_t a_r, b_r, r, q, r_n, q_n;
 
@@ -888,7 +892,7 @@ uf_union (const uf_t* uf, ref_t a, ref_t b)
 #if UFVERSION == 4
 
 pick_e
-uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
+uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
 {
     // INVARIANT: every consecutive non-BUSY state is in the same set
 
@@ -949,7 +953,7 @@ uf_pick_from_list (const uf_t* uf, ref_t state, ref_t *ret)
 }
 
 bool
-uf_lock (const uf_t* uf, ref_t a)
+uf_lock (const uf_t *uf, ref_t a)
 {
     if (atomic_read (&uf->array[a].uf_status) == UF_LIVE) {
        if (cas (&uf->array[a].uf_status, UF_LIVE, UF_BUSY)) {
@@ -965,7 +969,7 @@ uf_lock (const uf_t* uf, ref_t a)
 }
 
 void
-uf_unlock (const uf_t* uf, ref_t a)
+uf_unlock (const uf_t *uf, ref_t a)
 {
     atomic_write (&uf->array[a].uf_status, UF_LIVE);
 }
@@ -994,7 +998,7 @@ uf_unlock_list (const uf_t *uf, ref_t a_l)
 }
 
 bool
-uf_union (const uf_t* uf, ref_t a, ref_t b)
+uf_union (const uf_t *uf, ref_t a, ref_t b)
 {
     ref_t a_r, b_r, a_l, b_l, a_n, b_n, r, q;
 
@@ -1073,7 +1077,7 @@ uf_mark_undead (const uf_t *uf, ref_t state)
 }
 
 int
-uf_print_list(const uf_t* uf, ref_t state)
+uf_print_list(const uf_t *uf, ref_t state)
 {
     list_status l_status    = atomic_read(&uf->array[state].list_status);;
     ref_t next              = atomic_read(&uf->array[state].list_next);
@@ -1109,7 +1113,7 @@ uf_print_uf_status (uf_status us)
 }
 
 void
-uf_debug_aux (const uf_t* uf, ref_t state, int depth)
+uf_debug_aux (const uf_t *uf, ref_t state, int depth)
 { 
     if (depth == 0) {
         Warning(info, "\x1B[45mParent structure:\x1B[0m");
@@ -1140,7 +1144,7 @@ uf_debug_aux (const uf_t* uf, ref_t state, int depth)
 }
 
 void
-uf_debug_list (const uf_t* uf, ref_t start, ref_t state, int depth)
+uf_debug_list (const uf_t *uf, ref_t start, ref_t state, int depth)
 {
     if (depth == 10) {
         Warning(info, "\x1B[40mreached depth 10\x1B[0m");
@@ -1165,7 +1169,7 @@ uf_debug_list (const uf_t* uf, ref_t start, ref_t state, int depth)
 }
 
 int
-uf_debug (const uf_t* uf, ref_t state)
+uf_debug (const uf_t *uf, ref_t state)
 {
     uf_debug_aux (uf, state, 0);
     //ref_t f = uf_find(uf, state);
@@ -1175,7 +1179,7 @@ uf_debug (const uf_t* uf, ref_t state)
 }
 
 void         
-uf_free (uf_t* uf)
+uf_free (uf_t *uf)
 {
     RTfree(uf->array);
     RTfree(uf);
