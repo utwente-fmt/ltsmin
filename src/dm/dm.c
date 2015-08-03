@@ -1,5 +1,6 @@
 #include <hre/config.h>
 
+#include <float.h>
 #include <limits.h>
 #include <math.h>
 #include <stdlib.h>
@@ -23,6 +24,8 @@ dm_clear_header(matrix_header_t* p)
     for (int i = 0; i < p->size; i++) {
         p->data[i].becomes = p->data[i].at = p->data[i].group = i;
         p->count[i] = 0;
+        p->min[i] = -1;
+        p->max[i] = -1;
     }
 }
 
@@ -32,6 +35,10 @@ dm_create_header(matrix_header_t* p, int size)
     p->size = size;
     p->data = RTmalloc(sizeof(header_entry_t) * size);
     p->count = RTmallocZero(sizeof(int) * size);
+    p->min = RTmalloc(sizeof(int) * size);
+    memset(p->min, -1, sizeof(int) * size);
+    p->max = RTmalloc(sizeof(int) * size);
+    memset(p->max, -1, sizeof(int) * size);
     for (int i = 0; i < p->size; i++) {
         p->data[i].becomes = p->data[i].at = p->data[i].group = i;
     }
@@ -49,16 +56,35 @@ dm_free_header(matrix_header_t* p)
         RTfree(p->count);
         p->count = NULL;
     }
+    if (p->min != NULL) {
+        RTfree(p->min);
+        p->min = NULL;
+    }
+    if (p->max != NULL) {
+        RTfree(p->max);
+        p->max = NULL;
+    }
+}
+
+static void
+invalidate_min_max(matrix_header_t* p)
+{
+    memset(p->min, -1, sizeof(int) * p->size);
+    memset(p->max, -1, sizeof(int) * p->size);
 }
 
 static void
 copy_header_(const matrix_header_t* src, matrix_header_t* tgt)
 {
-    if (tgt->data == NULL && tgt->count == NULL) {
+    if (tgt->data == NULL && tgt->count == NULL && tgt->min == NULL && tgt->max == NULL) {
         tgt->size = src->size;
         tgt->data = RTmalloc(sizeof(header_entry_t) * tgt->size);
         tgt->count = RTmalloc(sizeof(int) * tgt->size);
+        tgt->min = RTmalloc(sizeof(int) * tgt->size);
+        tgt->max = RTmalloc(sizeof(int) * tgt->size);
         memcpy(tgt->count, src->count, sizeof(int) * tgt->size);
+        memcpy(tgt->min, src->min, sizeof(int) * tgt->size);
+        memcpy(tgt->max, src->max, sizeof(int) * tgt->size);
     }
     if (src->size == tgt->size) {
         memcpy(tgt->data, src->data, sizeof(header_entry_t) * tgt->size);
@@ -69,6 +95,9 @@ void
 dm_copy_row_info(const matrix_t* src, matrix_t* tgt)
 {
     copy_header_(&(src->row_perm), &(tgt->row_perm));
+
+    invalidate_min_max(&(tgt->col_perm));
+
     if (tgt->rows != src->rows) {
         for (int i = 0; i < dm_ncols(tgt); i++) {
             const int b = tgt->col_perm.data[i].becomes;
@@ -85,6 +114,9 @@ void
 dm_copy_col_info(const matrix_t* src, matrix_t* tgt)
 {
     copy_header_(&(src->col_perm), &(tgt->col_perm));
+
+    invalidate_min_max(&(tgt->row_perm));
+
     if (tgt->cols != src->cols) {
         for (int i = 0; i < dm_nrows(tgt); i++) {
             const int b = tgt->row_perm.data[i].becomes;
@@ -231,6 +263,20 @@ dm_set(matrix_t* m, int row, int col)
     if (!bitvector_is_set(&(m->bits), bitnr)) {
         m->row_perm.count[rowp]++;
         m->col_perm.count[colp]++;
+
+        // if cache is valid; update min and max
+        if (m->row_perm.min[rowp] != -1 || dm_ones_in_row(m, row) == 0) {
+            if (colp < m->row_perm.min[rowp]) m->row_perm.min[rowp] = colp;
+        }
+        if (m->col_perm.min[colp] != -1 || dm_ones_in_col(m, col) == 0) {
+            if (rowp < m->col_perm.min[colp]) m->col_perm.min[colp] = rowp;
+        }
+        if (m->row_perm.max[rowp] != -1 || dm_ones_in_row(m, row) == 0) {
+            if (colp > m->row_perm.max[rowp]) m->row_perm.max[rowp] = colp;
+        }
+        if (m->col_perm.max[colp] != -1 || dm_ones_in_col(m, col) == 0) {
+            if (rowp > m->col_perm.max[colp]) m->col_perm.max[colp] = rowp;
+        }
     }
 
     bitvector_set(&(m->bits), bitnr);
@@ -250,6 +296,48 @@ dm_unset(matrix_t* m, int row, int col)
     if (bitvector_is_set(&(m->bits), bitnr)) {
         m->row_perm.count[rowp]--;
         m->col_perm.count[colp]--;
+
+        // if cache is valid; update mins and maxs
+        if (m->row_perm.min[rowp] != -1 && colp == m->row_perm.min[rowp]) {
+            if (dm_ones_in_row(m, row) > 1) {
+                for (int i = col + 1; i < dm_ncols(m); i++) {
+                    if (dm_is_set(m, row, i)) {
+                        m->row_perm.min[rowp] = i;
+                        break;
+                    }
+                }
+            } else m->row_perm.min[rowp] = -1;
+        }
+        if (m->col_perm.min[colp] != -1 && rowp == m->col_perm.min[colp]) {
+            if (dm_ones_in_row(m, row) > 1) {
+                for (int i = row + 1; i < dm_nrows(m); i++) {
+                    if (dm_is_set(m, i, col)) {
+                        m->col_perm.min[colp] = i;
+                        break;
+                    }
+                }
+            } else m->col_perm.min[colp] = -1;
+        }
+        if (m->row_perm.max[rowp] != -1 && colp == m->row_perm.max[rowp]) {
+            if (dm_ones_in_col(m, col) > 1) {
+                for (int i = col - 1; i >= 0; i--) {
+                    if (dm_is_set(m, row, i)) {
+                        m->row_perm.max[rowp] = i;
+                        break;
+                    }
+                }
+            } else m->row_perm.max[rowp] = -1;
+        }
+        if (m->col_perm.max[colp] != -1 && rowp == m->col_perm.max[colp]) {
+            if (dm_ones_in_col(m, col) > 1) {
+                for (int i = row - 1; i >= 0; i--) {
+                    if (dm_is_set(m, i, col)) {
+                        m->col_perm.max[colp] = i;
+                        break;
+                    }
+                }
+            } else m->col_perm.max[colp] = -1;
+        }
     }
 
     bitvector_unset(&(m->bits), bitnr);
@@ -274,8 +362,8 @@ set_header_(matrix_header_t* p, int idx, int val)
     p->data[idx].becomes = val;
 }
 
-void
-dm_apply_permutation_group(matrix_header_t* p, const permutation_group_t* o)
+static void
+apply_permutation_group(matrix_header_t* p, const permutation_group_t* o)
 {
     // no work to do
     if (o->size == 0) return;
@@ -346,13 +434,17 @@ dm_print_perm(const matrix_header_t* p)
 void
 dm_permute_rows(matrix_t* m, const permutation_group_t* o)
 {
-    return dm_apply_permutation_group(&(m->row_perm), o);
+    invalidate_min_max(&(m->col_perm));
+
+    return apply_permutation_group(&(m->row_perm), o);
 }
 
 void
 dm_permute_cols(matrix_t* m, const permutation_group_t* o)
 {
-    return dm_apply_permutation_group(&(m->col_perm), o);
+    invalidate_min_max(&(m->row_perm));
+
+    return apply_permutation_group(&(m->col_perm), o);
 }
 
 void
@@ -389,8 +481,12 @@ dm_copy(const matrix_t* src, matrix_t* tgt)
     tgt->bits_per_row = src->bits_per_row;
     tgt->row_perm.data = NULL;
     tgt->row_perm.count = NULL;
+    tgt->row_perm.min = NULL;
+    tgt->row_perm.max = NULL;
     tgt->col_perm.data = NULL;
     tgt->col_perm.count = NULL;
+    tgt->col_perm.min = NULL;
+    tgt->col_perm.max = NULL;
     tgt->bits.data = NULL;
 
     copy_header_(&(src->row_perm), &(tgt->row_perm));
@@ -857,19 +953,73 @@ dm_ungroup_cols(matrix_t* m)
 int
 dm_first(const matrix_t* const m, const int row)
 {
-    for (int i = 0; i < dm_ncols(m); i++) {
-        if (dm_is_set(m, row, i)) return i;
+    const int rowp = m->row_perm.data[row].becomes;
+    if (m->row_perm.min[rowp] == -1) {
+        if (dm_ones_in_row(m, row) > 0) {
+            for (int i = 0; i < dm_ncols(m); i++) {
+                if (dm_is_set(m, row, i)) {
+                    m->row_perm.min[rowp] = i;
+                    break;
+                }
+            }
+        } else m->row_perm.min[rowp] = -1;
     }
-    return -1;
+
+    return m->row_perm.min[rowp];
 }
 
 int
 dm_last(const matrix_t* const m, const int row)
 {
-    for (int i = dm_ncols(m) - 1; i >= 0; i--) {
-        if (dm_is_set(m, row, i)) return i;
+    const int rowp = m->row_perm.data[row].becomes;
+    if (m->row_perm.max[rowp] == -1) {
+        if (dm_ones_in_row(m, row) > 0) {
+            for (int i = dm_ncols(m) - 1; i >= 0; i--) {
+                if (dm_is_set(m, row, i)) {
+                    m->row_perm.max[rowp] = i;
+                    break;
+                }
+            }
+        } else m->row_perm.max[rowp] = -1;
     }
-    return -1;
+
+    return m->row_perm.max[rowp];
+}
+
+int
+dm_top(const matrix_t* const m, const int col)
+{
+    const int colp = m->col_perm.data[col].becomes;
+    if (m->col_perm.min[colp] == -1) {
+        if (dm_ones_in_col(m, col) > 0) {
+            for (int i = 0; i < dm_nrows(m); i++) {
+                if (dm_is_set(m, i, col)) {
+                    m->col_perm.min[colp] = i;
+                    break;
+                }
+            }
+        } else m->col_perm.min[colp] = -1;
+    }
+
+    return m->col_perm.min[colp];
+}
+
+int
+dm_bottom(const matrix_t* const m, const int col)
+{
+    const int colp = m->col_perm.data[col].becomes;
+    if (m->col_perm.max[colp] == -1) {
+        if (dm_ones_in_col(m, col) > 0) {
+            for (int i = dm_nrows(m) - 1; i >= 0; i--) {
+                if (dm_is_set(m, i, col)) {
+                    m->col_perm.max[colp] = i;
+                    break;
+                }
+            }
+        } else m->col_perm.max[colp] = -1;
+    }
+
+    return m->col_perm.max[colp];
 }
 
 static inline int
