@@ -854,8 +854,8 @@ dm_ungroup_cols(matrix_t* m)
     }
 }
 
-static int
-first_(matrix_t* m, int row)
+int
+dm_first(const matrix_t* const m, const int row)
 {
     for (int i = 0; i < dm_ncols(m); i++) {
         if (dm_is_set(m, row, i)) return i;
@@ -863,8 +863,8 @@ first_(matrix_t* m, int row)
     return -1;
 }
 
-static int
-last_(matrix_t* m, int row)
+int
+dm_last(const matrix_t* const m, const int row)
 {
     for (int i = dm_ncols(m) - 1; i >= 0; i--) {
         if (dm_is_set(m, row, i)) return i;
@@ -875,7 +875,7 @@ last_(matrix_t* m, int row)
 static inline int
 row_costs_(matrix_t* m, int row)
 {
-    return last_(m, row) - first_(m, row) + 1;
+    return dm_last(m, row) - dm_first(m, row) + 1;
 }
 
 static int
@@ -1034,8 +1034,8 @@ dm_optimize(matrix_t* m)
 
         // initialize first and last integers per row
         for (int i = 0; i < dm_nrows(m); i++) {
-            firsts[i] = first_(m, i);
-            lasts[i] = last_(m, i);
+            firsts[i] = dm_first(m, i);
+            lasts[i] = dm_last(m, i);
         }
 
         // find best rotation
