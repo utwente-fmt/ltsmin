@@ -62,6 +62,40 @@ W2+;;
 
 rb4w;;
   Use special heuristics to move read dependencies before write dependences. Often a win in symbolic state space generation.
+
+wi;;
+  Writes information of the selected (*sr*, *sw*, *sc*) matrix to standard error. The following metrics are printed:
+  . Row bandwidth: the maximum distance of between non-copy entries of all rows. 
+  . Row profile: the sum of distances between non-copy entries of all rows.
+  . Row max wavefront: the maximum wavefront of all rows.
+  . Row avg wavefront: the average wavefront of all rows.
+  . Row RMS wavefront: the Root Mean Square wavefront of all rows.
+  . Col bandwidth: the maximum distance of between non-copy entries of all columns. 
+  . Col profile: the sum of distances between non-copy entries of all columns.
+  . Col max wavefront: the maximum wavefront of all columns.
+  . Col avg wavefront: the average wavefront of all columns.
+  . Col RMS wavefront: the Root Mean Square wavefront of all columns.
+  . Bandwidth: the maximum value of the row bandwidth and the column bandwidth.
+  . Profile: the sum of the row profile and the column profile.
+  . Max wavefront: the maximum value of the row maximum wavefront and column maximum wavefront.
+  . Avg wavefront: the average wavefront of the row wavefront and column wavefront.
+  . RMS wavefront: the Root Mean Square of the row wavefront and column wavefront.
+  
+sr;;
+ Select the read matrix for *cs*, *csa*, *cw*, *ca*, *rs*, *bcm*, *bs*, *bk*, *vcm*, *vacm*, *vgps* and *mi*.
+ 
+sw;;
+ Select the write matrix (default) for *cs*, *csa*, *cw*, *ca*, *rs*, *bcm*, *bs*, *bk*, *vcm*, *vacm*, *vgps* and *mi*.
+ The write matrix is the default selection, because only write dependencies can create new nodes in decision diagrams.
+ A bad variable order in the write matrix thus leads to a large number of peak nodes during reachability analysis.
+ A bad variable order in the read matrix can also lead to a slow reachability analysis, but typically
+ not as severe as a bad variable order in the write matrix. Slow reachability analysis due to a bad variable order
+ in the read matrix causes many recursive calls to the relational product operation. Typically it is best that read 
+ dependencies are moved to the top DD level, thus left most in the read matrix.
+  
+sc;;
+ Select the combined matrix for *cs*, *csa*, *cw*, *ca*, *rs*, *bcm*, *bs*, *bk*, *vcm*, *vacm*, *vgps* and *mi*.
+ The combined matrix is the logical or of the read and write matrix.
   
 bg;;
   Use a bipartite graph (default) for *bcm*, *bk*, *bs*, *vcm*, *vacm* and *vgps*.
