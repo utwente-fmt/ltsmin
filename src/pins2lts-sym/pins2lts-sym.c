@@ -105,7 +105,8 @@ static enum {
     PAR,
     PAR_P,
     CHAIN_P,
-    CHAIN
+    CHAIN,
+    NONE
 } strategy = BFS_P;
 
 static int expand_groups = 1; // set to 0 if transitions are loaded from file
@@ -122,6 +123,7 @@ static si_map_entry ORDER[] = {
     {"par-prev", PAR_P},
     {"chain-prev", CHAIN_P},
     {"chain", CHAIN},
+    {"none", NONE},
     {NULL, 0}
 };
 
@@ -232,7 +234,7 @@ POPT_TABLEEND
 
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST , (void*)reach_popt , 0 , NULL , NULL },
-    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par>" },
+    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par|none>" },
     { "inv-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize invariant detection", NULL },
     { "inv-bin-par", 0, POPT_ARG_VAL, &inv_bin_par, 1, "also parallelize every binary operand, may be slow when lots of state labels are to be evaluated (requires --inv-par)", NULL },
     { "mu-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize mu-calculus", NULL },
@@ -1983,6 +1985,14 @@ reach_stop(struct reach_s* node) {
         HREabort(LTSMIN_EXIT_UNSOUND);
     }
     reach_chain_stop();
+}
+
+static void
+reach_none(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
+    long *eg_count, long *next_count, long *guard_count)
+{
+    (void) visited; (void) visited_old; (void) reach_groups; (void) eg_count; (void) next_count; (void) guard_count;
+    Warning(info, "not doing anything");
 }
 
 static void
@@ -4163,6 +4173,9 @@ VOID_TASK_3(run_reachability, vset_t, states, char*, etf_output, rt_timer_t, tim
         break;
     case CHAIN:
         reach_proc = reach_chain;
+        break;
+    case NONE:
+        reach_proc = reach_none;
         break;
     }
 
