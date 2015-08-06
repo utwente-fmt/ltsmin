@@ -1,5 +1,6 @@
 #include <hre/config.h>
 
+#include <float.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -11,6 +12,7 @@
 #include <pins-lib/pins.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/dynamic-array.h>
+#include <util-lib/util.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 
 #ifdef HAVE_BOOST
@@ -29,7 +31,7 @@ static const char      *col_ins = NULL;
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
           "apply transformations to the dependency matrix: "
-          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w, mi, sw, sr, sc"
+          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w, mm, sw, sr, sc"
 #if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
       ", bg, tg"
 #endif
@@ -542,6 +544,203 @@ prepare_col_compare(rw_info_t *inf, struct group_info* context)
 }
 
 static void
+print_aggr(
+    const int type,
+    const char* name,
+    const int max_fc_digs,
+    const int max_sc_digs,
+    const int max_tc_digs,
+    const double tot,
+    const int tot_digs,
+    const double avg,
+    const double norm_tot,
+    const double max,
+    const int max_digs,
+    const double norm_max,
+    const double rms,
+    const int rms_digs,
+    const double norm_rms)
+{
+    printf("%-6s %-9s | %*.*g, %#*.*g (%#*.*g) | %*.*g (%#*.*g) | %#*.*g (%#*.*g)\n",
+        type ? "row" : "column",
+        name,
+        max(3, max_fc_digs), DBL_DIG, tot,
+        max(3, max_fc_digs), tot_digs, avg,
+        max(4, max_fc_digs), tot_digs, norm_tot,
+        max(3, max_sc_digs), DBL_DIG, max,
+        max(4, max_sc_digs + 2), max_digs, norm_max,
+        max(3, max_tc_digs), rms_digs, rms,
+        max(4, max_tc_digs), rms_digs, norm_rms);
+}
+
+static void
+print_dm_aggrs(const matrix_t* const m)
+{
+    int row_spans[dm_nrows(m)];
+    dm_row_spans(m, row_spans);
+
+    int col_wavefronts[dm_ncols(m)];
+    dm_col_wavefronts(m, col_wavefronts);
+
+    // compute row span aggregates
+    int trs_digs;
+    const double trs  = dm_row_aggr(m, row_spans, DM_AGGR_TOT, 0, &trs_digs);
+    // Siminiceanu, Ciardo: Normalized Event Span (NES)
+    const double ntrs = dm_row_aggr(m, row_spans, DM_AGGR_TOT, 1, NULL);
+    int mrs_digs;
+    const double ars  = dm_row_aggr(m, row_spans, DM_AGGR_AVG, 0, &mrs_digs);
+    const double mrs  = dm_row_aggr(m, row_spans, DM_AGGR_MAX, 0, NULL);
+    const double nmrs = dm_row_aggr(m, row_spans, DM_AGGR_MAX, 1, NULL);
+    int rmsrs_digs;
+    const double rmsrs  = dm_row_aggr(m, row_spans, DM_AGGR_RMS, 0, &rmsrs_digs);
+    const double nrmsrs  = dm_row_aggr(m, row_spans, DM_AGGR_RMS, 1, NULL);
+
+    // compute column wavefront aggregates
+    int tcwf_digs;
+    const double tcwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_TOT, 0, &tcwf_digs);
+    const double ntcwf = dm_col_aggr(m, col_wavefronts, DM_AGGR_TOT, 1, NULL);
+    int mcwf_digs;
+    const double acwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_AVG, 0, &mcwf_digs);
+    const double mcwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_MAX, 0, NULL);
+    const double nmcwf = dm_col_aggr(m, col_wavefronts, DM_AGGR_MAX, 1, NULL);
+    int rmscwf_digs;
+    const double rmscwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_RMS, 0, &rmscwf_digs);
+    const double nrmscwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_RMS, 1, NULL);
+
+    // max digits in first column
+    int max_fc_digs = max(trs_digs, tcwf_digs);
+
+    // max digits in second column
+    int max_sc_digs = max(mrs_digs, mcwf_digs);
+
+    // max digits in third column
+    int max_tc_digs = max(rmsrs_digs, rmscwf_digs);
+
+    // row bandwidth aggregates
+    int trb_digs = 0, mrb_digs = 0, rmsrb_digs = 0;
+    double trb = 0, ntrb = 0, arb = 0, mrb = 0, nmrb = 0, rmsrb = 0, nrmsrb = 0;
+
+    // column bandwidth aggregates
+    int tcb_digs = 0, mcb_digs = 0, rmscb_digs = 0;
+    double tcb = 0, ntcb = 0, acb = 0, mcb = 0, nmcb = 0, rmscb = 0, nrmscb = 0;
+
+    // column span aggregates
+    int tcs_digs = 0, mcs_digs = 0, rmscs_digs = 0;
+    double tcs = 0, ntcs = 0, acs = 0, mcs = 0, nmcs = 0, rmscs = 0, nrmscs = 0;
+
+    // row wavefront aggregates
+    int trwf_digs = 0, mrwf_digs = 0, rmsrwf_digs = 0;
+    double trwf = 0, ntrwf = 0, arwf = 0, mrwf = 0, nmrwf = 0, rmsrwf = 0, nrmsrwf = 0;
+
+    if (log_active(infoLong)) {
+
+        int row_bandwidths[dm_nrows(m)];
+        dm_row_bandwidths(m, row_bandwidths);
+
+        int col_bandwidths[dm_ncols(m)];
+        dm_col_bandwidths(m, col_bandwidths);
+
+        int col_spans[dm_ncols(m)];
+        dm_col_spans(m, col_spans);
+
+        int row_wavefronts[dm_nrows(m)];
+        dm_row_wavefronts(m, row_wavefronts);
+
+        // compute row bandwidth aggregates
+        trb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_TOT, 0, &trb_digs);
+        ntrb = dm_row_aggr(m, row_bandwidths, DM_AGGR_TOT, 1, NULL);
+        arb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_AVG, 0, &mrs_digs);
+        mrb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_MAX, 0, NULL);
+        nmrb = dm_row_aggr(m, row_bandwidths, DM_AGGR_MAX, 1, NULL);
+        rmsrb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_RMS, 0, &rmsrb_digs);
+        nrmsrb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_RMS, 1, NULL);
+
+        // compute column bandwidth aggregates
+        tcb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_TOT, 0, &tcb_digs);
+        ntcb = dm_col_aggr(m, col_bandwidths, DM_AGGR_TOT, 1, NULL);
+        acb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_AVG, 0, &mcb_digs);
+        mcb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_MAX, 0, NULL);
+        nmcb = dm_col_aggr(m, col_bandwidths, DM_AGGR_MAX, 1, NULL);
+        rmscb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_RMS, 0, &rmscb_digs);
+        nrmscb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_RMS, 1, NULL);
+
+        // compute column span aggregates
+        tcs  = dm_col_aggr(m, col_spans, DM_AGGR_TOT, 0, &tcs_digs);
+        ntcs = dm_col_aggr(m, col_spans, DM_AGGR_TOT, 1, NULL);
+        acs  = dm_col_aggr(m, col_spans, DM_AGGR_AVG, 0, &mcs_digs);
+        mcs  = dm_col_aggr(m, col_spans, DM_AGGR_MAX, 0, NULL);
+        nmcs = dm_col_aggr(m, col_spans, DM_AGGR_MAX, 1, NULL);
+        rmscs  = dm_col_aggr(m, col_spans, DM_AGGR_RMS, 0, &rmscs_digs);
+        nrmscs  = dm_col_aggr(m, col_spans, DM_AGGR_RMS, 1, NULL);
+
+        // compute row wavefront aggregates
+        trwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_TOT, 0, &trwf_digs);
+        ntrwf = dm_row_aggr(m, row_wavefronts, DM_AGGR_TOT, 1, NULL);
+        arwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_AVG, 0, &mrwf_digs);
+        mrwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_MAX, 0, NULL);
+        nmrwf = dm_row_aggr(m, row_wavefronts, DM_AGGR_MAX, 1, NULL);
+        rmsrwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_RMS, 0, &rmsrwf_digs);
+        nrmsrwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_RMS, 1, NULL);
+
+        // recompute max digits
+        max_fc_digs = max(max(max(max(max_fc_digs, trb_digs), tcb_digs), tcs_digs), trwf_digs);
+        max_sc_digs = max(max(max(max(max_sc_digs, mrs_digs), mcb_digs), mrs_digs), mcs_digs);
+        max_tc_digs = max(max(max(max(max_tc_digs, rmsrs_digs), rmscb_digs), rmscs_digs), rmsrwf_digs);
+    }
+
+    const double nra = ntrs * ntcwf;
+    printf("Normalized Region Activity (NRA)     : %.*g\n", max(trs_digs, tcwf_digs), nra);
+
+    // Siminiceanu, Ciardo
+    double wes = 0;
+    for (int i = 0; i < dm_nrows(m); i++) {
+        wes += ((double) dm_ncols(m) - dm_first(m, i) / (dm_ncols(m) / 2.0)) * (double) (row_spans[i] / ((double) dm_nrows(m) * dm_ncols(m)));
+    }
+    printf("Weighted Event Span, moment 1 (WES^1): %.*g\n", trs_digs, wes);
+
+    printf("aggr           |");
+    const int fc = printf("%*ctot,%*cavg %*c(norm) ", max_fc_digs - 3, ' ', max_fc_digs - 1, ' ', max_fc_digs - 2, ' ');
+    const int sc = printf("|%*cmax%*c(norm) ", max_sc_digs - 3, ' ', max_sc_digs - 1, ' ') - 1;
+    const int tc = printf("|%*cRMS%*c(norm)\n", max_tc_digs - 1, ' ', max_tc_digs - 1, ' ') - 2;
+    char fcc[fc + 1];
+    memset(fcc, (int)'-',fc); fcc[fc] = '\0';
+    char scc[sc + 1];
+    memset(scc, (int)'-',sc); scc[sc] = '\0';
+    char tcc[tc + 1];
+    memset(tcc, (int)'-',tc); tcc[tc] = '\0';
+
+    print_aggr(
+        1, "span",
+        max_fc_digs, max_sc_digs, max_tc_digs,
+        trs, trs_digs, ars, ntrs, mrs, mrs_digs, nmrs, rmsrs, rmsrs_digs, nrmsrs);
+    print_aggr(
+        0, "wavefront",
+        max_fc_digs, max_sc_digs, max_tc_digs,
+        tcwf, tcwf_digs, acwf, ntcwf, mcwf, mcwf_digs, nmcwf, rmscwf, rmscwf_digs, nrmscwf);
+
+    if (log_active(infoLong)) {
+        printf("-----------------+%s+%s+%s\n", fcc, scc, tcc);
+        print_aggr(
+            1, "bandwidth",
+            max_fc_digs, max_sc_digs, max_tc_digs,
+            trb, trb_digs, arb, ntrb, mrb, mrb_digs, nmrb, rmsrb, rmsrb_digs, nrmsrb);
+        print_aggr(
+            0, "bandwidth",
+            max_fc_digs, max_sc_digs, max_tc_digs,
+            tcb, tcb_digs, acb, ntcb, mcb, mcb_digs, nmcb, rmscb, rmscb_digs, nrmscb);
+        print_aggr(
+            0, "span",
+            max_fc_digs, max_sc_digs, max_tc_digs,
+            tcs, tcs_digs, acs, ntcs, mcs, mcs_digs, nmcs, rmscs, rmscs_digs, nrmscs);
+        print_aggr(
+            1, "wavefront",
+            max_fc_digs, max_sc_digs, max_tc_digs,
+            trwf, trwf_digs, arwf, ntrwf, mrwf, mrwf_digs, nmrwf, rmsrwf, rmsrwf_digs, nrmsrwf);
+    }
+    printf("-----------------+%s+%s+%s\n", fcc, scc, tcc);
+}
+
+static void
 apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const char* sep)
 {
     HREassert(
@@ -714,7 +913,10 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 apply_permutation(inf, row_perm, col_perm);
             }
 #endif
-            else if (strcasecmp (tok, "gsa") == 0) {
+            else if (strcasecmp (tok, "mm") == 0) {
+                Print1 (info, "Regroup Matrix Metrics");
+                print_dm_aggrs(selection);
+            } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
                 apply_regroup_spec (inf, macro, guards, sep);
