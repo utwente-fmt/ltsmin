@@ -1696,3 +1696,64 @@ dm_col_wavefronts(const matrix_t* const m, int* const wavefronts)
     return wavefronts;
 }
 
+static double
+aggr_op(const int size, int* const vals, dm_aggr_op_t op) {
+    double result = 0;
+    for (int i = 0; i < size; i++) {
+        switch(op) {
+        case DM_AGGR_MAX:
+            if (vals[i] > result) result = vals[i];
+            break;
+        case DM_AGGR_TOT:
+        case DM_AGGR_AVG:
+            result += vals[i];
+            break;
+        case DM_AGGR_RMS:
+            result += vals[i] * vals[i];
+            break;
+        default:
+            Warning(error, "unknown aggr");
+            HREabort(LTSMIN_EXIT_FAILURE);
+        }
+    }
+
+    switch(op) {
+    case DM_AGGR_AVG:
+    case DM_AGGR_RMS:
+        result /= size;
+        break;
+    default:
+        break;
+    }
+    if (op == DM_AGGR_RMS) result = sqrt(result);
+
+    return result;
+}
+
+double
+dm_row_aggr(const matrix_t* const m, int* const rows_aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig)
+{
+    double result = aggr_op(dm_nrows(m), rows_aggr, op);
+    if (normalize) {
+        if (op == DM_AGGR_TOT) result /= dm_nrows(m) * dm_ncols(m);
+        else result /= dm_ncols(m);
+    }
+
+    if (sig_dec_dig != NULL) *sig_dec_dig = snprintf(NULL, 0, "%zd", dm_ncols(m) * (size_t) dm_nrows(m));
+
+    return result;
+}
+
+double
+dm_col_aggr(const matrix_t* const m, int* const cols_aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig)
+{
+    double result = aggr_op(dm_ncols(m), cols_aggr, op);
+    if (normalize) {
+        if (op == DM_AGGR_TOT) result /= dm_ncols(m) * dm_nrows(m);
+        else result /= dm_nrows(m);
+    }
+
+    if (sig_dec_dig != NULL) *sig_dec_dig = snprintf(NULL, 0, "%zd", dm_ncols(m) * (size_t) dm_nrows(m));
+
+    return result;
+}
