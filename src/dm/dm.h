@@ -197,6 +197,11 @@ extern int* dm_col_spans(const matrix_t* const m, int* const spans);
 extern int* dm_row_wavefronts(const matrix_t* const m, int* const wavefronts);
 extern int* dm_col_wavefronts(const matrix_t* const m, int* const wavefronts);
 
+typedef enum { DM_AGGR_MAX, DM_AGGR_TOT, DM_AGGR_AVG, DM_AGGR_RMS } dm_aggr_op_t;
+
+extern double dm_row_aggr(const matrix_t* const m, int* const rows_aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig);
+extern double dm_col_aggr(const matrix_t* const m, int* const cols_aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig);
+
 #ifdef __cplusplus
 }
 #endif
