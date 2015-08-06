@@ -1022,22 +1022,6 @@ dm_bottom(const matrix_t* const m, const int col)
     return m->col_perm.max[colp];
 }
 
-static inline int
-row_costs_(matrix_t* m, int row)
-{
-    return dm_last(m, row) - dm_first(m, row) + 1;
-}
-
-static int
-cost_(matrix_t* m)
-{
-    int result = 0;
-    for (int i = 0; i < dm_nrows(m); i++) {
-        result += row_costs_(m, i);
-    }
-    return result;
-}
-
 // Simulated annealing routine taken from Skiena's Algorithm Design Manual
 static int COOL_STEPS = 500;
 static int TEMP_STEPS = 1000;
@@ -1050,7 +1034,8 @@ void
 dm_anneal(matrix_t* m)
 {
     int ncols = dm_ncols(m);
-    double cur_cost = cost_(m);
+    int row_spans[dm_nrows(m)];
+    double cur_cost = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL);
     double temp = INIT_TEMP;
 
     srandom(time(NULL));
@@ -1077,7 +1062,7 @@ dm_anneal(matrix_t* m)
                 dm_free_permutation_group(&rot);
             }
 
-            double delta = cost_(m) - cur_cost;
+            double delta = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL) - cur_cost;
 
             if (delta < 0) {
                 cur_cost += delta;
@@ -1108,7 +1093,7 @@ dm_anneal(matrix_t* m)
         if (cur_cost - start_cost < 0.0) temp /= COOL_FRAC;
     }
 
-    DMDBG (printf ("cost: %d ", cost_ (mayw)));
+    DMDBG (printf ("cost: %d ", dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL)));
 }
 
 int
@@ -1174,7 +1159,8 @@ dm_optimize(matrix_t* m)
     int d_rot[dm_ncols(m)];
     permutation_group_t rot;
 
-    int best_i = 0, best_j = 0, min = cost_(m), last_min = 0;
+    int row_spans[dm_nrows(m)];
+    int best_i = 0, best_j = 0, min = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL), last_min = 0;
 
     int firsts[dm_nrows(m)];
     int lasts[dm_nrows(m)];
@@ -1214,12 +1200,12 @@ dm_optimize(matrix_t* m)
             dm_free_permutation_group(&rot);
 
             DMDBG (printf("best rotation: %d-%d, costs %d\n", best_i, best_j, min));
-            DMDBG (dm_print_combined (stdout, r, mayw, mustw));
+            DMDBG (dm_print (stdout, m));
 
             best_i = best_j = 0;
         }
     }
-    DMDBG (printf ("cost: %d ", cost_ (mayw)));
+    DMDBG (printf ("cost: %d ", dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL)));
 }
 
 static inline void
@@ -1251,14 +1237,15 @@ dm_all_perm(matrix_t* m)
     int perm[len];
     int best_perm[len];
 
-    int min = cost_(m);
+    int row_spans[dm_nrows(m)];
+    int min = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL);
 
     for (int i = 0; i < len; i++) {
         perm[i] = best_perm[i] = i;
     }
 
     while (1) {
-        const int last_min = cost_(m);
+        const int last_min = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL);
         if (last_min < min) {
             memcpy(best_perm, perm, len * sizeof(int));
             min = last_min;
@@ -1323,7 +1310,7 @@ dm_all_perm(matrix_t* m)
     }
     DMDBG (printf ("current:"));
     DMDBG (current_all_perm_ (perm, len));
-    DMDBG (printf ("cost: %d ", cost_ (mayw)));
+    DMDBG (printf ("cost: %d ", dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL)));
 }
 
 void
