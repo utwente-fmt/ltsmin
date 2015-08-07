@@ -75,6 +75,7 @@ extern void dm_set(matrix_t* m, const int row, const int col);
 extern void dm_unset(matrix_t* m, const int row, const int col);
 extern int dm_is_set(const matrix_t* m, const int row, const int col);
 
+typedef void (*dm_permute_fn)(matrix_t* m, const permutation_group_t* o);
 extern void dm_permute_rows(matrix_t* m, const permutation_group_t* o);
 extern void dm_permute_cols(matrix_t* m, const permutation_group_t* o);
 
@@ -101,7 +102,15 @@ extern void dm_ungroup_cols(matrix_t* m);
 extern void dm_print(FILE* f, const matrix_t* m);
 extern void dm_print_combined(FILE* f, const matrix_t* r, const matrix_t* mayw, const matrix_t* mustw);
 
-extern void dm_anneal(matrix_t* m);
+typedef enum { DM_AGGR_MAX, DM_AGGR_TOT, DM_AGGR_AVG, DM_AGGR_RMS } dm_aggr_op_t;
+
+typedef double (*dm_cost_fn)(const matrix_t* const m, int* const vec, dm_aggr_op_t op, int* normalize, int* sig_dec_digs);
+
+typedef enum { DM_ROW, DM_COLUMN } dm_row_column_t;
+
+typedef void (*dm_cost_cb)(const matrix_t* const m, const double costs);
+
+extern void dm_anneal(matrix_t* m, dm_row_column_t rc, dm_cost_fn fn, dm_aggr_op_t aop, const int timeout, dm_cost_cb cb);
 extern void dm_optimize(matrix_t* m);
 extern void dm_all_perm(matrix_t* m);
 
@@ -188,17 +197,16 @@ extern int dm_is_empty(const matrix_t* m);
 extern void dm_bitvector_row(bitvector_t* bv, const matrix_t* m, int row);
 extern void dm_bitvector_col(bitvector_t* bv, const matrix_t* m, int col);
 
-extern int* dm_row_bandwidths(const matrix_t* const m, int* const bandwidths);
-extern int* dm_col_bandwidths(const matrix_t* const m, int* const bandwidths);
+extern double dm_row_bandwidths(const matrix_t* const m, int* const bandwidths, dm_aggr_op_t op, int* normalize, int* sig_dec_dig);
+extern double dm_col_bandwidths(const matrix_t* const m, int* const bandwidths, dm_aggr_op_t op, int* normalize, int* sig_dec_dig);
 
-extern int* dm_row_spans(const matrix_t* const m, int* const spans);
-extern int* dm_col_spans(const matrix_t* const m, int* const spans);
+extern double dm_row_spans(const matrix_t* const m, int* const spans, dm_aggr_op_t op, int* normalize, int* sig_dec_dig);
+extern double dm_col_spans(const matrix_t* const m, int* const spans, dm_aggr_op_t op, int* normalize, int* sig_dec_dig);
 
-extern int* dm_row_wavefronts(const matrix_t* const m, int* const wavefronts);
-extern int* dm_col_wavefronts(const matrix_t* const m, int* const wavefronts);
+extern double dm_row_wavefronts(const matrix_t* const m, int* const wavefronts, dm_aggr_op_t op, int* normalize, int* sig_dec_dig);
+extern double dm_col_wavefronts(const matrix_t* const m, int* const wavefronts, dm_aggr_op_t op, int* normalize, int* sig_dec_dig);
 
-typedef enum { DM_AGGR_MAX, DM_AGGR_TOT, DM_AGGR_AVG, DM_AGGR_RMS } dm_aggr_op_t;
-
+typedef double (*dm_aggr_fn)(const matrix_t* const m, int* const aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig);
 extern double dm_row_aggr(const matrix_t* const m, int* const rows_aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig);
 extern double dm_col_aggr(const matrix_t* const m, int* const cols_aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig);
 
