@@ -15,6 +15,9 @@
 #include <util-lib/fast_set.h>
 #include <pins2lts-mc/algorithm/ltl.h>
 
+#if SEARCH_COMPLETE_GRAPH
+#include <mc-lib/dlopen_extra.h>
+#endif
 
 #if HAVE_PROFILER
 #include <gperftools/profiler.h>
@@ -85,6 +88,10 @@ ufscc_local_init   (run_t *run, wctx_t *ctx)
     ctx->local->cnt.union_success           = 0;
     ctx->local->cnt.removed_from_list_count = 0;
 
+#if SEARCH_COMPLETE_GRAPH
+    dlopen_setup (files[0]);
+#endif
+
     (void) run; 
 }
 
@@ -126,6 +133,20 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti, int see
     (void) arg; (void) ti; (void) seen;
 }
 
+
+#if SEARCH_COMPLETE_GRAPH
+void
+permute_complete (void *arg, transition_info_t *ti, state_data_t dst, int *cpy) {
+    wctx_t              *ctx        = (wctx_t *) arg;
+    alg_local_t         *loc        = ctx->local;
+
+    loc->target->ref = (ref_t) dst[0];
+    ufscc_handle (ctx, loc->target, ti, 0);
+
+    (void) cpy;
+}
+#endif
+
 static size_t
 explore_state (wctx_t *ctx)
 {
@@ -142,8 +163,16 @@ explore_state (wctx_t *ctx)
 
     increase_level (ctx->counters);
     dfs_stack_enter (loc->dstack);
-    size_t trans = permute_trans (ctx->permute, ctx->state, ufscc_handle, ctx);
 
+#if SEARCH_COMPLETE_GRAPH
+    int ref_arr[2];
+    ref_arr[0] =  (int) ctx->state->ref;
+
+    // bypass the pins interface
+    size_t trans = dlopen_next_state (NULL, 0, ref_arr, permute_complete, ctx);
+#else
+    size_t trans = permute_trans (ctx->permute, ctx->state, ufscc_handle, ctx);
+#endif
     ctx->counters->explored ++;
     run_maybe_report1 (ctx->run, ctx->counters, "");
 
@@ -157,54 +186,20 @@ ufscc_init  (wctx_t *ctx)
     uf_alg_shared_t        *shared     = (uf_alg_shared_t*) ctx->run->shared;
     transition_info_t       ti         = GB_NO_TRANSITION;
 
-    // put the initial state on the stack
-    ufscc_handle (ctx, ctx->initial, &ti, 0);
 
-    char result = uf_make_claim(shared->uf, ctx->initial->ref, ctx->id);
+#if SEARCH_COMPLETE_GRAPH
+    ufscc_handle (ctx, loc->target, &ti, 0);
+    char result = uf_make_claim (shared->uf, loc->target->ref, ctx->id);
+#else
+    ufscc_handle (ctx, ctx->initial, &ti, 0);
+    char result = uf_make_claim (shared->uf, ctx->initial->ref, ctx->id);
+#endif
     
     if (result == CLAIM_FIRST) {
         loc->cnt.unique_states ++;
         ctx->counters->explored ++; // increase global counters
     }
 }
-
-/*bool
-getNextSuccessor (wctx_t *ctx, state_info_t *si, size_t *next_group) 
-{
-    // Iterates over the pins groups and searches for successors
-    // returns true if a successor is found, also sets next_group
-    // if we iterated over all groups, we set next_group to nGroups
-
-    alg_local_t            *loc        = ctx->local;
-    size_t                  nGroups    = pins_get_group_count(ctx->model);
-    int                     count;
-
-    if (*next_group == nGroups) 
-        return false;
-
-    do {
-        count = permute_next (ctx->permute, si, *next_group, ufscc_handle, ctx); 
-
-        //T//HREassert(count <= 1, "TODO: implement handling multiple states in group");
-
-        // slight improvement: increment with relative prime of nGroups
-        
-        *next_group = *next_group + 1;
-        if (*next_group == nGroups) 
-            *next_group = 0;
-
-        if (count == 1) {
-            if (*next_group == loc->start_group)
-                *next_group = nGroups;
-            return true;
-        }
-    } while (*next_group != loc->start_group);
-
-    //T//HREassert(*next_group == loc->start_group);
-
-    *next_group = nGroups;
-    return false;
-}*/
 
 void 
 print_worker_stats (wctx_t *ctx)
@@ -216,7 +211,6 @@ print_worker_stats (wctx_t *ctx)
     Warning(info, "Removed from list count:   %d", loc->cnt.removed_from_list_count);
     Warning(info, "Marked dead count:         %d", loc->cnt.marked_dead_count);
 }
-
 
 void
 successor (wctx_t *ctx)
@@ -455,12 +449,20 @@ ufscc_run  (run_t *run, wctx_t *ctx)
 
 #if HAVE_PROFILER
     if (ctx->id == 0)
-        Warning(info, "Using the profiler");
-    ProfilerStart("ufscc.perf");
+        Warning (info, "Using the profiler");
+    ProfilerStart ("ufscc.perf");
+#endif
+
+#if SEARCH_COMPLETE_GRAPH
+    int init_state = dlopen_get_worker_initial_state (ctx->id, W);
+    int inits = 0;
+    while (1)
+    {
+        inits ++;
+        loc->target->ref = init_state;
 #endif
 
     ufscc_init (ctx);
-
 
     // explore initial state
     state_data = dfs_stack_top (loc->dstack);
@@ -484,18 +486,20 @@ ufscc_run  (run_t *run, wctx_t *ctx)
         }
     }
 
+#if SEARCH_COMPLETE_GRAPH
+        init_state = dlopen_get_new_initial_state (init_state);
+        if (init_state == -1) {
+            Warning(info, "Number of inits : %d", inits);
+            break;
+        }
+    }
+#endif
 
 #if HAVE_PROFILER
     if (ctx->id == 0)
         Warning(info, "Done profiling");
     ProfilerStop();
 #endif
-
-    //print_worker_stats(ctx);
-
-    //if (!run_is_stopped(run) && dfs_stack_size(loc->dstack) != 0)
-    //    Warning (info, "Stack not empty: %zu ", dfs_stack_size(loc->dstack));
-    
 
     (void) run;
 }
