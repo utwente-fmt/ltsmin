@@ -10,6 +10,14 @@
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/fast_set.h>
 
+#if SEARCH_COMPLETE_GRAPH
+#include <mc-lib/dlopen_extra.h>
+#endif
+
+#if HAVE_PROFILER
+#include <gperftools/profiler.h>
+#endif
+
 
 #define SCC_STATE  GRED
 
@@ -85,6 +93,10 @@ tarjan_scc_local_init   (run_t *run, wctx_t *ctx)
     // create set (ref_t -> pointer to stack item)
     ctx->local->states = fset_create (sizeof(ref_t), sizeof(raw_data_t), 10, dbs_size);
 
+#if SEARCH_COMPLETE_GRAPH
+    dlopen_setup (files[0]);
+#endif
+
     (void) run; 
 }
 
@@ -139,6 +151,20 @@ tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti, int se
     (void) ti; (void) seen;
 }
 
+
+#if SEARCH_COMPLETE_GRAPH
+void
+permute_complete_tarjan (void *arg, transition_info_t *ti, state_data_t dst, int *cpy) {
+    wctx_t              *ctx        = (wctx_t *) arg;
+    alg_local_t         *loc        = ctx->local;
+
+    loc->target->ref = (ref_t) dst[0];
+    tarjan_handle (ctx, loc->target, ti, 0);
+
+    (void) cpy;
+}
+#endif
+
 static inline void
 explore_state (wctx_t *ctx)
 {
@@ -147,8 +173,17 @@ explore_state (wctx_t *ctx)
     dfs_stack_enter (loc->stack);
     increase_level (ctx->counters);
 
-    Debug ("Exploring %zu (%d, %d)", ctx->state->ref, loc->cnt.tarjan_counter, loc->cnt.tarjan_counter)
+    Debug ("Exploring %zu (%d, %d)", ctx->state->ref, loc->cnt.tarjan_counter, loc->cnt.tarjan_counter);
+
+#if SEARCH_COMPLETE_GRAPH
+    int ref_arr[2];
+    ref_arr[0] =  (int) ctx->state->ref;
+
+    // bypass the pins interface
+    dlopen_next_state (NULL, 0, ref_arr, permute_complete_tarjan, ctx);
+#else
     permute_trans (ctx->permute, ctx->state, tarjan_handle, ctx);
+#endif
 
     ctx->counters->explored++;
     work_counter_t     *cnt = ctx->counters;
@@ -159,12 +194,18 @@ static void
 tarjan_scc_init  (wctx_t *ctx)
 {
     // put the initial state on the stack
-    transition_info_t       ti = GB_NO_TRANSITION;
+    transition_info_t       ti  = GB_NO_TRANSITION;
+
+#if SEARCH_COMPLETE_GRAPH
+    alg_local_t            *loc = ctx->local;
+    tarjan_handle (ctx, loc->target, &ti, 0);
+#else
     tarjan_handle (ctx, ctx->initial, &ti, 0);
 
     // reset explored and transition count
     ctx->counters->explored     = 0;
     ctx->counters->trans        = 0;
+#endif
 }
 
 
@@ -242,6 +283,29 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
 void
 tarjan_scc_run  (run_t *run, wctx_t *ctx)
 {
+
+
+#if HAVE_PROFILER
+    if (ctx->id == 0)
+        Warning (info, "Using the profiler");
+    ProfilerStart ("tarjan.perf");
+#endif
+
+#if SEARCH_COMPLETE_GRAPH
+    alg_local_t *loc = ctx->local;
+    int init_state = dlopen_get_worker_initial_state (ctx->id, W);
+
+    // reset explored and transition count
+    ctx->counters->explored     = 0;
+    ctx->counters->trans        = 0;
+
+    int inits = 0;
+    while (1)
+    {
+        inits ++;
+        loc->target->ref = init_state;
+#endif
+
     tarjan_scc_init (ctx);
     
     alg_local_t            *loc = ctx->local;
@@ -312,7 +376,22 @@ tarjan_scc_run  (run_t *run, wctx_t *ctx)
             dfs_stack_pop (loc->stack);
         }
     }
+
+#if SEARCH_COMPLETE_GRAPH
+        init_state = dlopen_get_new_initial_state (init_state);
+        if (init_state == -1) {
+            Warning(info, "Number of inits : %d", inits);
+            break;
+        }
+    }
+#endif
     
+#if HAVE_PROFILER
+    if (ctx->id == 0)
+        Warning(info, "Done profiling");
+    ProfilerStop();
+#endif
+
     if (!run_is_stopped(run) && dfs_stack_size(loc->tarjan) != 0)
         Warning (info, "Tarjan stack not empty: %zu (stack %zu)", dfs_stack_size(loc->tarjan), dfs_stack_size(loc->stack));
     if (!run_is_stopped(run) && fset_count(loc->states) != 0)
