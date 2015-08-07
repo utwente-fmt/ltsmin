@@ -3,6 +3,7 @@
 #include <float.h>
 #include <limits.h>
 #include <math.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -1022,6 +1023,36 @@ dm_bottom(const matrix_t* const m, const int col)
     return m->col_perm.max[colp];
 }
 
+static int sig_show = 0;
+static int sig_stop = 0;
+
+static void
+catch_sig(int sig)
+{
+    if (sig == SIGINT) sig_show = 1;
+    if (sig == SIGTSTP) sig_stop = 1;
+}
+
+static void
+print_progress(const matrix_t* const m, dm_cost_fn fn, dm_aggr_op_t op, long double num_perms, rt_timer_t timer)
+{
+    int costs[max(dm_nrows(m), dm_ncols(m))];
+    int sig_digs = INT_MAX;
+    int normalize = 0;
+    const double cost = fn(m, costs, op, &normalize, &sig_digs);
+    if (normalize) {
+        Warning(info, "Current costs: %.*g (normalized)", sig_digs, cost);
+    } else {
+        normalize = 1;
+        const double norm = fn(m, costs, op, &normalize, NULL);
+        Warning(info, "Current costs: %.*g (%.*g)", sig_digs, cost, sig_digs, norm);
+    }
+    Warning(infoLong,
+        "Anneal time: %.1f seconds, total permutations: %Lg, %.1Lf permutations/second",
+        RTrealTime(timer), num_perms, num_perms / RTrealTime(timer));
+    sig_show = 0;
+}
+
 // Simulated annealing routine taken from Skiena's Algorithm Design Manual
 static int COOL_STEPS = 500;
 static int TEMP_STEPS = 1000;
@@ -1031,38 +1062,61 @@ static double E = 2.71828;
 static double K = 0.01;
 
 void
-dm_anneal(matrix_t* m)
+dm_anneal(matrix_t* m, dm_row_column_t rc, dm_cost_fn fn, dm_aggr_op_t op, const int timeout, dm_cost_cb cb)
 {
-    int ncols = dm_ncols(m);
-    int row_spans[dm_nrows(m)];
-    double cur_cost = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL);
+    int size;
+    int costs[max(dm_ncols(m), dm_nrows(m))];
+    dm_permute_fn permute_fn;
+    if (rc == DM_ROW) {
+        size = dm_nrows(m);
+        permute_fn = dm_permute_rows;
+    } else { // rc == DM_COLUMNS
+        size = dm_ncols(m);
+        permute_fn = dm_permute_cols;
+    }
+
+    int normalize = 0;
+    double cur_cost = fn(m, costs, op, &normalize, NULL);
+    if (cb != NULL) cb(m, cur_cost);
+
     double temp = INIT_TEMP;
 
     srandom(time(NULL));
 
-    for (int cool_step = 0; cool_step < COOL_STEPS; cool_step++) {
+    signal(SIGINT, catch_sig);
+    signal(SIGTSTP, catch_sig);
+    Warning(info, "Press ctrl+c to show current costs.");
+    Warning(info, "Press ctrl+z to stop and use current permutation.");
+
+    rt_timer_t timer = RTcreateTimer();
+    RTstartTimer(timer);
+
+    long double num_perms = 0;
+
+    for (int cool_step = 0; cool_step < COOL_STEPS && !sig_stop && (timeout < 0 || RTrealTime(timer) < timeout); cool_step++) {
         double start_cost = cur_cost;
         temp *= COOL_FRAC;
 
-        for (int temp_step = 0; temp_step < TEMP_STEPS; temp_step++) {
-            int i = random() % ncols;
-            int j = random() % ncols;
+        for (int temp_step = 0; temp_step < TEMP_STEPS && !sig_stop && (timeout < 0 || RTrealTime(timer) < timeout); temp_step++) {
+            int i = random() % size;
+            int j = random() % size;
 
             if (i != j) {
-                int d_rot[ncols];
+                int d_rot[size];
                 permutation_group_t rot;
                 int d = i < j ? 1 : -1;
 
-                dm_create_permutation_group(&rot, ncols, d_rot);
+                dm_create_permutation_group(&rot, size, d_rot);
                 for (int k = i; k != j; k += d) {
                     dm_add_to_permutation_group(&rot, k);
                 }
                 dm_add_to_permutation_group(&rot, j);
-                dm_permute_cols(m, &rot);
+                permute_fn(m, &rot);
                 dm_free_permutation_group(&rot);
             }
 
-            double delta = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL) - cur_cost;
+            const double cost = fn(m, costs, op, &normalize, NULL);
+            double delta = cost - cur_cost;
 
             if (delta < 0) {
                 cur_cost += delta;
@@ -1075,25 +1129,36 @@ dm_anneal(matrix_t* m)
                 if (merit > flip) {
                     cur_cost += delta;
                 } else if (i != j) {
-                    int d_rot[ncols];
+                    int d_rot[size];
                     permutation_group_t rot;
                     int d = i < j ? 1 : -1;
 
-                    dm_create_permutation_group(&rot, ncols, d_rot);
+                    dm_create_permutation_group(&rot, size, d_rot);
                     for (int k = j; k != i; k += -d) {
                         dm_add_to_permutation_group(&rot, k);
                     }
                     dm_add_to_permutation_group(&rot, i);
-                    dm_permute_cols(m, &rot);
+                    permute_fn(m, &rot);
                     dm_free_permutation_group(&rot);
                 }
             }
+            num_perms++;
+            if (sig_show) print_progress(m, fn, op, num_perms, timer);
         }
 
         if (cur_cost - start_cost < 0.0) temp /= COOL_FRAC;
     }
 
-    DMDBG (printf ("cost: %d ", dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL)));
+    if (log_active(infoLong)) {
+        Warning(infoLong, "Annealing done");
+        print_progress(m, fn, op, num_perms, timer);
+    }
+
+    RTdeleteTimer(timer);
+    sig_stop = 0;
+
+    signal(SIGINT, SIG_DFL);
+    signal(SIGTSTP, SIG_DFL);
 }
 
 int
@@ -1160,7 +1225,8 @@ dm_optimize(matrix_t* m)
     permutation_group_t rot;
 
     int row_spans[dm_nrows(m)];
-    int best_i = 0, best_j = 0, min = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL), last_min = 0;
+    int normalize = 0;
+    int best_i = 0, best_j = 0, min = dm_row_spans(m, row_spans, DM_AGGR_TOT, &normalize, NULL), last_min = 0;
 
     int firsts[dm_nrows(m)];
     int lasts[dm_nrows(m)];
@@ -1205,7 +1271,7 @@ dm_optimize(matrix_t* m)
             best_i = best_j = 0;
         }
     }
-    DMDBG (printf ("cost: %d ", dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL)));
+    DMDBG (printf ("cost: %d ", dm_row_spans(m, row_spans, DM_AGGR_TOT, &normalize, NULL)));
 }
 
 static inline void
@@ -1238,14 +1304,15 @@ dm_all_perm(matrix_t* m)
     int best_perm[len];
 
     int row_spans[dm_nrows(m)];
-    int min = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL);
+    int normalize = 0;
+    int min = dm_row_spans(m, row_spans, DM_AGGR_TOT, &normalize, NULL);
 
     for (int i = 0; i < len; i++) {
         perm[i] = best_perm[i] = i;
     }
 
     while (1) {
-        const int last_min = dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL);
+        const int last_min = dm_row_spans(m, row_spans, DM_AGGR_TOT, &normalize, NULL);
         if (last_min < min) {
             memcpy(best_perm, perm, len * sizeof(int));
             min = last_min;
@@ -1310,7 +1377,7 @@ dm_all_perm(matrix_t* m)
     }
     DMDBG (printf ("current:"));
     DMDBG (current_all_perm_ (perm, len));
-    DMDBG (printf ("cost: %d ", dm_row_aggr(m, dm_row_spans(m, row_spans), DM_AGGR_TOT, 0, NULL)));
+    DMDBG (printf ("cost: %d ", dm_row_spans(m, row_spans, DM_AGGR_TOT, &normalize, NULL)));
 }
 
 void
@@ -1589,102 +1656,8 @@ dm_is_empty(const matrix_t* m)
     return 1;
 }
 
-int*
-dm_row_bandwidths(const matrix_t* const m, int* const bandwidths)
-{
-    for (int i = 0; i < dm_nrows(m); i++) {
-        const int f = dm_first(m, i);
-        const int l = dm_last(m, i);
-        if (f == -1 || l == -1) bandwidths[i] = 0;
-        else bandwidths[i] = max(abs(i - f), abs(i - l)) + 1;
-    }
-
-    return bandwidths;
-}
-
-int*
-dm_col_bandwidths(const matrix_t* const m, int* const bandwidths)
-{
-    for (int i = 0; i < dm_ncols(m); i++) {
-        const int t = dm_top(m, i);
-        const int b = dm_bottom(m, i);
-        if (t == -1 || b == -1) bandwidths[i] = 0;
-        else bandwidths[i] = max(abs(i - t), abs(i - b)) + 1;
-    }
-
-    return bandwidths;
-}
-
-int*
-dm_row_spans(const matrix_t* const m, int* const spans)
-{
-    for (int i = 0; i < dm_nrows(m); i++) {
-        const int f = dm_first(m, i);
-        const int l = dm_last(m, i);
-        if (f == -1 || l == -1) spans[i] = 0;
-        else spans[i] = l - f + 1;
-    }
-
-    return spans;
-}
-
-int*
-dm_col_spans(const matrix_t* const m, int* const spans)
-{
-    for (int i = 0; i < dm_ncols(m); i++) {
-        const int t = dm_top(m, i);
-        const int b = dm_bottom(m, i);
-        if (t == -1 || b == -1) spans[i] = 0;
-        else spans[i] = b - t + 1;
-    }
-
-    return spans;
-}
-
-int*
-dm_row_wavefronts(const matrix_t* const m, int* const wavefronts)
-{
-    int wavefront = 0;
-    int col_active[dm_ncols(m)];
-    memset(col_active, 0, sizeof(int[dm_ncols(m)]));
-    for (int i = 0; i < dm_nrows(m); i++) {
-        for (int j = 0; j < dm_ncols(m); j++) {
-            if (dm_is_set(m, i, j)) {
-                if (!col_active[j]) {
-                    wavefront++;
-                    col_active[j] = 1;
-                }
-            }
-        }
-        wavefronts[i] = wavefront;
-    }
-
-    return wavefronts;
-}
-
-int*
-dm_col_wavefronts(const matrix_t* const m, int* const wavefronts)
-{
-    int wavefront = 0;
-    int row_active[dm_nrows(m)];
-    memset(row_active, 0, sizeof(int[dm_nrows(m)]));
-    for (int i = 0; i < dm_ncols(m); i++) {
-        for (int j = 0; j < dm_nrows(m); j++) {
-            if (dm_is_set(m, j, i)) {
-                if (!row_active[j]) {
-                    wavefront++;
-                    row_active[j] = 1;
-                }
-            }
-        }
-        wavefronts[i] = wavefront;
-    }
-
-    return wavefronts;
-}
-
 static double
-aggr_op(const int size, int* const vals, dm_aggr_op_t op) {
+metric_op(const int size, int* const vals, dm_aggr_op_t op) {
     double result = 0;
     for (int i = 0; i < size; i++) {
         switch(op) {
@@ -1699,7 +1672,7 @@ aggr_op(const int size, int* const vals, dm_aggr_op_t op) {
             result += vals[i] * vals[i];
             break;
         default:
-            Warning(error, "unknown aggr");
+            Warning(error, "unknown metric");
             HREabort(LTSMIN_EXIT_FAILURE);
         }
     }
@@ -1718,29 +1691,123 @@ aggr_op(const int size, int* const vals, dm_aggr_op_t op) {
 }
 
 double
-dm_row_aggr(const matrix_t* const m, int* const rows_aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig)
+dm_row_bandwidths(const matrix_t* const m, int* const bandwidths, dm_aggr_op_t op, int* normalize, int* sig_dec_digs)
 {
-    double result = aggr_op(dm_nrows(m), rows_aggr, op);
+    for (int i = 0; i < dm_nrows(m); i++) {
+        const int f = dm_first(m, i);
+        const int l = dm_last(m, i);
+        if (f == -1 || l == -1) bandwidths[i] = 0;
+        else bandwidths[i] = max(abs(i - f), abs(i - l)) + 1;
+    }
+
+    return dm_row_aggr(m, bandwidths, op, *normalize, sig_dec_digs);
+}
+
+double
+dm_col_bandwidths(const matrix_t* const m, int* const bandwidths, dm_aggr_op_t op, int* normalize, int* sig_dec_digs)
+{
+    for (int i = 0; i < dm_ncols(m); i++) {
+        const int t = dm_top(m, i);
+        const int b = dm_bottom(m, i);
+        if (t == -1 || b == -1) bandwidths[i] = 0;
+        else bandwidths[i] = max(abs(i - t), abs(i - b)) + 1;
+    }
+
+    return dm_col_aggr(m, bandwidths, op, *normalize, sig_dec_digs);
+}
+
+double
+dm_row_spans(const matrix_t* const m, int* const spans, dm_aggr_op_t op, int* normalize, int* sig_dec_digs)
+{
+    for (int i = 0; i < dm_nrows(m); i++) {
+        const int f = dm_first(m, i);
+        const int l = dm_last(m, i);
+        if (f == -1 || l == -1) spans[i] = 0;
+        else spans[i] = l - f + 1;
+    }
+
+    return dm_row_aggr(m, spans, op, *normalize, sig_dec_digs);
+}
+
+double
+dm_col_spans(const matrix_t* const m, int* const spans, dm_aggr_op_t op, int* normalize, int* sig_dec_digs)
+{
+    for (int i = 0; i < dm_ncols(m); i++) {
+        const int t = dm_top(m, i);
+        const int b = dm_bottom(m, i);
+        if (t == -1 || b == -1) spans[i] = 0;
+        else spans[i] = b - t + 1;
+    }
+
+    return dm_col_aggr(m, spans, op, *normalize, sig_dec_digs);
+}
+
+double
+dm_row_wavefronts(const matrix_t* const m, int* const wavefronts, dm_aggr_op_t op, int* normalize, int* sig_dec_digs)
+{
+    int wavefront = 0;
+    int col_active[dm_ncols(m)];
+    memset(col_active, 0, sizeof(int[dm_ncols(m)]));
+    for (int i = 0; i < dm_nrows(m); i++) {
+        for (int j = 0; j < dm_ncols(m); j++) {
+            if (dm_is_set(m, i, j)) {
+                if (!col_active[j]) {
+                    wavefront++;
+                    col_active[j] = 1;
+                }
+            }
+        }
+        wavefronts[i] = wavefront;
+    }
+
+    return dm_row_aggr(m, wavefronts, op, *normalize, sig_dec_digs);
+}
+
+double
+dm_col_wavefronts(const matrix_t* const m, int* const wavefronts, dm_aggr_op_t op, int* normalize, int* sig_dec_digs)
+{
+    int wavefront = 0;
+    int row_active[dm_nrows(m)];
+    memset(row_active, 0, sizeof(int[dm_nrows(m)]));
+    for (int i = 0; i < dm_ncols(m); i++) {
+        for (int j = 0; j < dm_nrows(m); j++) {
+            if (dm_is_set(m, j, i)) {
+                if (!row_active[j]) {
+                    wavefront++;
+                    row_active[j] = 1;
+                }
+            }
+        }
+        wavefronts[i] = wavefront;
+    }
+
+    return dm_col_aggr(m, wavefronts, op, *normalize, sig_dec_digs);
+}
+
+double
+dm_row_aggr(const matrix_t* const m, int* const rows_metric, dm_aggr_op_t op, const int normalize, int* sig_dec_dig)
+{
+    double result = metric_op(dm_nrows(m), rows_metric, op);
     if (normalize) {
         if (op == DM_AGGR_TOT) result /= dm_nrows(m) * dm_ncols(m);
         else result /= dm_ncols(m);
     }
 
-    if (sig_dec_dig != NULL) *sig_dec_dig = snprintf(NULL, 0, "%zd", dm_ncols(m) * (size_t) dm_nrows(m));
+    if (sig_dec_dig != NULL) *sig_dec_dig = min(*sig_dec_dig, snprintf(NULL, 0, "%zd", dm_ncols(m) * (size_t) dm_nrows(m)));
 
     return result;
 }
 
 double
-dm_col_aggr(const matrix_t* const m, int* const cols_aggr, dm_aggr_op_t op, const int normalize, int* sig_dec_dig)
+dm_col_aggr(const matrix_t* const m, int* const cols_metric, dm_aggr_op_t op, const int normalize, int* sig_dec_dig)
 {
-    double result = aggr_op(dm_ncols(m), cols_aggr, op);
+    double result = metric_op(dm_ncols(m), cols_metric, op);
     if (normalize) {
         if (op == DM_AGGR_TOT) result /= dm_ncols(m) * dm_nrows(m);
         else result /= dm_nrows(m);
     }
 
-    if (sig_dec_dig != NULL) *sig_dec_dig = snprintf(NULL, 0, "%zd", dm_ncols(m) * (size_t) dm_nrows(m));
+    if (sig_dec_dig != NULL) *sig_dec_dig = min(*sig_dec_dig, snprintf(NULL, 0, "%zd", dm_ncols(m) * (size_t) dm_nrows(m)));
 
     return result;
 }
