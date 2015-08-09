@@ -143,14 +143,15 @@ alg_shared_init_strategy      (run_t *run, strategy_t strat)
         dfs_fifo_shared_init (run);
         break;
     case Strat_TARJAN:
-        tarjan_scc_shared_init (run);
+        tarjan_shared_init (run);
         break;
     case Strat_UFSCC:
         ufscc_shared_init (run);
         break;
     case Strat_RENAULT:
-        renault_tarjan_scc_shared_init (run);
-        break;    default: Abort ("Strategy (%s) is unknown or incompatible with the current "
+        renault_shared_init (run);
+        break;
+    default: Abort ("Strategy (%s) is unknown or incompatible with the current "
                     "language module.", key_search(strategies, strategy[0]));
     }
 }

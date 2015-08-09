@@ -1,3 +1,10 @@
+/**
+ * Union-Find structure used for Renault's parallel Tarjan SCC algorithm
+ *
+ * TODO: remove rank in the implementation?
+ *       if so, refer to paper discussing random linking
+ */
+
 #ifndef RENAULT_UNIONFIND_H
 #define RENAULT_UNIONFIND_H
 
