@@ -59,6 +59,7 @@ static char** inv_detect = NULL;
 static int   num_inv = 0;
 static int   no_exit = 0;
 static int   no_matrix = 0;
+static int   peak_nodes = 0;
 static int   no_soundness_check = 0;
 static int   act_index;
 static int   act_label;
@@ -264,6 +265,7 @@ static  struct poptOption options[] = {
     { "no-soundness-check", 0, POPT_ARG_VAL, &no_soundness_check, 1, "disable checking whether the model specification is sound for guards", NULL },
     { "precise", 0, POPT_ARG_NONE, &precise, 0, "Compute the final number of states precisely", NULL},
     { "next-union", 0, POPT_ARG_NONE, &next_union, 0, "While computing successor states; unify simultaneously with current states", NULL },
+    { "peak-nodes", 0, POPT_ARG_NONE, &peak_nodes, 0, "record peak nodes and report after reachability analysis", NULL },
     POPT_TABLEEND
 };
 
@@ -1437,7 +1439,7 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
             Print(infoShort, "level %d is finished", level);
         }
     }
-    if (log_active (infoLong)) {
+    if (log_active (infoLong) || peak_nodes) {
         if (current != NULL) {
             int digs = vset_count_fn (current, &n_count, &e_count);
             Print(infoLong, "level %d has %.*Lg states ( %ld nodes )", level, digs, e_count, n_count);
@@ -1562,11 +1564,14 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
         } else Warning(info, "vset implementation does not support precise counting");
     }
 
-    if (log_active (infoLong)) {
+    if (log_active (infoLong) || peak_nodes) {
+        log_t l;
+        if (peak_nodes) l = info;
+        else l = infoLong;
         if (max_lev_count == 0) {
-            Print(infoLong, "( %ld final BDD nodes; %ld peak nodes )", n_count, max_vis_count);
+            Print(l, "( %ld final BDD nodes; %ld peak nodes )", n_count, max_vis_count);
         } else {
-            Print(infoLong,
+            Print(l,
                   "( %ld final BDD nodes; %ld peak nodes; %ld peak nodes per level )",
                   n_count, max_vis_count, max_lev_count);
         }
