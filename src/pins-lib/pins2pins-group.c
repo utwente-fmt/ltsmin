@@ -635,7 +635,7 @@ print_dm_aggrs(const matrix_t* const m)
     int trwf_digs = INT_MAX, mrwf_digs = INT_MAX, rmsrwf_digs = INT_MAX;
     double trwf = 0, ntrwf = 0, arwf = 0, mrwf = 0, nmrwf = 0, rmsrwf = 0, nrmsrwf = 0;
 
-    if (log_active(infoLong)) {
+    // if (log_active(infoLong)) {
 
         int row_bandwidths[dm_nrows(m)];
         normalize = 0;
@@ -689,7 +689,7 @@ print_dm_aggrs(const matrix_t* const m)
         max_fc_digs = max(max(max(max(max_fc_digs, trb_digs), tcb_digs), tcs_digs), trwf_digs);
         max_sc_digs = max(max(max(max(max_sc_digs, mrs_digs), mcb_digs), mrs_digs), mcs_digs);
         max_tc_digs = max(max(max(max(max_tc_digs, rmsrs_digs), rmscb_digs), rmscs_digs), rmsrwf_digs);
-    }
+    // }
 
     const double nra = ntrs * ntcwf;
     printf("Normalized Region Activity (NRA)     : %.*g\n", max(trs_digs, tcwf_digs), nra);
@@ -721,7 +721,7 @@ print_dm_aggrs(const matrix_t* const m)
         max_fc_digs, max_sc_digs, max_tc_digs,
         tcwf, tcwf_digs, acwf, ntcwf, mcwf, mcwf_digs, nmcwf, rmscwf, rmscwf_digs, nrmscwf);
 
-    if (log_active(infoLong)) {
+    // if (log_active(infoLong)) {
         printf("-----------------+%s+%s+%s\n", fcc, scc, tcc);
         print_aggr(
             1, "bandwidth",
@@ -739,7 +739,7 @@ print_dm_aggrs(const matrix_t* const m)
             1, "wavefront",
             max_fc_digs, max_sc_digs, max_tc_digs,
             trwf, trwf_digs, arwf, ntrwf, mrwf, mrwf_digs, nmrwf, rmsrwf, rmsrwf_digs, nrmsrwf);
-    }
+    // }
     printf("-----------------+%s+%s+%s\n", fcc, scc, tcc);
 }
 
