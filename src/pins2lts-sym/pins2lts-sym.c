@@ -4425,42 +4425,44 @@ VOID_TASK_1(actual_main, void*, arg)
     }
 
     /* optionally print counts of all group_next and group_explored sets */
-    if (log_active(infoLong)) {
-        long   n_count;
-        double e_count;
+    long   n_count;
+    double e_count;
 
-        long total_node_count = 0;
-        long explored_total_node_count = 0;
-        long explored_total_vector_count = 0;
-        for(int i=0; i<nGrps; i++) {
+    long total_node_count = 0;
+    long explored_total_node_count = 0;
+    double explored_total_vector_count = 0;
+    for(int i=0; i<nGrps; i++) {
 
-            vrel_count(group_next[i], &n_count, &e_count);
-            Print(infoLong, "group_next[%d]: %.*g short vectors %ld nodes", i, DBL_DIG, e_count, n_count);
-            total_node_count += n_count;
+        vrel_count(group_next[i], &n_count, &e_count);
+        Print(infoLong, "group_next[%d]: %.*g short vectors %ld nodes", i, DBL_DIG, e_count, n_count);
+        total_node_count += n_count;
 
-            vset_count(group_explored[i], &n_count, &e_count);
-            Print(infoLong, "group_explored[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
-            explored_total_node_count += n_count;
+        vset_count(group_explored[i], &n_count, &e_count);
+        Print(infoLong, "group_explored[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
+        explored_total_node_count += n_count;
+        explored_total_vector_count += e_count;
+    }
+    Print(info, "group_next: %ld nodes total", total_node_count);
+    Print(info, "group_explored: %ld nodes, %.*g short vectors total", explored_total_node_count, DBL_DIG, explored_total_vector_count);
+
+    if (GBgetUseGuards(model)) {
+        long total_false = 0;
+        long total_true = 0;
+        explored_total_vector_count = 0;
+        for(int i=0;i<nGuards; i++) {
+            vset_count(label_false[i], &n_count, &e_count);
+            Print(infoLong, "guard_false[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
+            total_false += n_count;
+            explored_total_vector_count += e_count;
+
+            vset_count(label_true[i], &n_count, &e_count);
+            Print(infoLong, "guard_true[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
+            total_true += n_count;
             explored_total_vector_count += e_count;
         }
-        Print(infoLong, "group_next: %ld nodes total", total_node_count);
-        Print(infoLong, "group_explored: %ld nodes, %ld short vectors total", explored_total_node_count, explored_total_vector_count);
-
-        if (GBgetUseGuards(model)) {
-            long total_false = 0;
-            long total_true = 0;
-            for(int i=0;i<nGuards; i++) {
-                vset_count(label_false[i], &n_count, &e_count);
-                Print(infoLong, "guard_false[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
-                total_false += n_count;
-
-                vset_count(label_true[i], &n_count, &e_count);
-                Print(infoLong, "guard_true[%d]: %.*g short vectors, %ld nodes", i, DBL_DIG, e_count, n_count);
-                total_true += n_count;
-            }
-            Print(infoLong, "guard_false: %ld nodes total", total_false);
-            Print(infoLong, "guard_true: %ld nodes total", total_true);
-        }
+        Print(info, "guard_false: %ld nodes total", total_false);
+        Print(info, "guard_true: %ld nodes total", total_true);
+        Print(info, "guard: %.*g short vectors total", DBL_DIG, explored_total_vector_count);
     }
 
     if (spg) { // converting the LTS to a symbolic parity game, save and solve.
