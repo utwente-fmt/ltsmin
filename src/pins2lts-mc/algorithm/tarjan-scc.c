@@ -18,6 +18,7 @@
 #include <gperftools/profiler.h>
 #endif
 
+
 /**
  * color for global state storage (SCC is complete <==> color == SCC_STATE)
  */
@@ -38,8 +39,8 @@ typedef struct tarjan_state_s {
  */
 typedef struct counter_s {
     uint32_t            scc_count;
-    uint32_t            tarjan_counter;       /* monotonically increasing
-                                               * counter for index */
+    uint32_t            tarjan_counter;       // monotonically increasing
+                                              //   counter for index
 } counter_t;
 
 
@@ -49,14 +50,14 @@ typedef struct counter_s {
 struct alg_local_s {
     dfs_stack_t         search_stack;
     dfs_stack_t         tarjan_stack;
-    fset_t             *visited_states;       /* tracks visited LIVE states
-                                               * and what their stack addresses
-                                               * are for either search_stack
-                                               * or tarjan_stack */
+    fset_t             *visited_states;       // tracks visited LIVE states
+                                              // and what their stack addresses
+                                              // are for either search_stack
+                                              // or tarjan_stack
     counter_t           cnt;
-    tarjan_state_t      state_tarjan;         /* tarjan info for ctx->state */
-    state_info_t       *target;               /* auxiliary state */
-    tarjan_state_t      target_tarjan;        /* tarjan info for target */
+    tarjan_state_t      state_tarjan;         // tarjan info for ctx->state
+    state_info_t       *target;               // auxiliary state
+    tarjan_state_t      target_tarjan;        // tarjan info for target
 };
 
 
@@ -80,7 +81,7 @@ tarjan_local_init (run_t *run, wctx_t *ctx)
     ctx->local         = RTmallocZero (sizeof (alg_local_t));
     ctx->local->target = state_info_create ();
 
-    /* extend state_info with tarjan_state information */
+    // extend state_info with tarjan_state information
     state_info_add_simple (ctx->local->target, sizeof (uint32_t),
                           &ctx->local->target_tarjan.index);
     state_info_add_simple (ctx->local->target, sizeof (uint32_t),
@@ -102,7 +103,7 @@ tarjan_local_init (run_t *run, wctx_t *ctx)
             fset_create (sizeof (ref_t), sizeof (raw_data_t), 10, dbs_size);
 
 #ifdef SEARCH_COMPLETE_GRAPH
-    /* provide the input file name to dlopen_setup */
+    // provide the input file name to dlopen_setup
     dlopen_setup (files[0]);
 #endif
 
@@ -127,7 +128,7 @@ static void
 tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                int seen)
 {
-    /* parent state is ctx->state */
+    // parent state is ctx->state
 
     wctx_t             *ctx   = (wctx_t *) arg;
     alg_local_t        *loc   = ctx->local;
@@ -137,11 +138,11 @@ tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     ctx->counters->trans++;
 
-    /* self-loop */
+    // self-loop
     if (ctx->state->ref == successor->ref)
         return;
 
-    /* completed SCC */
+    // completed SCC
     if (state_store_has_color (successor->ref, SCC_STATE, 0))
         return;
 
@@ -150,14 +151,14 @@ tarjan_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                        (void **)&addr, false);
 
     if (found) {
-        /* previously visited state ==> update lowlink */
+        // previously visited state ==> update lowlink
 
         state_info_deserialize (loc->target, *addr);
         if (loc->state_tarjan.lowlink > loc->target_tarjan.lowlink)
             loc->state_tarjan.lowlink = loc->target_tarjan.lowlink;
 
     } else {
-        /* unseen state ==> push to search_stack */
+        // unseen state ==> push to search_stack
 
         raw_data_t stack_loc = dfs_stack_push (loc->search_stack, NULL);
         state_info_serialize (successor, stack_loc);
@@ -198,7 +199,7 @@ explore_state (wctx_t *ctx)
     increase_level (ctx->counters);
 
 #ifdef SEARCH_COMPLETE_GRAPH
-    /* bypass the pins interface by directly handling the successors */
+    // bypass the pins interface by directly handling the successors
     int                 ref_arr[2];
     ref_arr[0] = (int) ctx->state->ref;
     dlopen_next_state (NULL, 0, ref_arr, permute_complete, ctx);
@@ -225,7 +226,7 @@ tarjan_init  (wctx_t *ctx)
 #else
     tarjan_handle (ctx, ctx->initial, &ti, 0);
 
-    /* reset explored and transition count */
+    // reset explored and transition count
     ctx->counters->explored = 0;
     ctx->counters->trans    = 0;
 #endif
@@ -241,11 +242,11 @@ update_parent (wctx_t *ctx, uint32_t low_child)
     alg_local_t        *loc        = ctx->local;
     raw_data_t          state_data;
 
-    /* the initial state has no parent */
+    // the initial state has no parent
     if (dfs_stack_nframes (loc->search_stack) == 0)
         return;
 
-    /* store the top of the previous stackframe to loc->target */
+    // store the top of the previous stackframe to loc->target
     state_data = dfs_stack_peek_top (loc->search_stack, 1);
     state_info_deserialize (loc->target, state_data);
 
@@ -270,11 +271,11 @@ move_tarjan (wctx_t *ctx, state_info_t *state, raw_data_t state_data)
     hash32_t            hash;
     int                 found;
 
-    /* add state to tarjan_stack */
+    // add state to tarjan_stack
     raw_data_t tarjan_loc = dfs_stack_push (loc->tarjan_stack, NULL);
     state_info_serialize (state, tarjan_loc);
 
-    /* Update reference to the new stack */
+    // Update reference to the new stack
     hash  = ref_hash (state->ref);
     found = fset_find (loc->visited_states, &hash, &state->ref,
                        (void**) &addr, false);
@@ -296,12 +297,12 @@ move_scc (wctx_t *ctx, ref_t state)
 
     Debug ("Marking %zu as SCC", state);
 
-    /* remove reference to stack state */
+    // remove reference to stack state
     hash    = ref_hash (state);
     success = fset_delete (loc->visited_states, &hash, &state);
     HREassert (success, "Could not remove SCC state from set");
 
-    /* set SCC globally */
+    // set SCC globally
     state_store_try_color (state, SCC_STATE, 0);
 }
 
@@ -319,11 +320,11 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
 
     loc->cnt.scc_count++;
 
-    /* loop and remove states until tarjan_stack.top has lowlink < root_low */
+    // loop and remove states until tarjan_stack.top has lowlink < root_low
     state_data = dfs_stack_top (loc->tarjan_stack);
     while ( state_data != NULL ) {
 
-        /* check if state_data belongs to a different SCC */
+        // check if state_data belongs to a different SCC
         state_info_deserialize (loc->target, state_data);
         if (loc->target_tarjan.lowlink < root_low) break;
 
@@ -333,7 +334,7 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
         state_data = dfs_stack_top (loc->tarjan_stack);
     }
 
-    /* move the root of the SCC (since it is not on tarjan_stack) */
+    // move the root of the SCC (since it is not on tarjan_stack)
     move_scc (ctx, root);
 }
 
@@ -356,27 +357,27 @@ tarjan_run (run_t *run, wctx_t *ctx)
     int              init_state = dlopen_get_worker_initial_state (ctx->id, W);
     int              inits      = 0;
 
-    /* loop until every state of the graph has been visited */
+    // loop until every state of the graph has been visited
     while ( 1 )
     {
         inits ++;
-        /* use loc->target as a dummy for the initial state */
+        // use loc->target as a dummy for the initial state
         loc->target->ref = init_state;
 #endif
 
     tarjan_init (ctx);
     
-    /* continue until we are done exploring the graph */
+    // continue until we are done exploring the graph
     while ( !run_is_stopped (run) ) {
 
         state_data = dfs_stack_top (loc->search_stack);
 
         if (state_data != NULL) {
-            /* there is a state on the current stackframe ==> explore it */
+            // there is a state on the current stackframe ==> explore it
 
             state_info_deserialize (ctx->state, state_data);
 
-            /* pop the state and continue if it is part of a completed SCC */
+            // pop the state and continue if it is part of a completed SCC
             if (state_store_has_color (ctx->state->ref, SCC_STATE, 0)) {
                 dfs_stack_pop (loc->search_stack);
                 continue;
@@ -387,14 +388,14 @@ tarjan_run (run_t *run, wctx_t *ctx)
                                   &ctx->state->ref, (void **) &addr, true);
 
             if (!on_stack) {
-                /* unseen state ==> initialize and explore */
+                // unseen state ==> initialize and explore
 
                 HREassert (loc->cnt.tarjan_counter != UINT32_MAX);
                 loc->cnt.tarjan_counter ++;
                 loc->state_tarjan.index   = loc->cnt.tarjan_counter;
                 loc->state_tarjan.lowlink = loc->cnt.tarjan_counter;
 
-                /* point visited_states data to stack */
+                // point visited_states data to stack
                 *addr = state_data;
 
                 explore_state (ctx);
@@ -402,8 +403,8 @@ tarjan_run (run_t *run, wctx_t *ctx)
                 state_info_serialize (ctx->state, state_data);
 
             } else {
-                /* previously visited state ==> update parent */
-                /* NB: state is on tarjan_stack */
+                // previously visited state ==> update parent
+                // NB: state is on tarjan_stack
 
                 state_info_deserialize (ctx->state, *addr);
                 update_parent (ctx, loc->state_tarjan.lowlink);
@@ -411,17 +412,17 @@ tarjan_run (run_t *run, wctx_t *ctx)
             }
 
         } else {
-            /* there is no state on the current stackframe ==> backtrack */
+            // there is no state on the current stackframe ==> backtrack
 
-            /* we are done if we backtrack from the initial state */
+            // we are done if we backtrack from the initial state
             if (0 == dfs_stack_nframes (loc->search_stack))
                 break;
 
-            /* leave the stackframe */
+            // leave the stackframe
             dfs_stack_leave (loc->search_stack);
             ctx->counters->level_cur--;
 
-            /* retrieve the parent state from search_stack (to be removed) */
+            // retrieve the parent state from search_stack (to be removed)
             state_data = dfs_stack_top (loc->search_stack);
             state_info_deserialize (ctx->state, state_data);
 
@@ -429,13 +430,11 @@ tarjan_run (run_t *run, wctx_t *ctx)
                    loc->state_tarjan.index, loc->state_tarjan.lowlink);
 
             if (loc->state_tarjan.index == loc->state_tarjan.lowlink) {
-                /* index == lowlink ==> root of the SCC ==> report the SCC */
-
+                // index == lowlink ==> root of the SCC ==> report the SCC
                 pop_scc (ctx, ctx->state->ref, loc->state_tarjan.lowlink);
 
             } else {
-                /* lowlink < index ==> LIVE SCC ==> move to tarjan_stack */
-
+                // lowlink < index ==> LIVE SCC ==> move to tarjan_stack
                 move_tarjan (ctx, ctx->state, state_data);
                 update_parent (ctx, loc->state_tarjan.lowlink);
             }
@@ -486,10 +485,10 @@ tarjan_print_stats (run_t *run, wctx_t *ctx)
 {
     counter_t          *reduced = (counter_t *) run->reduced;
 
-    /* print SCC statistics */
-    Warning(info, "unique states found:        %zu", ctx->counters->explored);
-    Warning(info, "unique transitions found:   %zu", ctx->counters->trans);
-    Warning(info, "scc count:                  %d", reduced->scc_count);
+    // print SCC statistics
+    Warning(info, "unique states count:        %zu", ctx->counters->explored);
+    Warning(info, "unique transitions count:   %zu", ctx->counters->trans);
+    Warning(info, "total scc count:            %d", reduced->scc_count);
     Warning(info, " ");
 
     run_report_total (run);

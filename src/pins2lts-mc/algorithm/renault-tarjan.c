@@ -33,11 +33,11 @@ typedef struct tarjan_state_s {
  * local counters
  */
 typedef struct counter_s {
-    uint32_t            unique_states_count;
-    uint32_t            unique_transitions_count;
+    uint32_t            unique_states;
+    uint32_t            unique_trans;
     uint32_t            scc_count;
-    uint32_t            tarjan_counter;       /* monotonically increasing
-                                               * counter for index */
+    uint32_t            tarjan_counter;       // monotonically increasing
+                                              //   counter for index
 } counter_t;
 
 
@@ -47,23 +47,22 @@ typedef struct counter_s {
 struct alg_local_s {
     dfs_stack_t         search_stack;
     dfs_stack_t         tarjan_stack;
-    fset_t             *visited_states;       /* tracks visited LIVE states
-                                               * and what their stack addresses
-                                               * are for either search_stack
-                                               * or tarjan_stack */
+    fset_t             *visited_states;       // tracks visited LIVE states
+                                              // and what their stack addresses
+                                              // are for either search_stack
+                                              // or tarjan_stack
     counter_t           cnt;
-    tarjan_state_t      state_tarjan;         /* tarjan info for ctx->state */
-    state_info_t       *target;               /* auxiliary state */
-    tarjan_state_t      target_tarjan;        /* tarjan info for target */
+    tarjan_state_t      state_tarjan;         // tarjan info for ctx->state
+    state_info_t       *target;               // auxiliary state
+    tarjan_state_t      target_tarjan;        // tarjan info for target
 };
-
 
 
 /**
  * shared SCC information (between workers)
  */
 typedef struct uf_alg_shared_s {
-    r_uf_t             *uf;                   /* shared union-find structure */
+    r_uf_t             *uf;                   // shared union-find structure
 } r_uf_alg_shared_t;
 
 
@@ -87,7 +86,7 @@ renault_local_init (run_t *run, wctx_t *ctx)
     ctx->local         = RTmallocZero (sizeof (alg_local_t));
     ctx->local->target = state_info_create ();
 
-    /* extend state_info with tarjan_state information */
+    // extend state_info with tarjan_state information
     state_info_add_simple (ctx->local->target, sizeof (uint32_t),
                           &ctx->local->target_tarjan.index);
     state_info_add_simple (ctx->local->target, sizeof (uint32_t),
@@ -98,20 +97,20 @@ renault_local_init (run_t *run, wctx_t *ctx)
     state_info_add_simple (ctx->state, sizeof (uint32_t),
                           &ctx->local->state_tarjan.lowlink);
 
-    size_t len = state_info_serialize_int_size (ctx->state);
+    size_t len               = state_info_serialize_int_size (ctx->state);
     ctx->local->search_stack = dfs_stack_create (len);
     ctx->local->tarjan_stack = dfs_stack_create (len);
 
-    ctx->local->cnt.scc_count                  = 0;
-    ctx->local->cnt.tarjan_counter             = 0;
-    ctx->local->cnt.unique_states_count        = 0;
-    ctx->local->cnt.unique_transitions_count   = 0;
+    ctx->local->cnt.scc_count       = 0;
+    ctx->local->cnt.tarjan_counter  = 0;
+    ctx->local->cnt.unique_states   = 0;
+    ctx->local->cnt.unique_trans    = 0;
 
     ctx->local->visited_states =
             fset_create (sizeof (ref_t), sizeof (raw_data_t), 10, dbs_size);
 
 #ifdef SEARCH_COMPLETE_GRAPH
-    /* provide the input file name to dlopen_setup */
+    // provide the input file name to dlopen_setup
     dlopen_setup (files[0]);
 #endif
 
@@ -120,7 +119,7 @@ renault_local_init (run_t *run, wctx_t *ctx)
 
 
 void
-renault_local_deinit   (run_t *run, wctx_t *ctx)
+renault_local_deinit (run_t *run, wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
 
@@ -131,11 +130,12 @@ renault_local_deinit   (run_t *run, wctx_t *ctx)
     (void) run;
 }
 
+
 static void
 renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         int seen)
 {
-    /* parent state is ctx->state */
+    // parent state is ctx->state
 
     wctx_t             *ctx    = (wctx_t *) arg;
     alg_local_t        *loc    = ctx->local;
@@ -146,11 +146,11 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     ctx->counters->trans++;
 
-    /* self-loop */
+    // self-loop
     if (ctx->state->ref == successor->ref)
         return;
 
-    /* completed SCC */
+    // completed SCC
     if (r_uf_is_dead (shared->uf, successor->ref))
         return;
 
@@ -159,8 +159,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                        (void **)&addr, false);
 
     if (found) {
-        /* previously visited state ==> update lowlink and unite state */
-
+        // previously visited state ==> update lowlink and unite state
         r_uf_union (shared->uf, ctx->state->ref, successor->ref);
 
         state_info_deserialize (loc->target, *addr);
@@ -168,14 +167,14 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             loc->state_tarjan.lowlink = loc->target_tarjan.lowlink;
 
     } else {
-        /* unseen state ==> push to search_stack */
-
+        // unseen state ==> push to search_stack
         raw_data_t stack_loc = dfs_stack_push (loc->search_stack, NULL);
         state_info_serialize (successor, stack_loc);
     }
 
     (void) ti; (void) seen;
 }
+
 
 #ifdef SEARCH_COMPLETE_GRAPH
 /**
@@ -209,7 +208,7 @@ explore_state (wctx_t *ctx)
     increase_level (ctx->counters);
 
 #ifdef SEARCH_COMPLETE_GRAPH
-    /* bypass the pins interface by directly handling the successors */
+    // bypass the pins interface by directly handling the successors
     int                 ref_arr[2];
     ref_arr[0] = (int) ctx->state->ref;
     trans = dlopen_next_state (NULL, 0, ref_arr, permute_complete, ctx);
@@ -218,8 +217,6 @@ explore_state (wctx_t *ctx)
 #endif
 
     ctx->counters->explored++;
-
-
     run_maybe_report1 (ctx->run, (work_counter_t *) ctx->counters, "");
 
     return trans;
@@ -230,7 +227,7 @@ explore_state (wctx_t *ctx)
  * put the initial state on the search_stack
  */
 static inline void
-renault_init  (wctx_t *ctx)
+renault_init (wctx_t *ctx)
 {
     transition_info_t   ti = GB_NO_TRANSITION;
 
@@ -240,7 +237,7 @@ renault_init  (wctx_t *ctx)
 #else
     renault_handle (ctx, ctx->initial, &ti, 0);
 
-    /* reset explored and transition count */
+    // reset explored and transition count
     ctx->counters->explored = 0;
     ctx->counters->trans    = 0;
 #endif
@@ -256,11 +253,11 @@ update_parent (wctx_t *ctx, uint32_t low_child)
     alg_local_t        *loc        = ctx->local;
     raw_data_t          state_data;
 
-    /* the initial state has no parent */
+    // the initial state has no parent
     if (dfs_stack_nframes (loc->search_stack) == 0)
         return;
 
-    /* store the top of the previous stackframe to loc->target */
+    // store the top of the previous stackframe to loc->target
     state_data = dfs_stack_peek_top (loc->search_stack, 1);
     state_info_deserialize (loc->target, state_data);
 
@@ -285,11 +282,11 @@ move_tarjan (wctx_t *ctx, state_info_t *state, raw_data_t state_data)
     hash32_t            hash;
     int                 found;
 
-    /* add state to tarjan_stack */
+    // add state to tarjan_stack
     raw_data_t tarjan_loc = dfs_stack_push (loc->tarjan_stack, NULL);
     state_info_serialize (state, tarjan_loc);
 
-    /* Update reference to the new stack */
+    // Update reference to the new stack
     hash  = ref_hash (state->ref);
     found = fset_find (loc->visited_states, &hash, &state->ref,
                        (void**) &addr, false);
@@ -311,7 +308,7 @@ move_scc (wctx_t *ctx, ref_t state)
 
     Debug ("Marking %zu as SCC", state);
 
-    /* remove reference to stack state */
+    // remove reference to stack state
     hash    = ref_hash (state);
     success = fset_delete (loc->visited_states, &hash, &state);
     HREassert (success, "Could not remove SCC state from set");
@@ -330,16 +327,16 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
 
     Debug ("Found SCC with root %zu", root);
 
-    /* loop and remove states until tarjan_stack.top has lowlink < root_low
-     * and put the states in the same UF set */
+    // loop and remove states until tarjan_stack.top has lowlink < root_low
+    //   and put the states in the same UF set
     state_data = dfs_stack_top (loc->tarjan_stack);
     while ( state_data != NULL ) {
 
-       /* check if state_data belongs to a different SCC */
+       // check if state_data belongs to a different SCC
        state_info_deserialize (loc->target, state_data);
        if (loc->target_tarjan.lowlink < root_low) break;
 
-       /* unite the root of the SCC with the current state */
+       // unite the root of the SCC with the current state
        r_uf_union (shared->uf, root, loc->target->ref);
 
        move_scc (ctx, loc->target->ref);
@@ -348,10 +345,10 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
        state_data = dfs_stack_top (loc->tarjan_stack);
     }
 
-    /* move the root of the SCC (since it is not on tarjan_stack) */
+    // move the root of the SCC (since it is not on tarjan_stack)
     move_scc (ctx, root);
 
-    /* mark the SCC globally dead in the UF structure */
+    // mark the SCC globally dead in the UF structure
     if (r_uf_mark_dead (shared->uf, root))
         loc->cnt.scc_count++;
 }
@@ -378,35 +375,33 @@ renault_run  (run_t *run, wctx_t *ctx)
     int              init_state = dlopen_get_worker_initial_state (ctx->id, W);
     int              inits      = 0;
 
-    /* loop until every state of the graph has been visited */
+    // loop until every state of the graph has been visited
     while ( 1 )
     {
         inits ++;
-        /* use loc->target as a dummy for the initial state */
+        // use loc->target as a dummy for the initial state
         loc->target->ref = init_state;
 #endif
 
     renault_init (ctx);
 
-    /* continue until we are done exploring the graph */
+    // continue until we are done exploring the graph
     while ( !run_is_stopped (run) ) {
 
         state_data = dfs_stack_top (loc->search_stack);
 
         if (state_data != NULL) {
-            /* there is a state on the current stackframe ==> explore it */
+            // there is a state on the current stackframe ==> explore it
 
             state_info_deserialize (ctx->state, state_data);
 
-            /*
-             * make claim:
-             * - CLAIM_FIRST   (initialized)
-             * - CLAIM_SUCCESS (LIVE state)
-             * - CLAIM_DEAD    (DEAD state)
-             */
+            // make claim:
+            // - CLAIM_FIRST   (initialized)
+            // - CLAIM_SUCCESS (LIVE state)
+            // - CLAIM_DEAD    (DEAD state)
             claim = r_uf_make_claim (shared->uf, ctx->state->ref);
 
-            /* pop the state and continue if it is part of a completed SCC */
+            // pop the state and continue if it is part of a completed SCC
             if (claim == CLAIM_DEAD) {
                 dfs_stack_pop (loc->search_stack);
                 continue;
@@ -417,44 +412,44 @@ renault_run  (run_t *run, wctx_t *ctx)
                                   &ctx->state->ref, (void **) &addr, true);
 
             if (!on_stack) {
-                /* unseen state ==> initialize and explore */
+                // unseen state ==> initialize and explore
 
                 HREassert (loc->cnt.tarjan_counter != UINT32_MAX);
                 loc->cnt.tarjan_counter ++;
                 loc->state_tarjan.index   = loc->cnt.tarjan_counter;
                 loc->state_tarjan.lowlink = loc->cnt.tarjan_counter;
-                *addr = state_data; /* point visited_states data to stack */
+                *addr = state_data; // point visited_states data to stack
 
                 transitions = explore_state (ctx);
 
-                /* count the number of unique states */
+                // count the number of unique states
                 if (claim == CLAIM_FIRST) {
-                    loc->cnt.unique_states_count ++;
-                    loc->cnt.unique_transitions_count += transitions;
+                    loc->cnt.unique_states ++;
+                    loc->cnt.unique_trans  += transitions;
                 }
 
                 state_info_serialize (ctx->state, state_data);
 
             } else {
-                /* previously visited state ==> update parent */
-                /* NB: state is on tarjan_stack */
+                // previously visited state ==> update parent
+                // NB: state is on tarjan_stack
 
                 state_info_deserialize (ctx->state, *addr);
                 update_parent (ctx, loc->state_tarjan.lowlink);
                 dfs_stack_pop (loc->search_stack);
             }
         } else {
-            /* there is no state on the current stackframe ==> backtrack */
+            // there is no state on the current stackframe ==> backtrack
 
-            /* we are done if we backtrack from the initial state */
+            // we are done if we backtrack from the initial state
             if (0 == dfs_stack_nframes (loc->search_stack))
                 break;
 
-            /* leave the stackframe */
+            // leave the stackframe
             dfs_stack_leave (loc->search_stack);
             ctx->counters->level_cur--;
 
-            /* retrieve the parent state from search_stack (to be removed) */
+            // retrieve the parent state from search_stack (to be removed)
             state_data = dfs_stack_top (loc->search_stack);
             state_info_deserialize (ctx->state, state_data);
 
@@ -462,13 +457,11 @@ renault_run  (run_t *run, wctx_t *ctx)
                    loc->state_tarjan.index, loc->state_tarjan.lowlink);
 
             if (loc->state_tarjan.index == loc->state_tarjan.lowlink) {
-                /* index == lowlink ==> root of the SCC ==> report the SCC */
-
+                // index == lowlink ==> root of the SCC ==> report the SCC
                 pop_scc (ctx, ctx->state->ref, loc->state_tarjan.lowlink);
 
             } else {
-                /* lowlink < index ==> LIVE SCC ==> move to tarjan_stack */
-
+                // lowlink < index ==> LIVE SCC ==> move to tarjan_stack
                 move_tarjan (ctx, ctx->state, state_data);
                 update_parent (ctx, loc->state_tarjan.lowlink);
             }
@@ -500,6 +493,7 @@ renault_run  (run_t *run, wctx_t *ctx)
                  fset_count(loc->visited_states));
 }
 
+
 void
 renault_reduce (run_t *run, wctx_t *ctx)
 {
@@ -509,9 +503,9 @@ renault_reduce (run_t *run, wctx_t *ctx)
     counter_t          *reduced = (counter_t *) run->reduced;
     counter_t          *cnt     = &ctx->local->cnt;
 
-    reduced->unique_states_count      += cnt->unique_states_count;
-    reduced->unique_transitions_count += cnt->unique_transitions_count;
-    reduced->scc_count                += cnt->scc_count;
+    reduced->unique_states += cnt->unique_states;
+    reduced->unique_trans  += cnt->unique_trans;
+    reduced->scc_count     += cnt->scc_count;
 }
 
 
@@ -520,12 +514,10 @@ renault_print_stats (run_t *run, wctx_t *ctx)
 {
     counter_t          *reduced = (counter_t *) run->reduced;
 
-    /* print SCC statistics */
-    Warning(info, "unique states found:        %d",
-            reduced->unique_states_count);
-    Warning(info, "unique transitions found:   %d",
-            reduced->unique_transitions_count);
-    Warning(info, "scc count:                  %d", reduced->scc_count);
+    // print SCC statistics
+    Warning(info, "unique states count:        %d", reduced->unique_states);
+    Warning(info, "unique transitions count:   %d", reduced->unique_trans);
+    Warning(info, "total scc count:            %d", reduced->scc_count);
     Warning(info, " ");
 
     run_report_total (run);
@@ -537,6 +529,8 @@ renault_print_stats (run_t *run, wctx_t *ctx)
 void
 renault_shared_init (run_t *run)
 {
+    r_uf_alg_shared_t  *shared;
+
     set_alg_local_init    (run->alg, renault_local_init);
     set_alg_global_init   (run->alg, renault_global_init);
     set_alg_global_deinit (run->alg, renault_global_deinit);
@@ -545,7 +539,7 @@ renault_shared_init (run_t *run)
     set_alg_run           (run->alg, renault_run);
     set_alg_reduce        (run->alg, renault_reduce);
 
-    run->shared                = RTmallocZero (sizeof (r_uf_alg_shared_t));
-    r_uf_alg_shared_t  *shared = (r_uf_alg_shared_t*) run->shared;
-    shared->uf                 = r_uf_create ();
+    run->shared = RTmallocZero (sizeof (r_uf_alg_shared_t));
+    shared      = (r_uf_alg_shared_t*) run->shared;
+    shared->uf  = r_uf_create ();
 }
