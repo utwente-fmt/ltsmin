@@ -190,10 +190,10 @@ ufscc_init  (wctx_t *ctx)
 
 #if SEARCH_COMPLETE_GRAPH
     ufscc_handle (ctx, loc->target, &ti, 0);
-    claim = uf_make_claim (shared->uf, loc->target->ref, ctx->id);
+    claim = uf_make_claim (shared->uf, loc->target->ref + 1, ctx->id);
 #else
     ufscc_handle (ctx, ctx->initial, &ti, 0);
-    claim = uf_make_claim (shared->uf, ctx->initial->ref, ctx->id);
+    claim = uf_make_claim (shared->uf, ctx->initial->ref + 1, ctx->id);
 #endif
     
     // explore the initial state
@@ -229,7 +229,7 @@ successor (wctx_t *ctx)
     // TO   = successor = ctx->state
 
     // early backtrack if parent is explored ==> all its children are explored
-    if ( !uf_is_in_list (shared->uf, loc->target->ref) ) {
+    if ( !uf_is_in_list (shared->uf, loc->target->ref + 1) ) {
         dfs_stack_pop (loc->search_stack);
         return;
     }
@@ -239,7 +239,7 @@ successor (wctx_t *ctx)
     // - CLAIM_SUCCESS (LIVE state and we have NOT yet visited its SCC)
     // - CLAIM_FOUND   (LIVE state and we have visited its SCC before)
     // - CLAIM_DEAD    (DEAD state)
-    claim = uf_make_claim (shared->uf, ctx->state->ref, ctx->id);
+    claim = uf_make_claim (shared->uf, ctx->state->ref + 1, ctx->id);
     
     if (claim == CLAIM_DEAD) {
         // (TO == DEAD) ==> get next successor
@@ -262,7 +262,7 @@ successor (wctx_t *ctx)
     else  { // result == CLAIM_FOUND
         // (TO == state in previously visited SCC) ==> cycle found
 
-        if ( uf_sameset (shared->uf, loc->target->ref, ctx->state->ref) )  {
+        if ( uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) )  {
             dfs_stack_pop (loc->search_stack);
             return;
         }
@@ -279,14 +279,14 @@ successor (wctx_t *ctx)
         // while ( not sameset (FROM, TO) )
         //   R.POP
         //   Union (R.TOP, FROM)
-        while ( !uf_sameset (shared->uf, ctx->state->ref, loc->target->ref) ) {
+        while ( !uf_sameset (shared->uf, ctx->state->ref + 1, loc->target->ref + 1) ) {
             
             dfs_stack_pop (loc->roots_stack); // UF Stack POP
 
             root_data = dfs_stack_top (loc->roots_stack);
             state_info_deserialize (loc->root, root_data); // roots_stack TOP
 
-            uf_union (shared->uf, loc->root->ref, loc->target->ref);
+            uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
         }
 
         // cycle is now merged (and DFS stack is unchanged)
@@ -330,7 +330,7 @@ backtrack (wctx_t *ctx)
 
     // remove ctx->state from the list
     // (no other workers have to explore this state anymore)
-    uf_remove_from_list (shared->uf, ctx->state->ref);
+    uf_remove_from_list (shared->uf, ctx->state->ref + 1);
 
     // store the previous state (from the removed one) in loc->target
     is_last_state = (0 == dfs_stack_nframes (loc->search_stack) );
@@ -343,13 +343,13 @@ backtrack (wctx_t *ctx)
     // - if so: standard backtrack (we don't need to report an SCC)
     // - else:  use pick_from_list to determine if the SCC is completed
     if ( !is_last_state
-         && uf_sameset (shared->uf, loc->target->ref, ctx->state->ref) ) {
+         && uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) ) {
         return; // backtrack in same set
     }
 
     // ctx->state is the last KNOWN state in its SCC (according to this worker)
     // ==> check if we can find another one with pick_from_list
-    pick = uf_pick_from_list (shared->uf, ctx->state->ref, &state_picked);
+    pick = uf_pick_from_list (shared->uf, ctx->state->ref + 1, &state_picked);
 
     if (pick != PICK_SUCCESS) {
         // list is empty ==> SCC is completely explored
@@ -365,7 +365,7 @@ backtrack (wctx_t *ctx)
         }
 
         // we may still have states on the stack of this SCC
-        if ( uf_sameset (shared->uf, loc->target->ref, ctx->state->ref) ) {
+        if ( uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) ) {
             return; // backtrack in same set 
             // (the state got marked dead AFTER the previous sameset check)
         }
@@ -375,7 +375,7 @@ backtrack (wctx_t *ctx)
         root_data = dfs_stack_top (loc->roots_stack);
         state_info_deserialize (loc->root, root_data); // R.TOP
         // pop from Roots
-        while (uf_sameset (shared->uf, ctx->state->ref, loc->root->ref) ) {
+        while (uf_sameset (shared->uf, ctx->state->ref + 1, loc->root->ref + 1) ) {
             dfs_stack_pop (loc->roots_stack); // R.POP
             root_data = dfs_stack_top (loc->roots_stack);
             state_info_deserialize (loc->root, root_data); // R.TOP
@@ -383,7 +383,7 @@ backtrack (wctx_t *ctx)
     }
     else {
         // Found w in List(v) ==> push w on stack and search its successors
-        state_info_set (ctx->state, state_picked, LM_NULL_LATTICE);
+        state_info_set (ctx->state, state_picked - 1, LM_NULL_LATTICE);
         state_data = dfs_stack_push (loc->search_stack, NULL);
         state_info_serialize (ctx->state, state_data);
         explore_state (ctx);
@@ -506,7 +506,7 @@ ufscc_state_seen (void *ptr, ref_t ref, int seen)
     wctx_t             *ctx    = (wctx_t *) ptr;
     uf_alg_shared_t    *shared = (uf_alg_shared_t*) ctx->run->shared;
 
-    return uf_owner (shared->uf, ref, ctx->id);
+    return uf_owner (shared->uf, ref + 1, ctx->id);
     (void) seen;
 }
 
