@@ -49,7 +49,7 @@ test_is_balloc_CPPFLAGS 	= $(AM_CPPFLAGS)
 
 # test-dbs
 test_dbs_SOURCES 				= test-dbs.c
-test_dbs_LDADD   				= $(PINS_LIBS) $(MC_LIB) $(DM_LIBS) $(AM_LDFLAGS)
+test_dbs_LDADD   				= $(PINS_LIBS) $(MC_LIB) $(DM_LIBS) $(HRE_LIB) $(AM_LDFLAGS)
 test_dbs_CPPFLAGS 				= $(AM_CPPFLAGS)
 nodist_EXTRA_test_dbs_SOURCES	= automake-force-linker.cxx # required by Boost & ViennaCL
 
@@ -60,7 +60,7 @@ test_dfs_stack_CPPFLAGS 	= $(AM_CPPFLAGS)
 
 # test-dm
 test_dm_SOURCES 				= test-dm.c
-test_dm_LDADD 					= $(DM_DEBUG_LIBS) $(PINS_LIBS) $(AM_LDFLAGS)
+test_dm_LDADD 					= $(DM_DEBUG_LIBS) $(PINS_LIBS) $(HRE_LIB) $(AM_LDFLAGS)
 test_dm_CPPFLAGS 				= -DDMDEBUG $(AM_CPPFLAGS)
 nodist_EXTRA_test_dm_SOURCES	= automake-force-linker.cxx # required by Boost & ViennaCL
 
@@ -80,7 +80,7 @@ endif
 # test-ltsmin-parse
 test_ltsmin_parse_SOURCES 				= test-ltsmin-parse.c
 test_ltsmin_parse_CPPFLAGS				= -DNXT -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS)
-test_ltsmin_parse_LDADD					= $(PINS_LIBS) $(DM_LIBS) $(AM_LDFLAGS)
+test_ltsmin_parse_LDADD					= $(PINS_LIBS) $(DM_LIBS) $(HRE_LIB) $(AM_LDFLAGS)
 test_ltsmin_parse_LDADD    			   += $(top_builddir)/ltl2ba/libltl2ba.la
 nodist_EXTRA_test_ltsmin_parse_SOURCES	= automake-force-linker.cxx # required by Boost & ViennaCL
 
@@ -91,7 +91,7 @@ test_mucalc_parser_LDADD     = $(HRE_LIB) ../hre-io/libhre-io.la ../ltsmin-lib/l
 
 # test-regroup
 test_regroup_SOURCES 				= test-regroup.c
-test_regroup_LDADD 					= $(DM_LIBS) $(PINS_LIBS) $(AM_LDFLAGS)
+test_regroup_LDADD 					= $(DM_LIBS) $(HRE_LIB) $(PINS_LIBS) $(AM_LDFLAGS)
 test_regroup_CPPFLAGS 				= $(AM_CPPFLAGS)
 nodist_EXTRA_test_regroup_SOURCES	= automake-force-linker.cxx # required by Boost & ViennaCL
 
