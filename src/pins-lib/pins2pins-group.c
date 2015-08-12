@@ -897,7 +897,6 @@ merge_matrices(rw_info_t* inf)
             for (int j = src; j != tgt; src < tgt ? j++ : j--) {
                 dm_add_to_permutation_group(&pg, j);
             }
-            dm_close_group(&pg);
             dm_permute_cols(inf->old_r, &pg);
             dm_permute_cols(inf->old_mayw, &pg);
             dm_permute_cols(inf->old_mustw, &pg);
@@ -1127,10 +1126,7 @@ GBregroup (model_t model)
         if (GBgetStateLabelInfo(model) != NULL) {
             dm_copy (GBgetStateLabelInfo (model), s);
 
-            if (dm_copy_col_info(r, s)) {
-                HREmessage(error, "Error in DM copy");
-                HREexit(LTSMIN_EXIT_FAILURE);
-            }
+            dm_copy_col_info(r, s);
 
             GBsetStateLabelInfo(group, s);
         }
