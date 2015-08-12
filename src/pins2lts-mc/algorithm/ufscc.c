@@ -117,13 +117,10 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (ctx->state->ref == successor->ref)
         return;
 
-    // TODO: better to do sameset/dead check here?
-    // - for now, just put all successors on the stack
-
     stack_loc = dfs_stack_push (loc->search_stack, NULL);
     state_info_serialize (successor, stack_loc);
 
-    (void) arg; (void) ti; (void) seen;
+    (void) ti; (void) seen;
 }
 
 
@@ -265,7 +262,7 @@ successor (wctx_t *ctx)
     else  { // result == CLAIM_FOUND
         // (TO == state in previously visited SCC) ==> cycle found
 
-        if (uf_sameset(shared->uf, loc->target->ref, ctx->state->ref))  {
+        if ( uf_sameset (shared->uf, loc->target->ref, ctx->state->ref) )  {
             dfs_stack_pop (loc->search_stack);
             return;
         }

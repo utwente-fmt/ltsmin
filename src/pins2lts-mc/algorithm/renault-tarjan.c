@@ -367,7 +367,8 @@ renault_run  (run_t *run, wctx_t *ctx)
     int                 transitions;
 
 #ifdef HAVE_PROFILER
-    Warning (info, "Using the profiler");
+    if (ctx->id == 0)
+        Warning (info, "Using the profiler");
     ProfilerStart ("renault.perf");
 #endif
 
@@ -480,7 +481,8 @@ renault_run  (run_t *run, wctx_t *ctx)
 #endif
 
 #ifdef HAVE_PROFILER
-    Warning(info, "Done profiling");
+    if (ctx->id == 0)
+        Warning(info, "Done profiling");
     ProfilerStop();
 #endif
 
