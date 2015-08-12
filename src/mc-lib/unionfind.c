@@ -15,12 +15,10 @@ typedef uint64_t sz_w;
 
 
 typedef enum uf_status_e {
-    UF_UNSEEN         = 0,                    // unseen (initial value)
-    UF_INIT           = 1,                    // busy initializing
-    UF_LIVE           = 2,                    // LIVE state
-    UF_LOCK           = 3,                    // prevent other workers from
+    UF_LIVE           = 0,                    // LIVE state
+    UF_LOCK           = 1,                    // prevent other workers from
                                               //   updating the parent
-    UF_DEAD           = 4,                    // completed SCC
+    UF_DEAD           = 2,                    // completed SCC
 } uf_status;
 
 
@@ -102,6 +100,7 @@ uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
     a = state;
 
     while ( 1 ) {
+        // HREassert ( a != 0 );
 
         // if we exit this loop, a.status == TOMB or we returned a LIVE state
         while ( 1 ) {
@@ -122,7 +121,7 @@ uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
         b = atomic_read (&uf->array[a].list_next);
 
         // if a is TOMB and only element, then the SCC is DEAD
-        if (a == b) {
+        if (a == b || b == 0) {
             if ( uf_mark_dead (uf, a) )
                 return PICK_MARK_DEAD;
             return PICK_DEAD;
@@ -145,6 +144,8 @@ uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
 
         // a --> b --> c
         c = atomic_read (&uf->array[b].list_next);
+
+        // HREassert ( c != 0 );
 
         // make the list shorter (a --> c)
         cas (&uf->array[a].list_next, b, c);
@@ -200,29 +201,8 @@ uf_make_claim (const uf_t *uf, ref_t state, size_t worker)
     HREassert (worker < WORKER_BITS);
 
     sz_w                w_id   = 1ULL << worker;
-    uf_status           status = atomic_read (&uf->array[state].uf_status);
-    ref_t               f;
-
-    if (status == UF_UNSEEN) {
-        // state unseen ==> Initialize it
-
-        if (cas (&uf->array[state].uf_status, UF_UNSEEN, UF_INIT) ) {
-
-            atomic_write (&uf->array[state].parent, state);
-            atomic_write (&uf->array[state].list_next, state);
-            atomic_write (&uf->array[state].p_set, w_id);
-            atomic_write (&uf->array[state].uf_status, UF_LIVE);
-
-            return CLAIM_FIRST;
-        }
-    }
-
-    // is someone currently initializing the state?
-    while ( status == UF_INIT ) {
-        status = atomic_read (&uf->array[state].uf_status);
-    }
-
-    f = uf_find (uf, state);
+    ref_t               f      = uf_find (uf, state);
+    sz_w                orig_pset;
 
     // is the state dead?
     if (atomic_read (&uf->array[f].uf_status) == UF_DEAD)
@@ -236,12 +216,15 @@ uf_make_claim (const uf_t *uf, ref_t state, size_t worker)
     }
 
     // Add our worker ID to the set, and ensure it is the UF representative
-    or_fetch (&uf->array[f].p_set, w_id);
-    while ( atomic_read (&uf->array[f].parent) != f ) {
-        f = atomic_read (&uf->array[f].parent);
-        or_fetch (&uf->array[f].p_set, w_id);
+    orig_pset = fetch_or (&uf->array[f].p_set, w_id);
+    while ( atomic_read (&uf->array[f].parent) != 0 ) {
+        f = uf_find (uf, f);
+        orig_pset = fetch_or (&uf->array[f].p_set, w_id);
     }
-    return CLAIM_SUCCESS;
+    if (orig_pset == 0)
+        return CLAIM_FIRST;
+    else
+        return CLAIM_SUCCESS;
 }
 
 
@@ -251,12 +234,14 @@ uf_make_claim (const uf_t *uf, ref_t state, size_t worker)
 ref_t
 uf_find (const uf_t *uf, ref_t state)
 {
+    //HREassert (state != 0);
+
     // recursively find and update the parent (path compression)
     ref_t               parent = atomic_read (&uf->array[state].parent);
     ref_t               root;
 
-    if (parent == state)
-        return parent;
+    if (parent == 0)
+        return state;
 
     root = uf_find (uf, parent);
 
@@ -282,7 +267,7 @@ uf_sameset (const uf_t *uf, ref_t a, ref_t b)
         return 1;
 
     // return false if the parent for a has not been updated
-    if (atomic_read (&uf->array[a_r].parent) == a)
+    if (atomic_read (&uf->array[a_r].parent) == 0)
         return 0;
 
     // otherwise retry
@@ -340,6 +325,13 @@ uf_union (const uf_t *uf, ref_t a, ref_t b)
     // swap the list entries
     a_n = atomic_read (&uf->array[a_l].list_next);
     b_n = atomic_read (&uf->array[b_l].list_next);
+
+    if (a_n == 0) // singleton
+        a_n = a_l;
+
+    if (b_n == 0) // singleton
+        b_n = b_l;
+
     atomic_write (&uf->array[a_l].list_next, b_n);
     atomic_write (&uf->array[b_l].list_next, a_n);
 
@@ -389,7 +381,7 @@ uf_mark_dead (const uf_t *uf, ref_t state)
         status = atomic_read (&uf->array[f].uf_status);
     }
 
-    HREassert (atomic_read (&uf->array[f].parent) == f,
+    HREassert (atomic_read (&uf->array[f].parent) == 0,
                "the parent of a DEAD representative should not change");
     HREassert (uf_is_dead (uf, state), "state should be dead");
 
@@ -408,7 +400,7 @@ uf_lock_uf (const uf_t *uf, ref_t a)
 
            // successfully locked
            // ensure that we actually locked the representative
-           if (atomic_read (&uf->array[a].parent) == a)
+           if (atomic_read (&uf->array[a].parent) == 0)
                return 1;
 
            // otherwise unlock and try again
@@ -465,8 +457,6 @@ uf_print_list_status (list_status ls)
 static char*
 uf_print_uf_status (uf_status us)
 {
-    if (us == UF_UNSEEN) return "UNSN";
-    if (us == UF_INIT)   return "INIT";
     if (us == UF_LIVE)   return "LIVE";
     if (us == UF_LOCK)   return "LOCK";
     if (us == UF_DEAD)   return "DEAD";
@@ -496,7 +486,7 @@ uf_debug_aux (const uf_t *uf, ref_t state, int depth)
         uf_print_list_status (atomic_read (&uf->array[state].list_status) ),
         atomic_read (&uf->array[state].list_next));
 
-    if (uf->array[state].parent != state) {
+    if (uf->array[state].parent != 0) {
         uf_debug_aux (uf, uf->array[state].parent, depth+1);
     }
 }
@@ -525,7 +515,8 @@ uf_debug_list_aux (const uf_t *uf, ref_t start, ref_t state, int depth)
              atomic_read (&uf->array[state].list_next));
 
     if (atomic_read (&uf->array[state].list_next) != start ||
-        atomic_read (&uf->array[state].list_next) != state) {
+        atomic_read (&uf->array[state].list_next) != state ||
+        atomic_read (&uf->array[state].list_next) != 0) {
         uf_debug_list_aux (uf, start, uf->array[state].list_next, depth+1);
     }
 }
