@@ -29,6 +29,13 @@ dependency matrix.  The following transformations _T_ are available:
 
 include::regroup-options.txt[]
 
+*--row-perm*='perm'::
+    Apply row permutation 'perm', where 'perm' is a sequence of row numbers, separated by a comma.
+    E.g. the vector 2,1,0 will swap row 2 with row 0.
+    
+*--col-perm*='perm'::
+    Apply column permutation 'perm', where 'perm' is a sequence of column numbers, separated by a comma.
+    E.g. the vector 2,1,0 will swap column 2 with column 0.
 
 *--mucalc*='FILE'|'FORMULA'::
     Compute a parity game for the mu-calculus formula.
