@@ -1,5 +1,6 @@
 #include <hre/config.h>
 
+#include <ctype.h>
 #include <float.h>
 #include <limits.h>
 #include <stdio.h>
@@ -29,6 +30,8 @@ static int              cw_max_cols = -1;
 static int              cw_max_rows = -1;
 static const char      *col_ins = NULL;
 static int mh_timeout = -1;
+static char            *row_perm = NULL;
+static char            *col_perm = NULL;
 
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
@@ -48,6 +51,8 @@ struct poptOption group_options[] = {
     { "cw-max-rows", 0, POPT_ARG_INT, &cw_max_rows, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> rows", "<num>" },
     { "col-ins", 0, POPT_ARG_STRING, &col_ins, 0, "insert column C before column C'", "<(C.C',)+>" },
     { "mh-timeout", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &mh_timeout, 0, "timeout for metaheuristic algorithms (-1 = no timeout)", "<seconds>" },
+    { "row-perm", 0, POPT_ARG_STRING, &row_perm, 0, "apply row permutation (R is a row number)", "<(R,)+>" },
+    { "col-perm", 0, POPT_ARG_STRING, &col_perm, 0, "apply column permutation (C is a column number)", "<(C,)+>" },
     POPT_TABLEEND
 };
 
@@ -426,7 +431,6 @@ subsume_cols(matrix_t *m, int cola, int colb, void *context)
     return is_subsumed(ctx, m->col_perm.data[cola].becomes, m->col_perm.data[colb].becomes);
 }
 
-#if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
 static void
 apply_permutation(rw_info_t *inf, int* row_perm, int* col_perm)
 {
@@ -454,7 +458,6 @@ apply_permutation(rw_info_t *inf, int* row_perm, int* col_perm)
         RTfree(groups);
     }
 }
-#endif
 
 static const uint16_t READ  = 0x0001; // right most bit denotes read
 static const uint16_t WRITE = 0x0002; // middle bit denotes write
@@ -1281,11 +1284,50 @@ merge_matrices(rw_info_t* inf)
     }
 }
 
+static void
+str2vec(const int max_size, const char *perm, int *vec)
+{
+    char *p = strdup(perm);
+    char *e;
+    int i = 0;
+    while ((e = strsep(&p, ",")) != NULL && strlen(e) > 0) {
+        if (i == max_size) {
+            Warning(error, "to many numbers (%d) given", i + 1);
+            HREexit(LTSMIN_EXIT_FAILURE);
+        }
+        const int j = atoi(e);
+
+        if (j < 0) {
+            Warning(error, "%d at %d should be >= 0", j, i);
+            HREexit(LTSMIN_EXIT_FAILURE);
+        }
+
+        if (j >= max_size) {
+            Warning(error, "%d at %d should be < %d", j, i, max_size);
+            HREexit(LTSMIN_EXIT_FAILURE);
+        }
+
+        for (int k = 0; k < i; k++) {
+            if (j == vec[k]) {
+                Warning(error, "%d at %d already given previously at %d", j, i, k);
+                HREexit(LTSMIN_EXIT_FAILURE);
+            }
+        }
+
+        vec[i] = j;
+
+        i++;
+    }
+    if (i != max_size) {
+        Warning(error, "to few numbers");
+        HREexit(LTSMIN_EXIT_FAILURE);
+    }
+}
 
 model_t
 GBregroup (model_t model)
 {
-    if (regroup_spec != NULL || col_ins != NULL) {
+    if (regroup_spec != NULL || col_ins != NULL || row_perm != NULL || col_perm != NULL) {
 
         Print1(info, "Initializing regrouping layer");
 
@@ -1327,7 +1369,22 @@ GBregroup (model_t model)
         inf.old_r = r;
         inf.old_mayw = mayw;
         inf.old_mustw = mustw;
+
         split_matrices(&inf);
+
+        if (row_perm != NULL) {
+            Warning(info, "Permuting rows according to given vector");
+            int perm[dm_nrows(inf.r)];
+            str2vec(dm_nrows(inf.r), row_perm, perm);
+            apply_permutation(&inf, perm, NULL);
+        }
+
+        if (col_perm != NULL) {
+            Warning(info, "Permuting columns according to given vector");
+            int perm[dm_ncols(inf.r)];
+            str2vec(dm_ncols(inf.r), col_perm, perm);
+            apply_permutation(&inf, NULL, perm);
+        }
 
         if (regroup_spec != NULL) {
             Print1 (info, "Regroup specification: %s", regroup_spec);
