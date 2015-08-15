@@ -219,9 +219,9 @@ uf_make_claim (const uf_t *uf, ref_t state, size_t worker)
     orig_pset = fetch_or (&uf->array[f].p_set, w_id);
     while ( atomic_read (&uf->array[f].parent) != 0 ) {
         f = uf_find (uf, f);
-        orig_pset = fetch_or (&uf->array[f].p_set, w_id);
+        fetch_or (&uf->array[f].p_set, w_id);
     }
-    if (orig_pset == 0)
+    if (orig_pset == 0ULL)
         return CLAIM_FIRST;
     else
         return CLAIM_SUCCESS;
@@ -335,12 +335,12 @@ uf_union (const uf_t *uf, ref_t a, ref_t b)
     atomic_write (&uf->array[a_l].list_next, b_n);
     atomic_write (&uf->array[b_l].list_next, a_n);
 
+    // update parent
+    atomic_write (&uf->array[q].parent, r);
+
     // update worker set (we do not need to ensure that r is still the root)
     q_w = atomic_read (&uf->array[q].p_set);
     or_fetch (&uf->array[r].p_set, q_w);
-
-    // update parent
-    atomic_write (&uf->array[q].parent, r);
 
     // unlock
     uf_unlock_list (uf, a_l);
