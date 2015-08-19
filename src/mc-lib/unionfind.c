@@ -283,10 +283,12 @@ bool
 uf_union (const uf_t *uf, ref_t a, ref_t b)
 {
     ref_t               a_r, b_r, a_l, b_l, a_n, b_n, r, q;
+    sz_w                q_w, r_w;
 
-    a_r = a;
-    b_r = b;
     while ( 1 ) {
+
+        a_r = uf_find (uf, a);
+        b_r = uf_find (uf, b);
 
         // find the representatives
         if (a_r == b_r) {
@@ -303,11 +305,8 @@ uf_union (const uf_t *uf, ref_t a, ref_t b)
         }
 
         // lock the non-root
-        if ( !uf_lock_uf (uf, q) ) {
-            a_r = uf_find (uf, a);
-            b_r = uf_find (uf, b);
+        if ( !uf_lock_uf (uf, q) )
             continue;
-        }
 
         break;
     }
@@ -338,6 +337,18 @@ uf_union (const uf_t *uf, ref_t a, ref_t b)
 
     // update parent
     atomic_write (&uf->array[q].parent, r);
+
+    // only update worker set for r if q adds workers
+    q_w = atomic_read (&uf->array[q].p_set);
+    r_w = atomic_read (&uf->array[r].p_set);
+    if ( (q_w | r_w) != r_w) {
+        // update!
+        fetch_or (&uf->array[r].p_set, q_w);
+        while (atomic_read (&uf->array[r].parent) != 0) {
+            r = uf_find (uf, r);
+            fetch_or (&uf->array[r].p_set, q_w);
+        }
+    }
 
     // unlock
     uf_unlock_list (uf, a_l);
