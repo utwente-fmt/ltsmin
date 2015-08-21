@@ -1789,7 +1789,7 @@ dm_row_aggr(const matrix_t* const m, int* const rows_metric, dm_aggr_op_t op, co
 {
     double result = metric_op(dm_nrows(m), rows_metric, op);
     if (normalize) {
-        if (op == DM_AGGR_TOT) result /= dm_nrows(m) * dm_ncols(m);
+        if (op == DM_AGGR_TOT) result /= dm_nrows(m) * (double) dm_ncols(m);
         else result /= dm_ncols(m);
     }
 
@@ -1803,7 +1803,7 @@ dm_col_aggr(const matrix_t* const m, int* const cols_metric, dm_aggr_op_t op, co
 {
     double result = metric_op(dm_ncols(m), cols_metric, op);
     if (normalize) {
-        if (op == DM_AGGR_TOT) result /= dm_ncols(m) * dm_nrows(m);
+        if (op == DM_AGGR_TOT) result /= dm_ncols(m) * (double) dm_nrows(m);
         else result /= dm_nrows(m);
     }
 
