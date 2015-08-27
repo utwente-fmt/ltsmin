@@ -30,6 +30,10 @@ typedef struct counter_s {
     uint32_t            scc_count;
     uint32_t            unique_states;
     uint32_t            unique_trans;
+    uint32_t            selfloop;
+    uint32_t            claimdead;
+    uint32_t            claimfound;
+    uint32_t            claimsuccess;
 } counter_t;
 
 
@@ -82,6 +86,10 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.scc_count               = 0;
     ctx->local->cnt.unique_states           = 0;
     ctx->local->cnt.unique_trans            = 0;
+    ctx->local->cnt.selfloop                = 0;
+    ctx->local->cnt.claimdead               = 0;
+    ctx->local->cnt.claimfound              = 0;
+    ctx->local->cnt.claimsuccess            = 0;
 
 #if SEARCH_COMPLETE_GRAPH
     dlopen_setup (files[0]);
@@ -114,8 +122,10 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     ctx->counters->trans++;
 
     // self-loop
-    if (ctx->state->ref == successor->ref)
+    if (ctx->state->ref == successor->ref) {
+        loc->cnt.selfloop ++;
         return;
+    }
 
     stack_loc = dfs_stack_push (loc->search_stack, NULL);
     state_info_serialize (successor, stack_loc);
@@ -201,6 +211,7 @@ ufscc_init  (wctx_t *ctx)
     state_info_deserialize (ctx->state, state_data); // search_stack TOP
     transitions = explore_state(ctx);
 
+    loc->cnt.claimsuccess ++;
     if (claim == CLAIM_FIRST) {
         loc->cnt.unique_states ++;
         loc->cnt.unique_trans += transitions;
@@ -243,12 +254,14 @@ successor (wctx_t *ctx)
     
     if (claim == CLAIM_DEAD) {
         // (TO == DEAD) ==> get next successor
+        loc->cnt.claimdead ++;
         dfs_stack_pop (loc->search_stack);
         return;
     }
 
     else if (claim == CLAIM_SUCCESS || claim == CLAIM_FIRST) {
         // (TO == 'new' state) ==> 'recursively' explore
+        loc->cnt.claimsuccess ++;
 
         trans = explore_state (ctx);
 
@@ -261,6 +274,7 @@ successor (wctx_t *ctx)
 
     else  { // result == CLAIM_FOUND
         // (TO == state in previously visited SCC) ==> cycle found
+        loc->cnt.claimfound ++;
 
         if ( uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) )  {
             dfs_stack_pop (loc->search_stack);
@@ -469,6 +483,10 @@ ufscc_reduce (run_t *run, wctx_t *ctx)
     reduced->unique_trans           += cnt->unique_trans;
     reduced->unique_states          += cnt->unique_states;
     reduced->scc_count              += cnt->scc_count;
+    reduced->selfloop               += cnt->selfloop;
+    reduced->claimdead              += cnt->claimdead;
+    reduced->claimfound             += cnt->claimfound;
+    reduced->claimsuccess           += cnt->claimsuccess;
 }
 
 
@@ -489,9 +507,13 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     counter_t              *reduced = (counter_t *) run->reduced;
 
     // SCC statistics
+    Warning(info, "total scc count:            %d", reduced->scc_count);
     Warning(info, "unique states count:        %d", reduced->unique_states);
     Warning(info, "unique transitions count:   %d", reduced->unique_trans);
-    Warning(info, "total scc count:            %d", reduced->scc_count);
+    Warning(info, "- self-loop count:          %d", reduced->selfloop);
+    Warning(info, "- claim dead count:         %d", reduced->claimdead);
+    Warning(info, "- claim found count:        %d", reduced->claimfound);
+    Warning(info, "- claim success count:      %d", reduced->claimsuccess);
     Warning(info, " ");
 
     run_report_total (run);
