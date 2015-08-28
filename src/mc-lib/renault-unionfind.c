@@ -202,6 +202,7 @@ r_uf_mark_dead (const r_uf_t *uf, ref_t state)
     while ( status != R_UF_DEAD ) {
         if (status == R_UF_LIVE)
             result = cas (&uf->array[f].r_uf_status, R_UF_LIVE, R_UF_DEAD);
+        f      = r_uf_find (uf, state);
         status = atomic_read (&uf->array[f].r_uf_status);
     }
 
