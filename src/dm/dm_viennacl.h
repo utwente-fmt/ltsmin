@@ -10,10 +10,11 @@ extern "C" {
 typedef enum {
     VIENNACL_CM,
     VIENNACL_ACM,
-    VIENNACL_GPS
+    VIENNACL_GPS,
+    VIENNACL_NONE
 } viennacl_reorder_t;
 
-extern void viennacl_reorder(const matrix_t*, int* row_perm, int* col_perm, viennacl_reorder_t, const int total);
+extern void viennacl_reorder(const matrix_t*, int* row_perm, int* col_perm, viennacl_reorder_t, const int total, const int metrics);
 
 #ifdef __cplusplus
 }

@@ -32,6 +32,7 @@ static const char      *col_ins = NULL;
 static int mh_timeout = -1;
 static char            *row_perm = NULL;
 static char            *col_perm = NULL;
+static int             graph_metrics = 0;
 
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
@@ -41,10 +42,10 @@ struct poptOption group_options[] = {
       ", bg, tg"
 #endif
 #ifdef HAVE_BOOST
-      ", bcm, bk, bs"
+      ", bcm, bk, bs, bn"
 #endif
 #ifdef HAVE_VIENNACL
-      ", vcm, vacm, vgps"
+      ", vcm, vacm, vgps, vn"
 #endif
           , "<(T,)+>" },
     { "cw-max-cols", 0, POPT_ARG_INT, &cw_max_cols, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> columns", "<num>" },
@@ -53,6 +54,7 @@ struct poptOption group_options[] = {
     { "mh-timeout", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &mh_timeout, 0, "timeout for metaheuristic algorithms (-1 = no timeout)", "<seconds>" },
     { "row-perm", 0, POPT_ARG_STRING, &row_perm, 0, "apply row permutation (R is a row number)", "<(R,)+>" },
     { "col-perm", 0, POPT_ARG_STRING, &col_perm, 0, "apply column permutation (C is a column number)", "<(C,)+>" },
+    { "graph-metrics", 0, POPT_ARG_NONE, &graph_metrics, 0, "print metrics of the symmetrized dependency matrix", NULL },
     POPT_TABLEEND
 };
 
@@ -548,202 +550,21 @@ prepare_col_compare(rw_info_t *inf, struct group_info* context)
         }
     }
 }
-
 static void
-print_aggr(
-    const int type,
-    const char* name,
-    const int max_fc_digs,
-    const int max_sc_digs,
-    const int max_tc_digs,
-    const double tot,
-    const int tot_digs,
-    const double avg,
-    const double norm_tot,
-    const double max,
-    const int max_digs,
-    const double norm_max,
-    const double rms,
-    const int rms_digs,
-    const double norm_rms)
+print_event_span(const matrix_t* const m)
 {
-    printf("%-6s %-9s | %*.*g, %#*.*g (%#*.*g) | %*.*g (%#*.*g) | %#*.*g (%#*.*g)\n",
-        type ? "row" : "column",
-        name,
-        max(3, max_fc_digs), DBL_DIG, tot,
-        max(3, max_fc_digs), tot_digs, avg,
-        max(4, max_fc_digs), tot_digs, norm_tot,
-        max(3, max_sc_digs), DBL_DIG, max,
-        max(4, max_sc_digs + 2), max_digs, norm_max,
-        max(3, max_tc_digs), rms_digs, rms,
-        max(4, max_tc_digs), rms_digs, norm_rms);
-}
+    int* row_spans = RTmalloc(sizeof(int[dm_nrows(m)]));
+    dm_row_spans(m, row_spans);
 
-static void
-print_dm_aggrs(const matrix_t* const m)
-{
-    int row_spans[dm_nrows(m)];
-    int trs_digs = INT_MAX;
-    int normalize = 0;
-    const double trs = dm_row_spans(m, row_spans, DM_AGGR_TOT, &normalize, &trs_digs);
+    const double es = dm_event_span(m, row_spans);
 
-    int col_wavefronts[dm_ncols(m)];
-    int tcwf_digs = INT_MAX;
-    normalize = 0;
-    const double tcwf = dm_col_wavefronts(m, col_wavefronts, DM_AGGR_TOT, &normalize, &tcwf_digs);
+    printf("Event Span: %.*g\n", DBL_DIG, es);
+    printf("Normalized Event Span: %.*g\n",
+        (int) ceil(log10(es)), es / (dm_ncols(m) * (double) dm_nrows(m)));
+    printf("Weighted Event Span, moment 1 (WES^1): %.*g\n",
+        (int) ceil(log10(dm_ncols(m))), dm_weighted_event_span(m, row_spans));
 
-    // compute row span aggregates
-    // Siminiceanu, Ciardo: Normalized Event Span (NES)
-    const double ntrs = dm_row_aggr(m, row_spans, DM_AGGR_TOT, 1, NULL);
-    int mrs_digs = INT_MAX;
-    const double ars  = dm_row_aggr(m, row_spans, DM_AGGR_AVG, 0, &mrs_digs);
-    const double mrs  = dm_row_aggr(m, row_spans, DM_AGGR_MAX, 0, NULL);
-    const double nmrs = dm_row_aggr(m, row_spans, DM_AGGR_MAX, 1, NULL);
-    int rmsrs_digs = INT_MAX;
-    const double rmsrs  = dm_row_aggr(m, row_spans, DM_AGGR_RMS, 0, &rmsrs_digs);
-    const double nrmsrs  = dm_row_aggr(m, row_spans, DM_AGGR_RMS, 1, NULL);
-
-    // compute column wavefront aggregates
-    const double ntcwf = dm_col_aggr(m, col_wavefronts, DM_AGGR_TOT, 1, NULL);
-    int mcwf_digs = INT_MAX;
-    const double acwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_AVG, 0, &mcwf_digs);
-    const double mcwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_MAX, 0, NULL);
-    const double nmcwf = dm_col_aggr(m, col_wavefronts, DM_AGGR_MAX, 1, NULL);
-    int rmscwf_digs = INT_MAX;
-    const double rmscwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_RMS, 0, &rmscwf_digs);
-    const double nrmscwf  = dm_col_aggr(m, col_wavefronts, DM_AGGR_RMS, 1, NULL);
-
-    // max digits in first column
-    int max_fc_digs = max(trs_digs, tcwf_digs);
-
-    // max digits in second column
-    int max_sc_digs = max(mrs_digs, mcwf_digs);
-
-    // max digits in third column
-    int max_tc_digs = max(rmsrs_digs, rmscwf_digs);
-
-    // row bandwidth aggregates
-    int trb_digs = INT_MAX, mrb_digs = INT_MAX, rmsrb_digs = INT_MAX;
-    double trb = 0, ntrb = 0, arb = 0, mrb = 0, nmrb = 0, rmsrb = 0, nrmsrb = 0;
-
-    // column bandwidth aggregates
-    int tcb_digs = INT_MAX, mcb_digs = INT_MAX, rmscb_digs = INT_MAX;
-    double tcb = 0, ntcb = 0, acb = 0, mcb = 0, nmcb = 0, rmscb = 0, nrmscb = 0;
-
-    // column span aggregates
-    int tcs_digs = INT_MAX, mcs_digs = INT_MAX, rmscs_digs = INT_MAX;
-    double tcs = 0, ntcs = 0, acs = 0, mcs = 0, nmcs = 0, rmscs = 0, nrmscs = 0;
-
-    // row wavefront aggregates
-    int trwf_digs = INT_MAX, mrwf_digs = INT_MAX, rmsrwf_digs = INT_MAX;
-    double trwf = 0, ntrwf = 0, arwf = 0, mrwf = 0, nmrwf = 0, rmsrwf = 0, nrmsrwf = 0;
-
-    // if (log_active(infoLong)) {
-
-        int row_bandwidths[dm_nrows(m)];
-        normalize = 0;
-        trb = dm_row_bandwidths(m, row_bandwidths, DM_AGGR_TOT, &normalize, &trb_digs);
-
-        int col_bandwidths[dm_ncols(m)];
-        normalize = 0;
-        tcb = dm_col_bandwidths(m, col_bandwidths, DM_AGGR_TOT, &normalize, &tcb_digs);
-
-        int col_spans[dm_ncols(m)];
-        normalize = 0;
-        tcs = dm_col_spans(m, col_spans, DM_AGGR_TOT, &normalize, &tcs_digs);
-
-        int row_wavefronts[dm_nrows(m)];
-        normalize = 0;
-        trwf = dm_row_wavefronts(m, row_wavefronts, DM_AGGR_TOT, &normalize, &trwf_digs);
-
-        // compute row bandwidth aggregates
-        ntrb = dm_row_aggr(m, row_bandwidths, DM_AGGR_TOT, 1, NULL);
-        arb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_AVG, 0, &mrb_digs);
-        mrb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_MAX, 0, NULL);
-        nmrb = dm_row_aggr(m, row_bandwidths, DM_AGGR_MAX, 1, NULL);
-        rmsrb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_RMS, 0, &rmsrb_digs);
-        nrmsrb  = dm_row_aggr(m, row_bandwidths, DM_AGGR_RMS, 1, NULL);
-
-        // compute column bandwidth aggregates
-        ntcb = dm_col_aggr(m, col_bandwidths, DM_AGGR_TOT, 1, NULL);
-        acb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_AVG, 0, &mcb_digs);
-        mcb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_MAX, 0, NULL);
-        nmcb = dm_col_aggr(m, col_bandwidths, DM_AGGR_MAX, 1, NULL);
-        rmscb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_RMS, 0, &rmscb_digs);
-        nrmscb  = dm_col_aggr(m, col_bandwidths, DM_AGGR_RMS, 1, NULL);
-
-        // compute column span aggregates
-        ntcs = dm_col_aggr(m, col_spans, DM_AGGR_TOT, 1, NULL);
-        acs  = dm_col_aggr(m, col_spans, DM_AGGR_AVG, 0, &mcs_digs);
-        mcs  = dm_col_aggr(m, col_spans, DM_AGGR_MAX, 0, NULL);
-        nmcs = dm_col_aggr(m, col_spans, DM_AGGR_MAX, 1, NULL);
-        rmscs  = dm_col_aggr(m, col_spans, DM_AGGR_RMS, 0, &rmscs_digs);
-        nrmscs  = dm_col_aggr(m, col_spans, DM_AGGR_RMS, 1, NULL);
-
-        // compute row wavefront aggregates
-        ntrwf = dm_row_aggr(m, row_wavefronts, DM_AGGR_TOT, 1, NULL);
-        arwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_AVG, 0, &mrwf_digs);
-        mrwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_MAX, 0, NULL);
-        nmrwf = dm_row_aggr(m, row_wavefronts, DM_AGGR_MAX, 1, NULL);
-        rmsrwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_RMS, 0, &rmsrwf_digs);
-        nrmsrwf  = dm_row_aggr(m, row_wavefronts, DM_AGGR_RMS, 1, NULL);
-
-        // recompute max digits
-        max_fc_digs = max(max(max(max(max_fc_digs, trb_digs), tcb_digs), tcs_digs), trwf_digs);
-        max_sc_digs = max(max(max(max(max_sc_digs, mrs_digs), mcb_digs), mrs_digs), mcs_digs);
-        max_tc_digs = max(max(max(max(max_tc_digs, rmsrs_digs), rmscb_digs), rmscs_digs), rmsrwf_digs);
-    // }
-
-    const double nra = ntrs * ntcwf;
-    printf("Normalized Region Activity (NRA)     : %.*g\n", max(trs_digs, tcwf_digs), nra);
-
-    // Siminiceanu, Ciardo
-    double wes = 0;
-    for (int i = 0; i < dm_nrows(m); i++) {
-        wes += ((double) dm_ncols(m) - dm_first(m, i) / (dm_ncols(m) / 2.0)) * (double) (row_spans[i] / ((double) dm_nrows(m) * dm_ncols(m)));
-    }
-    printf("Weighted Event Span, moment 1 (WES^1): %.*g\n", trs_digs, wes);
-
-    printf("metric \\ aggr    |");
-    const int fc = printf("%*ctot,%*cavg %*c(norm) ", max_fc_digs - 3, ' ', max_fc_digs - 1, ' ', max_fc_digs - 2, ' ');
-    const int sc = printf("|%*cmax%*c(norm) ", max_sc_digs - 3, ' ', max_sc_digs - 1, ' ') - 1;
-    const int tc = printf("|%*cRMS%*c(norm)\n", max_tc_digs - 1, ' ', max_tc_digs - 1, ' ') - 2;
-    char fcc[fc + 1];
-    memset(fcc, (int)'-',fc); fcc[fc] = '\0';
-    char scc[sc + 1];
-    memset(scc, (int)'-',sc); scc[sc] = '\0';
-    char tcc[tc + 1];
-    memset(tcc, (int)'-',tc); tcc[tc] = '\0';
-
-    print_aggr(
-        1, "span",
-        max_fc_digs, max_sc_digs, max_tc_digs,
-        trs, trs_digs, ars, ntrs, mrs, mrs_digs, nmrs, rmsrs, rmsrs_digs, nrmsrs);
-    print_aggr(
-        0, "wavefront",
-        max_fc_digs, max_sc_digs, max_tc_digs,
-        tcwf, tcwf_digs, acwf, ntcwf, mcwf, mcwf_digs, nmcwf, rmscwf, rmscwf_digs, nrmscwf);
-
-    // if (log_active(infoLong)) {
-        printf("-----------------+%s+%s+%s\n", fcc, scc, tcc);
-        print_aggr(
-            1, "bandwidth",
-            max_fc_digs, max_sc_digs, max_tc_digs,
-            trb, trb_digs, arb, ntrb, mrb, mrb_digs, nmrb, rmsrb, rmsrb_digs, nrmsrb);
-        print_aggr(
-            0, "bandwidth",
-            max_fc_digs, max_sc_digs, max_tc_digs,
-            tcb, tcb_digs, acb, ntcb, mcb, mcb_digs, nmcb, rmscb, rmscb_digs, nrmscb);
-        print_aggr(
-            0, "span",
-            max_fc_digs, max_sc_digs, max_tc_digs,
-            tcs, tcs_digs, acs, ntcs, mcs, mcs_digs, nmcs, rmscs, rmscs_digs, nrmscs);
-        print_aggr(
-            1, "wavefront",
-            max_fc_digs, max_sc_digs, max_tc_digs,
-            trwf, trwf_digs, arwf, ntrwf, mrwf, mrwf_digs, nmrwf, rmsrwf, rmsrwf_digs, nrmsrwf);
-    // }
-    printf("-----------------+%s+%s+%s\n", fcc, scc, tcc);
+    RTfree(row_spans);
 }
 
 static void
@@ -768,40 +589,8 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
 #endif
 
         matrix_t *selection = inf->mayw;
-        dm_row_column_t rc = DM_COLUMN;
-        int num_row_cost_fn = 0;
-        dm_cost_fn row_cost_fn[3];
-        int num_col_cost_fn = 0;
-        dm_cost_fn col_cost_fn[3];
 
-        int num_row_aggr_op = 0;
-        dm_aggr_op_t row_aggr_op[3] = { DM_AGGR_TOT, DM_AGGR_TOT, DM_AGGR_TOT };
-        int num_col_aggr_op = 0;
-        dm_aggr_op_t col_aggr_op[3] = { DM_AGGR_TOT, DM_AGGR_TOT, DM_AGGR_TOT };
-
-        double row_ccost(const matrix_t* const m, int* const vec, dm_aggr_op_t op, int* normalize, int* sig_dec_digs) {
-            (void) op;
-            if (num_row_cost_fn == 1) return row_cost_fn[0](m, vec, row_aggr_op[0], normalize, sig_dec_digs);
-            *normalize = 1;
-            double res = 1;
-            for (int i = 0; i < num_row_cost_fn; i++) {
-                res *= row_cost_fn[i](m, vec, row_aggr_op[i], normalize, sig_dec_digs);
-            }
-
-            return res;
-        }
-
-        double col_ccost(const matrix_t* const m, int* const vec, dm_aggr_op_t op, int* normalize, int* sig_dec_digs) {
-            (void) op;
-            if (num_col_cost_fn == 1) return col_cost_fn[0](m, vec, col_aggr_op[0], normalize, sig_dec_digs);
-            *normalize = 1;
-            double res = 1;
-            for (int i = 0; i < num_col_cost_fn; i++) {
-                res *= col_cost_fn[i](m, vec, col_aggr_op[i], normalize, sig_dec_digs);
-            }
-
-            return res;
-        }
+        dm_cost_t cost = DM_WEIGHTED_EVENT_SPAN;
 
         char               *tok;
         while ((tok = strsep (&spec, sep)) != NULL) {
@@ -819,108 +608,12 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                     dm_apply_or(inf->combined, inf->mayw);
                 }
                 selection = inf->combined;
-            } else if (strcasecmp (tok, "scol") == 0) {
-                Print1 (info, "Regroup Select permute Columns");
-                rc = DM_COLUMN;
-            } else if (strcasecmp (tok, "srow") == 0) {
-                Print1 (info, "Regroup Select permute Rows");
-                rc = DM_ROW;
-            } else if (strcasecmp (tok, "sspan") == 0) {
-                if (rc == DM_COLUMN) {
-                    if (num_col_cost_fn == 3) {
-                        Warning(error, "too many column cost functions");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select Span (cost nr. %d)", num_col_cost_fn);
-                    col_cost_fn[num_col_cost_fn++] = dm_row_spans;
-                } else { // rc == DM_ROW
-                    if (num_row_cost_fn == 3) {
-                        Warning(error, "too many row cost functions");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select Span (cost nr. %d)", num_row_cost_fn);
-                    row_cost_fn[num_row_cost_fn++] = dm_col_spans;
-                }
-            } else if (strcasecmp (tok, "sbw") == 0) {
-                if (rc == DM_COLUMN) {
-                    if (num_col_cost_fn == 3) {
-                        Warning(error, "too many column cost functions");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select Banwidth (cost nr. %d)", num_col_cost_fn);
-                    col_cost_fn[num_col_cost_fn++] = dm_row_bandwidths;
-                } else { // rc == DM_ROW
-                    if (num_row_cost_fn == 3) {
-                        Warning(error, "too many row cost functions");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select Bandwidth (cost nr. %d)", num_row_cost_fn);
-                    row_cost_fn[num_row_cost_fn++] = dm_col_bandwidths;
-                }
-            } else if (strcasecmp (tok, "swf") == 0) {
-                if (rc == DM_COLUMN) {
-                    if (num_col_cost_fn == 3) {
-                        Warning(error, "too many col cost functions");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select Wavefront (cost nr. %d)", num_col_cost_fn);
-                    col_cost_fn[num_col_cost_fn++] = dm_col_wavefronts;
-                } else { // rc == DM_ROW
-                    if (num_row_cost_fn == 3) {
-                        Warning(error, "too many row cost functions");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select Wavefront (cost nr. %d)", num_row_cost_fn);
-                    row_cost_fn[num_row_cost_fn++] = dm_row_wavefronts;
-                }
-            } else if (strcasecmp (tok, "smax") == 0) {
-                if (rc == DM_COLUMN) {
-                    if (num_col_aggr_op == 3) {
-                        Warning(error, "too many column aggregate operations");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select aggregate Maximum (op nr. %d)", num_col_aggr_op);
-                    col_aggr_op[num_col_aggr_op++] = DM_AGGR_MAX;
-                } else { // rc == DM_ROW
-                    if (num_row_aggr_op == 3) {
-                        Warning(error, "too many row aggregate operations");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select aggregate Maximum (op nr. %d)", num_row_aggr_op);
-                    row_aggr_op[num_row_aggr_op++] = DM_AGGR_MAX;
-                }
-            } else if (strcasecmp (tok, "stot") == 0) {
-                if (rc == DM_COLUMN) {
-                    if (num_col_aggr_op == 3) {
-                        Warning(error, "too many column aggregate operations");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select aggregate Total (op nr. %d)", num_col_aggr_op);
-                    col_aggr_op[num_col_aggr_op++] = DM_AGGR_TOT;
-                } else { // rc == DM_ROW
-                    if (num_row_aggr_op == 3) {
-                        Warning(error, "too many row aggregate operations");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select aggregate Total (op nr. %d)", num_row_aggr_op);
-                    row_aggr_op[num_row_aggr_op++] = DM_AGGR_TOT;
-                }
-            } else if (strcasecmp (tok, "srms") == 0) {
-                if (rc == DM_COLUMN) {
-                    if (num_col_aggr_op == 3) {
-                        Warning(error, "too many column aggregate operations");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select aggregate Root Mean Square (cost nr. %d)", num_col_aggr_op);
-                    col_aggr_op[num_col_aggr_op++] = DM_AGGR_RMS;
-                } else { // rc == DM_ROW
-                    if (num_row_aggr_op == 3) {
-                        Warning(error, "too many row aggregate operations");
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    Print1 (info, "Regroup Select aggregate Root Mean Square (cost nr. %d)", num_row_aggr_op);
-                    row_aggr_op[num_row_aggr_op++] = DM_AGGR_RMS;
-                }
+            } else if (strcasecmp (tok, "ses") == 0) {
+                Print1 (info, "Regroup Select Event Span");
+                cost = DM_EVENT_SPAN;
+            } else if (strcasecmp (tok, "swes") == 0) {
+                Print1 (info, "Regroup Select Weighted Event Span");
+                cost = DM_WEIGHTED_EVENT_SPAN;
             } else if (strcasecmp (tok, "w2W") == 0) {
                 Print1 (info, "Regroup over-approximate must-write to may-write");
                 dm_clear(inf->mustw);
@@ -964,33 +657,8 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 inf_copy_col_headers(inf->r, inf);
             } else if (strcasecmp (tok, "sa") == 0) {
                 Print1 (info, "Regroup Simulated Annealing");
-                if (rc == DM_COLUMN) {
-                    if (num_col_cost_fn == 0) {
-                        Warning(info,
-                            "Not selected any cost function; using row span");
-                        col_cost_fn[num_col_cost_fn++] = dm_row_spans;
-                    }
-                    if (num_col_aggr_op != num_col_cost_fn) {
-                        Warning(info,
-                            "Number of column aggregation operations is not equal to the number of cost"
-                            " functions, assuming aggregation operation \"total (stot)\".");
-                    }
-                    dm_anneal (selection, DM_COLUMN, col_ccost, DM_AGGR_TOT /* unused */, mh_timeout, NULL);
-                    inf_copy_col_headers(selection, inf);
-                } else { // rc == DM_ROW
-                    if (num_row_cost_fn == 0) {
-                        Warning(info,
-                            "Not selected any cost function; using row wavefront");
-                        row_cost_fn[num_row_cost_fn++] = dm_row_wavefronts;
-                    }
-                    if (num_row_aggr_op != num_row_cost_fn) {
-                        Warning(info,
-                            "Number of row aggregation operations is not equal to the number of cost"
-                            " functions, assuming aggregation operation \"total (stot)\".");
-                    }
-                    dm_anneal (selection, DM_ROW, row_ccost, DM_AGGR_TOT /* unused */, mh_timeout, NULL);
-                    inf_copy_row_headers(selection, inf);
-                }
+                dm_anneal (selection, cost, mh_timeout);
+                inf_copy_col_headers(selection, inf);
             } else if (strcasecmp (tok, "cw") == 0) {
                 Print1 (info, "Regroup Column sWaps");
                 if ((cw_max_cols < 0 || dm_ncols(selection) <= cw_max_cols) && (cw_max_rows < 0 || dm_nrows(selection) <= cw_max_rows)) {
@@ -1043,19 +711,25 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 Print1 (info, "Regroup Boost's Cuthill McKee");
                 int row_perm[dm_nrows(selection)];
                 int col_perm[dm_ncols(selection)];
-                boost_ordering(selection, row_perm, col_perm, BOOST_CM, total_graph);
+                boost_ordering(selection, row_perm, col_perm, BOOST_CM, total_graph, graph_metrics);
                 apply_permutation(inf, row_perm, col_perm);
             } else if (strcasecmp (tok, "bs") == 0) {
                 Print1 (info, "Regroup Boost's Sloan");
                 int row_perm[dm_nrows(selection)];
                 int col_perm[dm_ncols(selection)];
-                boost_ordering(selection, row_perm, col_perm, BOOST_SLOAN, total_graph);
+                boost_ordering(selection, row_perm, col_perm, BOOST_SLOAN, total_graph, graph_metrics);
                 apply_permutation(inf, row_perm, col_perm);
             } else if (strcasecmp (tok, "bk") == 0) {
                 Print1 (info, "Regroup Boost's King");
                 int row_perm[dm_nrows(selection)];
                 int col_perm[dm_ncols(selection)];
-                boost_ordering(selection, row_perm, col_perm, BOOST_KING, total_graph);
+                boost_ordering(selection, row_perm, col_perm, BOOST_KING, total_graph, graph_metrics);
+                apply_permutation(inf, row_perm, col_perm);
+            } else if (strcasecmp (tok, "bn") == 0) {
+                Print1 (info, "Regroup Boost's None");
+                int row_perm[dm_nrows(selection)];
+                int col_perm[dm_ncols(selection)];
+                boost_ordering(selection, row_perm, col_perm, BOOST_NONE, total_graph, graph_metrics);
                 apply_permutation(inf, row_perm, col_perm);
             }
 #endif
@@ -1064,25 +738,31 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 Print1 (info, "Regroup ViennaCL's Cuthill McKee");
                 int row_perm[dm_nrows(selection)];
                 int col_perm[dm_ncols(selection)];
-                viennacl_reorder(selection, row_perm, col_perm, VIENNACL_CM, total_graph);
+                viennacl_reorder(selection, row_perm, col_perm, VIENNACL_CM, total_graph, graph_metrics);
                 apply_permutation(inf, row_perm, col_perm);
             } else if (strcasecmp (tok, "vacm") == 0) {
                 Print1 (info, "Regroup ViennaCL's Advanced Cuthill McKee");
                 int row_perm[dm_nrows(selection)];
                 int col_perm[dm_ncols(selection)];
-                viennacl_reorder(selection, row_perm, col_perm, VIENNACL_ACM, total_graph);
+                viennacl_reorder(selection, row_perm, col_perm, VIENNACL_ACM, total_graph, graph_metrics);
                 apply_permutation(inf, row_perm, col_perm);
             } else if (strcasecmp (tok, "vgps") == 0) {
                 Print1 (info, "Regroup ViennaCL's Gibbs Poole Stockmeyer");
                 int row_perm[dm_nrows(selection)];
                 int col_perm[dm_ncols(selection)];
-                viennacl_reorder(selection, row_perm, col_perm, VIENNACL_GPS, total_graph);
+                viennacl_reorder(selection, row_perm, col_perm, VIENNACL_GPS, total_graph, graph_metrics);
+                apply_permutation(inf, row_perm, col_perm);
+            } else if (strcasecmp (tok, "vn") == 0) {
+                Print1 (info, "Regroup ViennaCL's None");
+                int row_perm[dm_nrows(selection)];
+                int col_perm[dm_ncols(selection)];
+                viennacl_reorder(selection, row_perm, col_perm, VIENNACL_NONE, total_graph, graph_metrics);
                 apply_permutation(inf, row_perm, col_perm);
             }
 #endif
             else if (strcasecmp (tok, "mm") == 0) {
                 Print1 (info, "Regroup Matrix Metrics");
-                print_dm_aggrs(selection);
+                print_event_span(selection);
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);
