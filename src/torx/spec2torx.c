@@ -142,7 +142,8 @@ main (int argc, char *argv[])
                        (chunkatint_t)SIputCAt,
                        (get_count_t)SIgetCount);
 
-    GBloadFile (model, files[0], &model);
+    GBloadFile (model, files[0]);
+    model = GBwrapModel(model);
 
     lts_type_t          ltstype = GBgetLTStype (model);
     N = lts_type_get_state_length (ltstype);

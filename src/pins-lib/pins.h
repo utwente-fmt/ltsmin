@@ -238,14 +238,15 @@ typedef enum {
 extern pins_ltl_type_t PINS_LTL;
 
 /**
-\brief Factory method for loading models.
+ * \brief Factory method for loading models.
+ *
+ * Given a model that has been initialized with data synchronization functions,
+ * this method determines the type of model by extension and loads it.
+ *
+ * NOTE: Default wrappers are now applied by GBwrapModel.
+ */
+void GBloadFile(model_t model, const char *filename);
 
-Given a model that has been initialized with data synchronization functions,
-this method determines the type of model by extension and loads it. If
-the parameter wrapped is not NULL then the default wrappers are applied to
-the model and the result is put in wrapped.
-*/
-extern void GBloadFile(model_t model,const char *filename,model_t *wrapped);
 /**
 \brief Factory method for loading models concurrently.
 
@@ -256,6 +257,14 @@ the read-only variables of model.
 \see GBregisterPreLoader
 */
 extern void GBloadFileShared(model_t model,const char *filename);
+
+/**
+ * \brief Method to wrap models according to the command line specification of users
+ *
+ * Given a model that has been initialized by GBloadFile, this method applies
+ * the wrappers (default and command-line specified) to the model
+ */
+model_t GBwrapModel(model_t model);
 
 /**
 \brief Get the basic LTS type or structure of the model.
@@ -901,6 +910,16 @@ extern model_t GBaddPORCheck(model_t model);
 \brief Add mu-calculus layer
 */
 extern model_t GBaddMucalc (model_t model, const char *mucalc_file);
+
+/**
+\brief Add multi-process fork wrapper
+*/
+extern model_t GBaddFork(model_t model);
+
+/**
+\brief Add mutex wrapper (for non thread-safe PINS models)
+*/
+extern model_t GBaddMutex(model_t model);
 
 
 //@{

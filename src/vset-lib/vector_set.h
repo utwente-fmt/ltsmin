@@ -278,6 +278,11 @@ extern void vrel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context
 extern void vrel_add_cpy(vrel_t rel,const int* src,const int* dst,const int* cpy);
 
 /**
+\brief Add an element to a relation, with a copy vector, and an action
+*/
+extern void vrel_add_act(vrel_t rel,const int* src,const int* dst,const int* cpy,const int act);
+
+/**
 \brief Count the number of diagram nodes and the number of elements stored.
 
 \param elements Pointer to bignum that will contain the count; this bignum
@@ -383,11 +388,6 @@ void vdom_set_name(vdom_t dom, int i, char* name);
 \brief get the name of the ith variable.
 */
 char* vdom_get_name(vdom_t dom, int i);
-
-/**
-\brief initialized the universe. Should be called after vdom_create_domain.
-*/
-void vdom_init_universe(vdom_t dom);
 
 //@}
 

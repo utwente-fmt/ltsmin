@@ -34,6 +34,9 @@ typedef enum {
     Strat_ECD    = 1024,
     Strat_DFSFIFO= 2048, // Not exactly LTL, but uses accepting states (for now) and random order
     Strat_TA     = 4096,
+    Strat_TARJAN = 8192,
+    Strat_UFSCC  = 16384,
+    Strat_RENAULT= 32768,
     Strat_TA_SBFS= Strat_SBFS | Strat_TA,
     Strat_TA_BFS = Strat_BFS | Strat_TA,
     Strat_TA_DFS = Strat_DFS | Strat_TA,

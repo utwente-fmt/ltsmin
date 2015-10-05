@@ -8,14 +8,19 @@
 #include <hre/user.h>
 #include <vset-lib/vdom_object.h>
 
-#include <lddmc.h>
 
-static int datasize = 25; // 25 = 1024 MB
+#include <sylvan.h>
+
+static int datasize = 22; // 23 = 128 MB
+static int maxtablesize = 28;  // 28 = 8196 MB
 static int cachesize = 24; // 24 = 576 MB
+static int maxcachesize = 28; // 28 = 9216 MB
 
 struct poptOption lddmc_options[]= {
-    { "lddmc-tablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "log2 size of LDD nodes table", "<datasize>"},
+    { "lddmc-tablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "log2 initial size of LDD nodes table", "<tablesize>"},
+    { "lddmc-maxtablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxtablesize , 0 , "log2 maximum size of LDD nodes table", "<maxtablesize>"},
     { "lddmc-cachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "log2 size of memoization cache", "<cachesize>"},
+    { "lddmc-maxcachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "log2 maximum size of memoization cache", "<maxcachesize>"},
     POPT_TABLEEND
 };
 
@@ -63,12 +68,12 @@ static int
 calculate_size(MDD meta)
 {
     int result = 0;
-    uint32_t val = lddmc_value(meta);
+    uint32_t val = lddmc_getvalue(meta);
     while (val != (uint32_t)-1) {
         if (val != 0) result += 1;
         meta = lddmc_follow(meta, val);
         assert(meta != lddmc_true && meta != lddmc_false);
-        val = lddmc_value(meta);
+        val = lddmc_getvalue(meta);
     }
     return result;
 }
@@ -190,7 +195,7 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
 
     MDD meta = rel->meta;
     for (;;) {
-        const uint32_t v = lddmc_value(meta);
+        const uint32_t v = lddmc_getvalue(meta);
         if (v == 1 || v == 3) {
             // read or only-read
             cpy_vec[k] = 0; // not supported yet for read levels
@@ -372,10 +377,9 @@ struct enum_context
     void* context;
 };
 
-TASK_3(void*, enumer, uint32_t*, values, size_t, count, struct enum_context*, ctx)
+VOID_TASK_3(enumer, uint32_t*, values, size_t, count, struct enum_context*, ctx)
 {
     ctx->cb(ctx->context, (int*)values);
-    return NULL;
     (void)count;
 }
 
@@ -384,7 +388,7 @@ set_enum(vset_t set, vset_element_cb cb, void* context)
 {
     LACE_ME;
     struct enum_context ctx = (struct enum_context){cb, context};
-    lddmc_sat_all_nopar(set->mdd, (lddmc_sat_cb)TASK(enumer), &ctx);
+    lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
 }
 
 struct set_update_context
@@ -417,7 +421,7 @@ set_update(vset_t dst, vset_t set, vset_update_cb cb, void* context)
     LACE_ME;
     struct set_update_context ctx = (struct set_update_context){dst, cb, context};
     MDD old = dst->mdd;
-    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_sat_cb)TASK(set_updater), &ctx));
+    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(set_updater), &ctx));
     dst->mdd = lddmc_ref(lddmc_union(dst->mdd, result));
     lddmc_deref(old);
     lddmc_deref(result);
@@ -454,7 +458,7 @@ rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void* context)
     LACE_ME;
     struct rel_update_context ctx = (struct rel_update_context){rel, cb, context};
     MDD old = rel->mdd;
-    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_sat_cb)TASK(rel_updater), &ctx));
+    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(rel_updater), &ctx));
     rel->mdd = lddmc_ref(lddmc_union(rel->mdd, result));
     lddmc_deref(old);
     lddmc_deref(result);
@@ -481,7 +485,7 @@ set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb,
     MDD cube = lddmc_ref(lddmc_cube((uint32_t*)match, p_len));
 
     struct enum_context ctx = (struct enum_context){cb, context};
-    lddmc_match_sat_par(set->mdd, cube, mdd_proj, (lddmc_sat_cb)TASK(enumer), &ctx);
+    lddmc_match_sat_par(set->mdd, cube, mdd_proj, (lddmc_enum_cb)TASK(enumer), &ctx);
     lddmc_deref(cube);
     lddmc_deref(mdd_proj);
 }
@@ -489,23 +493,32 @@ set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb,
 static void
 set_project(vset_t dst, vset_t src)
 {
-    entermt(dst);
-    LACE_ME;
-    assert(src->size == dst->dom->shared.size);
-    lddmc_deref(dst->mdd);
-    dst->mdd = lddmc_ref(lddmc_project(src->mdd, dst->proj));
-    leavemt(dst);
+    if (dst->proj == src->proj) {
+        lddmc_deref(dst->mdd);
+        dst->mdd = src->mdd;
+    } else {
+        entermt(dst);
+        LACE_ME;
+        assert(src->size == dst->dom->shared.size);
+        lddmc_deref(dst->mdd);
+        dst->mdd = lddmc_ref(lddmc_project(src->mdd, dst->proj));
+        leavemt(dst);
+    }
 }
 
 static void
 set_project_minus(vset_t dst, vset_t src, vset_t minus)
 {
-    entermt(dst);
-    LACE_ME;
-    assert(src->size == dst->dom->shared.size);
-    lddmc_deref(dst->mdd);
-    dst->mdd = lddmc_ref(lddmc_project_minus(src->mdd, dst->proj, minus->mdd));
-    leavemt(dst);
+    if (dst->proj == src->proj) {
+        set_minus(dst, minus);
+    } else {
+        entermt(dst);
+        LACE_ME;
+        assert(src->size == dst->dom->shared.size);
+        lddmc_deref(dst->mdd);
+        dst->mdd = lddmc_ref(lddmc_project_minus(src->mdd, dst->proj, minus->mdd));
+        leavemt(dst);
+    }
 }
 
 static void
@@ -761,7 +774,8 @@ vdom_create_lddmc(int n)
     /* Initialize library if necessary */
     static int initialized = 0;
     if (!initialized) {
-        lddmc_init(datasize, cachesize);
+        sylvan_init_package(1LL<<datasize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
+        sylvan_init_ldd();
         initialized = 1;
     }
 

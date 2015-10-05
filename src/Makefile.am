@@ -73,7 +73,10 @@ SUBDIRS += vset-lib
 SUBDIRS += spg-lib
 
 SUBDIRS += spg
+
+if HAVE_SYLVAN
 SUBDIRS += pins2lts-sym
+endif
 
 if HAVE_ATOMICS
 # multi-core lib, lockless data structures and a load balancer

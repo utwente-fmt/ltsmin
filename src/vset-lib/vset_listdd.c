@@ -1113,10 +1113,10 @@ mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
 static void
 set_project_mdd(vset_t dst, vset_t src)
 {
-    assert(src->p_len == -1);
-    if (dst->p_len == -1) {
+    if (dst->p_id == src->p_id || dst->p_len == -1) {
         dst->mdd = src->mdd;
     } else {
+        assert(src->p_len == -1);
         dst->mdd = 0;
         dst->mdd = mdd_project(dst->p_id, src->mdd, 0, dst->proj, dst->p_len);
     }

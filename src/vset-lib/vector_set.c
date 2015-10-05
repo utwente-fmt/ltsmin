@@ -460,6 +460,37 @@ void vrel_add_cpy(vrel_t rel,const int* src, const int* dst, const int* cpy){
     rel->dom->shared.rel_add_cpy(rel,src,dst,cpy);
 }
 
+static void
+default_rel_add_act(vrel_t rel, const int* src, const int* dst, const int* cpy, const int act)
+{
+    rel->dom->shared.rel_add(rel,src,dst);
+    (void)cpy;
+    (void)act;
+}
+
+static void
+default_rel_add_act_cpy(vrel_t rel, const int* src, const int* dst, const int* cpy, const int act)
+{
+    rel->dom->shared.rel_add_cpy(rel,src,dst,cpy);
+    (void)act;
+}
+
+void
+vrel_add_act(vrel_t rel,const int* src, const int* dst, const int* cpy, const int act)
+{
+    if (rel->dom->shared.rel_add_act == NULL) {
+        if (vdom_supports_cpy(rel->dom)) {
+            Warning(info, "vrel_add_act not supported; falling back to vrel_add_cpy");
+            rel->dom->shared.rel_add_act = default_rel_add_act_cpy;
+        } else {
+            Warning(info, "vrel_add_act not supported; falling back to vrel_add");
+            rel->dom->shared.rel_add_act = default_rel_add_act;
+        }
+    }
+
+    rel->dom->shared.rel_add_act(rel,src,dst,cpy,act);
+}
+
 void vrel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context) {
     rel->dom->shared.rel_update(rel, set, cb, context);
 }
@@ -547,10 +578,4 @@ int
 vdom_vector_size(vdom_t dom)
 {
     return dom->shared.size;
-}
-
-void
-vdom_init_universe(vdom_t dom)
-{
-    if (dom->shared.init_universe != NULL) dom->shared.init_universe(dom);
 }

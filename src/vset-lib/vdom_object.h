@@ -45,6 +45,7 @@ struct vector_domain_shared {
     void (*rel_load)(FILE* f, vrel_t rel);
 	void (*rel_add)(vrel_t rel,const int* src,const int* dst);
     void (*rel_add_cpy)(vrel_t rel,const int* src,const int* dst,const int* cpy);
+	void (*rel_add_act)(vrel_t rel,const int* src,const int* dst,const int* cpy,const int act);
     void (*rel_update)(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
     void (*rel_destroy)(vrel_t rel);
 
@@ -70,9 +71,6 @@ struct vector_domain_shared {
 	int (*separates_rw)();
 	int (*supports_cpy)();
 	char **names;
-
-	// init universe should be called after vdom_create_domain
-	void (*init_universe)(vdom_t dom);
 };
 
 /** Initialise the shared part of the domain. */

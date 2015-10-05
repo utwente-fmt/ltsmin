@@ -31,12 +31,7 @@
 #include <util-lib/bitset.h>
 #include <hre/stringindex.h>
 
-#ifdef HAVE_SYLVAN
 #include <sylvan.h>
-#else
-#include <mc-lib/atomics.h>
-#define LACE_ME
-#endif
 
 hre_context_t ctx;
 
@@ -94,32 +89,24 @@ static vset_t *class_enabled = NULL;
 static enum {
     BFS_P,
     BFS,
-#ifdef HAVE_SYLVAN
     PAR,
     PAR_P,
-#endif
     CHAIN_P,
     CHAIN
 } strategy = BFS_P;
 
 static int expand_groups = 1; // set to 0 if transitions are loaded from file
 
-#ifdef HAVE_SYLVAN
 static size_t lace_n_workers = 0;
 static size_t lace_dqsize = 40960000; // can be very big, no problemo
 static size_t lace_stacksize = 0; // use default
-
-static bool multi_process = false;
-#endif
 
 static char* order = "bfs-prev";
 static si_map_entry ORDER[] = {
     {"bfs-prev", BFS_P},
     {"bfs", BFS},
-#ifdef HAVE_SYLVAN
     {"par", PAR},
     {"par-prev", PAR_P},
-#endif
     {"chain-prev", CHAIN_P},
     {"chain", CHAIN},
     {NULL, 0}
@@ -195,22 +182,16 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
     }
 }
 
-#ifdef HAVE_SYLVAN
 static struct poptOption lace_options[] = {
     { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
     { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
     { "lace-stacksize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_stacksize, 0, "set size of program stack in kilo bytes (0=default stack size)", "<stacksize>"},
 POPT_TABLEEND
 };
-#endif
 
 static  struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)reach_popt , 0 , NULL , NULL },
-#ifdef HAVE_SYLVAN
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par>" },
-#else
-    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain>" },
-#endif
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
@@ -229,9 +210,7 @@ static  struct poptOption options[] = {
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
-#ifdef HAVE_SYLVAN
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
-#endif
     { "no-matrix" , 0 , POPT_ARG_VAL , &no_matrix , 1 , "do not print the dependency matrix when -v (verbose) is used" , NULL},
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
@@ -284,29 +263,11 @@ typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
 
 typedef int (*transitions_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
-static transitions_t* transitions_short; // which function to call for the next states.
-static transitions_t* transitions_long;
-
-typedef int (*label_t)(model_t model,int label,int *state);
-
-static label_t* label_short;
-static label_t* label_long;
-
-#ifdef HAVE_SYLVAN
-
-enum MULTI_PROC_GB_CALL { NOOP = 0, TRANSITION = 1, LABEL = 2, SHORT = 3, LONG = 4 };
-
-static transitions_t* transitions_short_multi; // which function to call in the multi-process environment.
-static transitions_t* transitions_long_multi;
-static label_t* label_short_multi;
-static label_t* label_long_multi;
-#endif
-
+static transitions_t transitions_short = NULL; // which function to call for the next states.
 
 /*
  * Add parallel operations
  */
-#ifdef HAVE_SYLVAN
 // join
 #define vset_join_par(dst, left, right) SPAWN(vset_join_par, dst, left, right)
 VOID_TASK_3(vset_join_par, vset_t, dst, vset_t, left, vset_t, right) { vset_join(dst, left, right); }
@@ -322,7 +283,6 @@ VOID_TASK_2(vset_intersect_par, vset_t, dst, vset_t, src) { vset_intersect(dst, 
 // minus
 #define vset_minus_par(dst, src) SPAWN(vset_minus_par, dst, src)
 VOID_TASK_2(vset_minus_par, vset_t, dst, vset_t, src) { vset_minus(dst, src); }
-#endif
 
 static inline void
 reduce(int group, vset_t set)
@@ -363,7 +323,7 @@ write_trace_state(lts_file_t trace_handle, int src_no, int *state)
   Warning(debug, "dumping state %d", src_no);
 
   for (int i = 0; i < sLbls; i++) {
-      labels[i] = (*label_long)(model, i, state);
+      labels[i] = GBgetStateLabelLong(model, i, state);
   }
 
   lts_write_state(trace_handle, 0, state, labels);
@@ -409,7 +369,7 @@ write_trace_step(lts_file_t trace_handle, int src_no, int *src,
     ctx.found = 0;
 
     for (int i = 0; i < nGrps && !ctx.found; i++) {
-        (*transitions_long)(model, i, src, write_trace_next, &ctx);
+        GBgetTransitionsLong(model, i, src, write_trace_next, &ctx);
     }
 
     if (!ctx.found)
@@ -604,7 +564,7 @@ struct guard_add_info
 static void eval_cb (vset_t set, void *context, int *src)
 {
     // evaluate the guard
-    int result = (*label_short)(model, ((struct guard_add_info*)context)->guard, src);
+    int result = GBgetStateLabelShort(model, ((struct guard_add_info*)context)->guard, src);
 
     // add to the correct set dependening on the result
     int dresult = ((struct guard_add_info*)context)->result;
@@ -617,13 +577,8 @@ static void eval_cb (vset_t set, void *context, int *src)
     }
 }
 
-#ifdef HAVE_SYLVAN
 #define eval_guard(g, s) CALL(eval_guard, (g), (s))
 VOID_TASK_2(eval_guard, int, guard, vset_t, set)
-#else
-static inline void
-eval_guard (int guard, vset_t set)
-#endif
 {
     // get the short vectors we need to evaluate
     // minus what we have already evaluated
@@ -711,14 +666,18 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     struct group_add_info *ctx = (struct group_add_info*)context;
 
-    if (vdom_supports_cpy(domain)) {
-        vrel_add_cpy(ctx->rel, ctx->src, dst, cpy);
-    } else {
-        vrel_add(ctx->rel, ctx->src, dst);
-    }
+    int act_index = 0;
+    if (ti->labels != NULL && act_label != -1) act_index = ti->labels[act_label];
+    vrel_add_act(ctx->rel, ctx->src, dst, cpy, act_index);
 
     if (act_detect && (no_exit || ErrorActions == 0)) {
-        int act_index = ti->labels[act_label];
+        // note: in theory, it might be possible that ti->labels == NULL,
+        // even though we are using action detection and act_label != -1,
+        // which was checked earlier in init_action_detection().
+        // this indicates an incorrect implementation of the pins model
+        if (ti->labels == NULL) {
+            Abort("ti->labels is null");
+        }
         if (seen_actions_test(act_index)) { // is this the first time we encounter this action?
             char *action=GBchunkGet(model,action_typeno,act_index).data;
 
@@ -745,11 +704,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
                     ctx->trace_count++;
                 }
 
-#ifdef HAVE_SYLVAN
                 add_fetch(ErrorActions, 1);
-#else
-                ErrorActions++;
-#endif
             }
         }
     }
@@ -780,13 +735,8 @@ explore_cb(vrel_t rel, void *context, int *src)
     }
 }
 
-#ifdef HAVE_SYLVAN
 #define expand_group_next(g, s) CALL(expand_group_next, (g), (s))
 VOID_TASK_2(expand_group_next, int, group, vset_t, set)
-#else
-static inline void
-expand_group_next(int group, vset_t set)
-#endif
 {
     if (!expand_groups) return; // assume transitions loaded from file cannot expand further
 
@@ -1332,13 +1282,8 @@ reach_destroy(struct reach_s *s)
     RTfree(s);
 }
 
-#ifdef HAVE_SYLVAN
 #define reach_bfs_reduce(dummy) CALL(reach_bfs_reduce, dummy)
 VOID_TASK_1(reach_bfs_reduce, struct reach_red_s *, dummy)
-#else
-static inline void
-reach_bfs_reduce(struct reach_red_s *dummy)
-#endif
 {
     if (dummy->index >= 0) { // base case
         // check if no states which satisfy other guards
@@ -1395,13 +1340,8 @@ reach_bfs_reduce(struct reach_red_s *dummy)
     }
 }
 
-#ifdef HAVE_SYLVAN
 #define reach_bfs_next(dummy, reach_groups, maybe) CALL(reach_bfs_next, dummy, reach_groups, maybe)
 VOID_TASK_3(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups, vset_t*, maybe)
-#else
-static inline void
-reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t* maybe)
-#endif
 {
     if (dummy->index >= 0) {
         if (!bitvector_is_set(reach_groups, dummy->index)) {
@@ -1522,7 +1462,6 @@ reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t* maybe)
 
 static inline void
 learn_guards(vset_t states, long *guard_count) {
-    #ifdef HAVE_SYLVAN
     LACE_ME;
     if (GBgetUseGuards(model)) {
         for (int g = 0; g < nGuards; g++) {
@@ -1532,14 +1471,6 @@ learn_guards(vset_t states, long *guard_count) {
     }
     if (GBgetUseGuards(model))
         for (int g = 0; g < nGuards; g++) SYNC(eval_guard);
-    #else
-    if (GBgetUseGuards(model)) {
-        for (int g = 0; g < nGuards; g++) {
-            if (guard_count != NULL) (*guard_count)++;
-            eval_guard(g, states);
-        }
-    }
-    #endif
 }
 
 static void
@@ -1792,8 +1723,6 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 /**
  * Parallel reachability implementation
  */
-
-#if defined(HAVE_SYLVAN)
 
 VOID_TASK_3(compute_left_maybe, vset_t, left_maybe, vset_t, left_true, vset_t, right_false)
 {
@@ -2222,8 +2151,6 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
     }
 }
-
-#endif
 
 static void
 reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
@@ -2961,9 +2888,12 @@ establish_group_order(int *group_order, int *initial_count)
 
     bitvector_create(&found_groups, nGrps);
 
-    int labels[nGuards];
-    for (int i = 0; i < nGuards; i++)
+    int label_count = lts_type_get_state_label_count(ltstype);
+    int labels[label_count];
+    for (int i = 0; i < label_count; i++) {
         labels[i] = act_label == i ? act_index : -1;
+    }
+
     for (int i = 0; i < nGrps; i++){
         if (GBtransitionInGroup(model, labels, i)) {
             Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
@@ -3050,7 +2980,9 @@ init_model(char *file)
 
     HREbarrier(HREglobal());
 
-    GBloadFile(model, file, &model);
+    GBloadFile(model, file);
+    model = GBaddMutex(model);
+    model = GBwrapModel(model);
 
     HREbarrier(HREglobal());
 
@@ -3103,7 +3035,6 @@ init_model(char *file)
 static void
 init_domain(vset_implementation_t impl) {
     domain = vdom_create_domain(N, impl);
-    if (HREme(HREglobal())==0) vdom_init_universe(domain);
 
     for (int i = 0; i < dm_ncols(GBgetDMInfo(model)); i++) {
         vdom_set_name(domain, i, lts_type_get_state_name(ltstype, i));
@@ -3201,13 +3132,10 @@ init_domain(vset_implementation_t impl) {
 }
 
 static void
-init_action()
+init_action_detection()
 {
-    // table number of first edge label
-    act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     if (act_label == -1)
         Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-    action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
     int count = 256; // GBchunkCount(model, action_typeno);
     seen_actions_prepare(count);
     Warning(info, "Detecting actions with prefix \"%s\"", act_detect);
@@ -3505,448 +3433,8 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     return g;
 }
 
-static char *files[2];
-
-
-#ifdef HAVE_SYLVAN
-static int* parent_sockets;
-static stream_t* parent_socket_is;
-static stream_t* parent_socket_os;
-static int* child_sockets;
-static stream_t* child_socket_is;
-static stream_t* child_socket_os;
-static int* run_chunk_thread;
-static pthread_t chunk_thread;
-
-void init_multi_process(size_t workers)
+VOID_TASK_3(run_reachability, vset_t, states, char*, etf_output, rt_timer_t, timer)
 {
-    HREenableFork(workers + 1, true);
-    parent_sockets = RTmalloc(sizeof(int)*workers);
-    parent_socket_is = RTmalloc(sizeof(stream_t)*workers);
-    parent_socket_os = RTmalloc(sizeof(stream_t)*workers);
-    child_sockets = RTmalloc(sizeof(int)*workers);
-    child_socket_is = RTmalloc(sizeof(stream_t)*workers);
-    child_socket_os = RTmalloc(sizeof(stream_t)*workers);
-    for(size_t i=0; i<workers; i++)
-    {
-        int fd[2];
-        socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
-        parent_sockets[i] = fd[0];
-        parent_socket_is[i] = fd_input(parent_sockets[i]);
-        parent_socket_os[i] = fd_output(parent_sockets[i]);
-        child_sockets[i] = fd[1];
-        child_socket_is[i] = fd_input(child_sockets[i]);
-        child_socket_os[i] = fd_output(child_sockets[i]);
-    }
-    run_chunk_thread = mmap(NULL,sizeof(int),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    *run_chunk_thread = 1;
-}
-
-static int
-master_get_transitions(model_t model, int group, int* src, TransitionCB cb, void* context, int r_length, int w_length, enum MULTI_PROC_GB_CALL type)
-{
-    // get my lace thread id
-    int id = lace_get_worker()->worker + 1;
-
-    Print(hre_debug, "master %d: writing state to slave (group=%d, length=%d).", id, group, r_length);
-    //stream_t os = fd_output(parent_sockets[id-1]);
-    stream_t os = parent_socket_os[id-1];
-    DSwriteS32(os, TRANSITION); // signal that a state will be sent next
-    DSwriteS32(os, type); // signal short or long
-    DSwriteS32(os, group);
-    for(int i=0; i<r_length; i++)
-    {
-        DSwriteS32(os, src[i]);
-    }
-    stream_flush(os);
-
-    //stream_t is = fd_input(parent_sockets[id-1]);
-    stream_t is = parent_socket_is[id-1];
-    int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
-
-    Debug("master %d: waiting for reply.", id);
-    enum MULTI_PROC_GB_CALL next = DSreadS32(is);
-    while(next==TRANSITION)
-    {
-        Print(hre_debug, "master %d: reading state from slave.", id);
-        int dst[w_length];
-        for(int i=0; i<w_length; i++)
-        {
-            dst[i] = DSreadS32(is);
-        }
-        int cpy[w_length];
-        int cpy_vector = DSreadS32(is);
-        if (cpy_vector)
-        {
-            for(int i=0; i<w_length; i++)
-            {
-                cpy[i] = DSreadS32(is);
-            }
-        }
-        transition_info_t ti;
-        ti.group = group;
-        ti.labels = alloca(labels*sizeof(int));
-        for(int i=0; i<labels; i++)
-        {
-            ti.labels[i] = DSreadS32(is);
-        }
-        ti.por_proviso = DSreadS32(is);
-        if (cpy_vector)
-        {
-            cb(context, &ti, dst, cpy);
-        }
-        else
-        {
-            cb(context, &ti, dst, NULL);
-        }
-        next = DSreadS32(is);
-    }
-    //RTfree(os);
-    //RTfree(is);
-    Print(hre_debug, "master %d: done.", id);
-    return 0;
-}
-
-static int
-master_get_transitions_short(model_t model, int group, int* src, TransitionCB cb, void* context)
-{
-    return master_get_transitions(model, group, src, cb, context, r_projs[group].len, w_projs[group].len, SHORT);
-}
-
-static int
-master_get_transitions_long(model_t model, int group, int* src, TransitionCB cb, void* context)
-{
-    return master_get_transitions(model, group, src, cb, context, N, N, LONG);
-}
-
-static int
-master_get_label(model_t model,int label,int *state, int p_length, enum MULTI_PROC_GB_CALL type)
-{
-    (void) model;
-    // get my lace thread id
-    int id = lace_get_worker()->worker + 1;
-
-    Print(hre_debug, "master %d: writing state to slave (label=%d, length=%d).", id, label, p_length);
-    //stream_t os = fd_output(parent_sockets[id-1]);
-    stream_t os = parent_socket_os[id-1];
-    DSwriteS32(os, LABEL); // signal that a state will be sent next
-    DSwriteS32(os, type); // signal short or long
-    DSwriteS32(os, label);
-    for(int i=0; i<p_length; i++)
-    {
-        DSwriteS32(os, state[i]);
-    }
-    stream_flush(os);
-
-    //stream_t is = fd_input(parent_sockets[id-1]);
-    stream_t is = parent_socket_is[id-1];
-
-    Debug("master %d: waiting for result.", id);
-    int result = DSreadS32(is);
-    //RTfree(os);
-    //RTfree(is);
-    Print(hre_debug, "master %d: done (result=%d).", id, result);
-    return result;
-}
-
-static int
-master_get_label_short(model_t model,int label,int *state)
-{
-    return master_get_label(model, label, state, g_projs[label].len, SHORT);
-}
-
-static int
-master_get_label_long(model_t model,int label,int *state)
-{
-    return master_get_label(model, label, state, N, LONG);
-}
-
-static void
-master_exit()
-{
-    for(size_t id=1; id<=lace_n_workers; id++)
-    {
-        Print(hre_debug, "master: stopping slave (id=%zu).", id);
-        //stream_t os = fd_output(parent_sockets[id-1]);
-        stream_t os = parent_socket_os[id-1];
-        DSwriteS32(os, NOOP); // signal that no states will be sent anymore
-        stream_flush(os);
-        RTfree(os);
-    }
-}
-
-static void
-slave_transition_cb(void* context, transition_info_t* ti, int* dst, int* cpy, int length)
-{
-    int id = HREme(HREglobal());
-    Debug("slave_transition_cb %d.", id);
-    //stream_t os = fd_output(child_sockets[id-1]);
-    stream_t os = child_socket_os[id-1];
-    int group = ti->group;
-    int labels = lts_type_get_edge_label_count(GBgetLTStype(model));
-    Print(hre_debug, "slave_transition_cb %d: writing state to master: group=%d, length=%d.", id, group, length);
-
-    DSwriteS32(os, TRANSITION);
-    for (int i=0; i<length; i++)
-    {
-        DSwriteS32(os, dst[i]);
-    }
-    if (cpy==NULL){
-        DSwriteS32(os, 0);
-    } else {
-        DSwriteS32(os, 1);
-        for (int i=0; i<length; i++)
-        {
-            DSwriteS32(os, cpy[i]);
-        }
-    }
-    for(int i=0; i<labels; i++)
-    {
-        DSwriteS32(os, ti->labels[i]);
-    }
-    DSwriteS32(os, ti->por_proviso);
-    stream_flush(os);
-    //RTfree(os);
-    (void)context;
-}
-
-static void
-slave_transition_cb_short(void* context, transition_info_t* ti, int* dst, int* cpy)
-{
-    slave_transition_cb(context, ti, dst, cpy, w_projs[ti->group].len);
-}
-
-static void
-slave_transition_cb_long(void* context, transition_info_t* ti, int* dst, int* cpy)
-{
-    slave_transition_cb(context, ti, dst, cpy, N);
-}
-
-static void
-start_slave()
-{
-    init_model(files[0]);
-
-    init_domain(VSET_IMPL_AUTOSELECT);
-
-    HREbarrier(HREglobal()); // wait for transition_short to be set
-
-    int id = HREme(HREglobal());
-    Print(infoLong, "slave %d: ready.", id);
-    //stream_t is = fd_input(child_sockets[id-1]);
-    stream_t is = child_socket_is[id-1];
-    enum MULTI_PROC_GB_CALL next = DSreadS32(is);
-    while (next!=NOOP)
-    {
-        enum MULTI_PROC_GB_CALL type = DSreadS32(is);
-        Print(hre_debug,"slave %d: making %s GB call", id, type == SHORT ? "short" : "long");
-
-        if (next == TRANSITION) {
-            Print(hre_debug, "slave %d: start reading transition.", id);
-            int group = DSreadS32(is);
-            int length = type == SHORT ? r_projs[group].len : N;
-            int src[length];
-            for(int i=0; i < length; i++)
-            {
-                src[i] = DSreadS32(is);
-            }
-            Print(hre_debug, "slave %d: received state (group=%d, length=%d).", id, group, length);
-            if (type == SHORT) {
-                (*transitions_short_multi)(model, group, src, slave_transition_cb_short, NULL);
-            } else { // type == LONG
-                (*transitions_long_multi)(model, group, src, slave_transition_cb_long, NULL);
-            }
-            Debug("slave %d: returned from greybox (group=%d).", id, group);
-            //stream_t os = fd_output(child_sockets[id-1]);
-            stream_t os = child_socket_os[id-1];
-            DSwriteS32(os, NOOP); // signal that all successor states have been sent
-            stream_flush(os);
-            //RTfree(os);
-            Print(hre_debug, "slave %d: done (group=%d).", id, group);
-        } else if (next == LABEL) {
-            Print(hre_debug, "slave %d: start reading label.", id);
-            int label = DSreadS32(is);
-            int length = type == SHORT ? g_projs[label].len : N;
-            int src[length];
-            for(int i=0; i < length; i++)
-            {
-                src[i] = DSreadS32(is);
-            }
-            Print(hre_debug, "slave %d: received state (label=%d, length=%d).", id, label, length);
-            int res;
-            if (type == SHORT) {
-                res = (*label_short_multi)(model, label, src);
-            } else { // type == lONG
-                res = (*label_long_multi)(model, label, src);
-            }
-            Debug("slave %d: returned from greybox (label=%d, result=%d).", id, label, res);
-            //stream_t os = fd_output(child_sockets[id-1]);
-            stream_t os = child_socket_os[id-1];
-            DSwriteS32(os, res); // signal the result of the label evaluation
-            stream_flush(os);
-            //RTfree(os);
-            Print(hre_debug, "slave %d: done (label=%d, res=%d).", id, label, res);
-        } else {
-            Warning(error, "unsupported operation");
-            HREexit(LTSMIN_EXIT_FAILURE);
-        }
-        next = DSreadS32(is);
-    }
-    Print(infoLong, "slave %d: exiting.", id);
-    RTfree(is);
-}
-
-static void*
-start_chunk_thread(void* arg){
-    Print(infoLong, "Starting chunk thread.");
-    HREyieldWhile(ctx, run_chunk_thread);
-    return 0;
-    (void)arg;
-}
-#endif
-
-#ifdef HAVE_SYLVAN
-TASK_1(void*, actual_main, void*, arg)
-#else
-static void*
-actual_main(void)
-#endif
-{
-    vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
-
-#ifdef HAVE_SYLVAN
-    HREinitBegin(HREappName());
-    HREglobalSet(ctx);
-    (void)arg;
-#endif
-
-    int *src;
-    vset_t initial;
-
-    init_model(files[0]);
-
-    Print(infoLong, "Master ready: %d.", HREme(HREglobal()));
-    //for(int i=0; i < HREpeers(HREglobal()); i++)
-    //{
-    //    const char msg[] = "Test message";
-    //    write(parent_sockets[i], msg, sizeof(msg));
-    //}
-
-    if (act_detect != NULL) init_action();
-    if (inv_detect) Abort("Invariant violation detection is not implemented.");
-
-    if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
-
-    if (transitions_load_filename != NULL) {
-        FILE *f = fopen(transitions_load_filename, "r");
-        if (f == 0) Abort("Cannot open '%s' for reading!", transitions_load_filename);
-
-        domain = vdom_create_domain_from_file(f, vset_impl);
-        if (HREme(HREglobal())==0) vdom_init_universe(domain);
-
-        /* Call hook */
-        vset_pre_load(f, domain);
-
-        /* Read initial state */
-        initial = vset_load(f, domain);
-
-        /* Read number of transitions and all transitions */
-        if (fread(&nGrps, sizeof(int), 1, f)!=1) Abort("Invalid file format.");
-        group_next = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
-        for(int i = 0; i < nGrps; i++) group_next[i] = vrel_load_proj(f, domain);
-        for(int i = 0; i < nGrps; i++) vrel_load(f, group_next[i]);
-
-        /* Call hook */
-        vset_post_load(f, domain);
-
-        /* Done! */
-        fclose(f);
-
-        /* Load state into src and initialize globals */
-        N = vdom_vector_size(domain);
-        src = (int*)alloca(sizeof(int)*N);
-        vset_example(initial, src);
-        // we do not need group_explored, group_tmp, projs
-        group_explored = group_tmp = NULL;
-        r_projs = w_projs = NULL;
-
-        Print(infoShort, "Loaded transition relations from '%s'...", files[0]);
-        expand_groups = 0;
-    } else {
-        init_domain(vset_impl);
-
-
-
-        if(GBgetUseGuards(model)) {
-            *transitions_short = GBgetActionsShort;
-            Print(infoShort, "Using GBgetActionsShort as next-state function");
-        } else { // false
-            *transitions_short = GBgetTransitionsShort;
-            Print(infoShort, "Using GBgetTransitionsShort as next-state function");
-        }
-        *transitions_long = GBgetTransitionsLong;
-
-        *label_short = GBgetStateLabelShort;
-        *label_long = GBgetStateLabelLong;
-
-        if (GBgetUseGuards(model)) {
-            if (no_soundness_check) {
-                Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
-            } else Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
-        }
-
-#ifdef HAVE_SYLVAN
-        if (multi_process) {
-            *transitions_short_multi = *transitions_short;
-            *transitions_short = master_get_transitions_short;
-            *transitions_long_multi = *transitions_long;
-            *transitions_long = master_get_transitions_long;
-            *label_short_multi = *label_short;
-            *label_short = master_get_label_short;
-            *label_long_multi = *label_long;
-            *label_long = master_get_label_long;
-        }
-#endif
-
-        initial = vset_create(domain, -1, NULL);
-        src = (int*)alloca(sizeof(int)*N);
-        GBgetInitialState(model, src);
-        vset_add(initial, src);
-
-        Print(infoShort, "got initial state");
-        expand_groups = 1;
-
-#ifdef HAVE_SYLVAN
-        if (multi_process) {
-            // FIXME: somehow, sometimes there is a deadlock at startup...
-            // start chunk tread
-            pthread_create(&chunk_thread, NULL, start_chunk_thread, (void*) 0);
-        }
-#endif
-    }
-
-#ifdef HAVE_SYLVAN
-    HREbarrier(HREglobal()); // synchronise with slave processes
-#endif
-
-    vset_t visited = vset_create(domain, -1, NULL);
-    vset_copy(visited, initial);
-
-    if (inhibit_matrix!=NULL){
-        if (sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
-    }
-    
-    if (dot_dir != NULL) {
-        DIR* dir = opendir(dot_dir);
-        if (dir) {
-            closedir(dir);
-        } else if (ENOENT == errno) {
-            Abort("Option 'dot-dir': directory '%s' does not exist", dot_dir);
-        } else {
-            Abort("Option 'dot-dir': failed opening directory '%s'", dot_dir);
-        }
-    }
-    
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
     guided_proc_t guided_proc = NULL;
@@ -3955,14 +3443,12 @@ actual_main(void)
     case BFS_P:
         reach_proc = reach_bfs_prev;
         break;
-#ifdef HAVE_SYLVAN
     case PAR:
         reach_proc = reach_par;
         break;
     case PAR_P:
         reach_proc = reach_par_prev;
         break;
-#endif
     case BFS:
         reach_proc = reach_bfs;
         break;
@@ -4001,60 +3487,184 @@ actual_main(void)
         break;
     }
 
-    // temporal logics
+    RTstartTimer(timer);
+    guided_proc(sat_proc, reach_proc, states, etf_output);
+    RTstopTimer(timer);
+}
+
+static char *files[2];
+
+struct args_t
+{
+    int argc;
+    char **argv;
+};
+
+VOID_TASK_1(init_hre, hre_context_t, context)
+{
+    if (LACE_WORKER_ID != 0) {
+        HREprocessSet(context);
+        HREglobalSet(context);
+    }
+}
+
+VOID_TASK_1(actual_main, void*, arg)
+{
+    int argc = ((struct args_t*)arg)->argc;
+    char **argv = ((struct args_t*)arg)->argv;
+
+    /* initialize HRE */
+    HREinitBegin(argv[0]);
+    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
+                  "The optional output of this analysis is an ETF "
+                      "representation of the input\n\nOptions");
+    lts_lib_setup(); // add options for LTS library
+    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
+
+    /* initialize HRE on other workers */
+    TOGETHER(init_hre, HREglobal());
+
+    /* check for unsupported options */
+    if (inv_detect) Abort("Invariant violation detection is not implemented.");
+    if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
+    if (inhibit_matrix != NULL && sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
+
+    /* turn off Lace for now to speed up while not using parallelism */
+    lace_suspend();
+
+    /* initialize the model and PINS wrappers */
+    init_model(files[0]);
+
+    /* initialize action detection */
+    act_label = lts_type_find_edge_label_prefix (ltstype, LTSMIN_EDGE_TYPE_ACTION_PREFIX);
+    if (act_label != -1) action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
+    if (act_detect != NULL) init_action_detection();
+
+    /* turn on Lace again (for Sylvan) */
+    if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
+        lace_resume();
+    }
+
+    int *src;
+    vset_t initial;
+
+    if (transitions_load_filename != NULL) {
+        FILE *f = fopen(transitions_load_filename, "r");
+        if (f == 0) Abort("Cannot open '%s' for reading!", transitions_load_filename);
+
+        domain = vdom_create_domain_from_file(f, VSET_IMPL_AUTOSELECT);
+
+        /* Call hook */
+        vset_pre_load(f, domain);
+
+        /* Read initial state */
+        initial = vset_load(f, domain);
+
+        /* Read number of transitions and all transitions */
+        if (fread(&nGrps, sizeof(int), 1, f)!=1) Abort("Invalid file format.");
+        group_next = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
+        for(int i = 0; i < nGrps; i++) group_next[i] = vrel_load_proj(f, domain);
+        for(int i = 0; i < nGrps; i++) vrel_load(f, group_next[i]);
+
+        /* Call hook */
+        vset_post_load(f, domain);
+
+        /* Done! */
+        fclose(f);
+
+        /* Load state into src and initialize globals */
+        N = vdom_vector_size(domain);
+        src = (int*)alloca(sizeof(int)*N);
+        vset_example(initial, src);
+        // we do not need group_explored, group_tmp, projs
+        group_explored = group_tmp = NULL;
+        r_projs = w_projs = NULL;
+
+        Print(infoShort, "Loaded transition relations from '%s'...", files[0]);
+        expand_groups = 0;
+    } else {
+        init_domain(VSET_IMPL_AUTOSELECT);
+
+        if(GBgetUseGuards(model)) {
+            transitions_short = GBgetActionsShort;
+            Print(infoShort, "Using GBgetActionsShort as next-state function");
+
+            if (no_soundness_check) {
+                Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
+            } else {
+                Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
+            }
+        } else {
+            transitions_short = GBgetTransitionsShort;
+            Print(infoShort, "Using GBgetTransitionsShort as next-state function");
+        }
+
+        initial = vset_create(domain, -1, NULL);
+        src = (int*)alloca(sizeof(int)*N);
+        GBgetInitialState(model, src);
+        vset_add(initial, src);
+
+        Print(infoShort, "got initial state");
+        expand_groups = 1;
+    }
+
+    /* if writing .dot files, open directory first */
+    if (dot_dir != NULL) {
+        DIR* dir = opendir(dot_dir);
+        if (dir) {
+            closedir(dir);
+        } else if (ENOENT == errno) {
+            Abort("Option 'dot-dir': directory '%s' does not exist", dot_dir);
+        } else {
+            Abort("Option 'dot-dir': failed opening directory '%s'", dot_dir);
+        }
+    }
+
+    /* if checking temporal formula, convert to mu expression */
     if (mu_formula) {
         mu_expr = parse_file(mu_formula, mu_parse_file, model);
-#if 0
-        char buf[1024];
-        ltsmin_expr_print_mu(mu_expr, buf);
-        printf("computing: %s\n",buf);
-#endif
     } else if (ctl_formula) {
         ltsmin_expr_t ctl = parse_file(ctl_formula, ctl_parse_file, model);
         mu_expr = ctl_star_to_mu(ctl);
         mu_formula = ctl_formula;
     }
 
-    if (mu_expr) { // run a small test to check correctness of mu formula
-        // and cause a segfault, because mu_var_man is not initialised yet...
+    /* if checking mu expression, run small correctness test on initial state */
+    if (mu_expr) {
+        // run a small test to check correctness of mu formula
         // setup var manager
         mu_var_man = create_manager(65535);
         ADD_ARRAY(mu_var_man, mu_var, vset_t);
 
-        vset_t x = mu_compute(mu_expr, visited);
+        vset_t x = mu_compute(mu_expr, initial);
         vset_destroy(x);
     }
-    bool spg = false;
+
+    /* determine if we need to generate a symbolic parity game */
 #ifdef LTSMIN_PBES
-    spg = true;
+    bool spg = true;
+#else
+    bool spg = GBhaveMucalc() ? true : false;
 #endif
-    if (GBhaveMucalc()) { // mu-calculus pins2pins layer
-        Warning(info,"Generating a Symbolic Parity Game (SPG).");
-        spg = true;
-    }
+
+    /* if spg, then initialize labeling stuff before reachability */
     if (spg) {
+        Print(infoShort, "Generating a Symbolic Parity Game (SPG).");
         init_spg(model);
     }
 
+    /* create timer */
     rt_timer_t timer = RTcreateTimer();
 
-    RTstartTimer(timer);
-    guided_proc(sat_proc, reach_proc, visited, files[1]);
-    RTstopTimer(timer);
+    /* run reachability */
+    vset_t visited = vset_create(domain, -1, NULL);
+    vset_copy(visited, initial);
+    CALL(run_reachability, visited, files[1], timer);
 
-#ifdef HAVE_SYLVAN
-    if (multi_process) {
-        master_exit();
-        if (transitions_load_filename == NULL) {
-            // signal chunk thread that all work is done.
-            Print(infoLong, "Wait for chunk thread to finish.");
-            *run_chunk_thread = 0;
-            HREcondSignal(ctx, 0);
-            pthread_join(chunk_thread, NULL);
-        }
-    }
-#endif
+    /* report states */
+    final_stat_reporting(visited, timer);
 
+    /* save vset/vrel data */
     if (transitions_save_filename != NULL) {
         FILE *f = fopen(transitions_save_filename, "w");
         if (f == NULL) Abort("Cannot open '%s' for writing!", transitions_save_filename);
@@ -4082,26 +3692,12 @@ actual_main(void)
         Print(infoShort, "Transition relations written to '%s'\n", transitions_save_filename);
     }
 
-    if (mu_expr) {
-        Print(infoLong, "Starting mu-calculus model checking.");
-        vset_t x = mu_compute(mu_expr, visited);
-
-        if (x) {
-            long   n_count;
-            char   elem_str[1024];
-            double e_count;
-
-            get_vset_size(x, &n_count, &e_count, elem_str, sizeof(elem_str));
-            Warning(info, "mu formula holds for %s (~%1.2e) states\n",
-                        elem_str, e_count);
-            Warning(info, " the initial state is %sin the set\n",
-                        vset_member(x, src) ? "" : "not ");
-            vset_destroy(x);
-        }
+    /* save LTS */
+    if (files[1] != NULL) {
+        do_output(files[1], visited);
     }
 
-    final_stat_reporting(visited, timer);
-
+    /* optionally print counts of all group_next and group_explored sets */
     if (log_active(infoLong)) {
         long   n_count;
         char   elem_str[1024];
@@ -4138,8 +3734,21 @@ actual_main(void)
         }
     }
 
-    if (files[1] != NULL)
-        do_output(files[1], visited);
+    if (mu_expr) {
+        Print(infoLong, "Starting mu-calculus model checking.");
+        vset_t x = mu_compute(mu_expr, visited);
+
+        if (x) {
+            long   n_count;
+            char   elem_str[1024];
+            double e_count;
+
+            get_vset_size(x, &n_count, &e_count, elem_str, sizeof(elem_str));
+            Warning(info, "mu formula holds for %s (~%1.2e) states\n", elem_str, e_count);
+            Warning(info, " the initial state is %sin the set\n", vset_member(x, src) ? "" : "not ");
+            vset_destroy(x);
+        }
+    }
 
     if (spg) { // converting the LTS to a symbolic parity game, save and solve.
         vset_destroy(true_states);
@@ -4195,98 +3804,22 @@ actual_main(void)
         }
     }
 
-    return 0;
+    /* in case other Lace threads were still suspended... */
+    if (vset_default_domain!=VSET_Sylvan && vset_default_domain!=VSET_LDDmc) {
+        lace_resume();
+    }
 }
 
 int
 main (int argc, char *argv[])
 {
-    HREinitBegin(argv[0]);
-    HREaddOptions(options,"Perform a symbolic reachability analysis of <model>\n"
-                  "The optional output of this analysis is an ETF "
-                      "representation of the input\n\nOptions");
-    lts_lib_setup(); // add options for LTS library
-
-#ifdef HAVE_SYLVAN
-    static  struct poptOption par_options[] = {
-        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
-        { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
-        POPT_TABLEEND
-    };
-    poptContext optCon = poptGetContext(NULL, argc, (const char**)argv, par_options, 0);
-    int res;
-    while((res = poptGetNextOpt(optCon)) != -1 ) { /* ignore errors */ }
+    poptContext optCon = poptGetContext(NULL, argc, (const char**)argv, lace_options, 0);
+    while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
     poptFreeContext(optCon);
 
-    if (!(vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc)) {
-        lace_n_workers = 1;
-    }
+    struct args_t args = (struct args_t){argc, argv};
     lace_init(lace_n_workers, lace_dqsize);
-    size_t n_workers = lace_workers();
-    Warning(info, "Using %zu CPUs", n_workers);
+    lace_startup(lace_stacksize, TASK(actual_main), (void*)&args);
 
-    if (!SPEC_MT_SAFE && n_workers > 1) {
-        multi_process = true;
-    }
-
-    // Use the multi-process environment if necessary:
-    if (multi_process) {
-        init_multi_process(n_workers);
-    }
-    transitions_short = mmap(NULL,sizeof(transitions_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    transitions_short_multi = mmap(NULL,sizeof(transitions_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    *(transitions_short) = NULL;
-    *(transitions_short_multi) = NULL;
-    transitions_long = mmap(NULL,sizeof(transitions_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    transitions_long_multi = mmap(NULL,sizeof(transitions_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    *(transitions_long) = NULL;
-    *(transitions_long_multi) = NULL;
-
-    label_short = mmap(NULL,sizeof(label_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    label_short_multi = mmap(NULL,sizeof(label_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    *(label_short) = NULL;
-    *(label_short_multi) = NULL;
-    label_long = mmap(NULL,sizeof(label_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    label_long_multi = mmap(NULL,sizeof(label_t),PROT_READ|PROT_WRITE,MAP_SHARED|MAP_ANON,0,0);
-    *(label_long) = NULL;
-    *(label_long_multi) = NULL;
-
-#else
-    transitions_short = RTmalloc(sizeof(transitions_t));
-    *(transitions_short) = NULL;
-    transitions_long = RTmalloc(sizeof(transitions_t));
-    *(transitions_long) = NULL;
-    label_short = RTmalloc(sizeof(label_t));
-    *(label_short) = NULL;
-    label_long = RTmalloc(sizeof(label_t));
-    *(label_long) = NULL;
-#endif
-
-    HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
-
-#ifdef HAVE_SYLVAN
-    lace_n_workers = n_workers;
-
-    Print(infoLong, "Worker %d / %d (pid = %d).", HREme(HREglobal()), HREpeers(HREglobal()), getpid());
-
-    if (!multi_process || HREme(HREglobal())==0){
-        Print(info, "Main process: %d.", HREme(HREglobal()));
-        if (multi_process)
-        {
-            Print(info, "%zu slave processes started.", n_workers);
-        }
-        ctx = HREglobal();
-        lace_startup(lace_stacksize, TASK(actual_main), 0);
-        Print(infoLong, "Main done.");
-    } else {
-        ctx = HREglobal();
-        start_slave();
-    }
-#else
-    actual_main();
-#endif
-
-#ifdef HAVE_SYLVAN
     return 0;
-#endif
 }

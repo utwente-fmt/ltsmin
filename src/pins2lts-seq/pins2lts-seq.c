@@ -1853,7 +1853,8 @@ main (int argc, char *argv[])
                       (chunkatint_t)HREgreyboxCAtI,
                       (get_count_t)HREgreyboxCount);
 
-    GBloadFile(opt.model,files[0],&opt.model);
+    GBloadFile(opt.model,files[0]);
+    opt.model = GBwrapModel(opt.model);
 
     lts_type_t ltstype=GBgetLTStype(opt.model);
     global.N=lts_type_get_state_length(ltstype);
