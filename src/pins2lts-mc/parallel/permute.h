@@ -17,7 +17,7 @@
 
 /* permute_get_transitions is a replacement for GBgetTransitionsLong
  */
-#define                     TODO_MAX 200
+#define                     TODO_MAX 10000
 
 typedef enum {
     Perm_None,      /* normal group order */
