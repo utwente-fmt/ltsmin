@@ -138,14 +138,14 @@ conjoin_lists (leap_t *leap, ci_list *groups)
         if (ci_binary_search (all, group) != -1) {
             Printf (debug, "Found overlapping stubborn set: ");
             ci_debug (groups);
-            Printf (debug, " (%zu)\n", ci_count(groups));
+            Printf (debug, " (%d)\n", ci_count(groups));
             return false;
         }
     }
     if ((SAFETY || PINS_LTL) && visible && leap->visible) {
         Printf (debug, "Found second visible stubborn set: ");
         ci_debug (groups);
-        Printf (debug, " (%zu)\n", ci_count(groups));
+        Printf (debug, " (%d)\n", ci_count(groups));
         return false;
     }
     leap->visible |= visible;
@@ -156,7 +156,7 @@ conjoin_lists (leap_t *leap, ci_list *groups)
     }
     Printf (debug, "Found leaping stubborn set: ");
     ci_debug (groups);
-    Printf (debug, " (%zu%s)\n", ci_count(groups), (visible ? " visible" : ""));
+    Printf (debug, " (%d%s)\n", ci_count(groups), (visible ? " visible" : ""));
     return true;
 }
 
@@ -219,7 +219,7 @@ leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
     return total;
 }
 
-static matrix_t *
+static void
 set_row (matrix_t *dm, int row)
 {
     for (int i = 0; i < dm_ncols (dm); i++) {
