@@ -12,6 +12,7 @@
 // #define UFDEBUG
 typedef uint64_t sz_w;
 #define WORKER_BITS 64
+#define LAZY_REMOVAL 1
 
 
 typedef enum uf_status_e {
@@ -84,6 +85,7 @@ uf_is_in_list (const uf_t *uf, ref_t state)
 }
 
 
+
 /**
  * searches the first LIVE state in the cyclic list, starting from state:
  * if all elements in the list are TOMB, we mark the SCC DEAD
@@ -94,8 +96,14 @@ pick_e
 uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
 {
     // invariant: every consecutive non-LOCK state is in the same set
+
+#if LAZY_REMOVAL
     ref_t               a, b, c;
     list_status         a_status, b_status;
+#else
+    ref_t               a, b;
+    list_status         a_status;
+#endif
 
     a = state;
 
@@ -121,6 +129,8 @@ uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
         b = atomic_read (&uf->array[a].list_next);
 
         // if a is TOMB and only element, then the SCC is DEAD
+
+#if LAZY_REMOVAL
         if (a == b || b == 0) {
             if ( uf_mark_dead (uf, a) )
                 return PICK_MARK_DEAD;
@@ -148,9 +158,23 @@ uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
         // HREassert ( c != 0 );
 
         // make the list shorter (a --> c)
-        cas (&uf->array[a].list_next, b, c);
+        //cas (&uf->array[a].list_next, b, c);
+        atomic_write (&uf->array[a].list_next, c);
 
         a = c; // continue searching from c
+#else
+        // in case no lazy removal, we need to traverse the complete list
+        // to find out if there are any LIVE states remaining
+        if (b == state || b == 0) {
+            if ( uf_mark_dead (uf, a) )
+                return PICK_MARK_DEAD;
+            return PICK_DEAD;
+        }
+
+
+        a = b; // continue searching from b
+
+#endif
     }
 }
 
@@ -451,6 +475,7 @@ uf_unlock_list (const uf_t *uf, ref_t a_l)
 
 
 /* ******************************** testing ******************************** */
+
 
 static char*
 uf_print_list_status (list_status ls)
