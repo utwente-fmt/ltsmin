@@ -22,6 +22,7 @@
 #include <gperftools/profiler.h>
 #endif
 
+#define LTL_CHECK 1
 
 /**
  * local counters
@@ -34,6 +35,9 @@ typedef struct counter_s {
     uint32_t            claimdead;
     uint32_t            claimfound;
     uint32_t            claimsuccess;
+#if LTL_CHECK
+    uint32_t            accepting;
+#endif
 } counter_t;
 
 
@@ -90,6 +94,9 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.claimdead               = 0;
     ctx->local->cnt.claimfound              = 0;
     ctx->local->cnt.claimsuccess            = 0;
+#if LTL_CHECK
+    ctx->local->cnt.accepting               = 0;
+#endif
 
 #if SEARCH_COMPLETE_GRAPH
     dlopen_setup (files[0]);
@@ -124,6 +131,11 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     // self-loop
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
+#if LTL_CHECK
+        if ( GBbuchiIsAccepting(ctx->model, state_info_state(successor) ) ) {
+            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+        }
+#endif
         return;
     }
 
@@ -215,6 +227,11 @@ ufscc_init  (wctx_t *ctx)
     if (claim == CLAIM_FIRST) {
         loc->cnt.unique_states ++;
         loc->cnt.unique_trans += transitions;
+#if LTL_CHECK
+        if ( GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state) ) ) {
+            loc->cnt.accepting ++;
+        }
+#endif
     }
 }
 
@@ -251,7 +268,7 @@ successor (wctx_t *ctx)
     // - CLAIM_FOUND   (LIVE state and we have visited its SCC before)
     // - CLAIM_DEAD    (DEAD state)
     claim = uf_make_claim (shared->uf, ctx->state->ref + 1, ctx->id);
-    
+
     if (claim == CLAIM_DEAD) {
         // (TO == DEAD) ==> get next successor
         loc->cnt.claimdead ++;
@@ -268,6 +285,11 @@ successor (wctx_t *ctx)
         if (claim == CLAIM_FIRST) {
             loc->cnt.unique_states ++;
             loc->cnt.unique_trans += trans;
+#if LTL_CHECK
+            if ( GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state) ) ) {
+                loc->cnt.accepting ++;
+            }
+#endif
         }
         return;
     }
@@ -300,6 +322,15 @@ successor (wctx_t *ctx)
             root_data = dfs_stack_top (loc->roots_stack);
             state_info_deserialize (loc->root, root_data); // roots_stack TOP
 
+
+#if LTL_CHECK
+            if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->root) ) ) {
+                ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, loc->root);
+            }
+            if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->target) ) ) {
+                ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, loc->target);
+            }
+#endif
             uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
         }
 
@@ -487,6 +518,9 @@ ufscc_reduce (run_t *run, wctx_t *ctx)
     reduced->claimdead              += cnt->claimdead;
     reduced->claimfound             += cnt->claimfound;
     reduced->claimsuccess           += cnt->claimsuccess;
+#if LTL_CHECK
+    reduced->accepting              += cnt->accepting;
+#endif
 }
 
 
@@ -515,6 +549,11 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info, "- claim found count:        %d", reduced->claimfound);
     Warning(info, "- claim success count:      %d", reduced->claimsuccess);
     Warning(info, " ");
+#if LTL_CHECK
+    Warning(info, "State space has %d states, %d are accepting",
+            reduced->unique_states, reduced->accepting);
+    Warning(info, " ");
+#endif
 
     run_report_total (run);
 
