@@ -45,6 +45,7 @@ typedef enum {
     Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS | Strat_DFSFIFO | Strat_OWCTY,
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
     Strat_LTL    = Strat_NDFS | Strat_LTLG | Strat_OWCTY | Strat_DFSFIFO,
+    Strat_SCC    = Strat_TARJAN | Strat_UFSCC | Strat_RENAULT,
     Strat_Reach  = Strat_BFS | Strat_SBFS | Strat_DFS | Strat_PBFS
 } strategy_t;
 

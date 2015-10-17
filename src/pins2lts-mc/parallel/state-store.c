@@ -145,7 +145,7 @@ state_store_init (model_t model, bool timed)
     size_t              bits = store->global_bits + store->count_bits;
 
     // Wrap functions
-    indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]);
+    indexing = NULL != trc_output || ((Strat_TA | Strat_LTL | Strat_SCC) & strategy[0]);
     switch (db_type) {
     case HashTable:
         store->statistics = (dbs_stats_f) DBSLLstats;
