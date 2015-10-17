@@ -162,6 +162,8 @@ global_print  (model_t model)
         print_options (model);
         state_store_print (global->store);
     }
+
+    HREbarrier (HREglobal()); // just to ensure progress/summary printing is last
 }
 
 void
