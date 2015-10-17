@@ -18,11 +18,11 @@ typedef struct alg_global_s alg_global_t;
 
 struct thread_ctx_s {
     size_t              id;             // thread id (0..NUM_THREADS)
-    stream_t            out;            // raw file output stream
     rt_timer_t          timer;          // Local exploration time timer
     permute_t          *permute;        // transition permutor
     work_counter_t     *counters;       // General work counters
     state_info_t       *initial;        // initial state
+    wctx_t             *parent;
 
     run_t              *run;            // The run info shared by all workers
     model_t             model;          // PINS language module

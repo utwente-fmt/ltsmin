@@ -58,6 +58,9 @@ extern bool      uf_is_dead (const uf_t *uf, ref_t state);
 
 extern bool      uf_mark_dead (const uf_t *uf, ref_t state);
 
+// permanently locks a UF node, regardless of previous value
+bool             uf_try_grab (const uf_t *uf, ref_t a);
+
 /* ******************************** testing ******************************** */
 
 extern ref_t     uf_debug (const uf_t *uf, ref_t state);
