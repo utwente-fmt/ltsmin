@@ -5,14 +5,17 @@
 #include <hre/config.h>
 
 #include <pins2lts-mc/algorithm/algorithm.h>
+#include <pins2lts-mc/algorithm/util.h>
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-info.h>
 #include <pins2lts-mc/parallel/worker.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/unionfind.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins.h>
 #include <util-lib/fast_set.h>
 #include <pins2lts-mc/algorithm/ltl.h>
+
 
 #if SEARCH_COMPLETE_GRAPH
 #include <mc-lib/dlopen_extra.h>
@@ -22,6 +25,8 @@
 #include <gperftools/profiler.h>
 #endif
 
+
+// TODO: move +1's and -1's inside the UF structure!
 
 /**
  * local counters
@@ -36,7 +41,6 @@ typedef struct counter_s {
     uint32_t            claimsuccess;
 } counter_t;
 
-
 /**
  * local SCC information (for each worker)
  */
@@ -46,6 +50,7 @@ struct alg_local_s {
     counter_t           cnt;
     state_info_t       *target;               // auxiliary state
     state_info_t       *root;                 // auxiliary state
+    wctx_t             *rctx;                 // reachability for trace construction
 };
 
 
@@ -53,9 +58,17 @@ struct alg_local_s {
  * shared SCC information (between workers)
  */
 typedef struct uf_alg_shared_s {
-    uf_t               *uf;                   // shared union-find structure
+    uf_t               *uf;             // shared union-find structure
+    ref_t               lasso_acc;      // SCC root for trace construction
+    ref_t               lasso_end;      // last on lasso (to iterate backwards from)
+    ref_t               lasso_root;     // last on lasso (to iterate backwards from)
+    run_t              *reach_run;      // parallel reachability object
+    bool                ltl;            // LTL property present?
 } uf_alg_shared_t;
 
+extern void report_lasso (wctx_t *ctx, ref_t accepting);
+extern int reach_scc_seen (void *ext_ctx, transition_info_t *ti,
+                           ref_t ref, int seen);
 
 void
 ufscc_global_init (run_t *run, wctx_t *ctx)
@@ -75,6 +88,7 @@ void
 ufscc_local_init (run_t *run, wctx_t *ctx)
 {
     ctx->local = RTmallocZero (sizeof (alg_local_t) );
+    uf_alg_shared_t    *shared = (uf_alg_shared_t*) ctx->run->shared;
 
     ctx->local->target = state_info_create ();
     ctx->local->root   = state_info_create ();
@@ -90,6 +104,13 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.claimdead               = 0;
     ctx->local->cnt.claimfound              = 0;
     ctx->local->cnt.claimsuccess            = 0;
+
+    shared->ltl = GBgetAcceptingStateLabelIndex(ctx->model) != -1;
+
+    if (shared->ltl && trc_output) {
+        ctx->local->rctx = run_init (shared->reach_run, ctx->model);
+        ctx->local->rctx->parent = ctx;
+    }
 
 #if SEARCH_COMPLETE_GRAPH
     dlopen_setup (files[0]);
@@ -125,12 +146,16 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
         return;
+    } else if (EXPECT_FALSE(trc_output && !seen && ti != &GB_NO_TRANSITION)) {
+        // use parent_ref from reachability (used in CE reconstuction)
+        ref_t *succ_parent = get_parent_ref(loc->rctx, successor->ref);
+        atomic_write (succ_parent, ctx->state->ref);
     }
 
     stack_loc = dfs_stack_push (loc->search_stack, NULL);
     state_info_serialize (successor, stack_loc);
 
-    (void) ti; (void) seen;
+    (void) ti;
 }
 
 
@@ -239,6 +264,17 @@ successor (wctx_t *ctx)
     // FROM = parent    = loc->target
     // TO   = successor = ctx->state
 
+    if (loc->target->ref == ctx->state->ref) { // self loop
+
+        loc->cnt.claimfound ++; // implies CLAIM_FOUND
+        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state))) {
+            report_lasso (ctx, ctx->state->ref);
+        }
+
+        dfs_stack_pop (loc->search_stack);
+        return;
+    }
+
     // early backtrack if parent is explored ==> all its children are explored
     if ( !uf_is_in_list (shared->uf, loc->target->ref + 1) ) {
         dfs_stack_pop (loc->search_stack);
@@ -276,9 +312,11 @@ successor (wctx_t *ctx)
         // (TO == state in previously visited SCC) ==> cycle found
         loc->cnt.claimfound ++;
 
-        if ( uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) )  {
+        Debug ("cycle: %zu  --> %zu", loc->target->ref, ctx->state->ref);
+
+        if (uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1)) {
             dfs_stack_pop (loc->search_stack);
-            return;
+            return; // also no chance of new accepting cycle
         }
 
         // we have:  .. -> TO  -> .. -> FROM -> TO
@@ -287,20 +325,25 @@ successor (wctx_t *ctx)
         //                                    (TO* is a state in SCC(TO))
         // ==> unite and pop states from R until sameset (R.TOP, TO)
 
-        root_data = dfs_stack_top (loc->roots_stack);
-        state_info_deserialize (loc->root, root_data); // roots_stack TOP
-
         // while ( not sameset (FROM, TO) )
-        //   R.POP
-        //   Union (R.TOP, FROM)
-        while ( !uf_sameset (shared->uf, ctx->state->ref + 1, loc->target->ref + 1) ) {
-            
-            dfs_stack_pop (loc->roots_stack); // UF Stack POP
-
-            root_data = dfs_stack_top (loc->roots_stack);
+        //   Union (R.POP(), FROM)
+        // R.PUSH (TO')
+        ref_t               accepting = DUMMY_IDX;
+        do {
+            root_data = dfs_stack_pop (loc->roots_stack); // UF Stack POP
             state_info_deserialize (loc->root, root_data); // roots_stack TOP
 
+            if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(loc->root))) {
+                accepting = loc->root->ref;
+            }
+            Debug ("Uniting: %zu and %zu", loc->root->ref, ctx->state->ref);
             uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
+        } while ( !uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) );
+        dfs_stack_push (loc->roots_stack, root_data);
+
+        // after uniting SCC, report lasso
+        if (accepting != DUMMY_IDX) {
+            report_lasso (ctx, accepting);
         }
 
         // cycle is now merged (and DFS stack is unchanged)
@@ -308,7 +351,6 @@ successor (wctx_t *ctx)
         return;
     }
 }
-
 
 /**
  * there are no states on the current stackframe. We leave the stackframe and
@@ -428,8 +470,8 @@ ufscc_run  (run_t *run, wctx_t *ctx)
 
     ufscc_init (ctx);
 
-    // continue until we are done exploring the graph
-    while ( !run_is_stopped(run)) {
+    // continue until we are done exploring the graph or interrupted
+    while ( !run_is_stopped(run) ) {
 
         state_data = dfs_stack_top (loc->search_stack);
 
@@ -466,6 +508,10 @@ ufscc_run  (run_t *run, wctx_t *ctx)
         Warning(info, "Done profiling");
     ProfilerStop();
 #endif
+
+    if (trc_output && global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
+        report_lasso (ctx, DUMMY_IDX); // aid other thread in counter-example reconstruction
+    }
 
     (void) run;
 }
@@ -523,13 +569,13 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
 
 
 int
-ufscc_state_seen (void *ptr, ref_t ref, int seen)
+ufscc_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
 {
     wctx_t             *ctx    = (wctx_t *) ptr;
     uf_alg_shared_t    *shared = (uf_alg_shared_t*) ctx->run->shared;
 
     return uf_owner (shared->uf, ref + 1, ctx->id);
-    (void) seen;
+    (void) seen; (void) ti;
 }
 
 
@@ -550,4 +596,183 @@ ufscc_shared_init   (run_t *run)
     run->shared = RTmallocZero (sizeof (uf_alg_shared_t));
     shared      = (uf_alg_shared_t*) run->shared;
     shared->uf  = uf_create();
+
+    if (trc_output) {
+        // Prepare parallel reachability (should be done in shared, .i.e. global and once)
+        if (strategy[1] == Strat_None) strategy[1] = Strat_DFS;
+        shared->reach_run = run_create (false);
+        alg_shared_init_strategy (shared->reach_run, strategy[1]);
+        set_alg_state_seen (shared->reach_run->alg, reach_scc_seen);
+    }
+}
+
+#define     PATH_IDX    DUMMY_IDX
+
+static void
+construct_parent_path (wctx_t *ctx, dfs_stack_t stack, ref_t from, ref_t until)
+{
+    alg_local_t        *loc        = ctx->local;
+    raw_data_t          state_data;
+
+    Warning (info, "\tConstructing reverse path from %zu to %zu", from, until);
+
+    dfs_stack_clear (loc->search_stack); // no longer needed
+
+    ref_t               x = from;
+    while (true) {
+        Warning (infoLong, "\tWriting %zu", x);
+        state_info_set (loc->target, x, LM_NULL_LATTICE);
+        state_data = dfs_stack_push (loc->search_stack, NULL);
+        state_info_serialize (loc->target, state_data);
+
+        ref_t *x_parent = get_parent_ref (loc->rctx, x);
+        ref_t next_x = *x_parent;
+        *x_parent = PATH_IDX; // Mark as path
+        if (x == until) break;
+
+        x = next_x;
+        HREassert (x != 0 || until == 0, "Failed to find reverse path from %zu to %zu on %zu", from, until, x);
+    }
+
+    // reorder
+    while (dfs_stack_size(loc->search_stack) != 0) {
+        state_data = dfs_stack_pop (loc->search_stack);
+        dfs_stack_push (stack, state_data);
+        dfs_stack_enter (stack); // trace.h expects this
+    }
+}
+
+/**
+ * Builds and reports counter example (CE) trace
+ *
+ * There is one parallel reachability context with tracing to aid with CE
+ * reconstruction (shared->reach_run and ctx->local->rctx).
+ * The UFSCC maintained the parent_refs of all visited states in this
+ * reachability context. So there is a parent path from 'accepting' to
+ * the initial state.
+ *
+ * This method will complete the parent path to an accepting cycle.
+ * First it collects the prefix trace to the accepting state from the parent path
+ * marking the parent references with PATH_IDX.
+ * Then it uses the parallel reachability context to search for a path in the
+ * model from the accepting state back to the prefix path. It searches only in the
+ * partial SCC which contains the accepting state and uses the permanent
+ * locking of nodes in the UF structure to mark states as visited (in the
+ * parallel reachility phase).
+ */
+void
+report_lasso (wctx_t *ctx, ref_t accepting)
+{
+    alg_local_t        *loc        = ctx->local;
+    uf_alg_shared_t    *shared     = (uf_alg_shared_t*) ctx->run->shared;
+
+    // stop other threads in UFSCC
+    int master = run_stop (ctx->run);
+    if (master) {
+        Warning (info, " ");
+        Warning (info, "Accepting cycle FOUND at depth ~%zu%s!",
+                 dfs_stack_nframes(loc->search_stack), loc->target->ref == ctx->state->ref ? " (self loop)" : "");
+        Warning (info, " ");
+    }
+    if (!trc_output) {
+        global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
+        return;
+    }
+
+    if ( master ) {
+        size_t              len = state_info_serialize_int_size (ctx->state);
+        dfs_stack_t         trace_stack = dfs_stack_create (len);
+
+        Warning (info, "Construction counter example");
+
+        HREassert (accepting != DUMMY_IDX, "A slave thread reach the master thread code");
+        shared->lasso_acc = accepting;
+
+        // replace global state store with own visited set
+        shared->lasso_end = DUMMY_IDX;
+
+        // wait for others (parent_ref should be complete)
+        HREbarrier (HREglobal());
+
+        // Construct path from ctx->initial-> to loc->target->ref
+        construct_parent_path (ctx, trace_stack, shared->lasso_acc, ctx->initial->ref);
+        dfs_stack_leave (trace_stack); dfs_stack_pop (trace_stack); // pop accepting (it will be re-entered)
+
+        // signal run prepared
+        HREbarrier (HREglobal());
+
+        Warning (info, "Performing parallel %s in SCC", key_search(strategies, strategy[1] & ~Strat_TA));
+
+        // set root state as new initial state
+        state_info_set (loc->rctx->initial, shared->lasso_acc, LM_NULL_LATTICE);
+        alg_run (shared->reach_run, loc->rctx);  // parallel reachability
+
+        HREassert (shared->lasso_end != DUMMY_IDX, "No path back to root %zu found in the SCC", shared->lasso_acc);
+        HREbarrier (HREglobal());
+
+        // use new parent ref to complete lasso
+        construct_parent_path (ctx, trace_stack, shared->lasso_end, shared->lasso_acc);
+        // push lasso root once more to close cycle
+        construct_parent_path (ctx, trace_stack, shared->lasso_root, shared->lasso_root);
+        dfs_stack_leave (trace_stack);
+
+        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
+        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
+
+        Warning (info, "  ");
+        Warning (info, "Writing counter example trace of length %zu", dfs_stack_size(trace_stack));
+        find_and_write_dfs_stack_trace (ctx->model, trace_stack);
+
+    } else {
+        // slave
+
+        // sync with master
+        HREbarrier (HREglobal());
+        // wait for leader to prepare
+        HREbarrier (HREglobal());
+
+        // set root state as new initial state
+        //state_info_first (loc->rctx->initial, shared->lasso_root_state);
+        state_info_set (loc->rctx->initial, shared->lasso_acc, LM_NULL_LATTICE);
+        alg_run (shared->reach_run, loc->rctx);  // parallel reachability
+
+        HREbarrier (HREglobal());
+    }
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
+}
+
+int
+reach_scc_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
+{
+    if (ti->group == GB_UNKNOWN_GROUP) return 1;
+
+    wctx_t             *rctx = (wctx_t *) ptr;
+    wctx_t             *ctx = rctx->parent;
+    uf_alg_shared_t    *shared = (uf_alg_shared_t *) ctx->run->shared;
+    ref_t               src = rctx->state->ref;
+    Printf (debug, "SCC candidate state %zu --(%d)--> %zu: ", src, ti->group, ref);
+    ref_t              *ref_parent = get_parent_ref (rctx, ref);
+
+    if (atomic_read (ref_parent) == PATH_IDX) {
+        shared->lasso_root = ref;
+        shared->lasso_end = src;
+        run_stop (shared->reach_run); // terminate reachability if cycle is found
+        Printf (debug, "END\n");
+        return 1;
+    } else {
+        if (!uf_sameset(shared->uf, ref + 1, shared->lasso_acc + 1)) {
+            Printf (debug, "out\n");
+            return 1; // avoid revisiting states outside of SCC
+        }
+        if (uf_try_grab(shared->uf, ref)) {
+            *ref_parent = 0; // allow reset
+            Printf (debug, "new\n");
+            return 0;
+        } else {
+            Printf (debug, "old\n");
+            return 1;
+        }
+
+    }
+    (void) seen;
 }

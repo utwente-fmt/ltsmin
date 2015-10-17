@@ -232,11 +232,11 @@ ndfs_local_deinit   (run_t *run, wctx_t *ctx)
 }
 
 int
-ndfs_state_seen (void *ptr, ref_t ref, int seen)
+ndfs_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
 {
     wctx_t             *ctx = (wctx_t *) ptr;
     return !nn_color_eq(nn_get_color(&ctx->local->color_map, ref), NNWHITE);
-    (void) seen;
+    (void) seen; (void) ti;
 }
 
 void
