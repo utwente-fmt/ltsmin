@@ -455,12 +455,7 @@ cndfs_global_init   (run_t *run, wctx_t *ctx)
 {
     ctx->global = RTmallocZero (sizeof(alg_global_t));
     ctx->global->work = SIZE_MAX;
-
-    if (run->shared->rec == NULL)
-        return;
-
-    ctx->global->rec = wctx_create (ctx->model, run);
-    alg_global_init (run->shared->rec, ctx->global->rec);
+    (void) run;
 }
 
 void
@@ -494,9 +489,7 @@ cndfs_local_setup   (run_t *run, wctx_t *ctx)
     HREassert (ctx->global != NULL, "Run global before local init");
 
     // We also need to finalize the worker initialization:
-    wctx_init (ctx->global->rec);
-
-    alg_local_init (run->shared->rec, ctx->global->rec);
+    ctx->global->rec = run_init (run->shared->rec, ctx->model);
 
     // Recursive strategy maybe unaware of its caller, so here we update its
     // recursive bits (top-level strategy always has rec_bits == 0, which

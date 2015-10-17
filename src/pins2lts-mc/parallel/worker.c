@@ -38,6 +38,10 @@ wctx_init (wctx_t *ctx)
     state_data_t            initial_state = RTmalloc (sizeof(int[N]));
     GBgetInitialState (ctx->model, initial_state);
     state_info_first (ctx->initial, initial_state);
+
+    // register with run:
+    HREassert (ctx->run->contexts[ctx->id] == NULL);
+    ctx->run->contexts[ctx->id] = ctx;
     // RTfree (ctx->initial); // used in state-info
 }
 

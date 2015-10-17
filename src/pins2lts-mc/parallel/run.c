@@ -109,8 +109,6 @@ run_init (run_t *run, model_t model)
     wctx_t          *ctx = wctx_create (model, run);
     RTswitchAlloc (false);
 
-    ctx->run = run;
-    run->contexts[ctx->id] = ctx; // polygamy
     wctx_init (ctx); // required in alg_global_init
 
     RTswitchAlloc (global->procs);
@@ -151,7 +149,7 @@ run_create (bool init)
 {
     RTswitchAlloc (global->procs);
     run_t              *run = RTmallocZero (sizeof(run_t));
-    run->contexts = RTmalloc (sizeof (wctx_t*[W]));
+    run->contexts = RTmallocZero (sizeof (wctx_t *[W]));
     run->syncer = RTmallocZero (sizeof (sync_t));
     run->total.maxtime = 0;
     run->total.mintime = SIZE_MAX;
