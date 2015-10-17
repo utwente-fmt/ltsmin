@@ -178,8 +178,8 @@ alg_popt (poptContext con, enum poptCallbackReason reason,
         char *strat = strdup (arg_strategy);
         char last;
         do {
-            if (i > 0 && !((Strat_ENDFS | Strat_OWCTY) & strategy[i-1]))
-                Abort ("Only ENDFS supports recursive repair procedures.");
+            if (i > 0 && !((Strat_ENDFS | Strat_OWCTY | Strat_UFSCC) & strategy[i-1]))
+                Abort ("Only ENDFS/OWCTY/UFSCC can use secondary search procedure procedures.");
             while (',' != arg_strategy[end] && '\0' != arg_strategy[end]) ++end;
             last = strat[end];
             strat[end] = '\0';
