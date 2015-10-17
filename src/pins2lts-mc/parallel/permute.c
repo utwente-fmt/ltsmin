@@ -141,11 +141,9 @@ dyn_cmp (const void *a, const void *b, void *arg)
     permute_todo_t     *A = &perm->todos[*((int*)a)];
     permute_todo_t     *B = &perm->todos[*((int*)b)];
 
-    int Aval = A->seen && perm->state_seen (perm->call_ctx, A->ref, A->seen);
-    int Bval = B->seen && perm->state_seen (perm->call_ctx, B->ref, B->seen);
-    if (Aval == Bval) // if dynamically no difference, then randomize:
+    if (A->seen == B->seen) // if dynamically no difference, then randomize:
         return rand[A->ti.group] - rand[B->ti.group];
-    return Bval - Aval;
+    return A->seen - B->seen;
 }
 
 static inline void
@@ -154,8 +152,9 @@ perm_todo (permute_t *perm, transition_info_t *ti, int seen)
     HREassert (perm->nstored < K+TODO_MAX);
     permute_todo_t     *todo = perm->todos + perm->nstored;
     perm->tosort[perm->nstored] = perm->nstored;
-    todo->seen = seen;
     todo->ref = perm->next->ref;
+    todo->seen = seen;
+    todo->seen = perm->state_seen (perm->call_ctx, ti, todo->ref, seen);
     todo->lattice = perm->next->lattice;
     todo->ti.group = ti->group;
     todo->ti.por_proviso = ti->por_proviso;
