@@ -57,7 +57,6 @@ static void      uf_unlock_uf (const uf_t *uf, ref_t a);
 static bool      uf_lock_list (const uf_t *uf, ref_t a, ref_t *a_l);
 static void      uf_unlock_list (const uf_t *uf, ref_t a_l);
 
-
 /**
  * initializer for the UF array
  */
@@ -422,6 +421,14 @@ uf_mark_dead (const uf_t *uf, ref_t state)
 }
 
 
+static void
+uf_unlock_uf (const uf_t *uf, ref_t a)
+{
+    // HREassert (atomic_read (&uf->array[a].uf_status) == UF_LOCK);
+    atomic_write (&uf->array[a].uf_status, UF_LIVE);
+}
+
+
 /* ******************************** locking ******************************** */
 
 
@@ -443,14 +450,13 @@ uf_lock_uf (const uf_t *uf, ref_t a)
     return 0;
 }
 
-
-static void
-uf_unlock_uf (const uf_t *uf, ref_t a)
+bool
+uf_try_grab (const uf_t *uf, ref_t a)
 {
-    // HREassert (atomic_read (&uf->array[a].uf_status) == UF_LOCK);
-    atomic_write (&uf->array[a].uf_status, UF_LIVE);
+    char x = atomic_read (&uf->array[a].uf_status);
+    if (x == UF_LOCK) return false;
+    return cas (&uf->array[a].uf_status, x, UF_LOCK);
 }
-
 
 static bool
 uf_lock_list (const uf_t *uf, ref_t a, ref_t *a_l)

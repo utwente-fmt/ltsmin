@@ -39,6 +39,8 @@ libalgorithm_la_SOURCES += timed.c
 libalgorithm_la_SOURCES += timed.h
 libalgorithm_la_SOURCES += ufscc.c
 libalgorithm_la_SOURCES += ufscc.h
+libalgorithm_la_SOURCES += util.c
+libalgorithm_la_SOURCES += util.h
 
 libalgorithm_la_CPPFLAGS = $(AM_CPPFLAGS)
 libalgorithm_la_LIBADD   = $(MC_LIBS) ../parallel/libparallel.la
