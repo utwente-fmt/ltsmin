@@ -53,7 +53,7 @@ find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack)
         state_data_t        data = dfs_stack_peek_top (stack, i);
         state_info_deserialize (ctx.state, data);
         new_state (&state, ctx.state);
-        Warning (info, "%zu\t(%zu),", ctx.state->ref, level - i);
+        Warning (infoLong, "%zu\t(%zu),", ctx.state->ref, level - i);
         int val = SIputC (ctx.si, state.data, sizeof(struct val_s));
         trace[level - i - 1] = (ref_t) val;
     }
