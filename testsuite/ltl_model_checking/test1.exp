@@ -13,13 +13,13 @@ set commands [dict create]
 
 # TEST 16:
 
-set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs"}
+set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs" "ufscc"}
 
 # anderson:
 foreach s $strategies {
     dict set commands test16_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=4 \
     	--strategy=$s -s22 $EXAMPLES_PATH/anderson.1.prop4.dve"
-    dict set commands test16_dve_mc_$s exp "633945 states"
+    dict set commands test16_dve_mc_$s exp "633945 states|unique states count:        633945"
 }
 dict set commands test_16_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	$EXAMPLES_PATH/anderson.1.prop4.dve"
@@ -32,7 +32,7 @@ compile_promela {"peterson3.pml" "zune.pml"}
 foreach s $strategies {
     dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) --threads=4 \
 	--strategy=$s -s20 peterson3.pml.spins"
-    dict set commands test16_seq_$s exp "167277 states"
+    dict set commands test16_seq_$s exp "167277 states|unique states count:        167277"
 }
 dict set commands test16_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
 					peterson3.pml.spins"
