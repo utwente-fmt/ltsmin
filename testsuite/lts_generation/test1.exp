@@ -50,6 +50,15 @@ dict set commands test10_seq exp "found at depth"
 dict set commands test10_sym cmd "$binpaths(prom2lts-sym) p117.pml.spins -d --trace=a.gcf"
 dict set commands test10_sym exp "deadlock found"
 
+
+set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs" "ufscc"}
+
+foreach s $strategies {
+    dict set commands test_trace_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=4 \
+	-s22  --trace=a.gcf --strategy=$s $EXAMPLES_PATH/iprotocol.2.prop4.dve"
+    dict set commands test_trace_dve_mc_$s exp "Accepting cycle FOUND"
+}
+
 # TODO: Validate the traces of this test by using ltsmin-printtrace
 
 

@@ -166,8 +166,14 @@ proc runmytest { test_name command_line exp_output} {
             return
         }
 
-        $exp_output {
-            pass "Expected output $exp_output found"
+        if { [string first "|" $exp_output] == -1 } {
+            $exp_output {
+                pass "Expected output $exp_output found"
+            }
+        } else {
+	    -re $exp_output {
+	        pass "Expected output $exp_output found"
+	    }
         }
 	    
         full_buffer {
