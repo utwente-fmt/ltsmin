@@ -11,7 +11,6 @@
 int              dlk_detect = 0;
 char            *act_detect = NULL;
 char            *inv_detect = NULL;
-int              no_exit = 0;
 size_t           max_level = SIZE_MAX;
 
 struct poptOption reach_options[] = {

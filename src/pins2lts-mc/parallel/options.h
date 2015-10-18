@@ -59,6 +59,7 @@ extern void print_options               (model_t model);
 #define                 MAX_STRATEGIES 5
 extern strategy_t       strategy[];
 extern proviso_t        proviso;
+extern int              no_exit;
 
 extern char*            trc_output;
 extern int              write_state;

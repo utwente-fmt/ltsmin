@@ -36,7 +36,6 @@ extern struct poptOption reach_options[];
 extern char            *act_detect;
 extern char            *inv_detect;
 extern int              dlk_detect;
-extern int              no_exit;
 extern size_t           max_level;
 
 typedef struct counter_s {
