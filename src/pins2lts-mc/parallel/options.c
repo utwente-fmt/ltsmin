@@ -49,6 +49,7 @@ strategy_t       strategy[MAX_STRATEGIES] =
 proviso_t        proviso = Proviso_None;
 char*            trc_output = NULL;
 int              write_state = 0;
+int              no_exit = 0;
 char*            label_filter = NULL;
 char            *files[2];
 

@@ -509,7 +509,8 @@ ufscc_run  (run_t *run, wctx_t *ctx)
     ProfilerStop();
 #endif
 
-    if (trc_output && global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
+    if (trc_output && run_is_stopped(run) &&
+            global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
         report_lasso (ctx, DUMMY_IDX); // aid other thread in counter-example reconstruction
     }
 
@@ -663,6 +664,8 @@ construct_parent_path (wctx_t *ctx, dfs_stack_t stack, ref_t from, ref_t until)
 void
 report_lasso (wctx_t *ctx, ref_t accepting)
 {
+    if (no_exit) return;
+
     alg_local_t        *loc        = ctx->local;
     uf_alg_shared_t    *shared     = (uf_alg_shared_t*) ctx->run->shared;
 
