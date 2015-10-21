@@ -14,6 +14,7 @@
 #include <util-lib/fast_set.h>
 #include <pins2lts-mc/algorithm/ltl.h>
 
+
 #if SEARCH_COMPLETE_GRAPH
 #include <mc-lib/dlopen_extra.h>
 #endif
@@ -22,7 +23,13 @@
 #include <gperftools/profiler.h>
 #endif
 
-#define LTL_CHECK 1
+//#define LTL_CHECK 1
+//#define PRINT_GRAPH 1
+
+#if PRINT_GRAPH
+int time_tick;
+int MAX_TIME_TICKS = 10000;
+#endif
 
 /**
  * local counters
@@ -100,6 +107,10 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
 
 #if SEARCH_COMPLETE_GRAPH
     dlopen_setup (files[0]);
+#endif
+
+#if PRINT_GRAPH
+    time_tick = 0;
 #endif
 
     (void) run; 
@@ -227,6 +238,14 @@ ufscc_init  (wctx_t *ctx)
     if (claim == CLAIM_FIRST) {
         loc->cnt.unique_states ++;
         loc->cnt.unique_trans += transitions;
+#if PRINT_GRAPH
+    if (time_tick < MAX_TIME_TICKS) {
+        time_tick ++;
+        printf("NODE,%zu,%zu,%d\n",
+               uf_find(shared->uf,ctx->state->ref+1), ctx->id, time_tick);
+    }
+#endif
+
 #if LTL_CHECK
         if ( GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state) ) ) {
             loc->cnt.accepting ++;
@@ -268,6 +287,21 @@ successor (wctx_t *ctx)
     // - CLAIM_FOUND   (LIVE state and we have visited its SCC before)
     // - CLAIM_DEAD    (DEAD state)
     claim = uf_make_claim (shared->uf, ctx->state->ref + 1, ctx->id);
+
+#if PRINT_GRAPH
+    if (time_tick < MAX_TIME_TICKS) {
+        time_tick ++;
+        if (claim == CLAIM_FIRST) {
+            printf("NODE,%zu,%zu,%d\n",
+                    uf_find(shared->uf,ctx->state->ref+1), ctx->id, time_tick);
+        }
+        printf("EDGE,%zu,%zu,%zu,%d\n",
+                uf_find(shared->uf,loc->target->ref+1),
+                uf_find(shared->uf,ctx->state->ref+1),
+                ctx->id,
+                time_tick);
+    }
+#endif
 
     if (claim == CLAIM_DEAD) {
         // (TO == DEAD) ==> get next successor
@@ -331,7 +365,23 @@ successor (wctx_t *ctx)
                 ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, loc->target);
             }
 #endif
+
+#if PRINT_GRAPH
+            ref_t old_a = uf_find(shared->uf, loc->root->ref + 1);
+            ref_t old_b = uf_find(shared->uf, loc->target->ref + 1);
+#endif
             uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
+#if PRINT_GRAPH
+            if (time_tick < MAX_TIME_TICKS) {
+                time_tick ++;
+                printf("UNION,%zu,%zu,%zu,%zu,%d\n",
+                        uf_find(shared->uf,loc->root->ref + 1),
+                        old_a,
+                        old_b,
+                        ctx->id,
+                        time_tick);
+            }
+#endif
         }
 
         // cycle is now merged (and DFS stack is unchanged)

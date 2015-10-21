@@ -258,21 +258,22 @@ uf_make_claim (const uf_t *uf, ref_t state, size_t worker)
 ref_t
 uf_find (const uf_t *uf, ref_t state)
 {
-    //HREassert (state != 0);
-
     // recursively find and update the parent (path compression)
-    ref_t               parent = atomic_read (&uf->array[state].parent);
-    ref_t               root;
+    ref_t               x      = state;
+    ref_t               parent = atomic_read (&uf->array[x].parent);
+    ref_t               y;
 
-    if (parent == 0)
-        return state;
-
-    root = uf_find (uf, parent);
-
-    if (root != parent)
-        atomic_write (&uf->array[state].parent, root);
-
-    return root;
+    while (parent != 0) {
+        y = parent;
+        parent = atomic_read (&uf->array[y].parent);
+        if (parent == 0) {
+            return y;
+        }
+        atomic_write (&uf->array[x].parent, parent);
+        x = parent;
+        parent = atomic_read (&uf->array[x].parent);
+    }
+    return x;
 }
 
 
