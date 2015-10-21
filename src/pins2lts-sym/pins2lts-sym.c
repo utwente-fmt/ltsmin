@@ -42,6 +42,7 @@ static char* dot_dir = NULL;
 
 static char* transitions_save_filename = NULL;
 static char* transitions_load_filename = NULL;
+static int save_reachable = 0; // save reachable states too in --save-transitions
 
 static char* trc_output = NULL;
 static char* trc_type   = "gcf";
@@ -203,6 +204,7 @@ static  struct poptOption options[] = {
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },
     { "type", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &trc_type, 0, "trace type to write", "<aut|gcd|gcf|dir|fsm|bcg>" },
     { "save-transitions", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write transition relations to", "<outputfile>" },
+    { "save-reachable", 0, POPT_ARG_NONE, &save_reachable, 0, "when saving transitions, also save reachable states", 0 },
     { "load-transitions", 0 , POPT_ARG_STRING, &transitions_load_filename, 0, "file to read transition relations from", "<inputfile>" },
     { "mu" , 0 , POPT_ARG_STRING , &mu_formula , 0 , "file with a mu formula" , "<mu-file>.mu" },
     { "ctl-star" , 0 , POPT_ARG_STRING , &ctl_formula , 0 , "file with a ctl* formula" , "<ctl-file>.ctl" },
@@ -3682,6 +3684,10 @@ VOID_TASK_1(actual_main, void*, arg)
         fwrite(&nGrps, sizeof(int), 1, f);
         for (int i=0; i<nGrps; i++) vrel_save_proj(f, group_next[i]);
         for (int i=0; i<nGrps; i++) vrel_save(f, group_next[i]);
+
+        /* Write reachable states (optional) */
+        fwrite(&save_reachable, sizeof(int), 1, f);
+        if (save_reachable) vset_save(f, visited);
 
         /* Call hook */
         vset_post_save(f, domain);
