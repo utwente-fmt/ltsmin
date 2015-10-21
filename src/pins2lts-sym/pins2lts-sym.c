@@ -29,6 +29,8 @@
 #include <vset-lib/vector_set.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/bitset.h>
+#include <util-lib/dfs-stack.h>
+#include <util-lib/util.h>
 #include <hre/stringindex.h>
 
 #include <sylvan.h>
@@ -47,6 +49,8 @@ static int save_reachable = 0; // save reachable states too in --save-transition
 static char* trc_output = NULL;
 static char* trc_type   = "gcf";
 static int   dlk_detect = 0;
+static int   sccs = 0;
+static int   trimming = 0;
 static char* act_detect = NULL;
 static char* inv_detect = NULL;
 static int   no_exit = 0;
@@ -78,6 +82,7 @@ static int min_priority = INT_MAX;
 static int max_priority = INT_MIN;
 static vset_t true_states;
 static vset_t false_states;
+static vset_t initial;
 
 /*
   The inhibit and class matrices are used for maximal progress.
@@ -198,6 +203,8 @@ static  struct poptOption options[] = {
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
     { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
+    { "trim" , 0 , POPT_ARG_VAL , &trimming , 1 , "apply trimming on SCCs" , NULL },
+    { "scc" , 0 , POPT_ARG_INT , &sccs , 0 , "detect sccs" , NULL },
     { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
     { "invariant", 'i', POPT_ARG_STRING, &inv_detect, 1, "detect invariant violations", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
@@ -3154,8 +3161,380 @@ get_svar_eq_int_set (int state_idx, int state_match, vset_t visited)
   return result;
 }
 
+static const int LENGTH[4] = { 0, 1, 1, 3 };
+
+static size_t           scc_count = 0;
+static int             *v;
+static dfs_stack_t      stack;
+static dfs_stack_t      T;
+static int report_shift = 2;
+
+static inline void
+report_scc_progress ()
+{
+    if ((scc_count >> report_shift) != 0) {
+        Warning(info, "SCC iteration: %zu.", scc_count);
+        report_shift += 1;
+    }
+}
+
+static inline vset_t *
+queue (vset_t *P)
+{
+    void *data = dfs_stack_push (stack, (int *)P);
+    return (vset_t *) data;
+}
+
+static inline vset_t *
+dequeue ()
+{
+    int **ptr = (int **)dfs_stack_pop (stack);
+    return (vset_t *) ptr;
+}
+
+static inline vset_t
+empty ()
+{
+    return vset_create (domain, -1, NULL);
+}
+
+static inline vset_t
+copy (vset_t B)
+{
+    vset_t S = empty ();
+    vset_copy (S, B);
+    return S;
+}
+
+static inline vset_t
+singleton (int *v)
+{
+    vset_t S = empty ();
+    vset_add (S, v);
+    return S;
+}
+
+void
+add_step (bool backward, vset_t addto, vset_t from, vset_t universe)
+{
+    vset_t          temp = empty ();
+    for (int i = 0; i < nGrps; i++) {
+        if (backward) {
+            vset_prev (temp, from, group_next[i], universe);
+            reduce (i, temp);
+        } else {
+            vset_next (temp, from, group_next[i]);
+            reduce (i, temp);
+            vset_intersect (temp, universe);
+        }
+        vset_union (addto, temp);
+        vset_clear (temp);
+    }
+    vset_destroy (temp);
+}
+
+static inline void
+trim (vset_t P)
+{
+    if (!trimming || vset_is_empty(P)) return;
+
+    //vset_t Pruned = empty ();
+    vset_t Ptemp = empty ();
+    while (true) {
+        add_step (false, Ptemp, P, P);
+        add_step (true, Ptemp, P, P);
+        if (vset_equal(P, Ptemp)) break;
+        vset_minus (P, Ptemp);
+        bn_int_t c;
+        vset_count (P, NULL, &c);
+        scc_count += bn_int2double (&c);
+        //vset_union (Pruned, P);
+        vset_copy (P, Ptemp);
+        vset_clear (Ptemp);
+    };
+    vset_destroy (Ptemp);
+    //vset_destroy (Pruned);
+}
+
+void
+reach_in (bool backward, vset_t B, vset_t universe)
+{
+    vset_t          front   = copy  (B);
+    vset_t          temp    = empty ();
+    while (!vset_is_empty(front)) {
+        add_step (backward, temp, front,  universe);
+        vset_minus (temp, B);
+        vset_union (B, temp);
+        vset_copy (front, temp);
+        vset_clear (temp);
+    }
+    vset_destroy (temp);
+    vset_destroy (front);
+}
+
+void
+scc_fb ()
+{
+    vset_t          P = *dequeue ();
+
+    trim (P);
+
+    if (vset_is_empty(P)) { vset_destroy (P); return; }
+
+    vset_random (P, v);                         // v in P
+    vset_t          F = singleton (v);          // B := {v}
+    vset_t          B = singleton (v);          // F := {v}
+
+
+    //vset_least_fixpoint (F, F, group_next, nGrps);
+    reach_in (false, F, P);                     // F := Succ(F)
+    reach_in (true, B, P);                      // B := Pred(B)
+
+    vset_t          SCC = copy (B);
+    vset_intersect (SCC, F);                    // SCC := F n B
+    scc_count++;
+    report_scc_progress ();
+
+    vset_minus (P, F);
+    vset_minus (P, B);                          // P := P \ B \ F
+    vset_minus (F, SCC);                        // F := F \ SCC
+    vset_minus (B, SCC);                        // B := B \ SCC
+    vset_destroy (SCC);
+
+    queue (&P);                                 // FB (P)
+    queue (&F);                                 // FB (F)
+    queue (&B);                                 // FB (B)
+}
+
+static inline void converge (bool backward, vset_t N, vset_t Nfront, vset_t C, vset_t P);
+
+void
+scc_lock_step ()
+{
+    vset_t          P = *dequeue ();
+
+    trim (P);
+
+    if (vset_is_empty(P)) { vset_destroy (P); return; }
+
+    vset_random (P, v);                         // v in P
+    vset_t          F = singleton (v);          // F := {v}
+    vset_t          B = singleton (v);          // B := {v}
+    vset_t          Ffront  = copy  (F);        // Ff := F
+    vset_t          Bfront  = copy  (B);        // Bf := B
+
+    vset_t          Btemp   = empty ();
+    vset_t          Ftemp   = empty ();
+    while (!vset_is_empty(Bfront) && !vset_is_empty(Ffront)) {
+        add_step (true, Btemp, Bfront, P);      // Bf := Pred(Bf) n P
+        vset_minus (Btemp, B);                  // Bf := Bf \ B
+        vset_union (B, Btemp);                  // B := B U Bf
+        vset_copy  (Bfront, Btemp);
+        vset_clear (Btemp);
+
+        add_step (false, Ftemp, Ffront, P);     // Ff := Succ(Ff) n P
+        vset_minus (Ftemp, F);                  // Ff := Ff \ F
+        vset_union (F, Ftemp);                  // F := F U Ff
+        vset_copy  (Ffront, Ftemp);
+        vset_clear (Ftemp);
+    }
+    vset_destroy (Btemp);
+    vset_destroy (Ftemp);
+
+    // Complete of non-converged set (N) within converged set (C)
+    if (vset_is_empty(Bfront)) {
+        vset_destroy (Bfront);
+        converge (false, F, Ffront, B, P);
+    } else {
+        vset_destroy (Ffront);
+        converge (true,  B, Bfront, F, P);
+    }
+}
+
+static inline void
+converge (bool backward, vset_t N, vset_t Nfront, vset_t C, vset_t P)
+{
+    // Converge N
+    vset_t          Ntemp   = copy (Nfront);    // N' := Nf
+    vset_intersect (Ntemp, C);                  // N' := N' n C
+    while (!vset_is_empty (Ntemp)) {            // N' n C != {}
+        vset_clear (Ntemp);                     // N' := {}
+        add_step (backward, Ntemp, Nfront, P);  // N' := XXXX(Nf) n P
+        vset_minus (Ntemp, N);                  // N' := N' \ N
+        vset_union (N, Ntemp);                  // N  := N U N'
+        vset_copy  (Nfront, Ntemp);             // Nf := N'
+        vset_intersect (Ntemp, C);              // N' := N' n C
+    }
+    vset_destroy (Ntemp);
+    vset_destroy (Nfront);
+
+    // The SCC containing v
+    vset_t          SCC = copy  (C);
+    vset_intersect (SCC, N);                    // SCC := C n N
+    scc_count++;
+    report_scc_progress ();
+
+    // Recursive calls
+    vset_minus (P, C);                          // P := P \ C
+    vset_minus (C, SCC);                        // C := C \ SCC
+    vset_destroy (SCC);
+
+    queue (&C);                                 // LockStep (C)
+    queue (&P);                                 // LockStep (P)
+}
+
+//  Construct Forward Skeleton <F, Sn, Nn>
+void
+skel_forward (vset_t V, vset_t N, vset_t F, vset_t Sn, vset_t Nn)
+{
+    HREassert (dfs_stack_size(T) == 0);
+    HREassert (!vset_is_empty(N));
+
+    vset_t          L = copy  (N);              // L  := N
+    vset_t          Ltemp = empty ();           // Lf := {}
+    while (!vset_is_empty(L)) {
+        dfs_stack_push (T, (int *)&L);          // Push(T, L)
+        vset_union (F, L);                      // F  := F U L
+        add_step (false, Ltemp, L, V);          // Lf := Succ(L) n V
+        L = copy  (Ltemp);                      // L  := Lf
+        vset_minus (L, F);                      // L  := L \ F
+        vset_clear (Ltemp);                     // Lf := {}
+    }
+    vset_destroy (L);
+
+    L = *(vset_t *) dfs_stack_pop (T);          // L  := Pop(T)
+    vset_random (L, v);                         // v  in L
+    vset_add (Sn, v);                           // Sn := {v}
+    vset_add (Nn, v);                           // Nn := {v}
+    HREassert (vset_is_empty(Sn) || !vset_is_empty(Nn), "Unexpected lack of skeleton predecessor");
+    vset_destroy (L);
+    while (dfs_stack_size(T) != 0) {
+        L = *(vset_t *) dfs_stack_pop (T);      // L  := Pop(T)
+        add_step (true, Ltemp, Sn, L);          // Lf := Pred(Sn) n L
+        HREassert (!vset_is_empty(Ltemp), "Unexpected lack of skeleton predecessor");
+        vset_random (Ltemp, v);                 // v in Lf
+        vset_add (Sn, v);                       // Sn := Sn U {v}
+        vset_clear (Ltemp);                     // Lf := {}
+        vset_destroy (L);
+    }
+    vset_destroy (Ltemp);
+
+    HREassert (!vset_is_empty(Nn));
+}
+
+void
+sscc ()
+{
+    vset_t         *A = dequeue ();
+    // previous Forward Skeleton <V, S, N>
+    vset_t          V = A[0];
+    vset_t          S = A[1];
+    vset_t          N = A[2];
+
+    trim (V);
+
+    if (vset_is_empty(V)) {                     // V = {}
+        vset_destroy (V);
+        vset_destroy (S);
+        vset_destroy (N);
+        return;
+    }
+
+    if (vset_is_empty(S)) {                     // S = {}
+        vset_random (V, v);                     // v  in V
+        vset_add (N, v);                        // N  := {v}
+    }
+
+    vset_t          F = empty ();                // F  := {}
+    vset_t          Sn = empty ();               // Sn := {}
+    vset_t          Nn = empty ();               // Nn := {}
+    skel_forward (V, N, F, Sn, Nn);
+
+    // Construct SCC by going backward from N in F
+    vset_t          SCC = copy  (N);            // SCC := N
+    reach_in (true, SCC, F);                    // mu SCC. N U (Pred(SCC) n F)
+
+    // The SCC containing v
+    scc_count++;
+    report_scc_progress ();
+
+    // Recursive calls
+    vset_minus (V, F);                          // V := V \ F
+    vset_t           SCCp = copy (SCC);
+    vset_intersect (SCCp, S);                   // SCC' := SCC n S
+    vset_minus (S, SCC);                        // S' := S \ SCC
+    vset_clear (N);
+    add_step (true, N, SCCp, S);                // N := Pred(SCC n S) n S'
+    HREassert (vset_is_empty(S) || !vset_is_empty(N), "Unexpected lack of skeleton predecessor");
+    vset_destroy (SCCp);
+
+    vset_minus (F, SCC);
+    vset_minus (Sn, SCC);
+    vset_destroy (SCC);
+
+    A = queue (NULL);                                  // SSCC (C)
+    A[0] = V;
+    A[1] = S;
+    A[2] = N;
+    A = queue (NULL);                                  // SSCC (P)
+    A[0] = F;
+    A[1] = Sn;
+    A[2] = Nn;
+}
+
+void
+scc_detect (vset_t  P)
+{
+    Warning(info, "Initializing SCC dettection");
+    rt_timer_t t = RTcreateTimer();
+    RTstartTimer(t);
+    v = RTmalloc (sizeof(int[N]));
+    stack = dfs_stack_create (INT_SIZE(sizeof(vset_t[LENGTH[sccs]])));
+
+    // Initialization
+    vset_t         *A = queue (NULL);
+    switch (sccs) {
+    case 1: A[0] = copy (P); break;
+    case 2: A[0] = copy (P); break;
+    case 3:
+        T = dfs_stack_create (INT_SIZE(sizeof(vset_t)));
+        vset_t          V = empty ();                // V := {}
+        vset_t          S = empty ();                // S := {}
+        vset_t          N = empty ();                // N := {}
+        skel_forward (P, initial, V, S, N);
+        HREassert (vset_equal(V, P), "Divergent reachability in initial skeleton construction for SCC detection");
+        A[0] = V; // copy  (P);
+        A[1] = S; // empty ();
+        A[2] = N; // empty ();
+        break;
+    default: Abort ("Unimplemented SCC detection function %d", sccs);
+    }
+    RTstopTimer(t);
+    Warning (info, " ");
+    RTprintTimer(infoShort, t, "SCC initialization took");
+
+    // SCC detection
+    RTresetTimer (t);
+    RTstartTimer(t);
+    while (dfs_stack_size(stack) != 0) {
+        switch (sccs) {
+        case 1: scc_fb ();          break;
+        case 2: scc_lock_step ();   break;
+        case 3: sscc ();            break;
+        default: Abort ("Unimplemented SCC detection function %d", sccs);
+        }
+    }
+    RTstopTimer(t);
+
+    Warning (info, " ");
+    Warning (info, "SCCs count: %zu", scc_count);
+    RTprintTimer(infoShort, t, "SCC detection took");
+    Warning (info, " ");
+}
+
 static array_manager_t mu_var_man = NULL;
 static vset_t* mu_var = NULL;
+
 
 /* Naive textbook mu-calculus algorithm
  * Taken from:
@@ -3205,17 +3584,10 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
         break;
     case MU_EXIST: { // E
         if (mu_expr->arg1->token == MU_NEXT) {
-            vset_t temp = vset_create(domain, -1, NULL);
             result = vset_create(domain, -1, NULL);
             vset_t g = mu_compute(mu_expr->arg1->arg1, visited);
 
-            for(int i=0;i<nGrps;i++){
-                vset_prev(temp,g,group_next[i],visited);
-                reduce(i, temp);
-                vset_union(result,temp);
-                vset_clear(temp);
-            }
-            vset_destroy(temp);
+            add_step (true, result, g, visited);
         } else {
             Abort("invalid operator following MU_EXIST, expecting MU_NEXT");
         }
@@ -3248,17 +3620,9 @@ mu_compute (ltsmin_expr_t mu_expr, vset_t visited)
             vset_minus(notphi, phi);
             vset_destroy(phi);
 
-            vset_t temp = vset_create(domain, -1, NULL);
-            vset_t prev = vset_create(domain, -1, NULL);
-
             // EX !phi
-            for(int i=0;i<nGrps;i++){
-                vset_prev(temp,notphi,group_next[i],visited);
-                reduce(i, temp);
-                vset_union(prev,temp);
-                vset_clear(temp);
-            }
-            vset_destroy(temp);
+            vset_t prev = vset_create(domain, -1, NULL);
+            add_step (true, prev, notphi, visited);
 
             // and negate result again
             vset_minus(result, prev);
@@ -3548,7 +3912,6 @@ VOID_TASK_1(actual_main, void*, arg)
     }
 
     int *src;
-    vset_t initial;
 
     if (transitions_load_filename != NULL) {
         FILE *f = fopen(transitions_load_filename, "r");
@@ -3663,8 +4026,10 @@ VOID_TASK_1(actual_main, void*, arg)
     vset_copy(visited, initial);
     CALL(run_reachability, visited, files[1], timer);
 
+    if (sccs) scc_detect (visited);
+
     /* report states */
-    final_stat_reporting(visited, timer);
+    final_stat_reporting (visited, timer);
 
     /* save vset/vrel data */
     if (transitions_save_filename != NULL) {
