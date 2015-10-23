@@ -54,7 +54,9 @@ struct poptOption group_options[] = {
     { "mh-timeout", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &mh_timeout, 0, "timeout for metaheuristic algorithms (-1 = no timeout)", "<seconds>" },
     { "row-perm", 0, POPT_ARG_STRING, &row_perm, 0, "apply row permutation (R is a row number)", "<(R,)+>" },
     { "col-perm", 0, POPT_ARG_STRING, &col_perm, 0, "apply column permutation (C is a column number)", "<(C,)+>" },
+#if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
     { "graph-metrics", 0, POPT_ARG_NONE, &graph_metrics, 0, "print metrics of the symmetrized dependency matrix", NULL },
+#endif
     POPT_TABLEEND
 };
 

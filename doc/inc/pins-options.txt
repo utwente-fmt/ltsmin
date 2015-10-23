@@ -29,13 +29,32 @@ dependency matrix.  The following transformations _T_ are available:
 
 include::regroup-options.txt[]
 
-*--row-perm*='perm'::
-    Apply row permutation 'perm', where 'perm' is a sequence of row numbers, separated by a comma.
+*--row-perm*='PERM'::
+    Apply row permutation 'PERM', where 'PERM' is a sequence of row numbers, separated by a comma.
     E.g. the vector 2,1,0 will swap row 2 with row 0.
     
-*--col-perm*='perm'::
-    Apply column permutation 'perm', where 'perm' is a sequence of column numbers, separated by a comma.
+*--col-perm*='PERM'::
+    Apply column permutation 'PERM', where 'PERM' is a sequence of column numbers, separated by a comma.
     E.g. the vector 2,1,0 will swap column 2 with column 0.
+    
+*--col-ins*='PAIRS'::
+    Insert columns before other columns in the dependency matrix.
++
+'PAIRS' is a comma-separated sequence of pairs '<(C.C',)+>'.
+E.g. *--col-ins=1.0* will insert column *1* before column *0*.
+Each pair contains a source column *C* and a target column *C'*. During the application of the whole
+sequence, *C* will always be the column number that corresponds with the column before the application of the whole sequence.
+The column number *C'* will always be the column during the application of the whole sequence. This means that
+in for example *--col-ins=2.0,1.0*, first column *2* is inserted at position *0*, then column *1* is inserted at position *0*.
+The result will be that the original column *2* will be at position *1*.
+Another important detail is that when *--col-ins* is used, all source columns will temporarily be "removed"
+during reordering from the dependency matrix, i.e. when the *-r*,*--regroup* option is given. After reordering
+is done, the columns will be inserted at the desired target position. In other words, reordering algorithms
+given by the option *-r*,*--regroup*, will only be applied on the dependency matrix with source columns removed.
++
+
+*--graph-metrics*::
+    Print Boost's and ViennaCL's graph metrics (only available when LTSmin is compiled with Boost or ViennaCL).
 
 *--mucalc*='FILE'|'FORMULA'::
     Compute a parity game for the mu-calculus formula.
