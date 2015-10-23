@@ -564,25 +564,23 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
     find_trace(trace_end, 2, global_level, levels, action);
 }
 
-struct guard_add_info
+static void
+guard_enum_cb (void *context, int *src)
 {
-    int guard; // guard number being evaluated
-    int result; // desired result of the guard
-};
+    int         guard = *(int *) context;
 
-static void eval_cb (vset_t set, void *context, int *src)
-{
     // evaluate the guard
-    int result = GBgetStateLabelShort(model, ((struct guard_add_info*)context)->guard, src);
+    int result = GBgetStateLabelShort(model, guard, src);
 
-    // add to the correct set dependening on the result
-    int dresult = ((struct guard_add_info*)context)->result;
-    if (
-            dresult == result ||  // we have true or false (just add)
-            (dresult == 0 && result == 2) ||  // always add maybe to false
-            (dresult == 1 && result == 2 && !no_soundness_check)) { // if we want to do soundness
-            vset_add(set, src);                                     // check then also add maybe to true.
-                                                                    // maybe = false \cap true
+    switch (result) {
+    case 0: vset_add (guard_false[guard], src); break;
+    case 1: vset_add (guard_true[guard], src); break;
+    case 2:
+        vset_add (guard_false[guard], src);
+        if (!no_soundness_check)
+            vset_add (guard_true[guard], src);
+        break;
+    default: Abort ("Unexpected guard value: %d", result);
     }
 }
 
@@ -608,22 +606,7 @@ VOID_TASK_2(eval_guard, int, guard, vset_t, set)
 
     }
 
-    // we evaluate guards twice, because we can not yet add to two different sets.
-    struct guard_add_info ctx_false;
-
-    ctx_false.guard = guard;
-    ctx_false.result = 0;
-
-    // evaluate guards and add to guard_false[guard] when false
-    vset_update(guard_false[guard], guard_tmp[guard], eval_cb, &ctx_false);
-
-    struct guard_add_info ctx_true;
-
-    ctx_true.guard = guard;
-    ctx_true.result = 1;
-
-    // evaluate guards and add to guard_true[guard] when true
-    vset_update(guard_true[guard], guard_tmp[guard], eval_cb, &ctx_true);
+    vset_enum (guard_tmp[guard], guard_enum_cb, &guard);
 
     vset_clear(guard_tmp[guard]);
 }
