@@ -1277,7 +1277,7 @@ dm_optimize(matrix_t* m)
             best_i = best_j = 0;
         }
     }
-    DMDBG (printf ("cost: %d ", dm_event_span(m, NULL)));
+    DMDBG (printf ("cost: %f ", dm_event_span(m, NULL)));
 }
 
 static inline void
@@ -1381,7 +1381,7 @@ dm_all_perm(matrix_t* m)
     }
     DMDBG (printf ("current:"));
     DMDBG (current_all_perm_ (perm, len));
-    DMDBG (printf ("cost: %d ", dm_event_span(m, NULL)));
+    DMDBG (printf ("cost: %f ", dm_event_span(m, NULL)));
 }
 
 void
@@ -1703,7 +1703,7 @@ dm_weighted_event_span(const matrix_t* const m, int* const spans)
 
     double res = 0;
     for (int i = 0; i < dm_nrows(m); i++) {
-        res += ((double) (dm_ncols(m) - dm_first(m, i)) / (dm_ncols(m) / 2.0)) * (double) (s[i] / ((double) dm_nrows(m) * dm_ncols(m)));
+        res += ((double) (dm_ncols(m) - dm_first(m, i)) / (dm_ncols(m) / 2.0)) * (double) s[i];
     }
 
     if (spans == NULL) {
