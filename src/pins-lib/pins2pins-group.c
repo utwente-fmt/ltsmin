@@ -558,11 +558,15 @@ print_event_span(const matrix_t* const m)
 
     const double es = dm_event_span(m, row_spans);
 
+    const double wes = dm_weighted_event_span(m, row_spans);
+
     printf("Event Span: %.*g\n", DBL_DIG, es);
     printf("Normalized Event Span: %.*g\n",
         (int) ceil(log10(es)), es / (dm_ncols(m) * (double) dm_nrows(m)));
     printf("Weighted Event Span, moment 1 (WES^1): %.*g\n",
-        (int) ceil(log10(dm_ncols(m))), dm_weighted_event_span(m, row_spans));
+        (int) ceil(log10(dm_ncols(m))), wes);
+    printf("Normalized Weighted Event Span, moment 1: %.*g\n",
+        (int) ceil(log10(dm_ncols(m))), wes / (dm_ncols(m) * (double) dm_nrows(m)));
 
     RTfree(row_spans);
 }
