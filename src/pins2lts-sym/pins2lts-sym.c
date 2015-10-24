@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <limits.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
+#include <mc-lib/bitvector-ll.h>
 #include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
 #include <util-lib/dynamic-array.h>
@@ -70,9 +72,7 @@ static int   ErrorActions = 0; // count number of found errors (action/deadlock/
 static int   precise = 0;
 static int   next_union = 0;
 
-static uint64_t *seen_actions = 0;
-static int seen_actions_size = 0;
-static int* seen_actions_warning = 0;
+static bitvector_ll_t *seen_actions;
 
 static int   sat_granularity = 10;
 static int   save_sat_levels = 0;
@@ -1072,31 +1072,17 @@ struct group_add_info {
     struct trace_action *trace_action;
 };
 
-static void
-seen_actions_prepare(int count)
-{
-    seen_actions = (uint64_t*)RTalignZero(8, sizeof(uint64_t) * ((count+63)/64));
-    seen_actions_size = count;
-    seen_actions_warning = RTmallocZero(sizeof(int));
-    Print(infoLong, "Prepare action cache for %d action labels.", seen_actions_size);
-}
-
 static int
-seen_actions_test(int idx)
+seen_actions_test (int idx)
 {
-    if (idx >= seen_actions_size) {
-        if (cas(seen_actions_warning, 0, 1)) {
-            Warning(info, "Warning: Action cache full. Caching currently limited to %d labels.", seen_actions_size);
+    int size = BVLLget_size(seen_actions);
+    if (idx >= size - 1) {
+        if (BVLLtry_set_sat_bit(seen_actions, size-1, 0)) {
+            Warning(info, "Warning: Action cache full. Caching currently limited to %d labels.", size-1);
         }
         return 1;
     }
-    volatile uint64_t *p = seen_actions+(idx/64);
-    const uint64_t m = 1ULL<<(idx&63);
-    for (;;) {
-        uint64_t v = *p;
-        if (v & m) return 0;
-        if (cas(p, v, v|m)) return 1;
-    }
+    return BVLLtry_set_sat_bit(seen_actions, idx, 0);
 }
 
 static void
@@ -3654,8 +3640,10 @@ init_action_detection()
 {
     if (act_label == -1)
         Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-    int count = 256; // GBchunkCount(model, action_typeno);
-    seen_actions_prepare(count);
+    int count = 8; // GBchunkCount(model, action_typeno);
+    // create vector with 2 values per bucket, i.e. one bit per bucket
+    Print(infoLong, "Preparing action cache for %zu action labels.", (size_t)(1ULL << count)-1);
+    seen_actions = BVLLcreate (2, count);
     Warning(info, "Detecting actions with prefix \"%s\"", act_detect);
 }
 
