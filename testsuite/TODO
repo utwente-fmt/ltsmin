@@ -3,7 +3,6 @@ The test suite needs still to be extended with:
 * tests for the distributed tools using --mpi, --workers and --procs.
     The distributed backend is tested in alg_backends_*, but without parallelism.
     See also the HAVE_POSIX flag in Makefile.am 
-* Optional multi-core backend tests. See HAVE_ATOMICS in configure.ac
 * More fine-grained dependencies. See Makefile.am, e.g. lts_generation can be
      executed partly without CADP or Mcrl2.
 * Integration of src/tests/test-* binaries
