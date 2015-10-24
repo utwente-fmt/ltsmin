@@ -106,7 +106,7 @@ int main()
     exit(0);
 }
 ]])], [POSIX_SHARED=yes], [POSIX_SHARED=no
-    AC_MSG_WARN([No POSIX support found.])])
+    AC_MSG_FAILURE([No POSIX support found.])])
 AC_LANG_RESTORE
 
 dnl Checks for programs.
@@ -339,7 +339,7 @@ AX_CHECK_FUNC_INCLUDE([],[__sync_synchronize],
   [__sync_synchronize()],
   [],[acx_atomics=no])
 if test x"$acx_atomics" != "xyes"; then
-  AC_MSG_WARN([no acceptable atomic operations found.])
+  AC_MSG_FAILURE([no acceptable atomic operations found.])
 fi
 
 have_opaal="yes"
@@ -388,29 +388,7 @@ if test "x$with_scoop" == xyes; then
     [have_scoop="yes"]
 fi
 
-AX_BOOST_BASE([1.46],[have_boost="yes"],)
-AX_PATH_VIENNACL(1.5.1, no)
-if (test x$HAVE_VIENNACL = x1); then
-    have_viennacl="yes"
-else
-    AC_MSG_WARN([no acceptable ViennaCL installation found.])
-fi
-
-AM_PATH_XML2(,[have_xml2="yes"],[AC_MSG_WARN([No acceptable libxml2 installation found.])])
-
-AC_ARG_WITH([prob],[AS_HELP_STRING([--with-prob],[Compile ProB front-end])],[],[with_prob=yes])
-AS_IF([test x"$with_prob" = "xyes"],[AX_ZMQ([3.0.0])])
-AS_IF([test x"$HAVE_ZMQ" = "x1"],[AX_CZMQ(,[
-    acx_prob=yes
-    PROB_CPPFLAGS="$CZMQ_CPPFLAGS $ZMQ_CPPFLAGS"
-    PROB_LDFLAGS="$CZMQ_LDFLAGS $ZMQ_LDFLAGS"
-    PROB_LIBS="$CZMQ_LIBS $ZMQ_LIBS"
-    AC_SUBST(PROB_CPPFLAGS)
-    AC_SUBST(PROB_LDFLAGS)
-    AC_SUBST(PROB_LIBS)
-])])
-
-AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
+#AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
 AS_IF([test x"$have_sylvan" = "xyes"], [AC_DEFINE([HAVE_SYLVAN], [1], [Define if using sylvan.])])
@@ -433,7 +411,7 @@ AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 AM_CONDITIONAL([HAVE_DVE], [true])    dnl can be built unconditionally
 AM_CONDITIONAL([HAVE_SPINS], [true])
 AM_CONDITIONAL([HAVE_SPINS_COMPILER], [test x"$acx_spins" = "xyes"])
-AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
+#AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
 AM_CONDITIONAL([HAVE_PROFILER], [test x"$acx_profiler" = xyes])
@@ -523,7 +501,7 @@ Configuration:
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc/happy/ghc-pkg/hashmap/deepseq could not be found}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
-    SYLVAN   = ${have_sylvan:-NO, only on 64-bit systems (override with --with-sylvan)}
+    SYLVAN   = ${have_sylvan:-NO, building without Sylvan/LDD-MC support}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}

@@ -40,9 +40,6 @@ if HAVE_OPAAL_COMPILER
 DEJATOOL +=	alg_backends_opaal
 endif
 
-if HAVE_POSIX
-# the following tools all require --procs=
-
 if HAVE_LIBMCRL2
 DEJATOOL +=	alg_backends_lps
 DEJATOOL +=	alg_backends_pbes
@@ -65,4 +62,3 @@ if HAVE_SCOOP
 DEJATOOL += alg_backends_mapa
 endif
 
-endif
