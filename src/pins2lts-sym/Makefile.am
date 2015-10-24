@@ -2,6 +2,7 @@ HRE_LIB = ../hre/libhre.la
 SYM_CPP_FLAGS = $(AM_CPPFLAGS) $(PROFILER_CPPFLAGS)
 SYM_LD_FLAGS = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
 PINS_LIBS  =
+PINS_LIBS += ../mc-lib/libmc.la
 PINS_LIBS += ../lts-io/liblts-io.la
 PINS_LIBS += ../hre-io/libhre-io.la
 PINS_LIBS += $(HRE_LIB)

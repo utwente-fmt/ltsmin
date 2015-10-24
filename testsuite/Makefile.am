@@ -40,9 +40,6 @@ if HAVE_OPAAL_COMPILER
 DEJATOOL +=	alg_backends_opaal
 endif
 
-if HAVE_POSIX
-# the following tools all require --procs=
-
 if HAVE_LIBMCRL2
 DEJATOOL +=	alg_backends_lps
 DEJATOOL +=	alg_backends_pbes
@@ -51,6 +48,4 @@ endif
 if HAVE_LIBMCRL
 # Test disabled due to bug in mcrl path parsing
 DEJATOOL +=	alg_backends_lpo
-endif
-
 endif

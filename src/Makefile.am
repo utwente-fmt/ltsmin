@@ -74,17 +74,14 @@ SUBDIRS += spg-lib
 
 SUBDIRS += spg
 
-if HAVE_SYLVAN
-SUBDIRS += pins2lts-sym
-endif
-
-if HAVE_ATOMICS
 # multi-core lib, lockless data structures and a load balancer
 SUBDIRS += mc-lib
 
+if HAVE_SYLVAN
+SUBDIRS += pins2lts-sym
+endif
 SUBDIRS += pins2lts-mc
 SUBDIRS += pins2lts-seq
-endif
 
 SUBDIRS += scripts
 SUBDIRS += tests
