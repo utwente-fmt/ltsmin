@@ -1,0 +1,753 @@
+#include <config.h>
+
+#include <assert.h>
+#include <ctype.h>
+#include <limits.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+
+#include <dm/dm.h>
+#include <hre/stringindex.h>
+#include <hre/unix.h>
+#include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
+#include <mc-lib/atomics.h>
+#include <pins-lib/pnml-pins.h>
+
+#define NUM_TRANSS SIgetCount(context->pnml_transs)
+#define NUM_PLACES SIgetCount(context->pnml_places)
+#define NUM_ARCS SIgetCount(context->pnml_arcs)
+
+static void
+pnml_popt(poptContext con,
+         enum poptCallbackReason reason,
+         const struct poptOption* opt,
+         const char* arg, void* data)
+{
+    (void) con; (void) opt; (void) arg; (void) data;
+    switch(reason){
+    case POPT_CALLBACK_REASON_PRE:
+        break;
+    case POPT_CALLBACK_REASON_POST:
+        GBregisterLoader("pnml", PNMLloadGreyboxModel);
+        return;
+    case POPT_CALLBACK_REASON_OPTION:
+        break;
+    }
+    Abort("unexpected call to pnml_popt");
+}
+
+struct poptOption pnml_options[]= {
+    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)&pnml_popt, 0 , NULL , NULL },
+    POPT_TABLEEND
+};
+
+typedef enum { ARC_IN, ARC_OUT, ARC_LAST } arc_dir_t;
+
+typedef struct arc {
+    int transition;
+    int place;
+    uint32_t num;
+    arc_dir_t type;
+} arc_t;
+
+typedef struct transition {
+    int start;
+    int in_arcs;
+    int out_arcs;
+} transition_t;
+
+typedef struct pnml_context {
+    xmlChar* name;
+    int num_safe_places;
+    bitvector_t safe_places;
+    transition_t* transitions;
+    arc_t* arcs;
+
+    string_index_t pnml_places;
+    string_index_t pnml_transs;
+    string_index_t pnml_arcs;
+
+    xmlNode* toolspecific;
+    uint8_t safe;
+
+    guard_t** guards_info;
+    int num_guards;
+    arc_t** guards; // not allowed to access transition!
+    int num_in_arcs;
+} pnml_context_t;
+
+static uint32_t max_token_count = 0;
+
+static void
+pnml_exit(model_t model)
+{
+    (void) model;
+    Warning(info, "max token count: %u", max_token_count);
+}
+
+static int
+get_successor_long(void* model, int t, int* in, void
+(*callback)(void* arg, transition_info_t* transition_info, int* out, int* cpy), void* arg)
+{
+    pnml_context_t* context = GBgetContext(model);
+
+    uint32_t out[NUM_PLACES];
+    memcpy(out, in, sizeof(int[NUM_PLACES]));
+
+    int overflown = 0;
+    uint32_t max = 0;
+    for (arc_t* arc = context->arcs + context->transitions[t].start; arc->transition == t; arc++) {
+        switch(arc->type) {
+            case ARC_IN: {
+                // check precondition
+                if (out[arc->place] - arc->num > out[arc->place]) return 0; // underflow (token count < 0)
+
+                // remove tokens
+                out[arc->place] -= arc->num;
+            }
+            break;
+            case ARC_OUT: {
+                // establish postcondition
+                if (!bitvector_is_set(&(context->safe_places), arc->place)) {
+
+                    // detect overflow and report later (only if transition is enabled)
+                    overflown |= out[arc->place] > UINT32_MAX - arc->num;
+
+                    // add tokens
+                    out[arc->place] += arc->num;
+
+                    // record max token count
+                    if (out[arc->place] > max) max = out[arc->place];
+                } else out[arc->place] = 1;
+            }
+            break;
+            case ARC_LAST: break;
+        }
+    }
+
+    if (overflown) Abort("max token count exceeded");
+
+    volatile uint32_t* ptr;
+    do {
+        ptr = &max_token_count;
+        if (max <= *ptr) break;
+    } while (!cas(ptr, *ptr, max));
+
+    transition_info_t transition_info = { (int[1]) { t }, t, 0 };
+    callback(arg, &transition_info, (int*) out, NULL);
+
+    return 1;
+}
+
+static int
+get_successor_short(void* model, int t, int* in, void
+(*callback)(void* arg, transition_info_t* transition_info, int* out, int* cpy), void* arg)
+{
+    pnml_context_t* context = GBgetContext(model);
+
+    HREassert(context->num_safe_places == 0, "get_successor_short not compatible with safe places");
+
+    const int num_writes = dm_ones_in_row(GBgetDMInfoMustWrite(model), t);
+
+    uint32_t out[num_writes];
+    memcpy(out, in, sizeof(int[num_writes]));
+    uint32_t* place = out;
+
+    int overflown = 0;
+    uint32_t max = 0;
+    for (arc_t* arc = context->arcs + context->transitions[t].start; arc->transition == t; arc++) {
+        switch(arc->type) {
+            case ARC_IN: {
+                // check precondition
+                if (*place - arc->num > *place) return 0; // underflow (token count < 0)
+
+                // remove tokens
+                *place -= arc->num;
+            }
+            break;
+            case ARC_OUT: {
+                // establish postcondition
+
+                // detect overflow and report later (only if transition is enabled)
+                overflown |= *place > UINT32_MAX - arc->num;
+
+                // add tokens
+                *place += arc->num;
+
+                // record max token count
+                if (*place > max) max = *place;
+            }
+            break;
+            case ARC_LAST: break;
+        }
+        if (arc->place != (arc + 1)->place) place++;
+    }
+
+    if (overflown) Abort("max token count exceeded");
+
+    volatile uint32_t* ptr;
+    do {
+        ptr = &max_token_count;
+        if (max <= *ptr) break;
+    } while (!cas(ptr, *ptr, max));
+
+    transition_info_t transition_info = { (int[1]) { t }, t, 0 };
+    callback(arg, &transition_info, (int*) out, NULL);
+
+    return 1;
+}
+
+static int
+get_update_long(void* model, int t, int* in, void
+(*callback)(void* arg, transition_info_t* transition_info, int* out, int* cpy), void* arg)
+{
+    pnml_context_t* context = GBgetContext(model);
+
+    uint32_t out[NUM_PLACES];
+    memcpy(out, in, sizeof(int[NUM_PLACES]));
+
+    int overflown = 0;
+    uint32_t max = 0;
+    for (arc_t* arc = context->arcs + context->transitions[t].start; arc->transition == t; arc++) {
+        switch(arc->type) {
+            case ARC_IN: {
+                /* If there is an underflow then this transition is disabled,
+                 * while it should not be, since this is the update function. */
+                HREassert(out[arc->place] - arc->num <= out[arc->place], "transition should not have been disabled");
+
+                // remove tokens
+                out[arc->place] -= arc->num;
+            }
+            break;
+            case ARC_OUT: {
+                // establish postcondition
+                if (!bitvector_is_set(&(context->safe_places), arc->place)) {
+
+                    // detect overflow and report later (only if transition is enabled)
+                    overflown |= out[arc->place] > UINT32_MAX - arc->num;
+
+                    // add tokens
+                    out[arc->place] += arc->num;
+
+                    // record max token count
+                    if (out[arc->place] > max) max = out[arc->place];
+                } else out[arc->place] = 1;
+            }
+            break;
+            case ARC_LAST: break;
+        }
+    }
+
+    if (overflown) Abort("max token count exceeded");
+
+    volatile uint32_t* ptr;
+    do {
+        ptr = &max_token_count;
+        if (max <= *ptr) break;
+    } while (!cas(ptr, *ptr, max));
+
+    transition_info_t transition_info = { (int[1]) { t }, t, 0 };
+    callback(arg, &transition_info, (int*) out, NULL);
+
+    return 1;
+}
+
+static int
+get_update_short(void* model, int t, int* in, void
+(*callback)(void* arg, transition_info_t* transition_info, int* out, int* cpy), void* arg)
+{
+    pnml_context_t* context = GBgetContext(model);
+
+    HREassert(context->num_safe_places == 0, "get_update_short not compatible with safe places");
+
+    const int num_writes = dm_ones_in_row(GBgetDMInfoMustWrite(model), t);
+
+    uint32_t out[num_writes];
+    memcpy(out, in, sizeof(int[num_writes]));
+    uint32_t* place = out;
+
+    int overflown = 0;
+    uint32_t max = 0;
+    for (arc_t* arc = context->arcs + context->transitions[t].start; arc->transition == t; arc++) {
+        switch(arc->type) {
+            case ARC_IN: {
+                // check precondition
+
+                /* If there is an underflow then this transition is disabled,
+                 * while it should not be, since this is the update function. */
+                HREassert(*place - arc->num <= *place, "transition should not have been disabled");
+
+                // remove tokens
+                *place -= arc->num;
+            }
+            break;
+            case ARC_OUT: {
+                // establish postcondition
+
+                // detect overflow and report later (only if transition is enabled)
+                overflown |= *place > UINT32_MAX - arc->num;
+
+                // add tokens
+                *place += arc->num;
+
+                // record max token count
+                if (*place > max) max = *place;
+            }
+            break;
+            case ARC_LAST: break;
+        }
+        if (arc->place != (arc + 1)->place) place++;
+    }
+
+    if (overflown) Abort("max token count exceeded");
+
+    volatile uint32_t* ptr;
+    do {
+        ptr = &max_token_count;
+        if (max <= *ptr) break;
+    } while (!cas(ptr, *ptr, max));
+
+    transition_info_t transition_info = { (int[1]) { t }, t, 0 };
+    callback(arg, &transition_info, (int*) out, NULL);
+
+    return 1;
+}
+
+static int
+get_label_long(model_t model, int label, int* src) {
+    pnml_context_t* context = GBgetContext(model);
+    HREassert(label < context->num_guards, "unknown state label");
+    const arc_t* arc = context->guards[label];
+    return ((uint32_t) src[arc->place]) >= arc->num;
+}
+
+static int
+get_label_short(model_t model, int label, int* src) {
+    pnml_context_t* context = GBgetContext(model);
+    HREassert(label < context->num_guards, "unknown state label");
+    return ((uint32_t) src[0]) >= context->guards[label]->num;
+}
+
+static void
+get_labels(model_t model, sl_group_enum_t group, int* src, int* label) {
+    pnml_context_t* context = GBgetContext(model);
+    if (group == GB_SL_GUARDS || group == GB_SL_ALL) {
+        for (int i = 0; i < context->num_guards; i++) {
+            const arc_t* arc = context->guards[i];
+            label[i] = ((uint32_t) src[arc->place]) >= arc->num;
+        }
+    }
+}
+
+static void
+find_ids(xmlNode* a_node, pnml_context_t* context)
+{
+    for (xmlNode* node = a_node; node; node = node->next) {
+        if (node->type == XML_ELEMENT_NODE) {
+            if (xmlStrcmp(node->name, (const xmlChar*) "place") == 0) {
+                const xmlChar* id = xmlGetProp(node, (const xmlChar*) "id");
+                if (SIput(context->pnml_places, (char*) id) == SI_INDEX_FAILED) Abort("duplicate place");
+            } else if(xmlStrcmp(node->name, (const xmlChar*) "transition") == 0) {
+                const xmlChar* id = xmlGetProp(node, (const xmlChar*) "id");
+                if (SIput(context->pnml_transs, (char*) id) == SI_INDEX_FAILED) Abort("duplicate transition");
+            } else if(xmlStrcmp(node->name, (const xmlChar*) "arc") == 0) {
+                const xmlChar* id = xmlGetProp(node, (const xmlChar*) "id");
+                if (SIput(context->pnml_arcs, (char*) id) == SI_INDEX_FAILED) Abort("duplicate arc");
+            } else if(context->toolspecific == NULL && xmlStrcmp(node->name, (const xmlChar*) "toolspecific") == 0) context->toolspecific = node;
+        }
+        find_ids(node->children, context);
+    }
+}
+
+static void
+parse_toolspecific(xmlNode* a_node, pnml_context_t* context)
+{
+    for (xmlNode* node = a_node; node; node = node->next) {
+        if (node->type == XML_ELEMENT_NODE) {
+            if (xmlStrcmp(node->name, (const xmlChar*) "structure") == 0) {
+                xmlChar* val = xmlStrdup(xmlGetProp(node, (const xmlChar*) "safe"));
+                xmlChar* lower = val;
+                for ( ; *val; ++val) *val = tolower(*val);
+                context->safe = xmlStrcmp(lower, (const xmlChar*) "true") == 0;
+            } else if (xmlStrcmp(node->name, (const xmlChar*) "places") == 0 && context->safe) {
+                xmlChar* places = xmlStrdup(xmlNodeGetContent(node));
+                // weird format; change all newlines to spaces
+                for (size_t i = 0; i < strlen((char*) places); i++) {
+                    if (places[i] == '\n') places[i] = ' ';
+                }
+                char* place;
+                while ((place = strsep((char**) &places, " ")) != NULL) {
+                    if (strlen(place) == 0) continue; // weird again
+                    int num;
+                    if ((num = SIlookup(context->pnml_places, place)) == SI_INDEX_FAILED) Abort("missing place: %s", place);
+                    bitvector_set(&(context->safe_places), num);
+                    context->num_safe_places++;
+                }
+            }
+        }
+        parse_toolspecific(node->children, context);
+    }
+}
+
+static void
+parse_net(xmlNode* a_node, model_t model, uint32_t* init_state[])
+{
+    pnml_context_t* context = GBgetContext(model);
+    for (xmlNode* node = a_node; node; node = node->next) {
+        if (node->type == XML_ELEMENT_NODE) {
+            if (xmlStrcmp(node->name, (const xmlChar*) "text") == 0) {
+                const xmlChar* id = xmlGetProp(node->parent->parent, (const xmlChar*) "id");
+                if (xmlStrcmp(node->parent->name, (const xmlChar*) "name") == 0) {
+                    if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "net") == 0) context->name = xmlStrdup(xmlNodeGetContent(node));
+                    else if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "transition") == 0) {
+                        int num;
+                        if ((num = SIlookup(context->pnml_transs, (char*) id)) == SI_INDEX_FAILED) Abort("missing transition");
+                        GBchunkPutAt(model, lts_type_find_type(GBgetLTStype(model), "action"), chunk_str((char*) xmlNodeGetContent(node)), num);
+                    } else if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "place") == 0) {
+                        int num;
+                        if ((num = SIlookup(context->pnml_places, (char*) id)) == SI_INDEX_FAILED) Abort("missing place");
+                        lts_type_set_state_name(GBgetLTStype(model), num, (char*) xmlNodeGetContent(node));
+                    }
+                } else if (xmlStrcmp(node->parent->name, (const xmlChar*) "initialMarking") == 0) {
+                    int num;
+                    if ((num = SIlookup(context->pnml_places, (char*) id)) == SI_INDEX_FAILED) Abort("missing place");
+                    const uint32_t val = (uint32_t) atol((char*) xmlNodeGetContent(node));
+                    (*init_state)[num] = val;
+                    if (val > max_token_count) max_token_count = val;
+                } else if (xmlStrcmp(node->parent->name, (const xmlChar*) "inscription") == 0) {
+                    int num;
+                    if ((num = SIlookup(context->pnml_arcs, (char*) id)) == SI_INDEX_FAILED) Abort("missing arc");
+                    context->arcs[num].num = (uint32_t) atol((char*) xmlNodeGetContent(node));
+                }
+            } else if (xmlStrcmp(node->name, (const xmlChar*) "arc") == 0) {
+                int num;
+                const xmlChar* id = xmlGetProp(node, (const xmlChar*) "id");
+                if ((num = SIlookup(context->pnml_arcs, (char*) id)) == SI_INDEX_FAILED) Abort("missing arc");
+                context->arcs[num].num = 1;
+
+                const xmlChar* source = xmlGetProp(node, (const xmlChar*) "source");
+                const xmlChar* target = xmlGetProp(node, (const xmlChar*) "target");
+                int source_num;
+                int target_num;
+                if ((source_num = SIlookup(context->pnml_places, (char*) source)) != SI_INDEX_FAILED &&
+                    (target_num = SIlookup(context->pnml_transs, (char*) target)) != SI_INDEX_FAILED) {
+                    // this is an in arc
+                    context->arcs[num].transition = target_num;
+                    context->arcs[num].place = source_num;
+                    context->arcs[num].type = ARC_IN;
+                    context->transitions[target_num].in_arcs++;
+                    context->num_in_arcs++;
+
+                    dm_set(GBgetDMInfoRead(model), target_num, source_num);
+                    dm_set(GBgetDMInfoMustWrite(model), target_num, source_num);
+                    dm_set(GBgetDMInfo(model), target_num, source_num);
+                    dm_set(GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), target_num, source_num);
+                } else if ((source_num = SIlookup(context->pnml_transs, (char*) source)) != SI_INDEX_FAILED &&
+                    (target_num = SIlookup(context->pnml_places, (char*) target)) != SI_INDEX_FAILED) {
+                    // this is an out arc
+                    context->arcs[num].transition = source_num;
+                    context->arcs[num].place = target_num;
+                    context->arcs[num].type = ARC_OUT;
+                    context->transitions[source_num].out_arcs++;
+
+                    if (!bitvector_is_set(&(context->safe_places), target_num)) {
+                        dm_set(GBgetDMInfoRead(model), source_num, target_num);
+                        dm_set(GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), source_num, target_num);
+                    }
+                    dm_set(GBgetDMInfoMustWrite(model), source_num, target_num);
+                    dm_set(GBgetDMInfo(model), source_num, target_num);
+                } else Abort("incorrect net");
+            }
+        }
+        parse_net(node->children, model, init_state);
+    }
+}
+
+/*
+ * Sorts arcs:
+ *  1.  first in ascending order of transition number,
+ *  2.  then in ascending order of place number,
+ *  3.  then in-arcs before out-arcs
+ *
+ *  1.  is necessary for any next-state function,
+ *      so that it is known which arc belongs to which transition group, and
+ *      allows to put many arcs of a group on the CPU's cache line.
+ *  2.  is necessary for any short next-state function,
+ *      since we only work with short vectors; arc->place is useless.
+ *  3.  is necessary for any next-state function,
+ *      to check the precondition of a transition,
+ *      before establishing the postcondition.
+ */
+static int
+compare_arcs(const void *a, const void *b)
+{
+    const arc_t* aa = (const arc_t*) a;
+    const arc_t* ab = (const arc_t*) b;
+
+    if (aa->transition < ab->transition) return -1;
+    if (aa->transition > ab->transition) return 1;
+    if (aa->place < ab->place) return -1;
+    if (aa->place > ab->place) return 1;
+
+    if (aa->type != ab->type) return aa->type == ARC_IN ? -1 : 1;
+    return 0;
+}
+
+static void
+attach_arcs(pnml_context_t* context)
+{
+    if (NUM_TRANSS > 0) {
+        qsort(context->arcs, NUM_ARCS, sizeof(arc_t), compare_arcs);
+
+        context->guards_info = RTmalloc(NUM_TRANSS * sizeof(guard_t*));
+        guard_t* guards;
+        guards = RTmalloc(sizeof(int[NUM_TRANSS]) + sizeof(int[context->num_in_arcs]));
+        context->guards = RTmalloc(sizeof(arc_t*) * context->num_in_arcs);
+
+        string_index_t guard_unique = SIcreate();
+        for (arc_t* arc = context->arcs; arc->type != ARC_LAST; arc++) {
+            const int num = arc - context->arcs;
+            if (num == 0 || arc->transition != (arc - 1)->transition) {
+                context->transitions[arc->transition].start = num;
+
+                guards->count = 0;
+                context->guards_info[arc->transition] = guards;
+                guards += 1 + context->transitions[arc->transition].in_arcs;
+            }
+            if (arc->type == ARC_IN) {
+                const char* u = "%d%d";
+                char unique[snprintf(NULL, 0, u, arc->place, arc->num) + 1];
+                sprintf(unique, u, arc->place, arc->num);
+                int duplicate;
+                if ((duplicate = SIput(guard_unique, unique)) != SI_INDEX_FAILED) context->guards[duplicate] = arc;
+                context->guards_info[arc->transition]->guard[context->guards_info[arc->transition]->count++] = duplicate;
+            }
+        }
+        context->num_guards = SIgetCount(guard_unique);
+        SIdestroy(&guard_unique);
+        context->guards = RTrealloc(context->guards, sizeof(arc_t*) * context->num_guards);
+    }
+}
+
+void
+PNMLloadGreyboxModel(model_t model, const char* name)
+{
+    rt_timer_t t = RTcreateTimer();
+    RTstartTimer(t);
+
+    pnml_context_t* context = RTmallocZero(sizeof(pnml_context_t));
+    GBsetContext(model, context);
+
+    xmlDoc* doc = NULL;
+
+    LIBXML_TEST_VERSION
+
+    if ((doc = xmlReadFile(name, NULL, 0)) == NULL) Abort("Could not open file: %s", name);
+
+    context->pnml_places = SIcreate();
+    context->pnml_transs = SIcreate();
+    context->pnml_arcs = SIcreate();
+
+    Warning(infoLong, "Determining Petri net size");
+    xmlNode* node = xmlDocGetRootElement(doc);
+    find_ids(node, context);
+    Warning(info, "Petri net has %d places, %d transitions and %d arcs",
+        NUM_PLACES, NUM_TRANSS, NUM_ARCS);
+
+    if (bitvector_create(&(context->safe_places), NUM_PLACES) != 0) Abort("Out of memory");
+    bitvector_clear(&(context->safe_places));
+
+    Warning(infoLong, "Analyzing safe places");
+    if (context->toolspecific != NULL) parse_toolspecific(context->toolspecific, context);
+    Warning(info, "There are %d safe places", context->num_safe_places);
+
+    lts_type_t ltstype;
+    matrix_t* dm_info = RTmalloc(sizeof(matrix_t));
+    matrix_t* dm_read_info = RTmalloc(sizeof(matrix_t));
+    matrix_t* dm_must_write_info = RTmalloc(sizeof(matrix_t));
+    matrix_t* dm_update = RTmalloc(sizeof(matrix_t));
+
+    Warning(infoLong, "Creating LTS type");
+
+    // get ltstypes
+    ltstype = lts_type_create();
+
+    // adding types
+    int int_type = lts_type_add_type(ltstype, "int", NULL);
+    int act_type = lts_type_add_type(ltstype, "action", NULL);
+
+    lts_type_set_format(ltstype, int_type, LTStypeDirect);
+    lts_type_set_format(ltstype, act_type, LTStypeEnum);
+
+    lts_type_set_state_length(ltstype, NUM_PLACES);
+
+    // edge label types
+    lts_type_set_edge_label_count(ltstype, 1);
+    lts_type_set_edge_label_name(ltstype, 0, "action");
+    lts_type_set_edge_label_type(ltstype, 0, "action");
+    lts_type_set_edge_label_typeno(ltstype, 0, act_type);
+
+    const int bool_type = lts_type_add_type(ltstype, LTSMIN_TYPE_BOOL, NULL);
+
+    for (int i = 0; i < NUM_PLACES; ++i) {
+        lts_type_set_state_typeno(ltstype, i, int_type);
+        lts_type_set_state_name(ltstype, i, "tmp");
+    }
+
+    GBsetLTStype(model, ltstype); // must set ltstype before setting initial state
+                                  // creates tables for types!
+
+    GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
+    GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE ), 1);
+
+    dm_create(dm_info, NUM_TRANSS, NUM_PLACES);
+    dm_create(dm_read_info, NUM_TRANSS, NUM_PLACES);
+    dm_create(dm_must_write_info, NUM_TRANSS, NUM_PLACES);
+    dm_create(dm_update, NUM_TRANSS, NUM_PLACES);
+
+    GBsetDMInfo(model, dm_info);
+    GBsetDMInfoRead(model, dm_read_info);
+    GBsetDMInfoMustWrite(model, dm_must_write_info);
+    GBsetSupportsCopy(model);
+    GBsetMatrix(model, LTSMIN_MATRIX_ACTIONS_READS, dm_update,
+        PINS_MAY_SET, PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+
+    context->arcs = RTalignZero(CACHE_LINE_SIZE, sizeof(arc_t[NUM_ARCS + 1]));
+    context->arcs[NUM_ARCS].type = ARC_LAST;
+    context->arcs[NUM_ARCS].transition = -1;
+    context->arcs[NUM_ARCS].place = -1;
+    context->transitions = RTmallocZero(sizeof(transition_t[NUM_TRANSS]));
+
+    Warning(infoLong, "Analyzing Petri net behavior");
+    node = xmlDocGetRootElement(doc);
+    uint32_t* init_state = RTmallocZero(sizeof(uint32_t[NUM_PLACES]));
+    parse_net(node, model, &init_state);
+    Warning(info, "Petri net %s analyzed", name);
+    GBsetInitialState(model, (int*) init_state);
+    RTfree(init_state);
+
+    xmlFreeDoc(doc);
+
+    attach_arcs(context);
+
+    lts_type_set_state_label_count (ltstype, context->num_guards);
+    matrix_t* sl_info = RTmalloc(sizeof(matrix_t));
+    dm_create(sl_info, context->num_guards, NUM_PLACES);
+
+    for (int i = 0; i < context->num_guards; i++) {
+        const arc_t* arc = context->guards[i];
+        const char* g = "guard_%s_ge_%d";
+        char label_name[snprintf(NULL, 0, g, SIget(context->pnml_places, arc->place), arc->num) + 1];
+        sprintf(label_name, g, SIget(context->pnml_places, arc->place), arc->num);
+        lts_type_set_state_label_name (ltstype, i, label_name);
+        lts_type_set_state_label_typeno (ltstype, i, bool_type);
+        dm_set(sl_info, i, arc->place);
+    }
+    GBsetStateLabelInfo(model, sl_info);
+
+    // set the label group implementation
+    sl_group_t* sl_group_all = RTmalloc(sizeof(sl_group_t) + context->num_guards * sizeof(int));
+    sl_group_all->count = context->num_guards;
+    for(int i = 0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
+    GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
+
+    sl_group_t* sl_group_guards = RTmalloc(sizeof(sl_group_t) + context->num_guards * sizeof(int));
+    sl_group_guards->count = context->num_guards;
+    for(int i = 0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i;
+    GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guards);
+
+    GBsetGuardsInfo(model, context->guards_info);
+
+    GBsetStateLabelLong(model, get_label_long);
+    GBsetStateLabelShort(model, get_label_short);
+
+    GBsetStateLabelsGroup(model, get_labels);
+
+    // get next state
+    GBsetNextStateLong(model, (next_method_grey_t) get_successor_long);
+    GBsetActionsLong(model, (next_method_grey_t) get_update_long);
+    if (context->num_safe_places == 0) {
+        GBsetNextStateShort(model, (next_method_grey_t) get_successor_short);
+        GBsetActionsShort(model, (next_method_grey_t) get_update_short);
+    } else Warning(infoLong, "Since this net has 1-safe places, short next-state functions are not used");
+
+    GBsetExit(model, pnml_exit);
+
+    lts_type_validate(ltstype);
+
+    if (PINS_POR) {
+        Warning(infoLong, "Creating Do Not Accord matrix");
+        matrix_t* dna_info = RTmalloc(sizeof(matrix_t));
+        dm_create(dna_info, NUM_TRANSS, NUM_TRANSS);
+        for (int i = 0; i < NUM_TRANSS; i++) {
+            for (int j = 0; j < NUM_TRANSS; j++) {
+                for (arc_t* arc_i = context->arcs + context->transitions[i].start; arc_i->transition == i; arc_i++) {
+                    if (arc_i->type != ARC_IN) continue;
+                    for (arc_t* arc_j = context->arcs + context->transitions[j].start; arc_j->transition == j; arc_j++) {
+                        if (arc_i->type != ARC_IN) continue;
+                        if (arc_i->place == arc_j->place) {
+                            dm_set(dna_info, i, j);
+                            goto next_dna;
+                        }
+                    }
+                }
+                next_dna: ;
+            }
+        }
+        GBsetDoNotAccordInfo(model, dna_info);
+
+        Warning(infoLong, "Creating Guard Necessary Enabling Set matrix");
+        matrix_t* gnes_info = RTmalloc(sizeof(matrix_t));
+        dm_create(gnes_info, context->num_guards, NUM_TRANSS);
+        for (int i = 0; i < context->num_guards; i++) {
+            const arc_t* source = context->guards[i];
+            for (int j = 0; j < NUM_TRANSS; j++) {
+                for (arc_t* target = context->arcs + context->transitions[j].start; target->transition == j; target++) {
+                    if (target->type != ARC_OUT) continue;
+                    if (target->place == source->place) dm_set(gnes_info, i, j);
+                }
+            }
+        }
+        GBsetGuardNESInfo(model, gnes_info);
+
+        Warning(infoLong, "Creating Guard Necessary Disabling Set matrix");
+        matrix_t* gnds_info = RTmalloc(sizeof(matrix_t));
+        dm_create(gnds_info, context->num_guards, NUM_TRANSS);
+        for (int i = 0; i < context->num_guards; i++) {
+            const arc_t* source = context->guards[i];
+            for (int j = 0; j < NUM_TRANSS; j++) {
+                if (source->transition == j) dm_set(gnds_info, i, j);
+            }
+        }
+        GBsetGuardNDSInfo(model, gnds_info);
+
+        Warning(infoLong, "Creating Do Not Left Accord (DNB) matrix");
+        matrix_t* ndb_info = RTmalloc(sizeof(matrix_t));
+        dm_create(ndb_info, NUM_TRANSS, NUM_TRANSS);
+        for (int i = 0; i < NUM_TRANSS; i++) {
+            for (int j = 0; j < NUM_TRANSS; j++) {
+                for (arc_t* source = context->arcs + context->transitions[i].start; source->transition == i; source++) {
+                    if (source->type != ARC_IN) continue;
+                    for (arc_t* target = context->arcs + context->transitions[j].start; target->transition == j; target++) {
+                        if (target->type != ARC_OUT) continue;
+                        if (source->place == target->place) {
+                            dm_set(ndb_info, i, j);
+                            goto next_ndb;
+                        }
+                    }
+                }
+                next_ndb: ;
+            }
+        }
+        GBsetMatrix(model, LTSMIN_NOT_LEFT_ACCORDS, ndb_info, PINS_STRICT, PINS_INDEX_OTHER, PINS_INDEX_OTHER);
+    } else Warning(infoLong, "Not creating POR matrices");
+
+    RTstopTimer(t);
+    RTprintTimer(infoShort, t, "Loading Petri net took");
+    RTdeleteTimer(t);
+}

@@ -42,6 +42,10 @@ if HAVE_OPAAL
 bin_PROGRAMS += opaal2lts-mc
 endif
 
+if HAVE_PNML
+bin_PROGRAMS += pnml2lts-mc
+endif
+
 mc_sources  = pins2lts-mc.c
 
 # etf2lts-mc
@@ -105,3 +109,10 @@ opaal2lts_mc_SOURCES  += ../pins-lib/opaal-pins.c ../pins-lib/opaal-pins.h
 opaal2lts_mc_LDADD     = $(MC_LIBS) $(OPAAL_LDFLAGS) 
 opaal2lts_mc_CPPFLAGS  = -DOPAAL $(MC_CPPFLAGS)
 nodist_EXTRA_opaal2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
+
+# pnml2lts-mc
+pnml2lts_mc_SOURCES   = $(mc_sources)
+pnml2lts_mc_SOURCES  += ../pins-lib/pnml-pins.c ../pins-lib/pnml-pins.h
+pnml2lts_mc_LDADD     = $(MC_LIBS) $(XML_LIBS)
+pnml2lts_mc_CPPFLAGS  = -DPNML $(MC_CPPFLAGS) $(XML_CPPFLAGS)
+nodist_EXTRA_pnml2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
