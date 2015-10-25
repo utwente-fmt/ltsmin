@@ -1280,6 +1280,7 @@ GBregroup (model_t model)
 
         RTstopTimer(t);
         RTprintTimer(infoShort, t, "Regrouping took");
+        RTdeleteTimer(t);
 
         // who is responsible for freeing matrix_t dm_info in group?
         // probably needed until program termination
