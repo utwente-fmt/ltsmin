@@ -34,6 +34,10 @@ if HAVE_SPINS
 bin_PROGRAMS += prom2lts-dist
 endif
 
+if HAVE_PNML
+bin_PROGRAMS += pnml2lts-dist
+endif
+
 # etf2lts-dist
 etf2lts_dist_SOURCES   = ../pins2lts-dist.c
 etf2lts_dist_SOURCES  += ../../pins-lib/etf-pins.c ../../pins-lib/etf-pins.h
@@ -101,3 +105,11 @@ prom2lts_dist_LDADD   += $(SPINS_LIBS)
 prom2lts_dist_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(DIST_CPPFLAGS)
 prom2lts_dist_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_prom2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
+
+# pnml2lts-dist
+pnml2lts_dist_SOURCES   = ../pins2lts-dist.c
+pnml2lts_dist_SOURCES  += ../../pins-lib/pnml-pins.c ../../pins-lib/pnml-pins.h
+pnml2lts_dist_LDADD     = $(PINS_LIBS) $(XML_LIBS)
+pnml2lts_dist_CPPFLAGS  = -DPNML $(DIST_CPPFLAGS) $(XML_CPPFLAGS)
+pnml2lts_dist_LDFLAGS   = $(AM_LDFLAGS)
+nodist_EXTRA_pnml2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL

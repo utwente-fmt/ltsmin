@@ -21,4 +21,5 @@ libutil_la_SOURCES += treedbs.c treedbs.h
 libutil_la_SOURCES += simplemap.c simplemap.h
 libutil_la_SOURCES += util.c util.h
 libutil_la_SOURCES += zobrist.c zobrist.h
+libutil_la_SOURCES += hashmap.c hashmap.h
 libutil_la_CPPFLAGS = $(AM_CPPFLAGS) 

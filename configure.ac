@@ -404,6 +404,8 @@ else
     AC_MSG_WARN([no acceptable ViennaCL installation found.])
 fi
 
+AM_PATH_XML2(,[have_xml2="yes"],[AC_MSG_WARN([No acceptable libxml2 installation found.])])
+
 AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
@@ -433,6 +435,7 @@ AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
 AM_CONDITIONAL([HAVE_PROFILER], [test x"$acx_profiler" = xyes])
 AM_CONDITIONAL([HAVE_BOOST], [test x"$have_boost" = xyes])
 AM_CONDITIONAL([HAVE_VIENNACL], [test x"$have_viennacl" = xyes])
+AM_CONDITIONAL([HAVE_PNML], [test x"$have_xml2" = xyes])
 
 AM_CONDITIONAL(BUILD_OS_IS_DARWIN,
 [case "${build_os}" in
@@ -517,5 +520,6 @@ Configuration:
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
+    PNML     = ${have_xml2:-NO, not building pnml (Petri net) front-end}
 ======================================================================
 EOM

@@ -39,6 +39,10 @@ if HAVE_SPINS
 bin_PROGRAMS += prom2lts-sym
 endif
 
+if HAVE_PNML
+bin_PROGRAMS += pnml2lts-sym
+endif
+
 SYM_CPP_FLAGS += $(SYLVAN_CPPFLAGS)
 
 # etf2lts-sym
@@ -110,3 +114,11 @@ prom2lts_sym_LDADD   += $(VSET_LIBS) $(SPINS_LIBS)
 prom2lts_sym_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(SYM_CPP_FLAGS)
 prom2lts_sym_LDFLAGS  = $(SPINS_LDFLAGS) $(SYM_LD_FLAGS)
 nodist_EXTRA_prom2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
+
+# pnml2lts-sym
+pnml2lts_sym_SOURCES   = pins2lts-sym.c
+pnml2lts_sym_SOURCES  += ../pins-lib/pnml-pins.c ../pins-lib/pnml-pins.h
+pnml2lts_sym_LDADD     = $(PINS_LIBS) $(VSET_LIBS) $(XML_LIBS)
+pnml2lts_sym_CPPFLAGS  = -DPNML $(SYM_CPP_FLAGS) $(XML_CPPFLAGS)
+pnml2lts_sym_LDFLAGS   = $(SYM_LDFLAGS)
+nodist_EXTRA_pnml2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
