@@ -53,12 +53,23 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     wctx_t             *ctx = (wctx_t *) arg;
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
     alg_global_t       *sm = ctx->global;
+    alg_shared_t       *shared = ctx->run->shared;
+    work_counter_t     *cnt = ctx->counters;
     ctx->counters->trans++;
     bool is_progress = loc->progress_trans > 0 ? loc->progress[ti->group] : // ! progress transition
             GBstateIsProgress(ctx->model, state_info_state(successor));     // ! progress state
 
-    if (!is_progress && seen && ecd_has_state(loc->cyan, successor))
-        ndfs_report_cycle (ctx->run, ctx->model, sm->stack, successor);
+
+    if (EXPECT_FALSE( trc_output && !seen && successor->ref != ctx->state->ref &&
+                      ti != &GB_NO_TRANSITION )) // race, but ok:
+        atomic_write (&shared->parent_ref[successor->ref], ctx->state->ref);
+
+    if (!is_progress && seen && ecd_has_state(loc->cyan, successor) && run_stop(ctx->run)) {
+        Warning (info, " ");
+        Warning (info, "Non-progress cycle FOUND at depth %zu!", cnt->level_cur);
+        Warning (info, " ");
+        handle_error_trace (ctx);
+    }
 
     // dfs_fifo_dfs/dfs_fifo_bfs also check this, but we want a clean stack for LB!
     if (state_store_has_color(ctx->state->ref, setV, 0))
@@ -261,6 +272,12 @@ dfs_fifo_run  (run_t *run, wctx_t *ctx)
     } else {
         dfs_fifo_bfs (ctx);
     }
+
+    if (trc_output && global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
+        // "other" threads sync with the one who write the counter example
+        HREbarrier (HREglobal());
+    }
+
     (void) run;
 }
 

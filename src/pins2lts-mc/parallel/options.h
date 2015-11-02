@@ -34,6 +34,9 @@ typedef enum {
     Strat_ECD    = 1024,
     Strat_DFSFIFO= 2048, // Not exactly LTL, but uses accepting states (for now) and random order
     Strat_TA     = 4096,
+    Strat_TARJAN = 8192,
+    Strat_UFSCC  = 16384,
+    Strat_RENAULT= 32768,
     Strat_TA_SBFS= Strat_SBFS | Strat_TA,
     Strat_TA_BFS = Strat_BFS | Strat_TA,
     Strat_TA_DFS = Strat_DFS | Strat_TA,
@@ -42,6 +45,7 @@ typedef enum {
     Strat_2Stacks= Strat_BFS | Strat_SBFS | Strat_CNDFS | Strat_ENDFS | Strat_DFSFIFO | Strat_OWCTY,
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
     Strat_LTL    = Strat_NDFS | Strat_LTLG | Strat_OWCTY | Strat_DFSFIFO,
+    Strat_SCC    = Strat_TARJAN | Strat_UFSCC | Strat_RENAULT,
     Strat_Reach  = Strat_BFS | Strat_SBFS | Strat_DFS | Strat_PBFS
 } strategy_t;
 
@@ -55,6 +59,7 @@ extern void print_options               (model_t model);
 #define                 MAX_STRATEGIES 5
 extern strategy_t       strategy[];
 extern proviso_t        proviso;
+extern int              no_exit;
 
 extern char*            trc_output;
 extern int              write_state;

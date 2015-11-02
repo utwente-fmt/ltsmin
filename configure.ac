@@ -106,7 +106,7 @@ int main()
     exit(0);
 }
 ]])], [POSIX_SHARED=yes], [POSIX_SHARED=no
-    AC_MSG_WARN([No POSIX support found.])])
+    AC_MSG_FAILURE([No POSIX support found.])])
 AC_LANG_RESTORE
 
 dnl Checks for programs.
@@ -333,7 +333,7 @@ AX_CHECK_FUNC_INCLUDE([],[__sync_synchronize],
   [__sync_synchronize()],
   [],[acx_atomics=no])
 if test x"$acx_atomics" != "xyes"; then
-  AC_MSG_WARN([no acceptable atomic operations found.])
+  AC_MSG_FAILURE([no acceptable atomic operations found.])
 fi
 
 have_opaal="yes"
@@ -396,7 +396,7 @@ if test "x$with_scoop" == xyes; then
     [have_scoop="yes"]
 fi
 
-AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
+#AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
 AS_IF([test x"$have_sylvan" = "xyes"], [AC_DEFINE([HAVE_SYLVAN], [1], [Define if using sylvan.])])
@@ -419,7 +419,7 @@ AM_CONDITIONAL([HAVE_CADP], [test x"$acx_cadp" = xyes])
 AM_CONDITIONAL([HAVE_DVE], [true])    dnl can be built unconditionally
 AM_CONDITIONAL([HAVE_SPINS], [true])
 AM_CONDITIONAL([HAVE_SPINS_COMPILER], [test x"$acx_spins" = "xyes"])
-AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
+#AM_CONDITIONAL([HAVE_ATOMICS], [test x"$acx_atomics" = xyes])
 AM_CONDITIONAL([HAVE_VERSION_CONTROL], [test -d "${srcdir}/.git"])
 AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
 AM_CONDITIONAL([HAVE_PROFILER], [test x"$acx_profiler" = xyes])
@@ -447,6 +447,7 @@ AC_CONFIG_FILES([
        src/ltsmin-lib/Makefile
        src/mc-lib/Makefile
        src/pins-lib/Makefile
+       src/pins-lib/por/Makefile
        src/util-lib/Makefile
        src/vset-lib/Makefile
        src/spg-lib/Makefile
@@ -503,7 +504,7 @@ Configuration:
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc/happy/ghc-pkg/hashmap/deepseq could not be found}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
-    SYLVAN   = ${have_sylvan:-NO, only on 64-bit systems (override with --with-sylvan)}
+    SYLVAN   = ${have_sylvan:-NO, building without Sylvan/LDD-MC support}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
 ======================================================================
 EOM

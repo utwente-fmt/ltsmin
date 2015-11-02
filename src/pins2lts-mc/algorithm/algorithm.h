@@ -95,12 +95,16 @@ extern void lndfs_shared_init       (run_t *run);
 extern void cndfs_shared_init       (run_t *run);
 extern void owcty_shared_init       (run_t *run);
 extern void dfs_fifo_shared_init    (run_t *run);
+extern void tarjan_shared_init      (run_t *run);
+extern void ufscc_shared_init       (run_t *run);
+extern void renault_shared_init     (run_t *run);
 
 /**
  * Helper functions
  */
 
-extern int alg_state_new_default    (void *ctx, ref_t ref, int seen);
+extern int alg_state_new_default    (void *ctx, transition_info_t *ti,
+                                     ref_t ref, int seen);
 
 extern int num_global_bits (strategy_t s);
 

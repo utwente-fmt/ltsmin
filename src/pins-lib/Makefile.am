@@ -7,10 +7,13 @@ LIBS += $(HRE_LIB)
 LIBS += ../util-lib/libutil.la
 LIBS += ../ltsmin-lib/libltsmin.la
 LIBS += ../dm/libdm.la
+LIBS += por/libpor.la
 
 noinst_LTLIBRARIES  = libpins.la
 
 pkginclude_HEADERS = dlopen-api.h pins.h
+
+SUBDIRS  = por
 
 if HAVE_LIBSTEP_INFO
 noinst_LTLIBRARIES += libmcrl-pins.la
@@ -71,9 +74,6 @@ libpins_la_SOURCES += pins2pins-group.c
 libpins_la_SOURCES += pg-types.c pg-types.h
 libpins_la_SOURCES += pins2pins-mucalc.c pins2pins-mucalc.h
 libpins_la_SOURCES += pins2pins-ltl.c
-libpins_la_SOURCES += pins2pins-por.h
-libpins_la_SOURCES += pins2pins-por.c
-libpins_la_SOURCES += pins2pins-por-check.c
 libpins_la_SOURCES += property-semantics.c property-semantics.h
 libpins_la_CPPFLAGS = -DNXT $(AM_CPPFLAGS) -I${top_srcdir}/ltl2ba
 libpins_la_LIBADD    =

@@ -6,7 +6,7 @@
 
 #include <stdlib.h>
 
-#include <pins-lib/pins2pins-por.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/dfs-fifo.h>
 #include <pins2lts-mc/algorithm/ltl.h>
@@ -29,13 +29,16 @@ si_map_entry strategies[] = {
     {"map",     Strat_MAP},
     {"ecd",     Strat_ECD},
     {"dfsfifo", Strat_DFSFIFO},
+    {"tarjan",  Strat_TARJAN},
+    {"ufscc",   Strat_UFSCC},
+    {"renault", Strat_RENAULT},
     {NULL, 0}
 };
 
 si_map_entry provisos[] = {
     {"none",    Proviso_None},
     {"force-none",Proviso_ForceNone},
-    {"closed-set",  Proviso_ClosedSet},
+    {"closed-set",Proviso_ClosedSet},
     {"stack",   Proviso_Stack},
     {"cndfs",   Proviso_CNDFS},
     {NULL, 0}
@@ -46,6 +49,7 @@ strategy_t       strategy[MAX_STRATEGIES] =
 proviso_t        proviso = Proviso_None;
 char*            trc_output = NULL;
 int              write_state = 0;
+int              no_exit = 0;
 char*            label_filter = NULL;
 char            *files[2];
 
@@ -82,7 +86,7 @@ options_static_init      (model_t model, bool timed)
         }
         if (proviso != Proviso_ForceNone) {
             if ((strategy[0] & Strat_CNDFS) && proviso != Proviso_CNDFS)
-                Abort ("Only the CNDFS proviso works in CNDFS!");
+                Abort ("Only the CNDFS proviso works in CNDFS (use --proviso=cndfs)!");
             if ((strategy[0] & Strat_NDFS) && proviso != Proviso_Stack)
                 Abort ("Only the stack proviso works in NDFS!");
             if ( (strategy[0] & (Strat_OWCTY|Strat_LNDFS|Strat_ENDFS)) )
@@ -175,8 +179,8 @@ alg_popt (poptContext con, enum poptCallbackReason reason,
         char *strat = strdup (arg_strategy);
         char last;
         do {
-            if (i > 0 && !((Strat_ENDFS | Strat_OWCTY) & strategy[i-1]))
-                Abort ("Only ENDFS supports recursive repair procedures.");
+            if (i > 0 && !((Strat_ENDFS | Strat_OWCTY | Strat_UFSCC) & strategy[i-1]))
+                Abort ("Only ENDFS/OWCTY/UFSCC can use secondary search procedure procedures.");
             while (',' != arg_strategy[end] && '\0' != arg_strategy[end]) ++end;
             last = strat[end];
             strat[end] = '\0';

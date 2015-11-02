@@ -138,18 +138,12 @@ dyn_cmp (const void *a, const void *b, void *arg)
 {
     permute_t          *perm = (permute_t *) arg;
     int                *rand = *perm->rand;
-    const permute_todo_t     *A = &perm->todos[*((int*)a)];
-    const permute_todo_t     *B = &perm->todos[*((int*)b)];
+    permute_todo_t     *A = &perm->todos[*((int*)a)];
+    permute_todo_t     *B = &perm->todos[*((int*)b)];
 
-    int Aval = A->seen;
-    int Bval = B->seen;
-    if (A->seen == B->seen) {
-        Aval = perm->state_seen (perm->call_ctx, A->ref, A->seen);
-        Bval = perm->state_seen (perm->call_ctx, B->ref, B->seen);
-    }
-    if (Aval == Bval) // if dynamically no difference, then randomize:
+    if (A->seen == B->seen) // if dynamically no difference, then randomize:
         return rand[A->ti.group] - rand[B->ti.group];
-    return Bval - Aval;
+    return A->seen - B->seen;
 }
 
 static inline void
@@ -158,8 +152,9 @@ perm_todo (permute_t *perm, transition_info_t *ti, int seen)
     HREassert (perm->nstored < K+TODO_MAX);
     permute_todo_t     *todo = perm->todos + perm->nstored;
     perm->tosort[perm->nstored] = perm->nstored;
-    todo->seen = seen;
     todo->ref = perm->next->ref;
+    todo->seen = seen;
+    todo->seen = perm->state_seen (perm->call_ctx, ti, todo->ref, seen);
     todo->lattice = perm->next->lattice;
     todo->ti.group = ti->group;
     todo->ti.por_proviso = ti->por_proviso;
@@ -224,6 +219,20 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
     default:
         Abort ("Unknown permutation!");
     }
+}
+
+int
+permute_next (permute_t *perm, state_info_t *state, int group, perm_cb_f cb, void *ctx)
+{
+    perm->permutation   = Perm_None;
+    perm->call_ctx      = ctx;
+    perm->real_cb       = cb;
+    perm->state         = state;
+    perm->nstored       = perm->start_group_index = 0;
+    int                 count;
+    state_data_t        data = state_info_pins_state (state);
+    count = GBgetTransitionsLong (((wctx_t *)ctx)->model, group, data, permute_one, perm);
+    return count;
 }
 
 int

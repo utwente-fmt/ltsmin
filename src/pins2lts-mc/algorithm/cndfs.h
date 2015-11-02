@@ -78,11 +78,13 @@ typedef struct cndfs_alg_local_s {
     alg_local_t        *rec;
     fset_t             *fset;
     cndfs_successors_t  successors;
+    size_t              accepting_depth;
 } cndfs_alg_local_t;
 
 typedef struct cndfs_reduced_s {
     alg_reduced_t       ndfs;
     size_t              rec;
+    size_t              max_load;
     float               waittime;
 } cndfs_reduced_t;
 

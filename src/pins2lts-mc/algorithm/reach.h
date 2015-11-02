@@ -36,7 +36,6 @@ extern struct poptOption reach_options[];
 extern char            *act_detect;
 extern char            *inv_detect;
 extern int              dlk_detect;
-extern int              no_exit;
 extern size_t           max_level;
 
 typedef struct counter_s {
@@ -161,12 +160,9 @@ action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
 
     alg_local_t        *loc = ctx->local;
     alg_global_t       *sm = ctx->global;
-    alg_shared_t       *shared = ctx->run->shared;
 
     loc->counters.errors++;
     if ((!no_exit || trc_output) && run_stop(ctx->run)) {
-        if (trc_output && successor->ref != ctx->state->ref) // race, but ok:
-            atomic_write(&shared->parent_ref[successor->ref], ctx->state->ref);
         raw_data_t          data = dfs_stack_push (sm->stack, NULL);
         state_info_serialize (successor, data);
         dfs_stack_enter (sm->stack);

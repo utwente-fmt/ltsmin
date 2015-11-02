@@ -1250,8 +1250,7 @@ GBwrapModel(model_t model)
         model = GBaddPORCheck(model);
     }
 
-    /* always add LTL (TODO is this necessary?) */
-    model = GBaddLTL(model);
+    model = GBaddLTL(model); // Only adds LTL when a formula is provided
 
     /* add regrouping if specified */
     if (regroup_options != NULL) {

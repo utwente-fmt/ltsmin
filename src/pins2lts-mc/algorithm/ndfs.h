@@ -67,7 +67,8 @@ extern void ndfs_global_deinit   (run_t *alg, wctx_t *ctx);
 
 extern void ndfs_print_stats   (run_t *alg, wctx_t *ctx);
 
-extern int  ndfs_state_seen (void *ptr, ref_t ref, int seen);
+extern int  ndfs_state_seen (void *ptr, transition_info_t *ti,
+                             ref_t ref, int seen);
 
 extern void ndfs_print_state_stats (run_t* run, wctx_t* ctx, int index,
                                     float waittime);

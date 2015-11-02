@@ -35,10 +35,37 @@ extern ci_list *ci_create (size_t size);
 
 extern void ci_free (ci_list *list);
 
+extern void ci_print (ci_list *list);
+
+extern void ci_debug (ci_list *list);
+
+extern void ci_sort (ci_list *list);
+
 static inline int
 ci_get (ci_list *list, int index)
 {
     return list->data[index];
+}
+
+/* begin iterator */
+static inline int *
+ci_begin (ci_list *list)
+{
+    return &list->data[0];
+}
+
+static inline int *
+ci_end (ci_list *list)
+{
+    return &list->data[list->count - 1];
+}
+/* end iterator */
+
+static inline int
+ci_top (ci_list *list)
+{
+    HREassert(list->count >= 0);
+    return list->data[list->count - 1];
 }
 
 static inline int
@@ -66,11 +93,37 @@ ci_add (ci_list *list, int num)
     list->data[list->count++] = num;
 }
 
+static inline int
+ci_binary_search (ci_list *list, int key)
+{
+    int             imin = 0;
+    int             imax = list->count - 1;
+    while (imax >= imin) {
+        int imid = imin + ((imax - imin) >> 1);
+        if (list->data[imid] == key) {
+            return imid;
+        } else if (list->data[imid] < key) {
+            imin = imid + 1;
+        } else {
+            imax = imid - 1;
+        }
+    }
+    return -1;
+}
+
 static inline void
 ci_add_if (ci_list *list, int num, int condition)
 {
     list->data[list->count] = num;
     list->count += condition != 0;
+}
+
+static inline void
+list_invert (ci_list *list)
+{
+    for (int i = 0; i < list->count / 2; i++) {
+        swap (list->data[i], list->data[list->count - i - 1]);
+    }
 }
 
 extern char *gnu_basename (char *path);

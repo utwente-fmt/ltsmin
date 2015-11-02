@@ -51,6 +51,7 @@ extern int *dfs_stack_pop_bottom (dfs_stack_t stack);
 extern void dfs_stack_discard (dfs_stack_t stack, size_t num);
 extern int *dfs_stack_peek(dfs_stack_t stack, size_t offset);
 extern int *dfs_stack_index(dfs_stack_t stack, size_t index);
+extern void dfs_stack_clear (dfs_stack_t stack);
 
 /**
  * Walk the stack to the top, for each element, call a callback

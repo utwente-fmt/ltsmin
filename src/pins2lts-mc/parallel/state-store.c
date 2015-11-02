@@ -137,7 +137,7 @@ state_store_init (model_t model, bool timed)
     store->local_bits = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
         store->global_bits += num_global_bits (strategy[i]);
-        store->local_bits += (~Strat_DFSFIFO & Strat_LTL & strategy[i++] ? 2 : 0);
+        store->local_bits += (~Strat_DFSFIFO & Strat_LTL & ~Strat_CNDFS & strategy[i++] ? 2 : 0);
     }
     store->count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) :
             (Strat_CNDFS == strategy[i - 1] && PINS_POR ? 2 : 0) );
@@ -145,7 +145,7 @@ state_store_init (model_t model, bool timed)
     size_t              bits = store->global_bits + store->count_bits;
 
     // Wrap functions
-    indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]);
+    indexing = NULL != trc_output || ((Strat_TA | Strat_LTL | Strat_SCC) & strategy[0]);
     switch (db_type) {
     case HashTable:
         store->statistics = (dbs_stats_f) DBSLLstats;
@@ -274,11 +274,27 @@ state_store_get_wip (ref_t ref)
             & global->store->count_mask;
 }
 
+uint32_t
+state_store_get_colors (ref_t ref)
+{
+    return global->store->get_sat_bits (global->store->dbs, ref)
+            >> global->store->count_bits;
+}
+
 int
-state_store_try_set_colors (ref_t ref, size_t bits, uint64_t old_val,
-                            uint64_t new_val)
+state_store_try_set_counters (ref_t ref, size_t bits,
+                              uint64_t old_val, uint64_t new_val)
+{
+    return global->store->try_set_sat_bits (global->store->dbs, ref, bits, 0,
+                                            old_val, new_val);
+}
+
+int
+state_store_try_set_colors (ref_t ref, size_t bits,
+                            uint64_t old_val, uint64_t new_val)
 {
     return global->store->try_set_sat_bits (global->store->dbs, ref, bits,
+                                            global->store->count_bits,
                                             old_val, new_val);
 }
 

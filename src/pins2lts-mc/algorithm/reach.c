@@ -11,7 +11,6 @@
 int              dlk_detect = 0;
 char            *act_detect = NULL;
 char            *inv_detect = NULL;
-int              no_exit = 0;
 size_t           max_level = SIZE_MAX;
 
 struct poptOption reach_options[] = {
@@ -46,6 +45,10 @@ handle_error_trace (wctx_t *ctx)
     size_t              level = ctx->counters->level_cur;
 
     if (trc_output) {
+
+        // wait for other threads to complete
+        HREbarrier (HREglobal());
+
         double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
         Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         if (strategy[0] & Strat_TA) {
@@ -169,9 +172,8 @@ reach_queue (void *arg, state_info_t *successor, transition_info_t *ti, int new)
         raw_data_t stack_loc = dfs_stack_push (sm->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref &&
-                          shared->parent_ref[successor->ref] == 0 &&
                           ti != &GB_NO_TRANSITION )) // race, but ok:
-            cas (&shared->parent_ref[successor->ref], 0, ctx->state->ref);
+            atomic_write (&shared->parent_ref[successor->ref], ctx->state->ref);
         loc->proviso |= proviso == Proviso_ClosedSet;
     } else if (proviso == Proviso_Stack) {
         loc->proviso |= !ecd_has_state (loc->cyan, successor);
@@ -347,10 +349,9 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     if (!seen) {
         pbfs_queue_state (ctx, successor);
-        if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref
-                          &&  shared->parent_ref[successor->ref] == 0
-                          && ti != &GB_NO_TRANSITION )) // race, but ok:
-            cas (&shared->parent_ref[successor->ref], 0, ctx->state->ref);
+        if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref &&
+                          ti != &GB_NO_TRANSITION )) // race, but ok:
+            atomic_write (&shared->parent_ref[successor->ref], ctx->state->ref);
         loc->counters.level_size++;
         loc->proviso |= 1;
     }
@@ -623,6 +624,11 @@ reach_run (run_t *run, wctx_t *ctx)
         }
         break;
     default: Abort ("Missing case in reach_run.");
+    }
+
+    if (trc_output && global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
+        // "other" threads sync with the one who write the counter example
+        HREbarrier (HREglobal());
     }
 }
 

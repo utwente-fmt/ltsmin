@@ -27,6 +27,11 @@
 #define LTSMIN_MATRIX_ACTIONS_READS     "dm_actions_reads"
 #define LTSMIN_MUST_DISABLE_MATRIX      "dm_must_disable"
 #define LTSMIN_MUST_ENABLE_MATRIX       "dm_must_enable"
+#define LTSMIN_NOT_LEFT_ACCORDS         "dm_not_left_accords"
+/* weaker version of NEVER-coenabledness: guard/group instead of guard/guard */
+/* note that we also take the inverse of coenabledness: never-coenabledness */
+/* TODO: make GBsetGuardCoEnabledInfo obsolete */
+#define LTSMIN_GUARD_GROUP_NOT_COEN     "dm_guard_group_not_coen"
 
 /**
  * Types

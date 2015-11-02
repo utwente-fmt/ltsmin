@@ -68,8 +68,13 @@ extern uint32_t state_store_dec_wip (ref_t ref);
 
 extern uint32_t state_store_get_wip (ref_t ref);
 
-extern int state_store_try_set_colors (ref_t ref, size_t bits, uint64_t old_val,
-                                       uint64_t new_val);
+extern uint32_t state_store_get_colors (ref_t ref);
+
+extern int state_store_try_set_counters (ref_t ref, size_t bits,
+                                         uint64_t old_val, uint64_t new_val);
+
+extern int state_store_try_set_colors (ref_t ref, size_t bits,
+                                       uint64_t old_val, uint64_t new_val);
 
 extern char *state_store_full_msg (int dbs_ret_value);
 
