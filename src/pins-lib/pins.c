@@ -200,9 +200,16 @@ int default_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*contex
 
 void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
 #define info ((struct nested_cb*)context)
-    int long_dst[dm_ncols(GBgetDMInfo(info->model))];
-    dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
-    info->cb(info->user_ctx,ti,long_dst,cpy);
+    int len = dm_ncols (GBgetDMInfo(info->model));
+    int long_dst[len];
+	dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
+    if (cpy != NULL) {
+        int long_cpy[len];
+        dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_cpy);
+        info->cb(info->user_ctx,ti,long_dst,long_cpy);
+    } else {
+        info->cb(info->user_ctx,ti,long_dst,NULL);
+    }
 #undef info
 }
 
