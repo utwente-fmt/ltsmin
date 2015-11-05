@@ -358,7 +358,7 @@ endfs_red (wctx_t *ctx)
     alg_local_t        *loc = ctx->local;
     cndfs_alg_local_t  *cloc = (cndfs_alg_local_t *) ctx->local;
     size_t              seed_level = dfs_stack_nframes (loc->stack);
-    int                 accepting;
+    int                 accepting = 0;
     int                 on_stack;
 
     size_t               *level;
