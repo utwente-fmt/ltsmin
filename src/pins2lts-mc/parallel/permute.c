@@ -99,6 +99,11 @@ struct permute_s {
     size_t              labels;     /* number of transition labels */
     alg_state_seen_f    state_seen;
     int                 por_proviso;
+
+    ci_list           **inhibited_by;
+    matrix_t           *inhibit_matrix;
+    matrix_t           *class_matrix;
+    int                 class_label;
 };
 
 static int
@@ -235,6 +240,17 @@ permute_next (permute_t *perm, state_info_t *state, int group, perm_cb_f cb, voi
     return count;
 }
 
+static inline bool
+is_inhibited (permute_t* perm, int *class_count, int i)
+{
+    for (int c = 0; c < perm->inhibited_by[i]->count; c++) {
+        int j = perm->inhibited_by[i]->data[c];
+        if (j >= i) return false;
+        if (class_count[j] > 0) return true;
+    }
+    return false;
+}
+
 int
 permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
 {
@@ -242,9 +258,28 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
     perm->real_cb = cb;
     perm->state = state;
     perm->nstored = perm->start_group_index = 0;
-    int                 count;
+    int                 count = 0;
     state_data_t        data = state_info_pins_state (state);
-    count = GBgetTransitionsAll (perm->model, data, permute_one, perm);
+
+    if (inhibit) {
+        int N = dm_nrows (perm->inhibit_matrix);
+        int class_count[N];
+        for (int i = 0; i < N; i++) {
+            class_count[i] = 0;
+            if (is_inhibited(perm, class_count, i)) continue;
+            if (perm->class_label >= 0) {
+                class_count[i] = GBgetTransitionsMatching (perm->model, perm->class_label, i, data, permute_one, perm);
+            } else if (perm->class_matrix != NULL) {
+                class_count[i] = GBgetTransitionsMarked (perm->model, perm->class_matrix, i, data, permute_one, perm);
+            } else {
+                Abort ("inhibit set, but no known classification found.");
+            }
+            count += class_count[i];
+        }
+    } else {
+        count = GBgetTransitionsAll (perm->model, data, permute_one, perm);
+    }
+
     switch (perm->permutation) {
     case Perm_Otf:
         randperm (perm->pad, perm->nstored, state->ref + perm->shiftorder);
@@ -346,6 +381,33 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
             perm->todos[i].ti.labels = NULL;
         }
     }
+
+    perm->class_label = lts_type_find_edge_label (GBgetLTStype(model),LTSMIN_EDGE_TYPE_ACTION_CLASS);
+    if (inhibit){
+        int id=GBgetMatrixID(model,"inhibit");
+        if (id>=0){
+            perm->inhibit_matrix = GBgetMatrix (model, id);
+            Warning(infoLong,"inhibit matrix is:");
+            if (log_active(infoLong)) dm_print (stderr, perm->inhibit_matrix);
+            perm->inhibited_by = (ci_list **)dm_cols_to_idx_table (perm->inhibit_matrix);
+        } else {
+            Warning(infoLong,"no inhibit matrix");
+        }
+        id = GBgetMatrixID(model,LTSMIN_EDGE_TYPE_ACTION_CLASS);
+        if (id>=0){
+            perm->class_matrix=GBgetMatrix(model,id);
+            Warning(infoLong,"inhibit class matrix is:");
+            if (log_active(infoLong)) dm_print(stderr,perm->class_matrix);
+        } else {
+            Warning(infoLong,"no inhibit class matrix");
+        }
+        if (perm->class_label>=0) {
+            Warning(infoLong,"inhibit class label is %d",perm->class_label);
+        } else {
+            Warning(infoLong,"no inhibit class label");
+        }
+    }
+
     return perm;
 }
 

@@ -49,6 +49,7 @@ strategy_t       strategy[MAX_STRATEGIES] =
 proviso_t        proviso = Proviso_None;
 char*            trc_output = NULL;
 int              write_state = 0;
+int              inhibit = 0;
 int              no_exit = 0;
 char*            label_filter = NULL;
 char            *files[2];
@@ -238,6 +239,7 @@ struct poptOption options[] = {
      &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,<strategy>|ndfs>"},
     {"proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &arg_proviso , 0 ,
      "select proviso for LTL+POR or safety+POR", "<force-none|closed-set|stack|cndfs>"},
+    {"inhibit", 0, POPT_ARG_VAL, &inhibit, 1, "Obey the inhibit matrix if the model defines it.", NULL },
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, alg_options_extra, 0, NULL, NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, dfs_fifo_options, 0, "DFS FIFO options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, owcty_options, 0, /*"OWCTY options"*/NULL, NULL},
