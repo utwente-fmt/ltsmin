@@ -54,7 +54,7 @@ proc runmytest { test_name command_line exp_output} {
     send_user "starting $command_line\n"
 
     # NOTE: this is ugly. If the exp_output is not set, put an unfindable string in it.
-    set unfindable_string "adhadkhaslkdLKHLKHads^*&^876"
+    set unfindable_string "adhadkhaslkdLKHLKHads876"
 
     if { [string length $exp_output] == 0 } {
         set exp_output $unfindable_string
@@ -166,15 +166,9 @@ proc runmytest { test_name command_line exp_output} {
             return
         }
 
-        if { [string first "|" $exp_output] == -1 } {
-            $exp_output {
-                pass "Expected output $exp_output found"
-            }
-        } else {
-	    -re $exp_output {
-	        pass "Expected output $exp_output found"
-	    }
-        }
+	-re $exp_output {
+	    pass "Expected output $exp_output found"
+	}
 	    
         full_buffer {
             puts "\n full buffer hit"
