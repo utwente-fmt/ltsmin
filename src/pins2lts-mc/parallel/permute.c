@@ -420,7 +420,6 @@ permute_state_info (permute_t *perm)
 void
 permute_free (permute_t *perm)
 {
-    RTfree (perm->todos);
     RTfree (perm->tosort);
     if (Perm_Otf == perm->permutation)
         RTfree (perm->pad);
@@ -439,5 +438,6 @@ permute_free (permute_t *perm)
             RTfree (perm->todos[i].ti.labels);
         }
     }
+    RTfree (perm->todos);
     RTfree (perm);
 }
