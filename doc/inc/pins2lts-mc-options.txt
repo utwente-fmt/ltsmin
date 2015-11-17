@@ -55,6 +55,18 @@ cndfs;;
   New CNDFS algorithm.
   Multi-Core Nested Depth-First Search (Evangelista, Laarman, Petrucci, van de Pol).
 
+tarjan;;
+  Tarjan's sequential SCC algorithm.
+  Depth-First Search and Linear Graph Algorithms (Tarjan).
+
+renault;;
+  Renault's SCC algorithm.
+  Parallel Explicit Model Checking for Generalized Büchi Automata (Renault et al.).
+
+ufscc;;
+  The UFSCC SCC algorithm.
+  Multi-Core On-The-Fly SCC Decomposition (Bloemen, Laarman, van de Pol).
+
 
 *--perm*='TYPE'::
         Select the transition permutation, which is used to guide
