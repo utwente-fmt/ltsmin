@@ -1,0 +1,10 @@
+== PNML
+
+The PNML front-end for LTSmin currently supports ordinary (unfolded) Petri nets:
+http://www.pnml.org/version-2009/grammar/ptnet.pntd. Further information can be
+found at: http://www.pnml.org/version-2009/version-2009.php.
+
+=== Front-end specific features
+
+  . After reachability analysis the *{manname}* will report the maximum number of tokens over all places.
+  . Support for 1-safe Petri nets, by means of the NUPN toolspecific syntax: http://cadp.inria.fr/man/nupn.html.

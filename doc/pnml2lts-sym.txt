@@ -1,0 +1,28 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+pnml2lts-sym(1)
+===============
+:Author:  Jeroen Meijer
+:Email:   <j.j.g.meijer@utwente.nl>
+:Date:    2015-12-02
+
+== NAME
+
+pnml2lts-sym - Symbolic reachability analysis for PNML models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'Petri-net.pnml' ['output.etf']
+
+== DESCRIPTION
+
+{manname} performs a reachability analysis on a specification provided
+in 'Petri-net.pnml'.  'output.etf' specifies the name of the output
+archive, written in manpage:etf[5] format.
+
+include::inc/pnml.txt[]
+
+== OPTIONS
+
+include::inc/pins2lts-sym-options.txt[]
+
+include::inc/pins2lts-sym.txt[]
