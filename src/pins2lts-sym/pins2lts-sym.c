@@ -1541,6 +1541,7 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
 
     RTstopTimer(t);
     RTprintTimer(infoShort, t, "counting took");
+    RTresetTimer(t);
 
     int is_precise = strstr(states, "e") == NULL && strstr(states, "inf") == NULL;
 
@@ -1549,20 +1550,23 @@ final_stat_reporting(vset_t visited, rt_timer_t timer)
     if (!is_precise && precise) {
         if (vdom_supports_precise_counting(domain)) {
             Print(infoShort, "counting visited states precisely...");
-            rt_timer_t t = RTcreateTimer();
             RTstartTimer(t);
             bn_int_t e_count;
-            vset_count_precise(visited, &n_count, &e_count);
+            vset_count_precise(visited, n_count, &e_count);
             RTstopTimer(t);
             RTprintTimer(infoShort, t, "counting took");
 
             size_t len = bn_strlen(&e_count);
             char e_str[len];
             bn_int2string(e_str, len, &e_count);
+            bn_clear(&e_count);
 
-            Print(infoShort, "state space has precisely %s states (%zu digits), %ld nodes", e_str, strlen(e_str), n_count);
+            Print(infoShort, "state space has precisely %s states (%zu digits)", e_str, strlen(e_str));
         } else Warning(info, "vset implementation does not support precise counting");
     }
+
+
+    RTdeleteTimer(t);
 
     if (log_active (infoLong) || peak_nodes) {
         log_t l;

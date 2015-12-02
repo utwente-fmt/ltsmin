@@ -61,6 +61,7 @@ struct op_rec {
             uint32_t res;
         } other;
         uint64_t count_part;
+        void* any;
     } res;
 };
 static struct op_rec *op_cache=NULL;
@@ -78,6 +79,7 @@ static struct op_rec *op_cache=NULL;
 #define OP_UNIVERSE 11
 #define OP_CCOUNT1 12
 #define OP_CCOUNT2 13
+#define OP_VISIT 14
 
 struct vector_domain {
     struct vector_domain_shared shared;
@@ -266,12 +268,13 @@ static void mdd_collect(uint32_t a,uint32_t b){
     }
     for(uint32_t i=0;i<cache_size;i++){
         uint32_t slot,op,arg1,arg2,res;
-        op=op_cache[i].op&0xffff;
+        op=op_cache[i].op&0x00ff;
         switch(op){
             case OP_UNUSED: continue;
             case OP_COUNT:
             case OP_CCOUNT1:
             case OP_CCOUNT2:
+            case OP_VISIT:
             {
                 arg1=op_cache[i].arg1;
                 arg2=0;
@@ -903,84 +906,6 @@ set_count_mdd(vset_t set, long *nodes, double *elements)
 {
     if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
     if (elements != NULL) *elements = mdd_count(set->mdd);
-}
-
-struct bignum_cache {
-    uint32_t node;
-    bn_int_t bignum;
-};
-
-static bn_int_t                bignum_false;
-static bn_int_t                bignum_true;
-static struct bignum_cache*    bignum_cache = NULL;
-static uint32_t                bignum_cache_size = 0;
-
-static void
-mdd_count_precise(uint32_t node, bn_int_t* bignum)
-{
-    if (node == 0) {
-        bn_init_copy(bignum, &bignum_false);
-        return;
-    }
-    if (node == 1) {
-        bn_init_copy(bignum, &bignum_true);
-        return;
-    }
-
-    uint32_t slot = hash(node, 0, 0) % bignum_cache_size;
-    if (bignum_cache[slot].node == node) {
-        bn_init_copy(bignum, &bignum_cache[slot].bignum);
-        return;
-    }
-
-    bn_int_t down;
-    bn_int_t right;
-    mdd_count_precise(node_table[node].down, &down);
-    mdd_count_precise(node_table[node].right, &right);
-
-    bn_init(bignum);
-    bn_add(&down, &right, bignum);
-    bn_clear(&down);
-    bn_clear(&right);
-
-    if (bignum_cache[slot].node) {
-        bn_clear(&bignum_cache[slot].bignum);
-    }
-
-    bignum_cache[slot].node = node;
-    bn_init_copy(&bignum_cache[slot].bignum, bignum);
-}
-
-static void
-set_count_precise_mdd(vset_t set, long* nodes, bn_int_t *elements)
-{
-    *nodes = mdd_node_count(set->mdd);
-
-    bn_init(&bignum_false);
-    bn_init(&bignum_true);
-    bn_set_digit(&bignum_true, 1);
-
-    uint32_t cache_size;
-    if (_cache_diff() <= 0) {
-        cache_size = *nodes >> (_cache_diff() * -1);
-    } else {
-        cache_size = *nodes << _cache_diff();
-    }
-
-    Warning(infoLong, "Bignum cache size is %" PRIu32 " entries", cache_size);
-
-    bignum_cache_size = *nodes >> (_cache_diff() * -1);
-    bignum_cache = (struct bignum_cache*) RTalignZero(CACHE_LINE_SIZE, cache_size * sizeof(struct bignum_cache));
-
-    mdd_count_precise(set->mdd, elements);
-
-    for (uint32_t i = 0; i < cache_size; i++) {
-        if (bignum_cache[i].node) bn_clear(&bignum_cache[i].bignum);
-    }
-
-    RTfree(bignum_cache);
-    bn_clear(&bignum_false);
-    bn_clear(&bignum_true);
 }
 
 static void
@@ -1740,6 +1665,112 @@ set_ccount_mdd(vset_t set, long *nodes, long double *elements)
     if (elements != NULL) *elements = mdd_ccount(set->mdd);
 }
 
+static void
+dom_visit_clear_cache(vdom_t dom, const int cache_op)
+{
+    (void) dom;
+    const uint32_t op = (uint32_t) OP_VISIT | (cache_op << 8);
+
+    for (uint32_t i = 0 ; i < cache_size; i++) {
+        if ((op_cache[i].op & 0xffff) == op) op_cache[i].op=OP_UNUSED;
+    }
+}
+
+static void
+mdd_visit_proj(uint32_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, uint32_t cache_op, uint32_t p_id)
+{
+    if (set <= 1) {
+        if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(1, set, 0, NULL, context);
+        return;
+    }
+
+    uint32_t op = cache_op | (p_id << 16);
+    uint32_t slot = hash(op, set, 0) % cache_size;
+
+    void* result;
+    if (op_cache[slot].op == op && op_cache[slot].arg1 == set){
+        result = op_cache[slot].res.any;
+        if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(0, node_table[set].val, 1, result, context);
+        return;
+    }
+
+    if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(0, node_table[set].val, 0, NULL, context);
+
+    void* context_down = alloca(ctx_size);
+    void* context_right = alloca(ctx_size);
+    if (cbs->vset_visit_init_context != NULL) {
+        cbs->vset_visit_init_context(context_down, context, 1);
+        cbs->vset_visit_init_context(context_right, context, 0);
+    }
+
+    mdd_visit_proj(node_table[set].down, cbs, ctx_size, context_down, cache_op, node_table[p_id].down);
+    mdd_visit_proj(node_table[set].right, cbs, ctx_size, context_right, cache_op, p_id);
+
+    if (cbs->vset_visit_post != NULL) {
+        int cache = 0;
+        cbs->vset_visit_post(node_table[set].val, context, &cache, &result);
+
+        if (cache) {
+            op_cache[slot].op = op;
+            op_cache[slot].arg1 = set;
+            op_cache[slot].res.any = result;
+            if(cbs->vset_visit_cache_success != NULL) cbs->vset_visit_cache_success(context, result);
+        }
+    }
+}
+
+static void
+mdd_visit(uint32_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, uint32_t cache_op)
+{
+    if (set <= 1) {
+        if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(1, set, 0, NULL, context);
+        return;
+    }
+
+    uint32_t slot = hash(cache_op, set, 0) % cache_size;
+
+    void* result;
+    if (op_cache[slot].op == cache_op && op_cache[slot].arg1 == set){
+        result = op_cache[slot].res.any;
+        if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(0, node_table[set].val, 1, result, context);
+        return;
+    }
+
+    cbs->vset_visit_pre(0, node_table[set].val, 0, NULL, context);
+
+    void* context_down = alloca(ctx_size);
+    void* context_right = alloca(ctx_size);
+    if (cbs->vset_visit_init_context != NULL) {
+        cbs->vset_visit_init_context(context_down, context, 1);
+        cbs->vset_visit_init_context(context_right, context, 0);
+    }
+
+    mdd_visit(node_table[set].down, cbs, ctx_size, context_down, cache_op);
+    mdd_visit(node_table[set].right, cbs, ctx_size, context_right, cache_op);
+
+    if (cbs->vset_visit_post != NULL) {
+        int cache = 0;
+        cbs->vset_visit_post(node_table[set].val, context, &cache, &result);
+
+        if (cache) {
+            op_cache[slot].op = cache_op;
+            op_cache[slot].arg1 = set;
+            op_cache[slot].res.any = result;
+            if(cbs->vset_visit_cache_success != NULL) cbs->vset_visit_cache_success(context, result);
+        }
+    }
+}
+
+static void
+set_visit_mdd(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op)
+{
+    if (cache_op > 0xff) Abort("cache op too large");
+
+    const uint32_t op = (uint32_t) OP_VISIT | (cache_op << 8);
+
+    if (set->proj != NULL) mdd_visit_proj(set->mdd, cbs, ctx_size, context, op, set->p_id);
+    else mdd_visit(set->mdd, cbs, ctx_size, context, op);
+}
 vdom_t vdom_create_list_native(int n){
     Warning(info,"Creating a native ListDD domain.");
     vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
@@ -1784,7 +1815,6 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_copy=set_copy_mdd;
     dom->shared.set_enum=set_enum_mdd;
     dom->shared.set_count=set_count_mdd;
-    dom->shared.set_count_precise=set_count_precise_mdd;
     dom->shared.set_ccount=set_ccount_mdd;
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
@@ -1811,5 +1841,7 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_least_fixpoint=set_least_fixpoint_mdd;
     dom->shared.set_dot=set_dot_mdd;
     dom->shared.rel_dot=rel_dot_mdd;
+    dom->shared.set_visit_seq=set_visit_mdd;
+    dom->shared.dom_visit_clear_cache=dom_visit_clear_cache;
     return dom;
 }

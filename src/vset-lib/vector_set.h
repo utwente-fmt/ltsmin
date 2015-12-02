@@ -218,7 +218,7 @@ is initialized by vset_count.
 */
 extern void vset_count(vset_t set,long *nodes,double *elements);
 
-extern void vset_count_precise(vset_t set,long *nodes,bn_int_t *elements);
+extern void vset_count_precise(vset_t set,long nodes,bn_int_t *elements);
 
 extern int vdom_supports_precise_counting(vdom_t dom);
 
@@ -399,9 +399,29 @@ void vdom_set_name(vdom_t dom, int i, char* name);
 */
 char* vdom_get_name(vdom_t dom, int i);
 
-//@}
-
 int _cache_diff();
+
+typedef void (*vset_visit_pre_cb) (int terminal, int val, int cached, void* result, void* context);
+typedef void (*vset_visit_init_context_cb) (void* context, void* parent, int succ);
+typedef void (*vset_visit_post_cb) (int val, void* context, int* cache, void** result);
+typedef void (*vset_visit_cache_success_cb) (void* context, void* result);
+
+typedef struct vset_visit_callbacks_s {
+    vset_visit_pre_cb vset_visit_pre;
+    vset_visit_init_context_cb vset_visit_init_context;
+    vset_visit_post_cb vset_visit_post;
+    vset_visit_cache_success_cb vset_visit_cache_success;
+} vset_visit_callbacks_t;
+
+extern void vset_visit_par(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
+
+extern void vset_visit_seq(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
+
+extern int vset_get_visit_op_num(vdom_t dom);
+
+extern void vset_blaat(vset_t set);
+
+//@}
 
 #endif
 

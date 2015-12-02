@@ -8,7 +8,6 @@
 Object structure and helper functions for vector sets.
 */
 
-
 struct vector_domain_shared {
 	int size;
 	vset_t (*set_create)(vdom_t dom,int k,int* proj);
@@ -36,8 +35,12 @@ struct vector_domain_shared {
 	void (*set_minus)(vset_t dst,vset_t src);
 	void (*set_zip)(vset_t dst,vset_t src);
 	void (*set_count)(vset_t set,long *nodes,double *elements);
-	void (*set_count_precise)(vset_t set,long *nodes,bn_int_t *elements);
+	void (*set_count_precise)(vset_t set,long nodes,bn_int_t *elements);
 	void (*set_ccount)(vset_t set,long *nodes,long double *elements);
+	int dom_visit_op_num;
+	void (*dom_visit_clear_cache)(vdom_t dom, const int cache_op);
+	void (*set_visit_seq)(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
+	void (*set_visit_par)(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
 	void (*rel_count)(vrel_t rel,long *nodes,double *elements);
 	vrel_t (*rel_create)(vdom_t dom,int k,int* proj);
     vrel_t (*rel_create_rw)(vdom_t dom,int r_k,int* r_proj,int w_k,int* w_proj);
@@ -80,6 +83,9 @@ struct vector_domain_shared {
 /** Initialise the shared part of the domain. */
 extern void vdom_init_shared(vdom_t dom,int n);
 
+extern int vdom_visit_op_next(vdom_t dom);
+
+extern void vdom_visit_clear_cache(vdom_t dom, const int cache_op);
 
 #endif
 
