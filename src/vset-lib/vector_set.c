@@ -1,7 +1,9 @@
 #include <hre/config.h>
+
 #include <stdlib.h>
 
 #include <hre/user.h>
+#include <mc-lib/atomics.h>
 #include <vset-lib/vdom_object.h>
 
 #ifdef HAVE_ATERM2_H
@@ -35,7 +37,7 @@ extern vdom_t vdom_create_lddmc_from_file(FILE *f);
 
 vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
 
-int vset_cache_diff = -2;
+int vset_cache_diff = 0;
 
 static void vset_popt(poptContext con,
  		enum poptCallbackReason reason,
@@ -99,7 +101,7 @@ struct poptOption vset_options[]={
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , lddmc_options , 0 , "LDDmc options" , NULL},
 #endif // HAVE_SYLVAN
     { "vset-cache-diff", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &vset_cache_diff , 0 ,
-      "Influences size of operations cache when counting precisely with bignums: cache size = floor(2log('nodes-to-count')) + <diff>", "<diff>"},
+      "Influences size of operations cache when counting precisely with bignums: cache size = (2log('nodes-to-count') + <diff>)^2", "<diff>"},
     POPT_TABLEEND
 };
 
@@ -249,6 +251,12 @@ default_set_next_union(vset_t dst,vset_t src,vrel_t rel,vset_t uni)
     vset_union(dst,uni);
 }
 
+static void
+default_set_visit_par(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op)
+{
+    vset_visit_seq(set, cbs, ctx_size, context, cache_op);
+}
+
 void vdom_init_shared(vdom_t dom,int n)
 {
     memset(&dom->shared, 0, sizeof(dom->shared));
@@ -262,7 +270,9 @@ void vdom_init_shared(vdom_t dom,int n)
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
     dom->shared.set_project_minus=default_set_project_minus;
     dom->shared.set_next_union=default_set_next_union;
+    dom->shared.set_visit_par=default_set_visit_par;
     dom->shared.names = RTmalloc(n * sizeof(char*));
+    dom->shared.dom_visit_op_num = 0;
     for (int i = 0; i < n; i++) dom->shared.names[i] = NULL;
 }
 
@@ -425,8 +435,113 @@ void vset_count(vset_t set,long *nodes,double *elements){
 	return set->dom->shared.set_count(set,nodes,elements);
 }
 
-void vset_count_precise(vset_t set,long *nodes,bn_int_t *elements){
-	return set->dom->shared.set_count_precise(set,nodes,elements);
+typedef struct count_info_global {
+    bn_int_t* bignums;
+    long* num_free;
+    bn_int_t* bignum_false;
+    bn_int_t* bignum_true;
+} count_info_global_t;
+
+typedef struct count_info {
+    bn_int_t bignum;
+    struct count_info* down;
+    struct count_info* right;
+    count_info_global_t* global;
+} count_info_t;
+
+static void
+count_precise_pre(int terminal, int val, int cached, void* result, void* context)
+{
+    (void) val;
+    count_info_t* ctx = (count_info_t*) context;
+
+    if(terminal) {
+        if (val) bn_init_copy(&ctx->bignum, ctx->global->bignum_true);
+        else bn_init_copy(&ctx->bignum, ctx->global->bignum_false);
+    } else if(cached) {
+        bn_init_copy(&ctx->bignum, (bn_int_t*) result);
+    }
+}
+
+void count_precise_init(void* context, void* parent, int succ) {
+    count_info_t* ctx = (count_info_t*) context;
+    count_info_t* p = (count_info_t*) parent;
+    ctx->global = p->global;
+
+    if (succ) p->down = ctx;
+    else p->right = ctx;
+}
+
+void count_precise_post(int val, void* context, int* cache, void** result) {
+    (void) val;
+    count_info_t* ctx = (count_info_t*) context;
+
+    bn_init(&ctx->bignum);
+    bn_add(&ctx->down->bignum, &ctx->right->bignum, &ctx->bignum);
+    bn_clear(&ctx->down->bignum);
+    bn_clear(&ctx->right->bignum);
+
+    const long f = *ctx->global->num_free;
+
+    if (f > 0) {
+        *cache = 1;
+        *result = ctx->global->bignums + f - 1;
+    }
+}
+
+void count_cache_success(void* context, void* result) {
+    count_info_t* ctx = (count_info_t*) context;
+    bn_init_copy((bn_int_t*) result, &ctx->bignum);
+    (*ctx->global->num_free)--;
+}
+
+void vset_count_precise(vset_t set,long nodes,bn_int_t *elements){
+
+    long cache_size;
+    if (_cache_diff() <= 0) {
+        cache_size = nodes >> (_cache_diff() * -1);
+    } else {
+        int diff = 0;
+        do cache_size = nodes << (_cache_diff() - diff--);
+        while (cache_size < nodes);
+    }
+
+    count_info_t context;
+    count_info_global_t glob;
+    context.global = &glob;
+    glob.bignums = RTmalloc(sizeof(bn_int_t) * cache_size);
+    Warning(infoLong, "Bignum cache has %zu entries", cache_size);
+    long num_free = cache_size;
+    glob.num_free = &num_free;
+
+    bn_int_t bignum_false;
+    bn_int_t bignum_true;
+
+    bn_init(&bignum_false);
+    bn_init(&bignum_true);
+    bn_set_digit(&bignum_true, 1);
+
+    glob.bignum_false = &bignum_false;
+    glob.bignum_true = &bignum_true;
+
+    vset_visit_callbacks_t cbs;
+    cbs.vset_visit_pre = count_precise_pre;
+    cbs.vset_visit_init_context = count_precise_init;
+    cbs.vset_visit_post = count_precise_post;
+    cbs.vset_visit_cache_success = count_cache_success;
+
+    const int cache_op = vdom_visit_op_next(set->dom);
+    vset_visit_seq(set, &cbs, sizeof(count_info_t), &context, cache_op);
+
+    for (long i = cache_size; i > num_free; i--) bn_clear(&glob.bignums[i - 1]);
+    RTfree(glob.bignums);
+    bn_clear(&bignum_false);
+    bn_clear(&bignum_true);
+
+    bn_init_copy(elements, &context.bignum);
+    bn_clear(&context.bignum);
+
+    vdom_visit_clear_cache(set->dom, cache_op);
 }
 
 int vdom_supports_precise_counting(vdom_t dom) {
@@ -617,4 +732,33 @@ int
 _cache_diff()
 {
     return vset_cache_diff;
+}
+
+void
+vset_visit_par(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op)
+{
+    if (set->dom->shared.set_visit_par == NULL) {
+        Abort("Vector set implementation does not support visiting nodes in parallel")
+    }
+    set->dom->shared.set_visit_par(set, cbs, ctx_size, context, cache_op);
+}
+
+void
+vset_visit_seq(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op)
+{
+    if (set->dom->shared.set_visit_seq == NULL) {
+        Abort("Vector set implementation does not support visiting nodes")
+    }
+    set->dom->shared.set_visit_seq(set, cbs, ctx_size, context, cache_op);
+}
+
+int vdom_visit_op_next(vdom_t dom) {
+    return dom->shared.dom_visit_op_num++;
+}
+
+void vdom_visit_clear_cache(vdom_t dom, const int cache_op) {
+    if (dom->shared.dom_visit_clear_cache != NULL) {
+        dom->shared.dom_visit_clear_cache(dom, cache_op);
+        dom->shared.dom_visit_op_num = 0;
+    }
 }
