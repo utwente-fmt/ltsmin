@@ -1,0 +1,32 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+pnml2lts-seq(1)
+================
+:Author:  Jeroen Meijer
+:Email:   <j.j.g.meijer@utwente.nl>
+:Date:    2015-12-02
+
+== NAME
+
+pnml2lts-seq - Sequential state space generator for PNML models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'Petri-net.pnml' ['output.fmt']
+
+== DESCRIPTION
+
+{manname} generates a labelled transition system from a specification
+provided in 'Petri-net.pnml' by enumerative reachability
+analysis using a general state expanding algorithm.
+'output.fmt' specifies the name of
+the output archive.  The desired format is deduced from the filename
+extension. Available formats are described below.
+
+include::inc/pnml.txt[]
+
+== OPTIONS
+
+include::inc/pins2lts-seq-options.txt[]
+
+include::inc/pins2lts-seq.txt[]
+

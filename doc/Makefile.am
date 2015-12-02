@@ -73,6 +73,11 @@ MANPAGES += pbes2lts-seq.1
 MANPAGES += pbes2lts-dist.1
 MANPAGES += pbes2lts-mc.1
 
+MANPAGES += pnml2lts-sym.1
+MANPAGES += pnml2lts-seq.1
+MANPAGES += pnml2lts-dist.1
+MANPAGES += pnml2lts-mc.1
+
 MANPAGES += spgsolver.1
 
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))

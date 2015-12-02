@@ -1,0 +1,31 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+pnml2lts-dist(1)
+=================
+:Author:  Jeroen Meijer
+:Email:   <j.j.g.meijer@utwente.nl>
+:Date:    2015-12-02
+
+== NAME
+
+pnml2lts-dist - Distributed state space generator for PNML models.
+
+== SYNOPSIS
+
+*{manname}* [OPTIONS]... 'Petri-net.pnml' ['output.fmt']
+
+== DESCRIPTION
+
+{manname} generates a labelled transition system from a specification
+provided in 'Petri-net.pnml'.
+'output.fmt' specifies the name of the output archive.  The desired 
+format is deduced from the filename extension. Available formats are described below.
+
+include::inc/mpi-example.txt[]
+
+include::inc/pnml.txt[]
+
+== OPTIONS
+
+include::inc/pins2lts-dist-options.txt[]
+
+include::inc/pins2lts-dist.txt[]
