@@ -460,6 +460,7 @@ AC_CONFIG_FILES([
        src/ltsmin-lib/Makefile
        src/mc-lib/Makefile
        src/pins-lib/Makefile
+       src/prob-lib/Makefile
        src/util-lib/Makefile
        src/vset-lib/Makefile
        src/spg-lib/Makefile
