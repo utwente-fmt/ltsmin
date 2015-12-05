@@ -28,6 +28,9 @@
 #if defined(PNML)
 #include <pins-lib/pnml-pins.h>
 #endif
+#if defined(PROB)
+#include <pins-lib/prob-pins.h>
+#endif
 #if defined(PINS_DLL)
 #include <pins-lib/dlopen-pins.h>
 #endif
@@ -85,6 +88,12 @@
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, pnml_options, 0, "PNML options", NULL }
 #define SPEC_MT_SAFE 1
 #define SPEC_REL_PERF 100
+#define SPEC_MAYBE_AND_FALSE_IS_FALSE 1
+#endif
+#if defined(PROB)
+#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, prob_options, 0, "ProB options", NULL }
+#define SPEC_MT_SAFE 0
+#define SPEC_REL_PERF 1
 #define SPEC_MAYBE_AND_FALSE_IS_FALSE 1
 #endif
 #if defined(PINS_DLL)

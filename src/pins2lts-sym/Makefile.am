@@ -13,6 +13,8 @@ PINS_LIBS += ../spg-lib/libspg.la
 
 VSET_LIBS = ../vset-lib/libvset.la
 
+PROB_LIBS = ../prob-lib/libprob.la
+
 bin_PROGRAMS = etf2lts-sym pins2lts-sym
 
 if HAVE_LIBSTEP_INFO
@@ -42,6 +44,8 @@ endif
 if HAVE_PNML
 bin_PROGRAMS += pnml2lts-sym
 endif
+
+bin_PROGRAMS += prob2lts-sym
 
 SYM_CPP_FLAGS += $(SYLVAN_CPPFLAGS)
 
@@ -122,3 +126,12 @@ pnml2lts_sym_LDADD     = $(PINS_LIBS) $(VSET_LIBS) $(XML_LIBS)
 pnml2lts_sym_CPPFLAGS  = -DPNML $(SYM_CPP_FLAGS) $(XML_CPPFLAGS)
 pnml2lts_sym_LDFLAGS   = $(SYM_LDFLAGS)
 nodist_EXTRA_pnml2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
+
+# prob2lts-sym
+prob2lts_sym_SOURCES   = pins2lts-sym.c
+prob2lts_sym_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
+prob2lts_sym_LDADD     = $(PINS_LIBS)
+prob2lts_sym_LDADD    += $(PROB_LIBS) $(VSET_LIBS)
+prob2lts_sym_CPPFLAGS  = -DPROB $(SYM_CPP_FLAGS)
+prob2lts_sym_LDFLAGS   = $(SYM_LD_FLAGS)
+nodist_EXTRA_prob2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
