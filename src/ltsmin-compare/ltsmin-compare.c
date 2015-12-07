@@ -7,7 +7,7 @@
 #include <lts-lib/lowmem.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 
-typedef enum {Undefined=0,Strong,Branching,Trace,Lumping} task_t;
+typedef enum {Undefined=0,Strong,Branching,Trace,Lumping,Weak} task_t;
 
 static task_t task=Undefined;
 static int divergence_sensitive=0;
@@ -39,10 +39,11 @@ static void trace_compare(lts_t lts){
 }
 
 static  struct poptOption options[] = {
-    { "strong" , 's' , POPT_ARG_VAL , &task , Strong , "minimize module strong bisimulation" , NULL },
-    { "branching" , 'b' , POPT_ARG_VAL , &task, Branching , "minimize module branching bisimulation" , NULL },
+    { "strong" , 's' , POPT_ARG_VAL , &task , Strong , "compare modulo strong bisimulation" , NULL },
+    { "branching" , 'b' , POPT_ARG_VAL , &task, Branching , "compare modulo branching bisimulation" , NULL },
+    { "weak", 'w' , POPT_ARG_VAL , &task , Weak , "compare modulo weak bisimulation" , NULL },
     { "divergence" , 0 , POPT_ARG_VAL , &divergence_sensitive , 1 , "make branching bisimulation divergence sensitive" , NULL },
-    { "lump" , 'l' , POPT_ARG_VAL , &task, Lumping , "minimize module lumping of CTMC" , NULL },
+    { "lump" , 'l' , POPT_ARG_VAL , &task, Lumping , "compare modulo lumping of CTMC" , NULL },
     { "trace" , 't' , POPT_ARG_VAL , &task, Trace, "compare modulo trace equivalence" , NULL },
     { "stutter" , 0 , POPT_ARG_VAL , &stuttering, 1, "allow stuttering during trace equivalence" , NULL },
     POPT_TABLEEND
@@ -77,6 +78,10 @@ int main(int argc, char *argv[]){
     switch(task){
         case Strong:{
             lowmem_strong_reduce(lts1);
+            break;
+        }
+        case Weak:{
+            setbased_weak_reduce(lts1);
             break;
         }
         case Branching:{
