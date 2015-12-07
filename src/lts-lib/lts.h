@@ -158,6 +158,13 @@ This is tau*a equialence for an edge label LTS.
 extern void lts_silent_compress(lts_t lts,silent_predicate silent,void*silent_context);
 
 /**
+\brief Reduce the given lts modulo weak bisimulation.
+
+This is a port of the mCRL 1 minimization.
+ */
+extern void setbased_weak_reduce(lts_t lts);
+
+/**
  Find the set of divergent states.
  */
 extern void lts_find_divergent(lts_t lts,silent_predicate silent,void*silent_context,bitset_t divergent);

@@ -18,6 +18,7 @@ liblts_lib_la_SOURCES += lowmem_lump.c
 liblts_lib_la_SOURCES += lowmem_s.c
 liblts_lib_la_SOURCES += sigmin-lib.c
 liblts_lib_la_SOURCES += set.c set.h
+liblts_lib_la_SOURCES += setbased_weak.c
 liblts_lib_la_SOURCES += silent_compress.c
 
 liblts_lib_la_CPPFLAGS = $(AM_CPPFLAGS)
