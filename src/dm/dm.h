@@ -151,6 +151,8 @@ extern void dm_print_perm(const matrix_header_t* p);
 
 extern void dm_clear(matrix_t* m);
 
+extern void dm_fill(matrix_t* m);
+
 /**
  * Applies logical or to each element of both matrices into tgt.
  */

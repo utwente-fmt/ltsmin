@@ -60,6 +60,9 @@ w2+;;
 W2+;;
   Over-approximate may-write to read+write. Allows must-write dependencies to also subsume read dependencies.
 
+-2r;;
+  Over-approximate copy to read. May be useful for testing whether the dependency matrix is correct.
+
 rb4w;;
   Use special heuristics to move read dependencies before write dependences. Often a win in symbolic state space generation.
 

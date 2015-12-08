@@ -37,7 +37,7 @@ static int             graph_metrics = 0;
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
           "apply transformations to the dependency matrix: "
-          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w, mm, sw, sr, sc"
+          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, -2r, rb4w, mm, sw, sr, sc"
 #if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
       ", bg, tg"
 #endif
@@ -645,6 +645,10 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 Print1 (info, "Regroup over-approximate must-write to read + write");
                 dm_apply_or(inf->r, inf->mustw);
                 dm_apply_or(inf->old_r, inf->old_mustw);
+            } else if (strcmp (tok, "-2r") == 0) {
+                Print1 (info, "Regroup over-approximate copy to read");
+                dm_fill(inf->r);
+                dm_fill(inf->old_r);
             } else if (strcasecmp (tok, "rb4w") == 0) {
                 Print1 (info, "Regroup Read BeFore Write");
                 dm_sort_cols (inf->r, &read_before_write);
