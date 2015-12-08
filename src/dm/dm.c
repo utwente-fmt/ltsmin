@@ -196,6 +196,16 @@ dm_clear(matrix_t* m)
 }
 
 void
+dm_fill(matrix_t* m)
+{
+    for (int i = 0; i < dm_nrows(m); i++) {
+        for (int j = 0; j < dm_ncols(m); j++) {
+            dm_set(m, i, j);
+        }
+    }
+}
+
+void
 dm_create(matrix_t* m, const int rows, const int cols)
 {
     DMDBG (printf ("rows, cols: %d, %d\n", rows, cols));
