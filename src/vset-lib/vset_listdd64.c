@@ -2192,7 +2192,6 @@ mdd_join(uint64_t a_pid, uint64_t b_pid, uint64_t a, uint64_t b, int a_p_len, in
 {
     if (a_p_len < 0 || b_p_len < 0) Abort("missing projection information");
     if (a == 0 || b == 0)  return 0;
-    if (a == b) return a;
     if (a_p_len == 0) return b;
     if (b_p_len == 0) return a;
 
@@ -2201,6 +2200,8 @@ mdd_join(uint64_t a_pid, uint64_t b_pid, uint64_t a, uint64_t b, int a_p_len, in
     uint64_t slot;
 
     if (a_proj[0] == b_proj[0]) {
+
+        if (a_pid == b_pid) return mdd_intersect(a, b);
 
         uint64_t old_a=a;
         uint64_t old_b=b;
