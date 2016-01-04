@@ -1440,7 +1440,7 @@ tableaux_node_t* build_initial_node(tableaux_t *t, ltsmin_expr_t e)
 {
     ltsmin_expr_t e_pnf = ctl_star_to_pnf(e);
 
-    tableaux_node_quantifier_t q = NODE_NONE;
+    tableaux_node_quantifier_t q = NODE_ALL;
 
     if (e_pnf->token == CTL_ALL || e_pnf->token == CTL_EXIST) {
         // get tail
