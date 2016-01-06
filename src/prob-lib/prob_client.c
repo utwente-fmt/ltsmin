@@ -106,14 +106,16 @@ prob_init(prob_client_t pc)
     zmsg_addstrf(request, "%d", pc->id_count);
     zmsg_send(&request, pc->zocket);
     zmsg_destroy(&request);
+
     zmsg_t *response = zmsg_recv(pc->zocket);
+
     if (response == NULL) Abort("Did not receive valid response");
     drop_frame(response);
     drop_frame(response);
 
     ProBInitialResponse resp = prob_get_init_response(response);
 
-    if (zmsg_size(response) != 0) Abort("Did not receive valid reponse");
+    if (zmsg_size(response) != 0) Abort("Did not receive valid reponse size");
 
 //    puts("transition groups:");
 //    print_chunk_array(resp.transition_groups);
