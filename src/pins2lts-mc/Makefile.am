@@ -13,6 +13,8 @@ MC_LIBS	+= parallel/libparallel.la
 MC_LIBS	+= algorithm/libalgorithm.la
 MC_LIBS	+= $(PINS_LIBS)
 
+PROB_LIBS = ../prob-lib/libprob.la
+
 SUBDIRS  = parallel
 SUBDIRS += algorithm
 
@@ -45,6 +47,9 @@ endif
 if HAVE_PNML
 bin_PROGRAMS += pnml2lts-mc
 endif
+
+# dont build prob2lts-mc yet, the chunkmapper does not support null-bytes in chunks.
+# bin_PROGRAMS += prob2lts-mc
 
 mc_sources  = pins2lts-mc.c
 
@@ -116,3 +121,10 @@ pnml2lts_mc_SOURCES  += ../pins-lib/pnml-pins.c ../pins-lib/pnml-pins.h
 pnml2lts_mc_LDADD     = $(MC_LIBS) $(XML_LIBS)
 pnml2lts_mc_CPPFLAGS  = -DPNML $(MC_CPPFLAGS) $(XML_CPPFLAGS)
 nodist_EXTRA_pnml2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
+
+# pnml2lts-mc
+prob2lts_mc_SOURCES   = $(mc_sources)
+prob2lts_mc_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
+prob2lts_mc_LDADD     = $(PROB_LIBS) $(MC_LIBS)
+prob2lts_mc_CPPFLAGS  = -DPROB $(MC_CPPFLAGS)
+nodist_EXTRA_prob2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
