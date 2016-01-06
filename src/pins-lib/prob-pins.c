@@ -19,8 +19,6 @@
 #include <util-lib/chunk_support.h>
 #include <util-lib/util.h>
 
-static const char* ZOCKET = "ipc:///tmp/ltsmin";
-
 // is_init is a reserved state variable
 static const char* IS_INIT = "is_init";
 
@@ -43,8 +41,7 @@ prob_popt(poptContext con, enum poptCallbackReason reason, const struct poptOpti
     case POPT_CALLBACK_REASON_PRE:
         break;
     case POPT_CALLBACK_REASON_POST:
-        GBregisterLoader("mch", ProBloadGreyboxModel);
-        GBregisterLoader("eventb", ProBloadGreyboxModel);
+        GBregisterLoader("probz", ProBloadGreyboxModel);
 
         Warning(info, "ProB module initialized");
         return;
@@ -154,19 +151,23 @@ ProBloadGreyboxModel(model_t model, const char* model_name)
 
     Warning(info, "ProB init");
 
-//    char abs_filename[PATH_MAX];
-//    char* ret_filename = realpath(model_name, abs_filename);
-//
-//    // check file exists
-//    struct stat st;
-//    if (stat(ret_filename, &st) != 0) Abort("File does not exist: %s", ret_filename);
+    char abs_filename[PATH_MAX];
+    char* ret_filename = realpath(model_name, abs_filename);
+
+    // check file exists
+    struct stat st;
+    if (stat(ret_filename, &st) != 0) Abort("Zocket does not exist: %s", ret_filename);
 
     prob_context_t* ctx = (prob_context_t*) RTmalloc(sizeof(prob_context_t));
     ctx->prob_client = prob_client_create();
     GBsetContext(model, ctx);
 
-    Warning(info, "connecting to zocket %s", ZOCKET);
-    prob_connect(ctx->prob_client, ZOCKET);
+    const char* ipc = "ipc://";
+    char zocket[strlen(ipc) + strlen(ret_filename)];
+    sprintf(zocket, "%s%s", ipc, ret_filename);
+
+    Warning(info, "connecting to zocket %s", zocket);
+    prob_connect(ctx->prob_client, zocket);
 
     ProBInitialResponse init = prob_init(ctx->prob_client);
 
