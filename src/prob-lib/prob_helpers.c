@@ -18,8 +18,8 @@ int get_number(zmsg_t *msg) {
     return nr;
 }
 
-Chunk get_chunk(zmsg_t *msg) {
-    Chunk res;
+ProBChunk get_chunk(zmsg_t *msg) {
+    ProBChunk res;
 
     zframe_t *chunk_f = zmsg_pop(msg);
     int chunk_size = zframe_size(chunk_f);
@@ -32,10 +32,10 @@ Chunk get_chunk(zmsg_t *msg) {
     return res;
 }
 
-ChunkArray get_chunk_array(zmsg_t *msg) {
-    ChunkArray res;
+ProBChunkArray get_chunk_array(zmsg_t *msg) {
+    ProBChunkArray res;
     res.size = get_number(msg);
-    res.chunks = RTmalloc(sizeof(Chunk) * res.size);
+    res.chunks = RTmalloc(sizeof(ProBChunk) * res.size);
     
     for (size_t i = 0; i < res.size; i++) {
         res.chunks[i] = get_chunk(msg);
@@ -44,16 +44,16 @@ ChunkArray get_chunk_array(zmsg_t *msg) {
     return res;
 }
 
-State get_state(zmsg_t *msg) {
+ProBState prob_get_state(zmsg_t *msg) {
     return get_chunk_array(msg);
 }
 
 
-InitialResponse get_init_response(zmsg_t *msg) {
+ProBInitialResponse prob_get_init_response(zmsg_t *msg) {
 
-    InitialResponse res;
+    ProBInitialResponse res;
 
-    res.initial_state = get_state(msg);
+    res.initial_state = prob_get_state(msg);
 
     res.transition_groups = get_chunk_array(msg);
     res.variables = get_chunk_array(msg);
@@ -61,16 +61,16 @@ InitialResponse get_init_response(zmsg_t *msg) {
     res.state_labels = get_chunk_array(msg);
 
 
-    res.may_write = get_matrix(msg);
-    res.must_write = get_matrix(msg);
-    res.reads_action = get_matrix(msg);
-    res.reads_guard = get_matrix(msg);
+    res.may_write = prob_get_matrix(msg);
+    res.must_write = prob_get_matrix(msg);
+    res.reads_action = prob_get_matrix(msg);
+    res.reads_guard = prob_get_matrix(msg);
     return res;
 }
 
 
-MatrixRow get_row(zmsg_t *msg) {
-    MatrixRow res;
+ProBMatrixRow get_row(zmsg_t *msg) {
+    ProBMatrixRow res;
     res.transition_group = get_chunk(msg);
     res.variables = get_chunk_array(msg);
 
@@ -78,11 +78,11 @@ MatrixRow get_row(zmsg_t *msg) {
 }
 
 
-Matrix get_matrix(zmsg_t *msg) {
-    Matrix m;
+ProBMatrix prob_get_matrix(zmsg_t *msg) {
+    ProBMatrix m;
     m.nr_rows = get_number(msg);
 
-    m.rows = (MatrixRow*) calloc(m.nr_rows, sizeof(MatrixRow));
+    m.rows = (ProBMatrixRow*) calloc(m.nr_rows, sizeof(ProBMatrixRow));
 
     for (size_t i = 0; i < m.nr_rows; i++) {
         m.rows[i] = get_row(msg);
@@ -91,7 +91,7 @@ Matrix get_matrix(zmsg_t *msg) {
     return m;
 }
 
-void put_state(zmsg_t *msg, State s) {
+void prob_put_state(zmsg_t *msg, ProBState s) {
     zmsg_addstrf(msg, "%zu", s.size);
 
     for (size_t i = 0; i < s.size; i++) {
@@ -101,45 +101,45 @@ void put_state(zmsg_t *msg, State s) {
 }
 
 
-void destroy_chunk_array(ChunkArray *arr) {
+void prob_destroy_chunk_array(ProBChunkArray *arr) {
     RTfree(arr->chunks);
     arr->chunks = NULL;
-    *arr = (ChunkArray) {0};
+    *arr = (ProBChunkArray) {0};
 }
 
-void destroy_state(State *s) {
-    destroy_chunk_array(s);
+void prob_destroy_state(ProBState *s) {
+    prob_destroy_chunk_array(s);
 }
 
-void destroy_chunk(Chunk *norris) {
+void destroy_chunk(ProBChunk *norris) {
     RTfree(norris->data);
-    *norris = (Chunk) {0};
+    *norris = (ProBChunk) {0};
 }
 
-void destroy_matrix_row(MatrixRow row) {
+void destroy_matrix_row(ProBMatrixRow row) {
     destroy_chunk(&(row.transition_group));
-    destroy_chunk_array(&(row.variables));
+    prob_destroy_chunk_array(&(row.variables));
 }
 
-void destroy_matrix(Matrix *m) {
+void prob_destroy_matrix(ProBMatrix *m) {
 
     for (size_t i = 0; i < m->nr_rows; i++) {
         destroy_matrix_row(m->rows[i]);
     }
     RTfree(m->rows);
-    *m = (Matrix) {0};
+    *m = (ProBMatrix) {0};
 }
 
-void destroy_initial_response(InitialResponse *resp) {
-    destroy_state(&(resp->initial_state));
+void prob_destroy_initial_response(ProBInitialResponse *resp) {
+    prob_destroy_state(&(resp->initial_state));
 
-    destroy_chunk_array(&(resp->transition_groups));
-    destroy_chunk_array(&(resp->variables));
-    destroy_chunk_array(&(resp->state_labels));
+    prob_destroy_chunk_array(&(resp->transition_groups));
+    prob_destroy_chunk_array(&(resp->variables));
+    prob_destroy_chunk_array(&(resp->state_labels));
 
-    destroy_matrix(&resp->may_write);
-    destroy_matrix(&resp->must_write);
-    destroy_matrix(&resp->reads_action);
-    destroy_matrix(&resp->reads_guard);
+    prob_destroy_matrix(&resp->may_write);
+    prob_destroy_matrix(&resp->must_write);
+    prob_destroy_matrix(&resp->reads_action);
+    prob_destroy_matrix(&resp->reads_guard);
 //    *resp = (InitialResponse) {0};
 }

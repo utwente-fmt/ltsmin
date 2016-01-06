@@ -60,15 +60,15 @@ struct poptOption prob_options[] = {
     { "no-close", 0, POPT_ARG_NONE, &no_close, 0, "do not close the ProB connection (so that it can be reused)", NULL },
     POPT_TABLEEND };
 
-static State
+static ProBState
 pins2prob_state(model_t model, int* pins)
 {
     prob_context_t* ctx = (prob_context_t*) GBgetContext(model);
 
-    State prob;
+    ProBState prob;
 
     prob.size = ctx->num_vars;
-    prob.chunks = RTmalloc(sizeof(Chunk) * prob.size);
+    prob.chunks = RTmalloc(sizeof(ProBChunk) * prob.size);
 
     for (int i = 0; i < ctx->num_vars; i++) {
         chunk c = GBchunkGet(model, ctx->var_type[i], pins[i]);
@@ -81,7 +81,7 @@ pins2prob_state(model_t model, int* pins)
 }
 
 static void
-prob2pins_state(State s, int *state, model_t model)
+prob2pins_state(ProBState s, int *state, model_t model)
 {
     prob_context_t* ctx = (prob_context_t*) GBgetContext(model);
 
@@ -110,11 +110,11 @@ get_successor_long(model_t model, int group, int *src, TransitionCB cb, void *ct
 
     chunk op_name = GBchunkGet(model, operation_type, prob_ctx->op_type[group]);
 
-    State prob = pins2prob_state(model, src);
+    ProBState prob = pins2prob_state(model, src);
 
     int nr_successors;
-    State *successors = prob_next_state(prob_ctx->prob_client, prob, op_name.data, &nr_successors);
-    destroy_state(&prob);
+    ProBState *successors = prob_next_state(prob_ctx->prob_client, prob, op_name.data, &nr_successors);
+    prob_destroy_state(&prob);
 
     int s[prob_ctx->num_vars + 1];
     if (group == 0) s[prob_ctx->num_vars] = 1;
@@ -124,7 +124,7 @@ get_successor_long(model_t model, int group, int *src, TransitionCB cb, void *ct
         transition_info_t transition_info = { transition_labels, group, 0 };
 
         prob2pins_state(successors[i], s, model);
-        destroy_state(successors + i);
+        prob_destroy_state(successors + i);
         cb(ctx, &transition_info, s, NULL);
     }
 
@@ -168,7 +168,7 @@ ProBloadGreyboxModel(model_t model, const char* model_name)
     Warning(info, "connecting to zocket %s", ZOCKET);
     prob_connect(ctx->prob_client, ZOCKET);
 
-    InitialResponse init = prob_init(ctx->prob_client);
+    ProBInitialResponse init = prob_init(ctx->prob_client);
 
     lts_type_t ltstype = lts_type_create();
 
@@ -316,7 +316,7 @@ ProBloadGreyboxModel(model_t model, const char* model_name)
     init_state[ctx->num_vars] = 0;
     GBsetInitialState(model, init_state);
 
-    destroy_initial_response(&init);
+    prob_destroy_initial_response(&init);
 
     GBsetNextStateLong(model, get_successor_long);
 
