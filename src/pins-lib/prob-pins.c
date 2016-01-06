@@ -117,7 +117,7 @@ get_successor_long(model_t model, int group, int *src, TransitionCB cb, void *ct
     prob_destroy_state(&prob);
 
     int s[prob_ctx->num_vars + 1];
-    if (group == 0) s[prob_ctx->num_vars] = 1;
+    s[prob_ctx->num_vars] = 1;
     for (int i = 0; i < nr_successors; i++) {
 
         int transition_labels[1] = { prob_ctx->op_type[group] };
