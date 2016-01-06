@@ -10,6 +10,7 @@ PINS_LIBS += ../ltsmin-lib/libltsmin.la
 PINS_LIBS += ../util-lib/libutil.la
 PINS_LIBS += ../dm/libdm.la
 VSET_LIBS = ../vset-lib/libvset.la
+PROB_LIBS = ../prob-lib/libprob.la
 
 bin_PROGRAMS = etf2lts-seq pins2lts-seq
 
@@ -36,6 +37,8 @@ endif
 if HAVE_PNML
 bin_PROGRAMS += pnml2lts-seq
 endif
+
+#bin_PROGRAMS += prob2lts-seq
 
 # pins2lts-seq
 pins2lts_seq_SOURCES   = pins2lts-seq.c
@@ -106,3 +109,11 @@ pnml2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 pnml2lts_seq_LDADD    += $(VSET_LIBS) $(XML_LIBS)
 pnml2lts_seq_CPPFLAGS  = -DPNML $(SEQ_CPPFLAGS) $(XML_CPPFLAGS)
 nodist_EXTRA_pnml2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
+
+# prob2lts-seq
+prob2lts_seq_SOURCES   = pins2lts-seq.c
+prob2lts_seq_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
+prob2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
+prob2lts_seq_LDADD    += $(PROB_LIBS) $(VSET_LIBS)
+prob2lts_seq_CPPFLAGS  = -DPROB $(SEQ_CPPFLAGS)
+nodist_EXTRA_prob2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset

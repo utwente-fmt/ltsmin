@@ -8,6 +8,8 @@ PINS_LIBS += ../../util-lib/libutil.la
 PINS_LIBS += ../../ltsmin-lib/libltsmin.la
 PINS_LIBS += ../../dm/libdm.la
 
+PROB_LIBS = ../../prob-lib/libprob.la
+
 bin_PROGRAMS = etf2lts-dist pins2lts-dist
 
 if HAVE_LIBSTEP_INFO
@@ -37,6 +39,8 @@ endif
 if HAVE_PNML
 bin_PROGRAMS += pnml2lts-dist
 endif
+
+#bin_PROGRAMS += prob2lts-dist
 
 # etf2lts-dist
 etf2lts_dist_SOURCES   = ../pins2lts-dist.c
@@ -113,3 +117,11 @@ pnml2lts_dist_LDADD     = $(PINS_LIBS) $(XML_LIBS)
 pnml2lts_dist_CPPFLAGS  = -DPNML $(DIST_CPPFLAGS) $(XML_CPPFLAGS)
 pnml2lts_dist_LDFLAGS   = $(AM_LDFLAGS)
 nodist_EXTRA_pnml2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
+
+# prob2lts-dist
+prob2lts_dist_SOURCES   = ../pins2lts-dist.c
+prob2lts_dist_SOURCES  += ../../pins-lib/prob-pins.c ../../pins-lib/prob-pins.h
+prob2lts_dist_LDADD     = $(PROB_LIBS) $(PINS_LIBS)
+prob2lts_dist_CPPFLAGS  = -DPROB $(DIST_CPPFLAGS)
+prob2lts_dist_LDFLAGS   = $(AM_LDFLAGS)
+nodist_EXTRA_prob2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
