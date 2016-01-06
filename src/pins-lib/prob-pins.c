@@ -257,6 +257,10 @@ ProBloadGreyboxModel(model_t model, const char* model_name)
     GBsetDMInfoRead(model, read);
     GBsetDMInfo(model, dm);
 
+    matrix_t* sl_info = RTmalloc(sizeof(matrix_t));
+    dm_create(sl_info, 0, 0);
+    GBsetStateLabelInfo(model, sl_info);
+
     // set all variables for init group to write dependent
     for (int i = 0; i < ctx->num_vars + 1; i++) dm_set(must_write, 0, i);
     // also set the init var to read dependent for all groups
