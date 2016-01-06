@@ -103,6 +103,9 @@ get_successor_long(model_t model, int group, int *src, TransitionCB cb, void *ct
      * This prevents adding a self loop to the initial state. */
     if (group == 0 && src[prob_ctx->num_vars] == 1) return 0;
 
+    // Don't give any successors for groups other than the init group if we have not initialized
+    if (group > 0 && src[prob_ctx->num_vars] == 0) return 0;
+
     int operation_type = prob_ctx->op_type_no;
 
     chunk op_name = GBchunkGet(model, operation_type, prob_ctx->op_type[group]);
@@ -256,8 +259,8 @@ ProBloadGreyboxModel(model_t model, const char* model_name)
 
     // set all variables for init group to write dependent
     for (int i = 0; i < ctx->num_vars + 1; i++) dm_set(must_write, 0, i);
-    // also set the init var to read dependent
-    dm_set(read, 0, ctx->num_vars);
+    // also set the init var to read dependent for all groups
+    for (int i = 0; i < num_groups; i++) dm_set(read, i, ctx->num_vars);
 
     for (size_t i = 0; i < init.must_write.nr_rows; i++) {
         const char* name = init.must_write.rows[i].transition_group.data;
