@@ -4,51 +4,51 @@
 #include <czmq.h>
 #include <zmq.h>
 
-typedef struct Chunk {
+typedef struct ProBChunk {
     char *data;
     int size;
-} Chunk;
+} ProBChunk;
 
-typedef struct ChunkArray {
-    Chunk *chunks;
+typedef struct ProBChunkArray {
+    ProBChunk *chunks;
     size_t size;
-} ChunkArray;
+} ProBChunkArray;
 
-typedef ChunkArray State;
+typedef ProBChunkArray ProBState;
 
 typedef struct MatrixRow {
-    Chunk transition_group;
-    ChunkArray variables;
-} MatrixRow;
+    ProBChunk transition_group;
+    ProBChunkArray variables;
+} ProBMatrixRow;
 
-typedef struct Matrix {
+typedef struct ProBMatrix {
     size_t nr_rows;
-    MatrixRow *rows; // nr_rows many
-} Matrix;
+    ProBMatrixRow *rows; // nr_rows many
+} ProBMatrix;
 
-typedef struct InitialResponse {
-    State initial_state;
+typedef struct ProBInitialResponse {
+    ProBState initial_state;
     
-    ChunkArray transition_groups;
-    ChunkArray variables;
-    ChunkArray variable_types;
-    ChunkArray state_labels;
+    ProBChunkArray transition_groups;
+    ProBChunkArray variables;
+    ProBChunkArray variable_types;
+    ProBChunkArray state_labels;
 
-    Matrix may_write;
-    Matrix must_write;
-    Matrix reads_action;
-    Matrix reads_guard;
-} InitialResponse;
+    ProBMatrix may_write;
+    ProBMatrix must_write;
+    ProBMatrix reads_action;
+    ProBMatrix reads_guard;
+} ProBInitialResponse;
 
 
-State get_state(zmsg_t *msg);
-Matrix get_matrix(zmsg_t *msg);
-InitialResponse get_init_response(zmsg_t *msg);
+ProBState prob_get_state(zmsg_t *msg);
+ProBMatrix prob_get_matrix(zmsg_t *msg);
+ProBInitialResponse prob_get_init_response(zmsg_t *msg);
 
-void put_state(zmsg_t *msg, State s);
-void destroy_initial_response(InitialResponse *resp);
-void destroy_state(State *s);
-void destroy_chunk_array(ChunkArray *arr);
-void destroy_matrix(Matrix *m);
+void prob_put_state(zmsg_t *msg, ProBState s);
+void prob_destroy_initial_response(ProBInitialResponse *resp);
+void prob_destroy_state(ProBState *s);
+void prob_destroy_chunk_array(ProBChunkArray *arr);
+void prob_destroy_matrix(ProBMatrix *m);
 
 #endif

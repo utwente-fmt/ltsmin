@@ -78,7 +78,7 @@ receive_number(zmsg_t *response)
 }
 
 void
-print_chunk_array(const ChunkArray arr)
+print_chunk_array(const ProBChunkArray arr)
 {
     printf("size: %ld\n", arr.size);
     for (size_t i = 0; i < arr.size; i++) {
@@ -86,19 +86,19 @@ print_chunk_array(const ChunkArray arr)
     }
 }
 
-void print_row(const MatrixRow row) {
+void print_row(const ProBMatrixRow row) {
     printf("Transition group: %s\n", row.transition_group.data);
     print_chunk_array(row.variables);
 }
 
-void print_matrix(const Matrix m) {
+void print_matrix(const ProBMatrix m) {
     for (size_t i = 0; i < m.nr_rows; i++) {
         print_row(m.rows[i]);
     }
 }
 
 
-InitialResponse
+ProBInitialResponse
 prob_init(prob_client_t pc)
 {
     zmsg_t *request = zmsg_new();
@@ -111,7 +111,7 @@ prob_init(prob_client_t pc)
     drop_frame(response);
     drop_frame(response);
 
-    InitialResponse resp = get_init_response(response);
+    ProBInitialResponse resp = prob_get_init_response(response);
 
     if (zmsg_size(response) != 0) Abort("Did not receive valid reponse");
 
@@ -139,15 +139,15 @@ prob_init(prob_client_t pc)
 }
 
 // Note: size is part of the result, it will contain the number of states.
-State *
-prob_next_state(prob_client_t pc, State s, char *transitiongroup, int *size)
+ProBState *
+prob_next_state(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
 {
     zmsg_t *request = zmsg_new();
     zmsg_addstr(request, "get-next-state");
     zmsg_addstrf(request, "%d", pc->id_count);
     zmsg_addstr(request, transitiongroup);
 
-    put_state(request, s);
+    prob_put_state(request, s);
     zmsg_send(&request, pc->zocket);
     zmsg_destroy(&request);
     zmsg_t *response = zmsg_recv(pc->zocket);
@@ -158,23 +158,23 @@ prob_next_state(prob_client_t pc, State s, char *transitiongroup, int *size)
     sscanf(nr_of_states_s, "%d", size);
     RTfree(nr_of_states_s);
 
-    State *successors = RTmalloc(sizeof(State) * (*size));
+    ProBState *successors = RTmalloc(sizeof(ProBState) * (*size));
     int i;
     for (i = 0; i < (*size); i++) {
-        successors[i] = get_state(response);
+        successors[i] = prob_get_state(response);
     }
     zmsg_destroy(&response);
     return successors;
 }
 
 int
-prob_get_state_label(prob_client_t pc, State s, char *label)
+prob_get_state_label(prob_client_t pc, ProBState s, char *label)
 {
     zmsg_t *request = zmsg_new();
     zmsg_addstr(request, "get-state-label");
     zmsg_addstrf(request, "%d", pc->id_count);
     zmsg_addstr(request, label);
-    put_state(request, s);
+    prob_put_state(request, s);
     zmsg_send(&request, pc->zocket);
     zmsg_destroy(&request);
     zmsg_t *response = zmsg_recv(pc->zocket);
@@ -208,7 +208,7 @@ start_ltsmin(void)
 
     prob_client_t pc = prob_client_create();
 
-    InitialResponse initial_resp = prob_init(pc);
+    ProBInitialResponse initial_resp = prob_init(pc);
 
     // Some Demo code
 
@@ -225,11 +225,11 @@ start_ltsmin(void)
      */
 
     int nr_successors;
-    State *successors = prob_next_state(pc, initial_resp.initial_state, "DA$init_state", &nr_successors);
-    destroy_initial_response(&initial_resp);
+    ProBState *successors = prob_next_state(pc, initial_resp.initial_state, "DA$init_state", &nr_successors);
+    prob_destroy_initial_response(&initial_resp);
 
     // Send a get label request using the last state of the previous request
-    State foo = successors[nr_successors - 1];
+    ProBState foo = successors[nr_successors - 1];
 
     // DAinvariant is hard wired because I am too lazy to store it in the init code.
     // However, ProB does send the state label. 
@@ -241,7 +241,7 @@ start_ltsmin(void)
     // Cleanup
     int i;
     for (i = 0; i < nr_successors; i++) {
-        destroy_state(&(successors[i]));
+        prob_destroy_state(&(successors[i]));
     }
     RTfree(successors);
 
