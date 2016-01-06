@@ -156,7 +156,7 @@ ProBloadGreyboxModel(model_t model, const char* model_name)
 
     // check file exists
     struct stat st;
-    if (stat(ret_filename, &st) != 0) Abort("Zocket does not exist: %s", ret_filename);
+    if (stat(ret_filename, &st) != 0) Abort("Zocket does not exist: %s", model_name);
 
     prob_context_t* ctx = (prob_context_t*) RTmalloc(sizeof(prob_context_t));
     ctx->prob_client = prob_client_create();
