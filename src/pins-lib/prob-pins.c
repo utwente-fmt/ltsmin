@@ -67,12 +67,20 @@ pins2prob_state(model_t model, int* pins)
     prob.size = ctx->num_vars;
     prob.chunks = RTmalloc(sizeof(ProBChunk) * prob.size);
 
+    Debugf("pins2prob state (%d): ", ctx->num_vars);
     for (int i = 0; i < ctx->num_vars; i++) {
         chunk c = GBchunkGet(model, ctx->var_type[i], pins[i]);
 
         prob.chunks[i].data = c.data;
         prob.chunks[i].size = c.len;
+        Debugf("(%u)", c.len);
+#ifdef LTSMIN_DEBUG
+        for (unsigned int j = 0; j < c.len; j++) Debugf("%x", c.data[j]);
+#endif
+
+        Debugf(",");
     }
+    Debugf("\n");
 
     return prob;
 }
@@ -81,14 +89,22 @@ static void
 prob2pins_state(ProBState s, int *state, model_t model)
 {
     prob_context_t* ctx = (prob_context_t*) GBgetContext(model);
+    HREassert(s.size == ctx->num_vars, "expecting %d chunks, but got %zu", ctx->num_vars, s.size);
 
+    Debugf("prob2pins state (%zu): ", s.size);
     for (size_t i = 0; i < s.size; i++) {
         chunk c;
         c.data = s.chunks[i].data;
         c.len = s.chunks[i].size;
+        Debugf("(%u)", c.len);
+#ifdef LTSMIN_DEBUG
+        for (unsigned int j = 0; j < c.len; j++) Debugf("%x", c.data[j]);
+#endif
+        Debugf(",");
         int chunk_id = GBchunkPut(model, ctx->var_type[i], c);
         state[i] = chunk_id;
     }
+    Debugf("\n");
 }
 
 static int
