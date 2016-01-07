@@ -25,6 +25,8 @@ prob_client_create()
     prob_client_t pc = (prob_client_t) RTmalloc(sizeof(struct prob_client));
     pc->id_count = 0;
 
+    zsys_set_logstream(stderr);
+
     return pc;
 }
 
@@ -101,13 +103,25 @@ void print_matrix(const ProBMatrix m) {
 ProBInitialResponse
 prob_init(prob_client_t pc)
 {
+    Debugf("initializing ProB Zocket\n")
     zmsg_t *request = zmsg_new();
     zmsg_addstr(request, "init");
     zmsg_addstrf(request, "%d", pc->id_count);
+
+#ifdef LTSMIN_DEBUG
+    Debugf("sending message with length %zu, contents are:\n", zmsg_content_size(request));
+    zmsg_print(request);
+#endif
+
     zmsg_send(&request, pc->zocket);
     zmsg_destroy(&request);
 
     zmsg_t *response = zmsg_recv(pc->zocket);
+
+#ifdef LTSMIN_DEBUG
+    Debugf("received message with length %zu, contents are:\n", zmsg_content_size(response));
+    zmsg_print(response);
+#endif
 
     if (response == NULL) Abort("Did not receive valid response");
     drop_frame(response);
@@ -150,9 +164,21 @@ prob_next_state(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
     zmsg_addstr(request, transitiongroup);
 
     prob_put_state(request, s);
+
+#ifdef LTSMIN_DEBUG
+    Debugf("requesting next-state, contents:\n");
+    zmsg_print(request);
+#endif
+
     zmsg_send(&request, pc->zocket);
     zmsg_destroy(&request);
     zmsg_t *response = zmsg_recv(pc->zocket);
+
+#ifdef LTSMIN_DEBUG
+    Debugf("response for next-state, contents:\n");
+    zmsg_print(response);
+#endif
+
     drop_frame(response);
     drop_frame(response);
 
