@@ -40,7 +40,7 @@ if HAVE_PNML
 bin_PROGRAMS += pnml2lts-dist
 endif
 
-#bin_PROGRAMS += prob2lts-dist
+bin_PROGRAMS += prob2lts-dist
 
 # etf2lts-dist
 etf2lts_dist_SOURCES   = ../pins2lts-dist.c
