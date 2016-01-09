@@ -179,7 +179,7 @@ ProBloadGreyboxModel(model_t model, const char* model_name)
     GBsetContext(model, ctx);
 
     const char* ipc = "ipc://";
-    char zocket[strlen(ipc) + strlen(ret_filename)];
+    char zocket[strlen(ipc) + strlen(ret_filename) + 1];
     sprintf(zocket, "%s%s", ipc, ret_filename);
 
     Warning(info, "connecting to zocket %s", zocket);
