@@ -33,14 +33,18 @@ prob_client_create()
 void
 prob_client_destroy(prob_client_t pc)
 {
+    RTfree(pc->file);
     RTfree(pc);
+    pc = NULL;
 }
 
 void
 prob_connect(prob_client_t pc, const char* file)
 {
     pc->ctx = zctx_new();
+    if (pc->ctx == NULL) Abort("Could not create zctx");
     pc->zocket = zsocket_new(pc->ctx, ZMQ_REQ);
+    if (pc->zocket == NULL) Abort("Could not create zsocket");
     pc->file = strdup(file);
 
     if (zsocket_connect(pc->zocket, pc->file) != 0) Abort("Could not connect to zocket %s", pc->file);
@@ -108,22 +112,22 @@ prob_init(prob_client_t pc)
     zmsg_addstr(request, "init");
     zmsg_addstrf(request, "%d", pc->id_count);
 
-#ifdef LTSMIN_DEBUG
     Debugf("sending message with length %zu, contents are:\n", zmsg_content_size(request));
-    zmsg_print(request);
+#ifdef LTSMIN_DEBUG
+    if (log_active(debug)) zmsg_print(request);
 #endif
 
-    zmsg_send(&request, pc->zocket);
+    if (zmsg_send(&request, pc->zocket) != 0) Abort("Could not send message");
     zmsg_destroy(&request);
 
     zmsg_t *response = zmsg_recv(pc->zocket);
+    if (response == NULL) Abort("Did not receive valid response");
 
-#ifdef LTSMIN_DEBUG
     Debugf("received message with length %zu, contents are:\n", zmsg_content_size(response));
-    zmsg_print(response);
+#ifdef LTSMIN_DEBUG
+    if (log_active(debug)) zmsg_print(response);
 #endif
 
-    if (response == NULL) Abort("Did not receive valid response");
     drop_frame(response);
     drop_frame(response);
 
@@ -165,18 +169,18 @@ prob_next_state(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
 
     prob_put_state(request, s);
 
-#ifdef LTSMIN_DEBUG
     Debugf("requesting next-state, contents:\n");
-    zmsg_print(request);
+#ifdef LTSMIN_DEBUG
+    if (log_active(debug)) zmsg_print(request);
 #endif
 
     zmsg_send(&request, pc->zocket);
     zmsg_destroy(&request);
     zmsg_t *response = zmsg_recv(pc->zocket);
 
-#ifdef LTSMIN_DEBUG
     Debugf("response for next-state, contents:\n");
-    zmsg_print(response);
+#ifdef LTSMIN_DEBUG
+    if (log_active(debug)) zmsg_print(response);
 #endif
 
     drop_frame(response);
