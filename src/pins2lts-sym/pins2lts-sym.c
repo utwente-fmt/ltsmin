@@ -1044,6 +1044,7 @@ check_inv(vset_t states, const int level)
                             Warning(info, "all invariants violated");
                             if(!no_exit) {
                                 Warning(info, "exiting now");
+                                GBExit(model);
                                 HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
                             }
                             Warning(info, "continuing...")
@@ -1101,6 +1102,7 @@ check_inv_par(vset_t states, const int level)
             Warning(info, "all invariants violated");
             if(!no_exit) {
                 Warning(info, "exiting now");
+                GBExit(model);
                 HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
             }
             Warning(info, "continuing...")
@@ -1424,6 +1426,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         dlk_detect=0; // avoids checking for more deadlocks; as long as dlk_detect==1, no deadlocks have been found.
     } else {
         Warning(info, "exiting now");
+        GBExit(model);
         HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
     }
 }
@@ -1983,6 +1986,7 @@ static void
 reach_chain_stop() {
     if (!no_exit && ErrorActions > 0) {
         Warning(info, "Exiting now");
+        GBExit(model);
         HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
     }
 }
