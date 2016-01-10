@@ -59,7 +59,9 @@ endif
 # PINS lib, defining the partitioned next-state interface
 SUBDIRS += pins-lib
 
+if HAVE_PROB
 SUBDIRS += prob-lib
+endif
 
 if HAVE_CADP
 SUBDIRS += pins-open
