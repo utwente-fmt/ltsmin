@@ -45,7 +45,9 @@ if HAVE_PNML
 bin_PROGRAMS += pnml2lts-sym
 endif
 
+if HAVE_PROB
 bin_PROGRAMS += prob2lts-sym
+endif
 
 SYM_CPP_FLAGS += $(SYLVAN_CPPFLAGS)
 

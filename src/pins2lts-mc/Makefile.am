@@ -123,8 +123,8 @@ pnml2lts_mc_CPPFLAGS  = -DPNML $(MC_CPPFLAGS) $(XML_CPPFLAGS)
 nodist_EXTRA_pnml2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # pnml2lts-mc
-prob2lts_mc_SOURCES   = $(mc_sources)
-prob2lts_mc_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
-prob2lts_mc_LDADD     = $(PROB_LIBS) $(MC_LIBS)
-prob2lts_mc_CPPFLAGS  = -DPROB $(MC_CPPFLAGS)
-nodist_EXTRA_prob2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
+#prob2lts_mc_SOURCES   = $(mc_sources)
+#prob2lts_mc_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
+#prob2lts_mc_LDADD     = $(PROB_LIBS) $(MC_LIBS)
+#prob2lts_mc_CPPFLAGS  = -DPROB $(MC_CPPFLAGS)
+#nodist_EXTRA_prob2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL

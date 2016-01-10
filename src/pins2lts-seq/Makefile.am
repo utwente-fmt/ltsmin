@@ -38,7 +38,9 @@ if HAVE_PNML
 bin_PROGRAMS += pnml2lts-seq
 endif
 
+if HAVE_PROB
 bin_PROGRAMS += prob2lts-seq
+endif
 
 # pins2lts-seq
 pins2lts_seq_SOURCES   = pins2lts-seq.c
