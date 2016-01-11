@@ -302,6 +302,7 @@ static vset_t *group_tmp;
 static vset_t *label_false; // 0
 static vset_t *label_true;  // 1
 static vset_t *label_tmp;
+static rt_timer_t reach_timer;
 
 struct inv_check_s
 {
@@ -977,6 +978,8 @@ check_inv(vset_t states, const int level)
                         if (num_inv_violated == num_inv) {
                             Warning(info, "all invariants violated");
                             if(!no_exit) {
+                                RTstopTimer(reach_timer);
+                                RTprintTimer(info, reach_timer, "invariant detection took");
                                 Warning(info, "exiting now");
                                 GBExit(model);
                                 HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -1036,6 +1039,8 @@ check_inv_par(vset_t states, const int level)
             Warning(info, "all invariants violated");
             if(!no_exit) {
                 Warning(info, "exiting now");
+                RTstopTimer(reach_timer);
+                RTprintTimer(info, reach_timer, "invariant detection took");
                 GBExit(model);
                 HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
             }
@@ -1362,6 +1367,8 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     if (no_exit) {
         dlk_detect=0; // avoids checking for more deadlocks; as long as dlk_detect==1, no deadlocks have been found.
     } else {
+        RTstopTimer(reach_timer);
+        RTprintTimer(info, reach_timer, "deadlock detection took");
         Warning(info, "exiting now");
         GBExit(model);
         HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -1458,9 +1465,9 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
 }
 
 static void
-final_stat_reporting(vset_t visited, rt_timer_t timer)
+final_stat_reporting(vset_t visited)
 {
-    RTprintTimer(info,timer, "reachability took");
+    RTprintTimer(info, reach_timer, "reachability took");
 
     if (dlk_detect) Warning(info, "No deadlocks found");
 
@@ -1875,6 +1882,8 @@ VOID_TASK_3(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups
 static void
 reach_chain_stop() {
     if (!no_exit && ErrorActions > 0) {
+        RTstopTimer(reach_timer);
+        RTprintTimer(info, reach_timer, "action detection took");
         Warning(info, "Exiting now");
         GBExit(model);
         HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -4046,7 +4055,7 @@ check_mu_par(vset_t visited, int* init)
     }
 }
 
-VOID_TASK_3(run_reachability, vset_t, states, char*, etf_output, rt_timer_t, timer)
+VOID_TASK_2(run_reachability, vset_t, states, char*, etf_output)
 {
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
@@ -4103,9 +4112,9 @@ VOID_TASK_3(run_reachability, vset_t, states, char*, etf_output, rt_timer_t, tim
         break;
     }
 
-    RTstartTimer(timer);
+    RTstartTimer(reach_timer);
     guided_proc(sat_proc, reach_proc, states, etf_output);
-    RTstopTimer(timer);
+    RTstopTimer(reach_timer);
 }
 
 static char *files[2];
@@ -4270,7 +4279,7 @@ VOID_TASK_1(actual_main, void*, arg)
     }
 
     /* create timer */
-    rt_timer_t timer = RTcreateTimer();
+    reach_timer = RTcreateTimer();
 
     /* fix level 0 */
     vset_t visited = vset_create(domain, -1, NULL);
@@ -4280,10 +4289,10 @@ VOID_TASK_1(actual_main, void*, arg)
     check_invariants(visited, 0);
 
     /* run reachability */
-    CALL(run_reachability, visited, files[1], timer);
+    CALL(run_reachability, visited, files[1]);
 
     /* report states */
-    final_stat_reporting(visited, timer);
+    final_stat_reporting(visited);
 
     /* save vset/vrel data */
     if (transitions_save_filename != NULL) {
@@ -4395,7 +4404,7 @@ VOID_TASK_1(actual_main, void*, arg)
                 Print(info, "The result is: %s.", result ? "true":"false");
                 RTstopTimer(pgsolve_timer);
                 Print(info, " ");
-                RTprintTimer(info, timer,               "reachability took   ");
+                RTprintTimer(info, reach_timer,               "reachability took   ");
                 RTprintTimer(info, compute_pg_timer,    "computing game took ");
                 RTprintTimer(info, pgsolve_timer,       "solving took        ");
                 if (spg_options->strategy_filename != NULL)
