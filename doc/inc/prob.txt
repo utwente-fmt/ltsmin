@@ -1,0 +1,8 @@
+== ProB
+
+The ProB front-end for LTSmin uses ZMQ to communicate with ProB.
+To use this front-end a ZMQ socket has to be opened first with ProB.
+This can be done with the commandline
+*LD_LIBRARY_PATH=lib ./probcli /path/to/machine.[mch|eventb|b|...] -ltsmin2 /tmp/ltsmin.probz*.
+The path to the socket is given with the option *-ltsmin2*. The file extension should be *.probz*.
+More information about ProB can be found at https://www3.hhu.de/stups/prob.

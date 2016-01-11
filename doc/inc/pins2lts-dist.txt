@@ -29,5 +29,6 @@ manpage:ltsmin-mucalc[5],
 manpage:etf[5],
 http://www.cwi.nl/{tilde}mcrl/[muCRL],
 http://www.mcrl2.org/[mCRL2],
-http://divine.fi.muni.cz/[DiVinE 2], and
-http://eprints.eemcs.utwente.nl/22042/[prom].
+http://divine.fi.muni.cz/[DiVinE 2],
+http://eprints.eemcs.utwente.nl/22042/[prom], and
+https://www3.hhu.de/stups/prob/index.php/Main_Page[ProB]
