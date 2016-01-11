@@ -16,7 +16,7 @@ pnml2lts-mc - Concurrent state space generator for PNML models.
 == DESCRIPTION
 
 {manname} performs multi-core reachability and LTL model checking on the
-labelled transition system from a compiled specification provided in
+labelled transition system from a specification provided in
 'Petri-net.pnml'.
 LTS output is not supported by this tool, use the distributed tools instead.
 

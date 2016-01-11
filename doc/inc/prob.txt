@@ -1,0 +1,27 @@
+== ProB
+
+The ProB front-end for LTSmin uses ZMQ to communicate with ProB.
+There are two ways LTSmin can communicate with ProB.
+One option is to manually start ProB and specify a path to a ZMQ socket.
+The other option is to add ProB to the PATH variable and let 
+LTSmin start ProB. The latter option allows significant speedups through parallelism.
+More information about ProB can be found at https://www3.hhu.de/stups/prob.
+
+=== Option 1: *.probz* extension
+
+To use this front-end with the *.probz* extension a ZMQ socket has to be opened first with ProB.
+This can be done with the commandline
+*LD_LIBRARY_PATH=lib ./probcli /path/to/machine.[mch|eventb|b|...] -ltsmin2 /tmp/ltsmin.probz*.
+The path to the socket is given with the option *-ltsmin2*. The file extension should be *.probz*.
+
+=== Option 2: *.mch*|*.eventb*|*.tlc* extensions
+
+To enable parallelism the *.mch*|*.eventb*|*.tlc* extensions are used.
+To use these extensions some environment variables need to be set.
+
+  . First set the *LD_LIBRARY_PATH* variable: *export LD_LIBRARY_PATH=/path/to/ProB/lib:$LD_LIBRARY_PATH*.
+  . Next set the *PATH* variable: *export PATH=/path/to/ProB:$PATH*.
+  
+Make sure you can run *probcli* from the commandline.
+When *probcli* can be run from the commandline, then LTSmin can start multiple ProB instances to
+enable parallelism.

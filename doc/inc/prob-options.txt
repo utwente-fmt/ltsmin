@@ -1,0 +1,5 @@
+=== ProB Options
+
+*--no-close*::
+    Do not close the connection to ProB. This will leave the ProB instance running,
+    such that the connection can be reused.    

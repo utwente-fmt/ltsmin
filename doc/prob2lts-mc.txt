@@ -1,0 +1,30 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+prob2lts-mc(1)
+===============
+:Author:  Jeroen Meijer
+:Email:   <j.j.g.meijer@utwente.nl>
+:Date:    2016-01-26
+
+== NAME
+
+prob2lts-mc - Concurrent reachability analysis for B, through ProB.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... '/path/to/socket.probz|/path/to/machine.[mch|eventb|tlc]'
+
+== DESCRIPTION
+
+{manname} performs multi-core reachability analysis on a specification provided
+through '/path/to/machine.[mch|eventb|tlc]', and sequential reachability analysis on a specification
+provided through '/path/to/socket.probz'.
+
+include::inc/prob.txt[]
+
+== OPTIONS
+
+include::inc/pins2lts-mc-options.txt[]
+
+include::inc/prob-options.txt[]
+
+include::inc/pins2lts-mc.txt[]
