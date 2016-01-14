@@ -163,8 +163,6 @@ prob_exit(model_t model)
 void
 ProBloadGreyboxModel(model_t model, const char* model_name)
 {
-    (void) model_name;
-
     Warning(info, "ProB init");
 
     char abs_filename[PATH_MAX];
