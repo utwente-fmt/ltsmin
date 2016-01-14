@@ -89,7 +89,7 @@ static void
 prob2pins_state(ProBState s, int *state, model_t model)
 {
     prob_context_t* ctx = (prob_context_t*) GBgetContext(model);
-    HREassert(s.size == ctx->num_vars, "expecting %d chunks, but got %zu", ctx->num_vars, s.size);
+    HREassert((int) s.size == ctx->num_vars, "expecting %d chunks, but got %zu", ctx->num_vars, s.size);
 
     Debugf("prob2pins state (%zu): ", s.size);
     for (size_t i = 0; i < s.size; i++) {
