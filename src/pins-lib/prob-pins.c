@@ -24,12 +24,15 @@ static const char* IS_INIT = "is_init";
 
 static int no_close = 0;
 
+static char* zocket_prefix = "/tmp/ltsmin-";
+
 typedef struct prob_context {
     int num_vars;
     int op_type_no;
     prob_client_t prob_client;
     int* op_type;
     int* var_type;
+    char* zocket;
 } prob_context_t;
 
 static void
@@ -41,7 +44,11 @@ prob_popt(poptContext con, enum poptCallbackReason reason, const struct poptOpti
     case POPT_CALLBACK_REASON_PRE:
         break;
     case POPT_CALLBACK_REASON_POST:
-        GBregisterLoader("probz", ProBloadGreyboxModel);
+        GBregisterLoader("mch", ProBstartProb);
+        GBregisterLoader("eventb", ProBstartProb);
+        GBregisterLoader("tla", ProBstartProb);
+
+        GBregisterLoader("probz", ProBcreateZocket);
 
         Warning(info, "ProB module initialized");
         return;
@@ -55,7 +62,72 @@ prob_popt(poptContext con, enum poptCallbackReason reason, const struct poptOpti
 struct poptOption prob_options[] = {
     { NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void*) &prob_popt, 0, NULL, NULL },
     { "no-close", 0, POPT_ARG_NONE, &no_close, 0, "do not close the ProB connection (so that it can be reused)", NULL },
+    { "zocket-prefix", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &zocket_prefix, 0, "use a default ZMQ socket prefix, ignored for a file with a .probz extension", NULL },
     POPT_TABLEEND };
+
+static prob_context_t*
+create_context(model_t model)
+{
+    prob_context_t* ctx = (prob_context_t*) RTmalloc(sizeof(prob_context_t));
+    GBsetContext(model, ctx);
+    return ctx;
+}
+
+static void
+prob_load_model(model_t model);
+
+void
+ProBcreateZocket(model_t model, const char* file)
+{
+    if (HREpeers(HREglobal()) > 1) {
+        if (HREme(HREglobal()) == 0) {
+            Warning(error, "The \".probz\" extension is incompatible with parallelism. "
+                "If you want to exploit parallelism, supply the machine file directly. "
+                "Consult the manpage \"man prob2lts-mc\" for further information. "
+                "If you don't need parallelism, you can also supply the --procs=1 option.");
+        }
+        HREabort(LTSMIN_EXIT_FAILURE);
+    }
+    prob_context_t* ctx = create_context(model);
+
+    ctx->zocket = RTmalloc(sizeof(char[PATH_MAX]));
+    ctx->zocket = realpath(file, ctx->zocket);
+
+    // check file exists
+    struct stat st;
+    if (stat(ctx->zocket, &st) != 0) Abort("Zocket does not exist: %s", ctx->zocket);
+
+    prob_load_model(model);
+}
+
+void
+ProBstartProb(model_t model, const char* file)
+{
+    prob_context_t* ctx = create_context(model);
+
+    char abs_filename[PATH_MAX];
+    char* ret_filename = realpath(file, abs_filename);
+
+    // check file exists
+    struct stat st;
+    if (stat(ret_filename, &st) != 0) Abort("File does not exist: %s", file);
+
+    const char* zocket = "%s%d.probz";
+    ctx->zocket = RTmalloc(snprintf(NULL, 0, zocket, zocket_prefix, HREme(HREglobal())) + 1);
+    sprintf(ctx->zocket, zocket, zocket_prefix, HREme(HREglobal()));
+
+    if (stat(ctx->zocket, &st) == 0) Abort("File already exists at %s", ctx->zocket);
+
+    Warning(info, "Creating zocket for HRE worker %d at %s", HREme(HREglobal()), ctx->zocket);
+
+    const char* command = "probcli %s -ltsmin2 %s &";
+    char buf[snprintf(NULL, 0, command, ret_filename, ctx->zocket) + 1];
+    sprintf(buf, command, ret_filename, ctx->zocket);
+
+    if (system(buf) != 0) Abort("Could not launch 'probcli', make sure it is on your PATH");
+
+    prob_load_model(model);
+}
 
 static ProBState
 pins2prob_state(model_t model, int* pins)
@@ -160,25 +232,19 @@ prob_exit(model_t model)
     }
 }
 
-void
-ProBloadGreyboxModel(model_t model, const char* model_name)
+static void
+prob_load_model(model_t model)
 {
     Warning(info, "ProB init");
 
-    char abs_filename[PATH_MAX];
-    char* ret_filename = realpath(model_name, abs_filename);
+    prob_context_t* ctx = (prob_context_t*) GBgetContext(model);
 
-    // check file exists
-    struct stat st;
-    if (stat(ret_filename, &st) != 0) Abort("Zocket does not exist: %s", model_name);
-
-    prob_context_t* ctx = (prob_context_t*) RTmalloc(sizeof(prob_context_t));
     ctx->prob_client = prob_client_create();
-    GBsetContext(model, ctx);
 
     const char* ipc = "ipc://";
-    char zocket[strlen(ipc) + strlen(ret_filename) + 1];
-    sprintf(zocket, "%s%s", ipc, ret_filename);
+    char zocket[strlen(ipc) + strlen(ctx->zocket) + 1];
+    sprintf(zocket, "%s%s", ipc, ctx->zocket);
+    RTfree(ctx->zocket);
 
     Warning(info, "connecting to zocket %s", zocket);
     prob_connect(ctx->prob_client, zocket);

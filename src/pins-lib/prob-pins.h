@@ -6,6 +6,10 @@
 
 extern struct poptOption prob_options[];
 
+extern void ProBcreateZocket(model_t model, const char* name);
+
+extern void ProBstartProb(model_t model, const char* name);
+
 extern void ProBloadGreyboxModel(model_t model, const char* name);
 
 #endif
