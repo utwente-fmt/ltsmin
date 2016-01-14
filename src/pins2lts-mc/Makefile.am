@@ -48,8 +48,9 @@ if HAVE_PNML
 bin_PROGRAMS += pnml2lts-mc
 endif
 
-# dont build prob2lts-mc yet, the chunkmapper does not support null-bytes in chunks.
-# bin_PROGRAMS += prob2lts-mc
+if HAVE_PROB
+bin_PROGRAMS += prob2lts-mc
+endif
 
 mc_sources  = pins2lts-mc.c
 
@@ -122,9 +123,9 @@ pnml2lts_mc_LDADD     = $(MC_LIBS) $(XML_LIBS)
 pnml2lts_mc_CPPFLAGS  = -DPNML $(MC_CPPFLAGS) $(XML_CPPFLAGS)
 nodist_EXTRA_pnml2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
-# pnml2lts-mc
-#prob2lts_mc_SOURCES   = $(mc_sources)
-#prob2lts_mc_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
-#prob2lts_mc_LDADD     = $(PROB_LIBS) $(MC_LIBS)
-#prob2lts_mc_CPPFLAGS  = -DPROB $(MC_CPPFLAGS)
-#nodist_EXTRA_prob2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
+# prob2lts-mc
+prob2lts_mc_SOURCES   = $(mc_sources)
+prob2lts_mc_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
+prob2lts_mc_LDADD     = $(PROB_LIBS) $(MC_LIBS)
+prob2lts_mc_CPPFLAGS  = -DPROB $(MC_CPPFLAGS)
+nodist_EXTRA_prob2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
