@@ -108,7 +108,7 @@ prob2pins_state(ProBState s, int *state, model_t model)
 }
 
 static int
-get_successor_long(model_t model, int group, int *src, TransitionCB cb, void *ctx)
+get_successors_long(model_t model, int group, int *src, TransitionCB cb, void *ctx)
 {
     prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
 
@@ -339,7 +339,7 @@ ProBloadGreyboxModel(model_t model, const char* model_name)
 
     prob_destroy_initial_response(&init);
 
-    GBsetNextStateLong(model, get_successor_long);
+    GBsetNextStateLong(model, get_successors_long);
 
     GBsetExit(model, prob_exit);
 
