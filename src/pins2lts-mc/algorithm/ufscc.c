@@ -46,6 +46,7 @@ typedef struct counter_s {
     uint32_t            claimdead;
     uint32_t            claimfound;
     uint32_t            claimsuccess;
+    uint32_t            cum_max_stack;
 #if LTL_CHECK
     uint32_t            accepting;
 #endif
@@ -114,6 +115,7 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.claimdead               = 0;
     ctx->local->cnt.claimfound              = 0;
     ctx->local->cnt.claimsuccess            = 0;
+    ctx->local->cnt.cum_max_stack           = 0;
 #if LTL_CHECK
     ctx->local->cnt.accepting               = 0;
 #endif
@@ -604,6 +606,8 @@ ufscc_reduce (run_t *run, wctx_t *ctx)
     reduced->claimdead              += cnt->claimdead;
     reduced->claimfound             += cnt->claimfound;
     reduced->claimsuccess           += cnt->claimsuccess;
+    reduced->cum_max_stack          += ctx->counters->level_max;
+
 #if LTL_CHECK
     reduced->accepting              += cnt->accepting;
 #endif
@@ -634,6 +638,7 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info, "- claim dead count:         %d", reduced->claimdead);
     Warning(info, "- claim found count:        %d", reduced->claimfound);
     Warning(info, "- claim success count:      %d", reduced->claimsuccess);
+    Warning(info, "- cum. max stack depth:     %d", reduced->cum_max_stack);
     Warning(info, " ");
 #if LTL_CHECK
     Warning(info, "State space has %d states, %d are accepting",
