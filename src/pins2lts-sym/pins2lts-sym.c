@@ -30,6 +30,7 @@
 #include <util-lib/dynamic-array.h>
 #include <util-lib/bitset.h>
 #include <hre/stringindex.h>
+#include <mc-lib/atomics.h>
 
 #include <sylvan.h>
 
@@ -706,7 +707,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
                     ctx->trace_count++;
                 }
 
-                add_fetch(ErrorActions, 1);
+                add_fetch(&ErrorActions, 1);
             }
         }
     }
