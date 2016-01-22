@@ -1,4 +1,4 @@
-LTSmin - model checking and minimization of labelled transition systems
+LTSmin - model checking and minimization of labelled transition systems [![Build Status](https://travis-ci.org/utwente-fmt/ltsmin.svg?branch=master)](https://travis-ci.org/utwente-fmt/ltsmin)
 
 * Introduction
 LTSmin started out as a generic toolset for manipulating labelled
