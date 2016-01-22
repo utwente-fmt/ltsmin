@@ -1,0 +1,221 @@
+language: cpp
+
+compiler:
+- clang
+- gcc
+
+os:
+- linux
+- osx
+
+dist: trusty
+
+osx_image: xcode7.2
+
+cache:
+  directories:
+    - $HOME/ltsmin-deps
+
+matrix:
+  exclude:
+    # This one I am excluding, because we test clang on OSX.
+    - compiler: clang
+      os: linux
+    # This one I am excluding, because xcode and gcc seem to clash big time on everything.
+    # Feel free to do a pull request that fixes this :)
+    # Anyways, gcc is tested on linux.
+    - compiler: gcc
+      os: osx
+
+env: 
+  - CZMQ_VERSION="3.0.2"
+    CZMQ_URL="https://github.com/zeromq/czmq/archive/v$CZMQ_VERSION.tar.gz"
+    PROB_NAME_LINUX="ProB.linux64.tar.gz"
+    PROB_URL_LINUX="http://nightly.cobra.cs.uni-duesseldorf.de/ltsmin/$PROB_NAME_LINUX"
+    PROB_NAME_OSX="ProB.mac_os.10.7.5.x86_64.tar.gz"
+    PROB_URL_OSX="http://nightly.cobra.cs.uni-duesseldorf.de/ltsmin/$PROB_NAME_OSX"
+    DIVINE_VERSION="1.2"
+    DIVINE_COMPILER="gcc-4.9"
+    DIVINE_NAME="divine2-ltsmin-$DIVINE_VERSION-$TRAVIS_OS_NAME-$DIVINE_COMPILER.tgz"
+    DIVINE_URL="https://github.com/utwente-fmt/divine2/releases/download/$DIVINE_VERSION/$DIVINE_NAME"
+    MCRL2_REV="13391"
+    MCRL2_SVN="https://svn.win.tue.nl/repos/MCRL2/trunk"
+    MCRL2_OSX_FILE="mcrl2-201409.1_x86_64"
+    MCRL2_OSX_URL="http://www.mcrl2.org/download/release/$MCRL2_OSX_FILE.dmg"
+    MCRL2_OSX_VER="mcrl2-201409.1.13218_x86_64"
+    VIENNACL_NAME="ViennaCL-1.7.1"
+    VIENNACL_URL="http://netcologne.dl.sourceforge.net/project/viennacl/1.7.x/$VIENNACL_NAME.tar.gz"
+    WITH_MCRL2="yes"
+    WITH_PROB="yes"
+    GHCVER="7.10.3"
+    HAPPYVER="1.19.5"
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test # for gcc 4.9
+      - kubuntu-backports       # for cmake 2.8.12
+      - boost-latest            # for boost > 1.46
+      - hvr-ghc                 # for GHC dynamic packages
+    packages:
+      - gcc-4.9
+      - g++-4.9
+      - libzmq3-dev
+      - cmake
+      - libyaml-dev
+      - libpopt-dev
+      - asciidoc
+      - xmlto
+      - doxygen
+      - libboost1.55-dev
+      - ghc-7.10.3
+      - ghc-7.10.3-dyn
+      - happy-1.19.5
+      
+before_install:
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; 
+    then export PATH=/opt/ghc/$GHCVER/bin:/opt/happy/$HAPPYVER/bin:$PATH; fi
+
+install:  
+  # update brew
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update && brew install
+    asciidoc
+    xmlto
+    viennacl
+    zmq
+    cmake
+    ant
+    ghc
+    cabal-install
+    popt && 
+    export XML_CATALOG_FILES=/usr/local/etc/xml/catalog; fi
+   
+  # for building mCRL2:  
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then pip install --user pyyaml psutil; fi
+  
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+    cabal update &&
+    cabal install happy &&
+    export PATH="$HOME/.cabal/bin:$PATH"; fi
+  
+  - mkdir -p "$HOME/ltsmin-deps"
+  
+  # set correct compiler
+  - if [ "$CC" = "gcc" ]; then export CC="gcc-4.9"; fi
+  - if [ "$CXX" = "g++" ]; then export CXX="g++-4.9"; fi
+    
+  # install czmq from source
+  # but only static libraries; we want to merge them into prob2lts-*
+  # since czmq is not distributed in Ubuntu.
+  # the LDFLAGS is necessary, because of a bug: https://github.com/zeromq/czmq/issues/1323
+  - if [ $WITH_PROB = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libczmq.a" ]; then 
+    wget "$CZMQ_URL" -P /tmp &&
+    tar -xf "/tmp/v$CZMQ_VERSION.tar.gz" -C /tmp &&
+    pushd /tmp/czmq-$CZMQ_VERSION &&
+    ./autogen.sh &&
+    ./configure --disable-shared --prefix="$HOME/ltsmin-deps" &&
+    make -j2 LDFLAGS="-lpthread" &&
+    make install &&
+    popd; fi
+    
+  # install mCRL2 on Linux
+  - if [ "$TRAVIS_OS_NAME" = "linux" -a "$WITH_MCRL2" = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libmcrl2_core.a" ]; then 
+    mkdir /tmp/mCRL2 &&
+    svn co -q --non-interactive --trust-server-cert "$MCRL2_SVN" -r"$MCRL2_REV" /tmp/mCRL2/src &&
+    mkdir /tmp/mCRL2/build &&
+    pushd /tmp/mCRL2/build &&
+    cmake ../src -DMCRL2_ENABLE_GUI_TOOLS=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="$HOME/ltsmin-deps" -DMCRL2_MAN_PAGES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_C_COMPILER="$CC" &&
+    make -j2 &&
+    make install -j2 &&
+    mv "$HOME/ltsmin-deps/share/mcrl2/lib/"* "$HOME/ltsmin-deps/lib" &&
+    popd; fi
+  
+  # install mCRL2 on OSX
+  - if [ "$TRAVIS_OS_NAME" = "osx" -a "$WITH_MCRL2" = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libmcrl2_core.a" ]; then
+    wget "$MCRL2_OSX_URL" -P /tmp &&
+    hdiutil attach "/tmp/$MCRL2_OSX_FILE.dmg" &&
+    tar -xf "/Volumes/$MCRL2_OSX_VER/$MCRL2_OSX_VER.pkg/Contents/Archive.pax.gz" -C "$HOME" &&
+    cp "$HOME/mCRL2/Library/"* "$HOME/ltsmin-deps/lib" &&
+    cp -R "$HOME/mCRL2/Applications/"* "$HOME/ltsmin-deps/bin" &&
+    cp -R "$HOME/mCRL2/Headers/include/mcrl2" "$HOME/ltsmin-deps/include" &&
+    rm -rf "$HOME/mCRL2" &&
+    hdiutil detach "/Volumes/$MCRL2_OSX_VER"; fi
+  
+  # fix missing (for mcrl2-201409.1) libdparser.a; download it and merge into libmcrl2_core.a  
+  - if [ "$WITH_MCRL2" = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libdparser.a" ]; then
+    wget "https://github.com/utwente-fmt/ltsmin-travis/raw/master/$TRAVIS_OS_NAME/mCRL2/libdparser.a" -P "$HOME/ltsmin-deps/lib" &&
+    pushd "$HOME/ltsmin-deps/lib" &&
+    ar -x libmcrl2_core.a && ar -x libdparser.a && rm libmcrl2_core.a && ar -qcs libmcrl2_core.a *.o &&
+    popd; fi  
+    
+  # install ProB  
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+    export PROB_NAME="$PROB_NAME_LINUX" &&
+    export PROB_URL="$PROB_URL_LINUX"; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+    export PROB_NAME="$PROB_NAME_OSX" &&
+    export PROB_URL="$PROB_URL_OSX"; fi
+  - if [ ! -f "$HOME/ProB/probcli" ]; then 
+    mkdir -p "$HOME/ProB" &&
+    wget "$PROB_URL" -P /tmp && 
+    tar -xf "/tmp/$PROB_NAME" -C "$HOME/ProB"; fi
+
+  # install Divine2
+  - if [ ! -f "$HOME/ltsmin-deps/bin/divine" ]; then
+    wget "$DIVINE_URL" -P /tmp &&
+    tar -xf "/tmp/$DIVINE_NAME" -C "$HOME/ltsmin-deps"; fi
+  
+  # install ViennaCL on linux
+  - if [ ! -d "$HOME/ltsmin-deps/include/viennacl" -a "$TRAVIS_OS_NAME" = "linux" ]; then
+    wget "$VIENNACL_URL" -P /tmp &&
+    tar xf "/tmp/$VIENNACL_NAME.tar.gz" -C /tmp &&
+    cp -R "/tmp/$VIENNACL_NAME/viennacl" "$HOME/ltsmin-deps/include"; fi
+
+before_script:
+  # export necessary variables
+  # bin
+  - export PATH=$HOME/ltsmin-deps/bin:$HOME/ProB:$PATH
+  # include    
+  - export C_INCLUDE_PATH="$HOME/ltsmin-deps/include:$C_INCLUDE_PATH"
+  # lib (linux)
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then 
+    export LD_LIBRARY_PATH="$HOME/ltsmin-deps/lib:$HOME/ProB/lib:$LD_LIBRARY_PATH"; fi
+  # lib (osx)
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then 
+    export DYLD_LIBRARY_PATH="$HOME/ltsmin-deps/lib:$HOME/ProB/lib:$DYLD_LIBRARY_PATH" &&
+    export LDFLAGS="-L$HOME/ltsmin-deps/lib"; fi
+
+script:
+  - ./ltsminreconf &&
+    ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include"
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make -j2; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make -j2 LDFLAGS="-static-libstdc++ -static-libgcc"; fi
+  - make dist &&
+    export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
+    mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TRAVIS_TAG-source.tgz"
+  - if [ ${#TRAVIS_TAG} -gt 0 ]; then
+    make install &&
+    cp "$HOME/ltsmin-deps/bin/divine" /tmp/dist/bin &&
+    cp "$HOME/ltsmin-deps/bin/txt2lps" /tmp/dist/bin &&
+    cp "$HOME/ltsmin-deps/bin/txt2pbes" /tmp/dist/bin &&
+    export distname="ltsmin-$TRAVIS_TAG-$TRAVIS_OS_NAME-$CC" &&
+    pushd /tmp/dist &&
+    tar cfz "$distname.tgz" * &&
+    popd; fi
+  
+notifications:
+  email: false
+
+deploy:
+  provider: releases
+  # change this key if you want to upload to your own repository, but don't push upstream!
+  api_key:
+    secure: uOlJEcM+k143sHC14Iav3YQVAVEKX8Oq0OXF4IBY1BgjGBHE6En7VemaZcWGiZX5K9pepZ2wXBtXk4VGlzZpkZAgQCayUKaQKRtNFhJJtx9ZrhAqZ4wa6hPXRKExGdYetL72S1u9bTdWXjU20k2b/ROE2opXOWdjfN/mBEkdWQQPyB1zlnqzXK8xsJVRnX7h2rCZxefP/F9Z6TDNDzKNjpHFK0WdXwOYBVzop8jFfl6dcwqvxy9Gmbh3fkJCh4rrqs01KOALXN+o/uOu9PnSnuf9JjXXK1wsMCYIGxuUfz67BzYcAy7bNrRwP+eehLKp1ntxul0YPabOLnEY4dlohWu3ryL8iFbewnqnVKuMxSJ7rAmTqpz2nWpl9mqpqqUtcGA457hsebDGEjzgr4VXx6h1rtIChrmqLoSUslY/VQWXIhY2g9YxfUNXIFt2LGU4lhmxrXwXb9yYaDkP+dy+Zk6V/IkX0vMHUET8Hqq5p85j7OoEG/NN4pjZzs9T/qXJCgTG0gI8BHBYxBA1PwndoQgqXmxPELkIY5CB8ETtf2wPE7zzTbhjg8HR4IGahWuRJeiMA+MD0uimglxdnA43aC2w7Tzp4zGc7p4TH+bjs3lFimM+uMc/hh58yweBeRDYyaVlXDAX5NdnmsF7mJc7W9cty8gkmppsDvhUmRHDzIw=
+  file: 
+    - "ltsmin-$TRAVIS_TAG-source.tgz"
+    - "/tmp/dist/$distname.tgz"
+  skip_cleanup: true
+  on:
+    # change this repo slug if you want to upload to your own repository, but don't push upstream!
+    repo: Meijuh/ltsmin
+    tags: true  
