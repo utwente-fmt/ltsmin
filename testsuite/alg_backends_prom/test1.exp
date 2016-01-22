@@ -33,7 +33,7 @@ run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
 dict set langs prom exp_output "state space has 242"
-dict set backends sym params "--vset=" {ldd}
+dict set backends sym params "--vset=" {"ldd --lace-workers=1"}
 # BuDDy is too slow for this test 
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
