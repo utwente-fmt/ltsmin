@@ -23,10 +23,10 @@ set langs [dict create]
 
 # lps:
 dict set langs lps model "ieee-11073.lps"
-dict set langs lps options mc "--procs=$num_threads --mcrl2=-rjitty"
-dict set langs lps options dist "--mcrl2=-rjitty"
-dict set langs lps options seq "--mcrl2=-rjitty"
-dict set langs lps options sym "--mcrl2=-rjitty"
+dict set langs lps options mc "--procs=$num_threads --mcrl2-rewriter=jitty"
+dict set langs lps options dist "--mcrl2-rewriter=jitty"
+dict set langs lps options seq "--mcrl2-rewriter=jitty"
+dict set langs lps options sym "--mcrl2-rewriter=jitty"
 
 dict set langs lps exp_output "831 states 2893 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
