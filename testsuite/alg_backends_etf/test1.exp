@@ -16,7 +16,7 @@ puts   "----------------------------------------------\n"
 
 
 # the number of threads to use in multithreaded backends
-set num_threads 5
+set num_threads 2
 
 # Language ETF-frontends:
 # -------------------

@@ -14,7 +14,7 @@ puts   "TESTING: Algorithmic backends for OPAAL"
 puts   "-----------------------------\n"
 
 # the number of threads to use in multithreaded backends
-set num_threads 5
+set num_threads 2
 
 set langs [dict create]
 
