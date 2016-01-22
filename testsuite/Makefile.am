@@ -56,4 +56,8 @@ if HAVE_PNML
 DEJATOOL += alg_backends_pnml
 endif
 
+if HAVE_PROB
+DEJATOOL += alg_backends_prob
+endif
+
 endif
