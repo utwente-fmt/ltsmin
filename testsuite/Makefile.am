@@ -52,4 +52,8 @@ if HAVE_LIBMCRL
 DEJATOOL +=	alg_backends_lpo
 endif
 
+if HAVE_PNML
+DEJATOOL += alg_backends_pnml
+endif
+
 endif
