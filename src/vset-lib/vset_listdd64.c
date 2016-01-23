@@ -1329,10 +1329,9 @@ mdd_next_write(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, 
 static void
 set_project_mdd(vset_t dst, vset_t src)
 {
-    if (dst->p_id == src->p_id || dst->p_len == -1) {
+    if (src->p_len != src->dom->shared.size || dst->p_len == dst->dom->shared.size) {
         dst->mdd = src->mdd;
     } else {
-        assert(src->p_len == src->dom->shared.size);
         dst->mdd = 0;
         dst->mdd = mdd_project(dst->p_id, src->mdd, 0, dst->proj, dst->p_len);
     }
