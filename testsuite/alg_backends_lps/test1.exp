@@ -34,6 +34,8 @@ run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
 dict set langs lps exp_output "state space has 831"
+# below, disable the -g option, this fails in 201409.1, but fixed in newer SVN version.
+dict set backends sym options {"-rga" ""}
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
