@@ -1195,7 +1195,6 @@ GBregroup (model_t model)
         // set new dependency matrices
         GBsetDMInfoMayWrite (group, mayw);
         GBsetDMInfoMustWrite(group, mustw);
-        GBsetProjectMatrix(group, mayw);
 
         // here we either transform the read matrix or the actions read matrix
         if (GBgetUseGuards(model)) { // we have transformed the actions read matrix
@@ -1211,7 +1210,6 @@ GBregroup (model_t model)
                              ctx->transmap);
             dm_copy_col_info(r, read);
             GBsetDMInfoRead(group, read);
-            GBsetExpandMatrix(group, r);
         } else { // we have transformed the read matrix
 
             // transform the actions read matrix and set it
@@ -1224,8 +1222,8 @@ GBregroup (model_t model)
                         PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
             // set the new read matrix
             GBsetDMInfoRead(group, r);
-            GBsetExpandMatrix(group, r);
         }
+
 
         // create a new combined dependency matrix
         matrix_t *new_dm = RTmalloc (sizeof (matrix_t));
@@ -1266,11 +1264,6 @@ GBregroup (model_t model)
         GBsetPrettyPrint (group, group_chunk_pretty_print);
 
         GBinitModelDefaults (&group, model);
-
-        // apparently we have over-approximated w to W.
-        // so now we support copy.
-        if (dm_is_empty(mustw) && original_must_write == original_may_write)
-            GBsetSupportsCopy(group);
 
         // permute initial state
         {

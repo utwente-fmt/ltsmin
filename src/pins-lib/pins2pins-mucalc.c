@@ -1003,10 +1003,8 @@ GBaddMucalc (model_t model, const char *mucalc_file)
 
     GBsetDMInfo(_model, _p_dm);
     GBsetDMInfoRead(_model, _p_dm_r);
-    GBsetExpandMatrix(_model, _p_dm_r);
     GBsetDMInfoMayWrite(_model, _p_dm_mw);
     GBsetDMInfoMustWrite(_model, _p_dm_w);
-    GBsetProjectMatrix(_model, _p_dm_mw);
 
     // Set the state label functions for parity games
     GBsetStateLabelShort(_model, mucalc_sl_short);

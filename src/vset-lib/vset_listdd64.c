@@ -2277,7 +2277,6 @@ set_join_mdd(vset_t dst, vset_t left, vset_t right)
 }
 
 static int separates_rw() { return 1; }
-static int supports_cpy() { return 1; }
 
 static long double mdd_ccount(uint32_t mdd){
     if (mdd<=1) return mdd;
@@ -2398,6 +2397,5 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.rel_dot=rel_dot_mdd;
     dom->shared.set_join=set_join_mdd;
     dom->shared.separates_rw=separates_rw;
-    dom->shared.supports_cpy=supports_cpy;
     return dom;
 }

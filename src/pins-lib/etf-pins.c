@@ -223,7 +223,6 @@ ETFloadGreyboxModel(model_t model, const char *name)
      * Set these again when ETF supports read, write and copy.
        GBsetDMInfoRead(model, p_dm_read_info);
        GBsetDMInfoMustWrite(model, p_dm_write_info);
-       GBsetSupportsCopy(model); // no may-write so we support copy.
      */
     GBsetNextStateShort(model,etf_short);
 

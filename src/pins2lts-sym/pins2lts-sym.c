@@ -3213,8 +3213,7 @@ do_output(char *etf_output, vset_t visited)
          * extended.
          */
         Warning(info, "Note: ETF format does not yet support read, write and copy.");
-        GBsetExpandMatrix(model, GBgetDMInfo(model));
-        GBsetProjectMatrix(model, GBgetDMInfo(model));
+        transitions_short = GBgetTransitionsShort;
 
         for (int i = 0; i < nGrps; i++) {
             vset_destroy(group_explored[i]);
@@ -3548,28 +3547,38 @@ init_domain(vset_implementation_t impl) {
     label_true     = (vset_t*)RTmalloc(sLbls * sizeof(vset_t));
     label_tmp      = (vset_t*)RTmalloc(sLbls * sizeof(vset_t));
 
-    matrix_t *read_matrix = RTmalloc(sizeof (matrix_t));
-    dm_copy(GBgetExpandMatrix(model), read_matrix);
-    matrix_t *write_matrix = RTmalloc(sizeof (matrix_t));
-    dm_copy(GBgetProjectMatrix(model), write_matrix);
-    if (!vdom_separates_rw(domain)) {
-        dm_apply_or(read_matrix, GBgetProjectMatrix(model));
-        dm_apply_or(write_matrix, GBgetExpandMatrix(model));
+    matrix_t* read_matrix;
+    matrix_t* write_matrix;
+
+    if (!vdom_separates_rw(domain) && !GBgetUseGuards(model)) {
+        read_matrix = GBgetDMInfo(model);
+        write_matrix = GBgetDMInfo(model);
+        Warning(info, "Using GBgetTransitionsShort as next-state function");
+        transitions_short = GBgetTransitionsShort;
+    } else if (!vdom_separates_rw(domain) && GBgetUseGuards(model)) {
+        read_matrix = GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
+        write_matrix = GBgetDMInfo(model);
+        Warning(info, "Using GBgetActionsShort as next-state function");
+        transitions_short = GBgetActionsShort;
+    } else if (vdom_separates_rw(domain) && !GBgetUseGuards(model)) {
+        read_matrix = GBgetDMInfoRead(model);
+        write_matrix = GBgetDMInfoMayWrite(model);
+        Warning(info, "Using GBgetTransitionsShortR2W as next-state function");
+        transitions_short = GBgetTransitionsShortR2W;
+    } else { // vdom_separates_rw(domain) && GBgetUseGuards(model)
+        read_matrix = GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
+        write_matrix = GBgetDMInfoMayWrite(model);
+        Warning(info, "Using GBgetActionsShortR2W as next-state function");
+        transitions_short = GBgetActionsShortR2W;
     }
 
-    if (vdom_separates_rw(domain) && (!GBsupportsCopy(model) || !vdom_supports_cpy(domain))) {
-        if (HREme(HREglobal())==0) {
-            Warning(info, "May-write does not support copy; over-approximating may-write \\ must-write to read + write");
+    if (GBgetUseGuards(model)) {
+        if (no_soundness_check) {
+            Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
+        } else {
+            Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
         }
-        matrix_t *w = RTmalloc(sizeof(matrix_t));
-        dm_copy(GBgetDMInfoMayWrite(model), w);
-        dm_apply_xor(w, GBgetDMInfoMustWrite(model));
-        dm_apply_or(read_matrix, w);
-        dm_free(w);
     }
-
-    GBsetExpandMatrix(model, read_matrix);
-    GBsetProjectMatrix(model, write_matrix);
 
     for(int i = 0; i < nGrps; i++) {
         r_projs[i].len   = dm_ones_in_row(read_matrix, i);
@@ -4227,20 +4236,6 @@ VOID_TASK_1(actual_main, void*, arg)
         expand_groups = 0;
     } else {
         init_domain(VSET_IMPL_AUTOSELECT);
-
-        if(GBgetUseGuards(model)) {
-            transitions_short = GBgetActionsShort;
-            Print(infoShort, "Using GBgetActionsShort as next-state function");
-
-            if (no_soundness_check) {
-                Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
-            } else {
-                Warning(info, "Guard-splitting: checking soundness of specification, this may be slow!");
-            }
-        } else {
-            transitions_short = GBgetTransitionsShort;
-            Print(infoShort, "Using GBgetTransitionsShort as next-state function");
-        }
 
         initial = vset_create(domain, -1, NULL);
         src = (int*)alloca(sizeof(int)*N);

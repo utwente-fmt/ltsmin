@@ -32,6 +32,19 @@ mutex_next_short(model_t model, int group, int* src, TransitionCB cb, void* cont
 }
 
 static int
+mutex_next_short_r2w(model_t model, int group, int* src, TransitionCB cb, void* context)
+{
+    struct mutex_context *mc = (struct mutex_context*)GBgetContext(model);
+    pthread_mutex_lock(&mc->mutex);
+    mc->count++;
+
+    int res = GBgetTransitionsShortR2W(GBgetParent(model), group, src, cb, context);
+
+    pthread_mutex_unlock(&mc->mutex);
+    return res;
+}
+
+static int
 mutex_next_long(model_t model, int group, int* src, TransitionCB cb, void* context)
 {
     struct mutex_context *mc = (struct mutex_context*)GBgetContext(model);
@@ -78,6 +91,19 @@ mutex_actions_short(model_t model, int group, int* src, TransitionCB cb, void* c
     mc->count++;
 
     int res = GBgetActionsShort(GBgetParent(model), group, src, cb, context);
+
+    pthread_mutex_unlock(&mc->mutex);
+    return res;
+}
+
+static int
+mutex_actions_short_r2w(model_t model, int group, int* src, TransitionCB cb, void* context)
+{
+    struct mutex_context *mc = (struct mutex_context*)GBgetContext(model);
+    pthread_mutex_lock(&mc->mutex);
+    mc->count++;
+
+    int res = GBgetActionsShortR2W(GBgetParent(model), group, src, cb, context);
 
     pthread_mutex_unlock(&mc->mutex);
     return res;
@@ -183,10 +209,12 @@ GBaddMutex(model_t parent_model)
 
     /* set overloaded functions */
     GBsetNextStateShort(mutex_model, mutex_next_short);
+    GBsetNextStateShortR2W(mutex_model, mutex_next_short_r2w);
     GBsetNextStateLong(mutex_model, mutex_next_long);
     GBsetNextStateAll(mutex_model, mutex_next_all);
     GBsetNextStateMatching(mutex_model, mutex_next_matching);
     GBsetActionsShort(mutex_model, mutex_actions_short);
+    GBsetActionsShortR2W(mutex_model, mutex_actions_short_r2w);
     GBsetActionsLong(mutex_model, mutex_actions_long);
     GBsetStateLabelShort(mutex_model, mutex_state_labels_short);
     GBsetStateLabelLong(mutex_model, mutex_state_labels_long);

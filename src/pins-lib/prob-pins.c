@@ -325,17 +325,15 @@ prob_load_model(model_t model)
         SIputAt(op_si,name,i);
     }
 
-    matrix_t* may_write = RTmalloc(sizeof(matrix_t));
     matrix_t* must_write = RTmalloc(sizeof(matrix_t));
     matrix_t* read = RTmalloc(sizeof(matrix_t));
     matrix_t* dm = RTmalloc(sizeof(matrix_t));
-    dm_create(may_write, num_groups, ctx->num_vars + 1);
     dm_create(must_write, num_groups, ctx->num_vars + 1);
     dm_create(read, num_groups, ctx->num_vars + 1);
 
-    GBsetDMInfoMayWrite(model, may_write);
     GBsetDMInfoMustWrite(model, must_write);
     GBsetDMInfoRead(model, read);
+
     GBsetDMInfo(model, dm);
 
     matrix_t* sl_info = RTmalloc(sizeof(matrix_t));
@@ -358,8 +356,6 @@ prob_load_model(model_t model)
         }
     }
 
-    dm_apply_or(may_write, must_write);
-
     for (size_t i = 0; i < init.may_write.nr_rows; i++) {
         const char* name = init.may_write.rows[i].transition_group.data;
         const int vars = init.may_write.rows[i].variables.size;
@@ -367,7 +363,8 @@ prob_load_model(model_t model)
         for (int j = 0; j < vars; j++) {
             const char* var = init.may_write.rows[i].variables.chunks[j].data;
             const int col = SIlookup(var_si, var);
-            dm_set(may_write, row, col);
+            dm_set(must_write, row, col);
+            dm_set(read, row, col);
         }
     }
 
@@ -393,7 +390,7 @@ prob_load_model(model_t model)
         }
     }
 
-    dm_copy(may_write, dm);
+    dm_copy(must_write, dm);
     dm_apply_or(dm, read);
 
     int init_state[ctx->num_vars + 1];

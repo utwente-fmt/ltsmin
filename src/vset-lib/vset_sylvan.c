@@ -888,12 +888,6 @@ separates_rw()
     return 1;
 }
 
-static int
-supports_cpy()
-{
-    return 1;
-}
-
 static void
 dom_set_function_pointers(vdom_t dom)
 {
@@ -944,7 +938,6 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.rel_destroy=rel_destroy;
 
     dom->shared.separates_rw=separates_rw;
-    dom->shared.supports_cpy=supports_cpy;
 }
 
 VOID_TASK_0(gc_start)

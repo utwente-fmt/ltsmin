@@ -723,12 +723,6 @@ separates_rw()
     return 1;
 }
 
-static int
-supports_cpy()
-{
-    return 1;
-}
-
 typedef struct lddmc_visit_info_global {
     uint64_t op;
     vset_visit_callbacks_t* cbs;
@@ -922,7 +916,6 @@ set_function_pointers(vdom_t dom)
     dom->shared.rel_load=rel_load;
 
     dom->shared.separates_rw=separates_rw;
-    dom->shared.supports_cpy=supports_cpy;
 }
 
 vdom_t

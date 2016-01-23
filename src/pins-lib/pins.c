@@ -19,7 +19,6 @@ struct grey_box_model {
 	matrix_t *dm_read_info;
 	matrix_t *dm_may_write_info;
 	matrix_t *dm_must_write_info;
-	int supports_copy;
 	matrix_t *sl_info;
     sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
     guard_t** guards;
@@ -38,8 +37,10 @@ struct grey_box_model {
 	int use_guards;
 	void*context;
     next_method_grey_t next_short;
+    next_method_grey_t next_short_r2w;
 	next_method_grey_t next_long;
     next_method_grey_t actions_short;
+    next_method_grey_t actions_short_r2w;
     next_method_grey_t actions_long;
 	next_method_matching_t next_matching;
 	next_method_black_t next_all;
@@ -59,8 +60,6 @@ struct grey_box_model {
 	chunk2pretty_t chunk2pretty;
 	void** map;
 	string_set_t default_filter;
-	matrix_t *expand_matrix;
-	matrix_t *project_matrix;
 	
 	int mucalc_node_count;
 
@@ -136,14 +135,31 @@ struct nested_cb {
 
 void project_dest(void*context,transition_info_t*ti,int*dst,int*cpy){
 #define info ((struct nested_cb*)context)
-    int len = dm_ones_in_row(GBgetProjectMatrix(info->model), info->group);
+    int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
     int short_dst[len];
 
-    dm_project_vector(GBgetProjectMatrix(info->model), info->group, dst, short_dst);
+    dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
     ti->group = info->group;
     if (cpy != NULL) {
         int short_cpy[len];
-        dm_project_vector(GBgetProjectMatrix(info->model), info->group, cpy, short_cpy);
+        dm_project_vector(GBgetDMInfo(info->model), info->group, cpy, short_cpy);
+        info->cb(info->user_ctx,ti,short_dst,short_cpy);
+    } else {
+        info->cb(info->user_ctx,ti,short_dst,NULL);
+    }
+#undef info
+}
+
+void project_dest_write(void*context,transition_info_t*ti,int*dst,int*cpy){
+#define info ((struct nested_cb*)context)
+    int len = dm_ones_in_row(GBgetDMInfoMayWrite(info->model), info->group);
+    int short_dst[len];
+
+    dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, dst, short_dst);
+    ti->group = info->group;
+    if (cpy != NULL) {
+        int short_cpy[len];
+        dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, cpy, short_cpy);
         info->cb(info->user_ctx,ti,short_dst,short_cpy);
     } else {
         info->cb(info->user_ctx,ti,short_dst,NULL);
@@ -152,24 +168,38 @@ void project_dest(void*context,transition_info_t*ti,int*dst,int*cpy){
 }
 
 int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
-	struct nested_cb info;
-	info.model = self;
-	info.group = group;
-	info.src=src;
-	info.cb=cb;
-	info.user_ctx=context;
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
 
-    int long_src[dm_ncols(GBgetExpandMatrix(self))];
-    dm_expand_vector(GBgetExpandMatrix(self), group, self->s0, src, long_src);
+    int long_src[dm_ncols(GBgetDMInfo(self))];
+    dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
 
     return self->next_long(self,group,long_src,project_dest,&info);
 }
 
+int default_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context){
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
+
+    int long_src[dm_ncols(GBgetDMInfoRead(self))];
+    dm_expand_vector(GBgetDMInfoRead(self), group, self->s0, src, long_src);
+
+    return self->next_long(self,group,long_src,project_dest_write,&info);
+}
+
 void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
 #define info ((struct nested_cb*)context)
-	int long_dst[dm_ncols(GBgetProjectMatrix(info->model))];
-	dm_expand_vector(GBgetProjectMatrix(info->model), info->group, info->src, dst, long_dst);
-	info->cb(info->user_ctx,ti,long_dst,cpy);
+    int long_dst[dm_ncols(GBgetDMInfo(info->model))];
+    dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
+    info->cb(info->user_ctx,ti,long_dst,cpy);
 #undef info
 }
 
@@ -181,9 +211,9 @@ int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	info.cb=cb;
 	info.user_ctx=context;
 
-	int len = dm_ones_in_row(GBgetExpandMatrix(self), group);
+	const int len = dm_ones_in_row(GBgetDMInfo(self), group);
 	int src_short[len];
-	dm_project_vector(GBgetExpandMatrix(self), group, src, src_short);
+	dm_project_vector(GBgetDMInfo(self), group, src, src_short);
 
 	return self->next_short(self,group,src_short,expand_dest,&info);
 }
@@ -196,9 +226,24 @@ int default_actions_short(model_t self,int group,int*src,TransitionCB cb,void*co
     info.cb=cb;
     info.user_ctx=context;
 
-    int long_src[dm_ncols(GBgetExpandMatrix(self))];
-    dm_expand_vector(GBgetExpandMatrix(self), group, self->s0, src, long_src);
+    int long_src[dm_ncols(GBgetDMInfo(self))];
+    dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
     return self->actions_long(self,group,long_src,project_dest,&info);
+}
+
+int default_actions_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context){
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
+
+    matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+
+    int long_src[dm_ncols(read)];
+    dm_expand_vector(read, group, self->s0, src, long_src);
+    return self->actions_long(self,group,long_src,project_dest_write,&info);
 }
 
 int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*context){
@@ -209,14 +254,14 @@ int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*con
     info.cb=cb;
     info.user_ctx=context;
 
-    int len = dm_ones_in_row(GBgetExpandMatrix(self), group);
+    matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+
+    const int len = dm_ones_in_row(read, group);
     int src_short[len];
-    dm_project_vector(GBgetExpandMatrix(self), group, src, src_short);
+    dm_project_vector(read, group, src, src_short);
 
     return self->actions_short(self,group,src_short,expand_dest,&info);
 }
-
-
 
 int GBgetTransitionsMarked(model_t self,matrix_t* matrix,int row,int*src,TransitionCB cb,void*context){
     int N=dm_ncols(matrix);
@@ -298,6 +343,12 @@ wrapped_default_short (model_t self,int group,int*src,TransitionCB cb,void*conte
 }
 
 int
+wrapped_default_short_r2w (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetTransitionsShortR2W (GBgetParent(self), group, src, cb, context);
+}
+
+int
 wrapped_default_long (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
     return GBgetTransitionsLong (GBgetParent(self), group, src, cb, context);
@@ -307,6 +358,12 @@ int
 wrapped_default_actions_short (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
     return GBgetActionsShort (GBgetParent(self), group, src, cb, context);
+}
+
+int
+wrapped_default_actions_short_r2w (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetActionsShortR2W (GBgetParent(self), group, src, cb, context);
 }
 
 int
@@ -398,7 +455,6 @@ model_t GBcreateBase(){
 	model->dm_read_info=NULL;
 	model->dm_may_write_info=NULL;
 	model->dm_must_write_info=NULL;
-	model->supports_copy=-1;
 	model->sl_info=NULL;
     for(int i=0; i < GB_SL_GROUP_COUNT; i++)
         model->sl_groups[i]=NULL;
@@ -416,8 +472,10 @@ model_t GBcreateBase(){
 	model->s0=NULL;
 	model->context=0;
     model->next_short=default_short;
+    model->next_short_r2w=default_short_r2w;
 	model->next_long=default_long;
     model->actions_short=default_actions_short;
+    model->actions_short_r2w=default_actions_short_r2w;
     model->actions_long=default_actions_long;
 	model->next_matching=next_matching_default;
 	model->next_all=default_all;
@@ -433,8 +491,6 @@ model_t GBcreateBase(){
 	model->chunk2pretty=NULL;
 	model->map=NULL;
 	model->get_count=NULL;
-	model->expand_matrix=NULL;
-	model->project_matrix=NULL;
 	model->use_guards=0;
 	model->mucalc_node_count = 0;
 	
@@ -486,7 +542,6 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         else
             model->dm_must_write_info = model->dm_info;
     }
-    if (model->supports_copy == -1) model->supports_copy = default_src->supports_copy;
     if (model->dm_info == NULL)
         model->dm_info = default_src->dm_info;
 
@@ -531,10 +586,12 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     for (int i = 0; i < GBgetMatrixCount(default_src); i++) {
         const char* name = GBgetMatrixName(default_src, i);
-        pins_strictness_t strictness = GBgetMatrixStrictness(default_src, i);
-        index_class_t row_info = GBgetMatrixRowInfo(default_src, i);
-        index_class_t column_info = GBgetMatrixColumnInfo(default_src, i);
-        GBsetMatrix(model, name, GBgetMatrix(default_src, i), strictness, row_info, column_info);
+        if (GBgetMatrixID(model, (char*) name) == SI_INDEX_FAILED) {
+            pins_strictness_t strictness = GBgetMatrixStrictness(default_src, i);
+            index_class_t row_info = GBgetMatrixRowInfo(default_src, i);
+            index_class_t column_info = GBgetMatrixColumnInfo(default_src, i);
+            GBsetMatrix(model, name, GBgetMatrix(default_src, i), strictness, row_info, column_info);
+        }
     }
 
     if (model->s0 == NULL) {
@@ -567,15 +624,19 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
      * implements a next_all.
      */
     if (model->next_short == default_short &&
+        model->next_short_r2w == default_short_r2w &&
         model->next_long == default_long &&
-        model->actions_short == default_short &&
-        model->actions_long == default_long &&
+        model->actions_short == default_actions_short &&
+        model->actions_short_r2w == default_actions_short_r2w &&
+        model->actions_long == default_actions_long &&
         model->next_all == default_all) {
         GBsetNextStateShort (model, wrapped_default_short);
+        GBsetNextStateShortR2W (model, wrapped_default_short_r2w);
         GBsetNextStateLong (model, wrapped_default_long);
         GBsetNextStateAll (model, wrapped_default_all);
         GBsetActionsLong (model, wrapped_default_actions_long);
         GBsetActionsShort (model, wrapped_default_actions_short);
+        GBsetActionsShortR2W (model, wrapped_default_actions_short_r2w);
     }
 
     if (model->state_labels_short == state_labels_default_short &&
@@ -591,13 +652,8 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->covered_by_short == NULL)
         GBsetIsCoveredByShort(model, default_src->covered_by_short);
 
-    if (model->expand_matrix == NULL) model->expand_matrix=default_src->expand_matrix;
-    if (model->project_matrix == NULL) model->project_matrix=default_src->project_matrix;
     if (model->use_guards == 0) model->use_guards=default_src->use_guards;
     if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
-
-    model->static_info_index = default_src->static_info_index;
-    model->static_info_matrices = default_src->static_info_matrices;
 
     model->exit = wrapped_exit_default;
 }
@@ -664,28 +720,6 @@ matrix_t *GBgetDMInfoRead(model_t model) {
 	return model->dm_read_info;
 }
 
-matrix_t *GBgetExpandMatrix(model_t model) {
-    if (model->expand_matrix == NULL) {
-        model->expand_matrix = GBgetDMInfoRead(model);
-    }
-    return model->expand_matrix;
-}
-
-matrix_t *GBgetProjectMatrix(model_t model) {
-    if (model->project_matrix == NULL) {
-        model->project_matrix = GBgetDMInfoMayWrite(model);
-    }
-    return model->project_matrix;
-}
-
-void GBsetExpandMatrix(model_t model, matrix_t *dm_info) {
-    model->expand_matrix = dm_info;
-}
-
-void GBsetProjectMatrix(model_t model, matrix_t *dm_info) {
-    model->project_matrix = dm_info;
-}
-
 static int write_checked=0;
 
 static void check_write_matrices(model_t model) {
@@ -731,14 +765,6 @@ matrix_t *GBgetDMInfoMustWrite(model_t model) {
     return model->dm_must_write_info;
 }
 
-int GBsupportsCopy(model_t model) {
-    if (model->supports_copy == -1) model->supports_copy = 0;
-    return model->supports_copy;
-}
-void GBsetSupportsCopy(model_t model) {
-    model->supports_copy = 1;
-}
-
 void GBsetStateLabelInfo(model_t model, matrix_t *info){
 	if (model->sl_info != NULL)  Abort("state info already set");
 	model->sl_info=info;
@@ -770,8 +796,16 @@ void GBsetActionsShort(model_t model,next_method_grey_t method){
     model->actions_short=method;
 }
 
+void GBsetActionsShortR2W(model_t model, next_method_grey_t method) {
+    model->actions_short_r2w=method;
+}
+
 int GBgetActionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
     return model->actions_short(model,group,src,cb,context);
+}
+
+int GBgetActionsShortR2W(model_t model,int group,int*src,TransitionCB cb,void*context){
+    return model->actions_short_r2w(model,group,src,cb,context);
 }
 
 void GBsetActionsLong(model_t model,next_method_grey_t method){
@@ -786,8 +820,16 @@ void GBsetNextStateShort(model_t model,next_method_grey_t method){
     model->next_short=method;
 }
 
+void GBsetNextStateShortR2W(model_t model,next_method_grey_t method){
+    model->next_short_r2w=method;
+}
+
 int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
     return model->next_short(model,group,src,cb,context);
+}
+
+int GBgetTransitionsShortR2W(model_t model,int group,int*src,TransitionCB cb,void*context){
+    return model->next_short_r2w(model,group,src,cb,context);
 }
 
 void GBsetNextStateLong(model_t model,next_method_grey_t method){
@@ -1075,7 +1117,7 @@ void GBprintDependencyMatrixMustWrite(FILE* file, model_t model) {
 }
 
 void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
-    matrix_t *dm_r = GBgetExpandMatrix(model);
+    matrix_t *dm_r = GBgetDMInfoRead(model);
     matrix_t *dm_may_w = GBgetDMInfoMayWrite(model);
     matrix_t *dm_must_w = GBgetDMInfoMustWrite(model);
 
@@ -1240,12 +1282,6 @@ GBloadFile(model_t model, const char *filename)
 
                     model->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
                     model->next_all = guards_all;
-
-                    /* check if there is a suitable expand matrix (read matrix) for this model */
-                    model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
-                    if (model->expand_matrix == NULL) {
-                        Abort ("Matrix not available for --"USE_GUARDS_OPTION);
-                    }
                 }
 
                 return;

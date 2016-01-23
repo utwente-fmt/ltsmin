@@ -613,7 +613,6 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     GBsetDMInfo(model, dm_info);
     GBsetDMInfoRead(model, dm_read_info);
     GBsetDMInfoMustWrite(model, dm_must_write_info);
-    GBsetSupportsCopy(model);
     GBsetMatrix(model, LTSMIN_MATRIX_ACTIONS_READS, dm_update,
         PINS_MAY_SET, PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
 
@@ -674,6 +673,8 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     if (context->num_safe_places == 0) {
         GBsetNextStateShort(model, (next_method_grey_t) get_successor_short);
         GBsetActionsShort(model, (next_method_grey_t) get_update_short);
+        GBsetNextStateShortR2W(model, (next_method_grey_t) get_successor_short);
+        GBsetActionsShortR2W(model, (next_method_grey_t) get_update_short);
     } else Warning(infoLong, "Since this net has 1-safe places, short next-state functions are not used");
 
     GBsetExit(model, pnml_exit);

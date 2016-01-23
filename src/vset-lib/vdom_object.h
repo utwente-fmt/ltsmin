@@ -75,7 +75,6 @@ struct vector_domain_shared {
     // creating a domain from a saved dom: vdom_create_domain_from_file
 
 	int (*separates_rw)();
-	int (*supports_cpy)();
 	int (*supports_precise_counting)();
 	char **names;
 };

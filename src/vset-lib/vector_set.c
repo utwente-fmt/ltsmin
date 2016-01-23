@@ -291,11 +291,6 @@ int vdom_separates_rw(vdom_t dom) {
     return dom->shared.separates_rw();
 }
 
-int vdom_supports_cpy(vdom_t dom) {
-    if (dom->shared.supports_cpy == NULL) return 0;
-    return dom->shared.supports_cpy();
-}
-
 vset_t vset_create(vdom_t dom,int k,int* proj){
 	return dom->shared.set_create(dom,k,proj);
 }
@@ -627,7 +622,7 @@ void
 vrel_add_act(vrel_t rel,const int* src, const int* dst, const int* cpy, const int act)
 {
     if (rel->dom->shared.rel_add_act == NULL) {
-        if (vdom_supports_cpy(rel->dom)) {
+        if (vdom_separates_rw(rel->dom)) {
             Warning(info, "vrel_add_act not supported; falling back to vrel_add_cpy");
             rel->dom->shared.rel_add_act = default_rel_add_act_cpy;
         } else {
