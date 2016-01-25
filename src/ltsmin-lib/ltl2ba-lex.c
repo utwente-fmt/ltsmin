@@ -38,67 +38,26 @@
 #undef Debug
 #include <hre/user.h>
 #include <ltsmin-lib/ltl2ba-lex.h>
+#include <ltsmin-lib/ltl2ba-lex-helper.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <ltsmin-lib/ltsmin-buchi.h>
 
 
-typedef struct ltsmin_expr_list_t {
-    char* text;
-    ltsmin_expr_t expr;
-    struct ltsmin_expr_list* next;
-} ltsmin_expr_list_t;
-
-ltsmin_expr_list_t* le_list = NULL;
-
-typedef struct ltsmin_lin_expr {
-    int size;
-    int count;
-    ltsmin_expr_t lin_expr[];
-} ltsmin_lin_expr_t;
-
-static ltsmin_lin_expr_t* le;
+static ltsmin_expr_list_t *le_list = NULL;
+static ltsmin_lin_expr_t *le;
 static int le_at;
 
-static int	tl_lex(void);
+static int  tl_lex(void);
 
 extern YYSTYPE  tl_yylval;
-char	yytext[2048];
+char    yytext[2048];
 
 #define Token(y)        tl_yylval = tl_nn(y,ZN,ZN); append_uform(yytext); \
     Debug ("LTL Lexer: passing token '%s' to LTL2BA", yytext); return y
 
 #define LTL_LPAR ((void*)0x01)
 #define LTL_RPAR ((void*)0x02)
-
-ltsmin_expr_t
-ltsmin_expr_lookup(ltsmin_expr_t e, char* text)
-{
-    // lookup expression
-    ltsmin_expr_list_t **pp_le_list = &le_list;
-    while(*pp_le_list != NULL) {
-        if (e) {
-            // compare on expression
-            if ((*pp_le_list)->expr->hash == e->hash) {
-                if (LTSminExprEq((*pp_le_list)->expr, e)) {
-                    return (*pp_le_list)->expr;
-                }
-            }
-        } else {
-            // compare on text
-            if (strcmp((*pp_le_list)->text, text) == 0)
-                return (*pp_le_list)->expr;
-        }
-        pp_le_list = (ltsmin_expr_list_t**)&((*pp_le_list)->next);
-    }
-    // alloc room for this predicate expression
-    *pp_le_list = (ltsmin_expr_list_t*) tl_emalloc(sizeof(ltsmin_expr_list_t));
-    (*pp_le_list)->text = strdup(text);
-    (*pp_le_list)->expr = e;
-    Debug ("LTL Symbol table: record expression %p as '%s'", e, text);
-    (*pp_le_list)->next = NULL;
-    return e;
-}
 
 static int
 tl_lex(void)
@@ -151,7 +110,7 @@ tl_lex(void)
         case LTL_SVAR:
         case LTL_VAR: {
             ltsmin_expr_print_ltl(e, yytext);
-            /*ltsmin_expr_t ne = */ltsmin_expr_lookup(e, yytext);
+            /*ltsmin_expr_t ne = */ltsmin_expr_lookup(e, yytext, &le_list);
 
             tl_yylval = tl_nn(PREDICATE,ZN,ZN);
             tl_yylval->sym = tl_lookup(yytext);
@@ -165,47 +124,6 @@ tl_lex(void)
     }
     tl_yyerror("expected something...");
     return 0;
-}
-
-void
-add_lin_expr(ltsmin_expr_t e)
-{
-    // fill le_expr
-    if (le->count >= le->size) {
-        le->size *= 2;
-        le = RTrealloc(le, sizeof(ltsmin_lin_expr_t) + le->size * sizeof(ltsmin_expr_t));
-    }
-    Debug ("LTL Linearizer: added expression %p at %d", e, le->count);
-    le->lin_expr[le->count++] = e;
-}
-
-void
-linearize_ltsmin_expr(ltsmin_expr_t e)
-{
-    // quick fix
-    if (e->token == LTL_EQ) {
-        // add expr
-        add_lin_expr(e);
-        return;
-    }
-
-    // add left part of binary op first
-    if (e->node_type == BINARY_OP) {
-        add_lin_expr(LTL_LPAR);
-        linearize_ltsmin_expr(e->arg1);
-    }
-    // add expr
-    add_lin_expr(e);
-
-    // linearization order
-    if (e->node_type == UNARY_OP) {
-        add_lin_expr(LTL_LPAR);
-        linearize_ltsmin_expr(e->arg1);
-        add_lin_expr(LTL_RPAR);
-    } else if (e->node_type == BINARY_OP) {
-        linearize_ltsmin_expr(e->arg2);
-        add_lin_expr(LTL_RPAR);
-    }
 }
 
 /* ltsmin extension for passing an ltsmin-expression to ltl2ba */
@@ -224,20 +142,18 @@ ltsmin_ltl2ba(ltsmin_expr_t e)
     le->size = le_size;
     le->count = 0;
 
-    linearize_ltsmin_expr(e);
+    linearize_ltsmin_expr(e, &le);
 
     // print linearized expression for debugging:
-    /*
-    for(int i=0; i < le->count; i++) {
+    /*for(int i=0; i < le->count; i++) {
         if (le->lin_expr[i] == LTL_LPAR) {
-            printf("par (");
+            printf("par (\n");
         } else if (le->lin_expr[i] == LTL_RPAR) {
-            printf("par )");
+            printf("par )\n");
         } else {
             printf("token %d, idx %d\n", le->lin_expr[i]->token, le->lin_expr[i]->idx);
         }
-    }
-    */
+    }*/
 
     le_at = 0;
 
@@ -274,10 +190,11 @@ ltsmin_buchi()
     // allocate buchi struct
     res = RTmalloc(sizeof(ltsmin_buchi_t) + state_count * sizeof(ltsmin_buchi_state_t*));
     int n_symbols = sym_id;
+    res->acceptance_set = 0;
     res->predicate_count = n_symbols;
     res->predicates = RTmalloc(n_symbols * sizeof(ltsmin_expr_t));
     for (int i=0; i < n_symbols; i++) {
-        ltsmin_expr_t e = ltsmin_expr_lookup (NULL, sym_table[i]);
+        ltsmin_expr_t e = ltsmin_expr_lookup (NULL, sym_table[i], &le_list);
         Debug("LTL symbol table: lookup up predicate '%s': %p", sym_table[i], e);
         HREassert (e != NULL, "Lookup failed for expression: %s", sym_table[i]);
         res->predicates[i] = e;
@@ -298,6 +215,7 @@ ltsmin_buchi()
 
         transition_count = 0;
         for(t = s->trans->nxt; t != s->trans; t = t->nxt) {
+            bs->transitions[transition_count].acc_set = 0;
             bs->transitions[transition_count].pos = t->pos;
             bs->transitions[transition_count].neg = t->neg;
             bs->transitions[transition_count].to_state = map_id[t->to->final*32+t->to->id+1];
