@@ -12,6 +12,8 @@ EXTRA_DIST += *.mcrl2
 EXTRA_DIST += *.mu
 EXTRA_DIST += *.pml
 EXTRA_DIST += pbes_formula
+EXTRA_DIST += *.pnml
+EXTRA_DIST += *.mch
 
 if HAVE_LIBMCRL2
 EXTRA_DIST += brp.lps
