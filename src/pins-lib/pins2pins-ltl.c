@@ -12,6 +12,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <ltsmin-lib/ltl2ba-lex.h>
+#include <ltsmin-lib/ltl2hoa.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
@@ -342,9 +343,38 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
 void
 print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 {
+    int is_hoa = ba->acceptance_set;
+    if (is_hoa) { // HOA acceptance
+        char buf[4096];
+        memset(buf, 0, sizeof(buf));
+        char* at = buf;
+        *at = '\0';
+        for (int p=0; p<32; p++) {
+            if ( ba->acceptance_set & (1 << p) )
+                at +=  sprintf(at, " %d",p);
+        }
+        Warning(info, "Acceptance set: {%s }", buf);
+    }
     Warning(info, "buchi has %d states", ba->state_count);
     for(int i=0; i < ba->state_count; i++) {
-        Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
+        if (is_hoa) {
+            if (!ba->states[i]->accept) {
+                Warning(info, " state %d:", i);
+            } else {
+                char buf[4096];
+                memset(buf, 0, sizeof(buf));
+                char* at = buf;
+                *at = '\0';
+                for (int p=0; p<32; p++) {
+                    if ( ba->states[i]->accept & (1 << p) )
+                        at +=  sprintf(at, " %d",p);
+                }
+                Warning(info, " state %d: {%s }", i, buf);
+            }
+        }
+        else {
+            Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
+        }
         for(int j=0; j < ba->states[i]->transition_count; j++) {
             char buf[4096*32];
             memset(buf, 0, sizeof(buf));
@@ -364,6 +394,15 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
                 }
             }
             if (at == buf) sprintf(at, "true");
+            
+            if (is_hoa && ba->states[i]->transitions[j].acc_set) { // HOA acceptance
+                at += sprintf(at, " {");
+                for (int p=0; p<32; p++) {
+                    if ( ba->states[i]->transitions[j].acc_set & (1 << p) )
+                        at +=  sprintf(at, " %d",p);
+                }
+                at +=  sprintf(at, " }");
+            }
             Warning(info, "  -> %d, | %s", ba->states[i]->transitions[j].to_state, buf);
         }
     }
@@ -384,9 +423,18 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
         ltsmin_expr_t ltl = parse_file_env (ltl_file, ltl_parse_file, model, env);
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
-        ltsmin_ltl2ba(notltl);
-        ltsmin_buchi_t *ba = ltsmin_buchi();
-        ba->env = env;
+
+        int HAVE_SPOT = 1;
+        int TO_TGBA = 1;
+
+        ltsmin_buchi_t *ba;
+        if (HAVE_SPOT) {
+            ltsmin_ltl2hoa(notltl, TO_TGBA);
+            ba = ltsmin_hoa_buchi();
+        } else {
+            ltsmin_ltl2ba(notltl);
+            ba = ltsmin_buchi();
+        }
         if (NULL == ba) {
             Print(info, "Empty buchi automaton.");
             Print(info, "The property is TRUE.");
@@ -395,6 +443,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         if (ba->predicate_count > 30) {
             Abort("more than 30 predicates in buchi automaton are currently not supported");
         }
+        ba->env = env;
         atomic_write (&shared_ba, ba);
         print_ltsmin_buchi(ba, env);
     } else {
