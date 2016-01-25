@@ -260,7 +260,7 @@ prob_load_model(model_t model)
     lts_type_set_format(ltstype, ctx->op_type_no, LTStypeChunk);
 
     lts_type_set_edge_label_count(ltstype, 1);
-    lts_type_set_edge_label_name(ltstype, 0, "operation");
+    lts_type_set_edge_label_name(ltstype, 0, "action");
     lts_type_set_edge_label_typeno(ltstype, 0, ctx->op_type_no);
 
     // init state labels
