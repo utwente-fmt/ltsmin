@@ -12,7 +12,11 @@ libltsmin_la_SOURCES += etf-parser.c
 libltsmin_la_SOURCES += etf-util.c etf-util.h
 libltsmin_la_SOURCES += ltl2ba-lex.c ltl2ba-lex.h
 libltsmin_la_SOURCES += ltl2ba-lex-helper.c ltl2ba-lex-helper.h
+
+if HAVE_SPOT
 libltsmin_la_SOURCES += ltl2hoa.cpp ltl2hoa.h
+endif
+
 libltsmin_la_SOURCES += lts-type.c lts-type.h
 libltsmin_la_SOURCES += ltsmin-buchi.h
 libltsmin_la_SOURCES += ltsmin-parse-env.h
@@ -24,13 +28,14 @@ libltsmin_la_SOURCES += ltsmin-lexer.l
 libltsmin_la_SOURCES += ltsmin-standard.h
 
 libltsmin_la_LIBADD   = $(top_builddir)/ltl2ba/libltl2ba.la
-libltsmin_la_LIBADD  += -L/home/vincent/install/lib 
-libltsmin_la_LIBADD  += -lspot -lbddx
+libltsmin_la_LIBADD  += $(SPOT_LDFLAGS) $(SPOT_LIBS)
+
+libltsmin_la_LIBS     = $(SPOT_LIBS)
+
 libltsmin_la_CPPFLAGS = -DNXT
 libltsmin_la_CPPFLAGS+= -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS) 
-libltsmin_la_CPPFLAGS+= -I${top_srcdir} -I/home/vincent/install/include 
-libltsmin_la_CPPFLAGS+= -std=c++11
-# TODO: make this general
+libltsmin_la_CPPFLAGS+= -I${top_srcdir}
+libltsmin_la_CPPFLAGS+=  $(SPOT_CPPFLAGS)
 
 # mu-calculus parser
 libmucalc_la_SOURCES  =
