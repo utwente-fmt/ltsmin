@@ -214,6 +214,9 @@ AC_SUBST([BUDDY_LDFLAGS])
 ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
+ACX_SPOT([:],
+  [AC_MSG_WARN([No Spot installation found.])])
+
 ACX_CLINE_DEF([], [])
 
 AC_CHECK_LIB([rt], [aio_error])
@@ -419,6 +422,8 @@ AM_CONDITIONAL([HAVE_BOOST], [test x"$have_boost" = xyes])
 AM_CONDITIONAL([HAVE_VIENNACL], [test x"$have_viennacl" = xyes])
 AM_CONDITIONAL([HAVE_PNML], [test x"$have_xml2" = xyes])
 AM_CONDITIONAL([HAVE_PROB], [test x"$acx_prob" = xyes])
+AM_CONDITIONAL([HAVE_SPOT], [test x"$acx_spot" = xyes])
+AS_IF([test x"$acx_spot" = "xyes"], [AC_DEFINE([HAVE_SPOT], [1], [Define if using Spot.])])
 
 AM_CONDITIONAL(BUILD_OS_IS_DARWIN,
 [case "${build_os}" in
@@ -501,6 +506,7 @@ Configuration:
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc/happy/ghc-pkg/hashmap/deepseq could not be found}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
+    SPOT     = ${acx_spot:-NO, Spot not found (override with --with-spot)}
     SYLVAN   = ${have_sylvan:-NO, building without Sylvan/LDD-MC support}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}

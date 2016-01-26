@@ -12,7 +12,11 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <ltsmin-lib/ltl2ba-lex.h>
+
+#ifdef HAVE_SPOT
 #include <ltsmin-lib/ltl2hoa.h>
+#endif
+
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
@@ -424,17 +428,23 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         ltsmin_expr_t ltl = parse_file_env (ltl_file, ltl_parse_file, model, env);
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
 
-        int HAVE_SPOT = 1;
-        int TO_TGBA = 1;
+        int use_spot = 1;
+        int to_tgba = 1;
+
 
         ltsmin_buchi_t *ba;
-        if (HAVE_SPOT) {
-            ltsmin_ltl2hoa(notltl, TO_TGBA);
+#ifdef HAVE_SPOT
+        if (use_spot) {
+            ltsmin_ltl2hoa(notltl, to_tgba);
             ba = ltsmin_hoa_buchi();
         } else {
+#endif
             ltsmin_ltl2ba(notltl);
             ba = ltsmin_buchi();
+#ifdef HAVE_SPOT
         }
+#endif
+
         if (NULL == ba) {
             Print(info, "Empty buchi automaton.");
             Print(info, "The property is TRUE.");
