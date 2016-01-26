@@ -27,7 +27,7 @@ static int no_close = 0;
 static char* zocket_prefix = "/tmp/ltsmin-";
 
 typedef struct prob_context {
-    int num_vars;
+    size_t num_vars;
     int op_type_no;
     prob_client_t prob_client;
     int* op_type;
@@ -140,7 +140,7 @@ pins2prob_state(model_t model, int* pins)
     prob.chunks = RTmalloc(sizeof(ProBChunk) * prob.size);
 
     Debugf("pins2prob state (%d): ", ctx->num_vars);
-    for (int i = 0; i < ctx->num_vars; i++) {
+    for (size_t i = 0; i < ctx->num_vars; i++) {
         chunk c = GBchunkGet(model, ctx->var_type[i], pins[i]);
 
         prob.chunks[i].data = c.data;
@@ -161,7 +161,7 @@ static void
 prob2pins_state(ProBState s, int *state, model_t model)
 {
     prob_context_t* ctx = (prob_context_t*) GBgetContext(model);
-    HREassert((int) s.size == ctx->num_vars, "expecting %d chunks, but got %zu", ctx->num_vars, s.size);
+    HREassert(s.size == ctx->num_vars, "expecting %zu chunks, but got %zu", ctx->num_vars, s.size);
 
     Debugf("prob2pins state (%zu): ", s.size);
     for (size_t i = 0; i < s.size; i++) {
@@ -281,7 +281,7 @@ prob_load_model(model_t model)
     ctx->var_type = RTmalloc(sizeof(int[ctx->num_vars]));
 
     string_index_t var_si = SIcreate();
-    for (int i = 0; i < ctx->num_vars; i++) {
+    for (size_t i = 0; i < ctx->num_vars; i++) {
         const char* type = init.variable_types.chunks[i].data;
 
         HREassert(type != NULL, "invalid type name");
@@ -341,7 +341,7 @@ prob_load_model(model_t model)
     GBsetStateLabelInfo(model, sl_info);
 
     // set all variables for init group to write dependent
-    for (int i = 0; i < ctx->num_vars + 1; i++) dm_set(must_write, 0, i);
+    for (size_t i = 0; i < ctx->num_vars + 1; i++) dm_set(must_write, 0, i);
     // also set the init var to read dependent for all groups
     for (int i = 0; i < num_groups; i++) dm_set(read, i, ctx->num_vars);
 
