@@ -26,12 +26,20 @@
 
 static char *ltl_file = NULL;
 static const char *ltl_semantics_name = "none";
+static const char *buchi_type = "ba";
 
 static si_map_entry db_ltl_semantics[]={
     {"none",    PINS_LTL_NONE},
     {"spin",    PINS_LTL_SPIN},
     {"textbook",PINS_LTL_TEXTBOOK},
     {"ltsmin",  PINS_LTL_LTSMIN},
+    {NULL, 0}
+};
+
+static si_map_entry db_buchi_type[]={
+    {"ba",      PINS_BUCHI_TYPE_BA},
+    {"tgba",    PINS_BUCHI_TYPE_TGBA},
+    {"spotba",  PINS_BUCHI_TYPE_SPOTBA},
     {NULL, 0}
 };
 
@@ -53,6 +61,15 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
             }
             Print (infoLong, "LTL semantics: %s", ltl_semantics_name);
             PINS_LTL = l;
+
+            int b = linear_search (db_buchi_type, buchi_type);
+            if (b < 0) {
+                Warning (error, "unknown buchi type %s", buchi_type);
+                HREprintUsage();
+                HREexit(LTSMIN_EXIT_FAILURE);
+            }
+            Print (infoLong, "Buchi type: %s", buchi_type);
+            PINS_BUCHI_TYPE = b;
         }
         return;
     case POPT_CALLBACK_REASON_OPTION:
@@ -67,6 +84,8 @@ struct poptOption ltl_options[] = {
      "<ltl-file>.ltl|<ltl formula>"},
     {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics_name, 0,
      "LTL semantics", "<spin|textbook|ltsmin>"},
+    {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
+     "Buchi automaton type", "<ba|tgba|spotba>"},
     POPT_TABLEEND
 };
 
@@ -428,17 +447,16 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         ltsmin_expr_t ltl = parse_file_env (ltl_file, ltl_parse_file, model, env);
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
 
-        int use_spot = 1;
-        int to_tgba = 1;
-
-
         ltsmin_buchi_t *ba;
 #ifdef HAVE_SPOT
-        if (use_spot) {
-            ltsmin_ltl2hoa(notltl, to_tgba);
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
+            PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
+            ltsmin_ltl2hoa(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA);
             ba = ltsmin_hoa_buchi();
         } else {
 #endif
+            HREassert(PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_BA, 
+                "Buchi type %s is not possible without Spot", buchi_type);
             ltsmin_ltl2ba(notltl);
             ba = ltsmin_buchi();
 #ifdef HAVE_SPOT

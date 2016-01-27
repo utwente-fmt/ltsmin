@@ -1175,6 +1175,8 @@ static int              labels=0;
 static int              cache=0;
 pins_por_t              PINS_POR = PINS_POR_NONE;
 pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
+pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
+static const char      *regroup_options = NULL;
 
 static char *mucalc_file = NULL;
 
