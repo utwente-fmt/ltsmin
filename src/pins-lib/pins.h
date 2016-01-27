@@ -240,6 +240,27 @@ typedef enum {
 extern pins_ltl_type_t PINS_LTL;
 
 /**
+\brief The type of the Buchi automaton
+
+PINS_BUCHI_TYPE_BA refers to the (state-based) Buchi Automaton obtained
+from ltl2ba.
+PINS_BUCHI_TYPE_TGBA refers to the Transition Based Generalized Buchi
+Automaton obtained from Spot (via ltl2hoa).
+PINS_BUCHI_TYPE_SPOTBA refers to the (state-based) Buchi Automaton
+obtained from Spot (via ltl2hoa).
+*/
+typedef enum {
+    PINS_BUCHI_TYPE_BA,
+    PINS_BUCHI_TYPE_TGBA,
+    PINS_BUCHI_TYPE_SPOTBA,
+} pins_buchi_type_t;
+
+/**
+ * \brief buchi type for the LTL automaton
+ */
+extern pins_buchi_type_t PINS_BUCHI_TYPE;
+
+/**
  * \brief Factory method for loading models.
  *
  * Given a model that has been initialized with data synchronization functions,
