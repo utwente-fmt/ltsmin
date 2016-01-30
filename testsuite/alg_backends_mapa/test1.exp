@@ -1,0 +1,42 @@
+# include the general include file which contains the functions
+source $srcdir/lib/include.tcl
+
+# use the local uncluding file containing several procedures
+source $srcdir/lib/backends.tcl
+
+#cd into the test dir such that output files are placed here.
+if { [file exists $binpaths(out) ] != 1 } {
+    file mkdir $binpaths(out)
+}
+cd $binpaths(out)
+
+puts "\n----------------------------------------------"
+puts   "TESTING: Algorithmic backends for MAPA language"
+puts   "----------------------------------------------\n"
+
+
+# the number of threads to use in multithreaded backends
+set num_threads 2
+
+# Language MAPA-frontends:
+# -------------------
+set langs [dict create]
+# a model per language
+dict set langs mapa model "salesman.mapa" 
+dict set langs mapa options mc "--threads=$num_threads"
+
+dict set langs mapa exp_output "4 states 5 transitions"
+set alg_be [ find_alg_backends "{dist}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
+# different output for symbolic tool:
+dict set langs mapa exp_output "state space has 4"
+dict set backends sym options {""}
+dict set backends sym params "--order=" {bfs-prev bfs par par-prev}
+dict set backends sym params "--saturation=" {none}
+dict set backends sym params "--vset=" {"ldd --lace-workers=1" "fdd --lace-workers=1" "ldd64 --lace-workers=1" "lddmc --lace-workers=2 --lddmc-tablesize=18 --lddmc-maxtablesize=18 --lddmc-cachesize=18 --lddmc-maxcachesize=18"}
+set alg_be [ find_alg_backends "{sym}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
+
+cd ".."

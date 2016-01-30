@@ -60,4 +60,8 @@ if HAVE_PROB
 DEJATOOL += alg_backends_prob
 endif
 
+if HAVE_SCOOP
+DEJATOOL += alg_backends_mapa
+endif
+
 endif

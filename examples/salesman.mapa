@@ -1,0 +1,7 @@
+Salesman(hourlyRate : {10..20}, working : Bool) = 
+not(working) => startWorking.Salesman[working:=T]
+++ working => <0.2>.stopWorking.Salesman[working := F] ++ <1.0>.sell@(10).Salesman[]
+
+stateReward working -> hourlyRate 
+
+init Salesman[15, F]
