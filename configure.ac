@@ -365,32 +365,18 @@ AC_SUBST([SYLVAN_LIBS],['${top_builddir}/sylvan/src/libsylvan.la'])
 AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
 AC_SUBST([SYLVAN_LDFLAGS])
 
-AC_CHECK_PROGS(OPAAL_LTSMIN, [opaal_ltsmin])
+AC_CHECK_PROGS(OPAAL_LTSMIN,[opaal_ltsmin])
 
 AC_ARG_WITH([scoop],[AS_HELP_STRING([--with-scoop],[Compile scoop])],[],[
     AC_CHECK_PROG(GHC, ghc, ghc)
     AC_CHECK_PROG(HAPPY, happy, happy)
-    AC_CHECK_PROG(GHCPKG, ghc-pkg, ghcpkg)
-    if test -z "$GHC" -o -z "$HAPPY" -o -z "$GHCPKG" ; then    
+    if test -z "$GHC" -o -z "$HAPPY"; then    
         [with_scoop=no]
     else
-        # the following madness is necessary because the containers package on Ubuntu
-        # installed with ghc-pkg seems incorrectly linked:
-        # https://stackoverflow.com/questions/27291531/haskell-linking-with-dynamic-libraries-on-ubuntu
-        # Note: it might after all be a better idea to find out whether the mapa2lts-* tools can be linked with GHC itself.
-        # But this may prove difficult where the mpi linker is used, e.g. in the mapa2lts-dist tool.
-        set -o pipefail
-        GHC_DEEPSEQ=`ghc-pkg field deepseq library-dirs 2> /dev/null | sed -n -e 's/^.* //p' | sed ':a;N;$!ba;s/\n/ -Wl,-rpath,/g'`
-        if test -z "$GHC_DEEPSEQ" ; then
-            AC_MSG_WARN([GHC package deepseq not found])
-            [with_scoop=no]
-    	else
-            AC_MSG_NOTICE([GHC package deepseq found])    	    
-            AC_SUBST(SCOOP_LDFLAGS, ["-Wl,-rpath,$GHC_DEEPSEQ"])
-            [with_scoop=yes]
-       	fi
+        [with_scoop=yes]
     fi
 ])
+
 if test "x$with_scoop" == xyes; then
     AC_CONFIG_SUBDIRS([scoop])
     [have_scoop="yes"]

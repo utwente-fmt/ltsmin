@@ -55,7 +55,7 @@ nodist_EXTRA_etf2lts_dist_SOURCES = automake-force-linker.cxx # required by Boos
 mapa2lts_dist_SOURCES   = ../pins2lts-dist.c
 mapa2lts_dist_LDADD     = ../../pins-lib/libmapa-pins.la
 mapa2lts_dist_LDADD    += $(PINS_LIBS) -lscoop
-mapa2lts_dist_LDFLAGS   = -Wl,-rpath,$(DESTDIR)$(pkglibdir) $(SCOOP_LDFLAGS) -L${top_builddir}/scoop/src $(AM_LDFLAGS) -Wl,-lscoop
+mapa2lts_dist_LDFLAGS   = $(SCOOP_LDFLAGS) -L${top_builddir}/scoop/src $(AM_LDFLAGS)
 mapa2lts_dist_CPPFLAGS  = -DMAPA $(DIST_CPPFLAGS)
 nodist_EXTRA_mapa2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
