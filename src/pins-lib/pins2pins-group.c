@@ -33,6 +33,7 @@ static int mh_timeout = -1;
 static char            *row_perm = NULL;
 static char            *col_perm = NULL;
 static int             graph_metrics = 0;
+static int             group_exit = 0;
 
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
@@ -57,6 +58,7 @@ struct poptOption group_options[] = {
 #if defined(HAVE_BOOST) || defined(HAVE_VIENNACL)
     { "graph-metrics", 0, POPT_ARG_NONE, &graph_metrics, 0, "print metrics of the symmetrized dependency matrix", NULL },
 #endif
+    { "regroup-exit", 0, POPT_ARG_NONE, &group_exit, 0, "exit after regrouping is done", NULL },
     POPT_TABLEEND
 };
 
@@ -1278,6 +1280,11 @@ GBregroup (model_t model)
         RTstopTimer(t);
         RTprintTimer(infoShort, t, "Regrouping took");
         RTdeleteTimer(t);
+
+        if (group_exit) {
+            GBExit(model);
+            HREabort(LTSMIN_EXIT_SUCCESS);
+        }
 
         // who is responsible for freeing matrix_t dm_info in group?
         // probably needed until program termination

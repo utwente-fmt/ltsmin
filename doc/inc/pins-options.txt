@@ -55,6 +55,9 @@ given by the option *-r*,*--regroup*, will only be applied on the dependency mat
 
 *--graph-metrics*::
     Print Boost's and ViennaCL's graph metrics (only available when LTSmin is compiled with Boost or ViennaCL).
+    
+*--regroup-exit*::
+    Exit with 0 when regrouping is done.
 
 *--mucalc*='FILE'|'FORMULA'::
     Compute a parity game for the mu-calculus formula.
