@@ -163,6 +163,7 @@ perm_todo (permute_t *perm, transition_info_t *ti, int seen)
     todo->lattice = perm->next->lattice;
     todo->ti.group = ti->group;
     todo->ti.por_proviso = ti->por_proviso;
+    todo->ti.acc_set = ti->acc_set;
     if (EXPECT_FALSE(act_detect || files[1]))
         memcpy (todo->ti.labels, ti->labels, sizeof(int*[perm->labels]));
     perm->nstored++;

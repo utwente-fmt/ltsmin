@@ -150,10 +150,11 @@ typedef struct transition_info {
     int* labels;                    // edge labels, NULL, or pointer to the edge label(s)
     int  group;                     // holds transition group or -1 if unknown
     int  por_proviso;               // provides information on the cycle proviso (ltl) to the por layer
+    int  acc_set;                   // transition acceptance marks for TGBA
 } transition_info_t;
 
 #define GB_UNKNOWN_GROUP -1
-#define GB_TI(A,B) {(A),(B), 0}     // transition_info_t initialization macro
+#define GB_TI(A,B) {(A),(B), 0, 0}     // transition_info_t initialization macro
 static const transition_info_t GB_NO_TRANSITION = GB_TI(NULL, GB_UNKNOWN_GROUP);
 
 /**
