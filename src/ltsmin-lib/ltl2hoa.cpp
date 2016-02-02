@@ -62,16 +62,16 @@ ltl_to_store(ltsmin_expr_t e)
     switch(le->lin_expr[i]->token) {
       case LTL_TRUE:      at += sprintf(at, "true"); break;
       case LTL_FALSE:     at += sprintf(at, "false"); break;
-      case LTL_AND:       at += sprintf(at, "&&"); break;
-      case LTL_OR:        at += sprintf(at, "||"); break;
-      case LTL_NOT:       at += sprintf(at, "!"); break;
-      case LTL_FUTURE:    at += sprintf(at, "<>"); break;
-      case LTL_GLOBALLY:  at += sprintf(at, "[]"); break;
-      case LTL_UNTIL:     at += sprintf(at, "U"); break;
-      case LTL_RELEASE:   at += sprintf(at, "V"); break;
-      case LTL_NEXT:      at += sprintf(at, "X"); break;
-      case LTL_EQUIV:     at += sprintf(at, "<->"); break;
-      case LTL_IMPLY:     at += sprintf(at, "->"); break;
+      case LTL_AND:       at += sprintf(at, " && "); break;
+      case LTL_OR:        at += sprintf(at, " || "); break;
+      case LTL_NOT:       at += sprintf(at, " ! "); break;
+      case LTL_FUTURE:    at += sprintf(at, " <> "); break;
+      case LTL_GLOBALLY:  at += sprintf(at, " [] "); break;
+      case LTL_UNTIL:     at += sprintf(at, " U "); break;
+      case LTL_RELEASE:   at += sprintf(at, " V "); break;
+      case LTL_NEXT:      at += sprintf(at, " X "); break;
+      case LTL_EQUIV:     at += sprintf(at, " <-> "); break;
+      case LTL_IMPLY:     at += sprintf(at, " -> "); break;
       case LTL_EQ:
       case LTL_SVAR:
       case LTL_VAR: {
@@ -110,7 +110,7 @@ get_predicate_index(std::vector<std::string> pred_vec, std::string predicate)
 ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
 {
   // ensure that the automaton is deterministic
-  HREassert(spot::is_deterministic(aut), "The automaton is not deterministic");
+  //HREassert(spot::is_deterministic(aut), "The automaton is not deterministic");
 
   // We need the dictionary to print the BDDs that label the edges
   const auto& dict = aut->get_dict();
@@ -235,7 +235,10 @@ void ltsmin_ltl2hoa(ltsmin_expr_t e, int to_tgba) {
   HREassert(!parse_errors, "Parse errors found in LTL formula. LTL = %s", buff);
   spot::translator trans;
   isTGBA = to_tgba;
-  trans.set_type(spot::postprocessor::TGBA);
+  if (isTGBA)
+    trans.set_type(spot::postprocessor::TGBA);
+  else
+    trans.set_type(spot::postprocessor::BA);
   spot_automaton = trans.run(f);
 }
 
