@@ -16,22 +16,10 @@
 #include <util-lib/fast_set.h>
 #include <pins2lts-mc/algorithm/ltl.h>
 
-
-#if SEARCH_COMPLETE_GRAPH
-#include <mc-lib/dlopen_extra.h>
-#endif
-
 #if HAVE_PROFILER
 #include <gperftools/profiler.h>
 #endif
 
-//#define LTL_CHECK 1
-//#define PRINT_GRAPH 1
-
-#if PRINT_GRAPH
-int time_tick;
-int MAX_TIME_TICKS = 10000;
-#endif
 
 // TODO: move +1's and -1's inside the UF structure!
 
@@ -47,9 +35,6 @@ typedef struct counter_s {
     uint32_t            claimfound;
     uint32_t            claimsuccess;
     uint32_t            cum_max_stack;
-#if LTL_CHECK
-    uint32_t            accepting;
-#endif
 } counter_t;
 
 /**
@@ -116,9 +101,6 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.claimfound              = 0;
     ctx->local->cnt.claimsuccess            = 0;
     ctx->local->cnt.cum_max_stack           = 0;
-#if LTL_CHECK
-    ctx->local->cnt.accepting               = 0;
-#endif
 
     shared->ltl = pins_get_accepting_state_label_index(ctx->model) != -1;
 
@@ -126,14 +108,6 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
         ctx->local->rctx = run_init (shared->reach_run, ctx->model);
         ctx->local->rctx->parent = ctx;
     }
-
-#if SEARCH_COMPLETE_GRAPH
-    dlopen_setup (files[0]);
-#endif
-
-#if PRINT_GRAPH
-    time_tick = 0;
-#endif
 
     (void) run; 
 }
@@ -150,25 +124,35 @@ ufscc_local_deinit   (run_t *run, wctx_t *ctx)
     (void) run;
 }
 
+int acc_count = 0; // TEMP: TODO: REMOVE
 
 static void
 ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
               int seen)
 {
     wctx_t             *ctx       = (wctx_t *) arg;
+    uf_alg_shared_t    *shared    = (uf_alg_shared_t*) ctx->run->shared;
     alg_local_t        *loc       = ctx->local;
     raw_data_t          stack_loc;
+
+    /*if (acc_count++ < 30) {
+        Warning(info, "(%zu->%zu) Group: %d, Acceptance: %d",
+            ctx->state->ref,
+            successor->ref,
+            ti->group,
+            ti->acc_set);
+    } else {
+        Abort("exit");
+    }*/
 
     ctx->counters->trans++;
 
     // self-loop
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
-#if LTL_CHECK
-        if ( pins_state_is_accepting(ctx->model, state_info_state(successor) ) ) {
-            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+        if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(ctx->state))) {
+            report_lasso (ctx, ctx->state->ref);
         }
-#endif
         return;
     } else if (EXPECT_FALSE(trc_output && !seen && ti != &GB_NO_TRANSITION)) {
         // use parent_ref from reachability (used in CE reconstuction)
@@ -181,25 +165,6 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     (void) ti;
 }
-
-
-#if SEARCH_COMPLETE_GRAPH
-/**
- * bypasses pins to directly handle the successor
- * assumes that we only require state->ref
- */
-static inline void
-permute_complete (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
-{
-    wctx_t             *ctx        = (wctx_t *) arg;
-    alg_local_t        *loc        = ctx->local;
-
-    loc->target->ref = (ref_t) dst[0];
-    ufscc_handle (ctx, loc->target, ti, 0);
-
-    (void) cpy;
-}
-#endif
 
 
 /**
@@ -221,14 +186,7 @@ explore_state (wctx_t *ctx)
     increase_level (ctx->counters);
     dfs_stack_enter (loc->search_stack);
 
-#if SEARCH_COMPLETE_GRAPH
-    // bypass the pins interface by directly handling the successors
-    int                 ref_arr[2];
-    ref_arr[0] =  (int) ctx->state->ref;
-    trans = dlopen_next_state (NULL, 0, ref_arr, permute_complete, ctx);
-#else
     trans = permute_trans (ctx->permute, ctx->state, ufscc_handle, ctx);
-#endif
 
     ctx->counters->explored ++;
     run_maybe_report1 (ctx->run, ctx->counters, "");
@@ -247,13 +205,8 @@ ufscc_init  (wctx_t *ctx)
     size_t              transitions;
     raw_data_t          state_data;
 
-#if SEARCH_COMPLETE_GRAPH
-    ufscc_handle (ctx, loc->target, &ti, 0);
-    claim = uf_make_claim (shared->uf, loc->target->ref + 1, ctx->id);
-#else
     ufscc_handle (ctx, ctx->initial, &ti, 0);
     claim = uf_make_claim (shared->uf, ctx->initial->ref + 1, ctx->id);
-#endif
     
     // explore the initial state
     state_data = dfs_stack_top (loc->search_stack);
@@ -264,19 +217,6 @@ ufscc_init  (wctx_t *ctx)
     if (claim == CLAIM_FIRST) {
         loc->cnt.unique_states ++;
         loc->cnt.unique_trans += transitions;
-#if PRINT_GRAPH
-    if (time_tick < MAX_TIME_TICKS) {
-        time_tick ++;
-        printf("NODE,%zu,%zu,%d\n",
-               uf_find(shared->uf,ctx->state->ref+1), ctx->id, time_tick);
-    }
-#endif
-
-#if LTL_CHECK
-        if ( pins_state_is_accepting(ctx->model, state_info_state(ctx->state) ) ) {
-            loc->cnt.accepting ++;
-        }
-#endif
     }
 }
 
@@ -325,21 +265,6 @@ successor (wctx_t *ctx)
     // - CLAIM_DEAD    (DEAD state)
     claim = uf_make_claim (shared->uf, ctx->state->ref + 1, ctx->id);
 
-#if PRINT_GRAPH
-    if (time_tick < MAX_TIME_TICKS) {
-        time_tick ++;
-        if (claim == CLAIM_FIRST) {
-            printf("NODE,%zu,%zu,%d\n",
-                    uf_find(shared->uf,ctx->state->ref+1), ctx->id, time_tick);
-        }
-        printf("EDGE,%zu,%zu,%zu,%d\n",
-                uf_find(shared->uf,loc->target->ref+1),
-                uf_find(shared->uf,ctx->state->ref+1),
-                ctx->id,
-                time_tick);
-    }
-#endif
-
     if (claim == CLAIM_DEAD) {
         // (TO == DEAD) ==> get next successor
         loc->cnt.claimdead ++;
@@ -356,11 +281,6 @@ successor (wctx_t *ctx)
         if (claim == CLAIM_FIRST) {
             loc->cnt.unique_states ++;
             loc->cnt.unique_trans += trans;
-#if LTL_CHECK
-            if ( pins_state_is_accepting(ctx->model, state_info_state(ctx->state) ) ) {
-                loc->cnt.accepting ++;
-            }
-#endif
         }
         return;
     }
@@ -394,22 +314,9 @@ successor (wctx_t *ctx)
                 accepting = loc->root->ref;
             }
             Debug ("Uniting: %zu and %zu", loc->root->ref, ctx->state->ref);
-#if PRINT_GRAPH
-            ref_t old_a = uf_find(shared->uf, loc->root->ref + 1);
-            ref_t old_b = uf_find(shared->uf, loc->target->ref + 1);
-#endif
+
             uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
-#if PRINT_GRAPH
-            if (time_tick < MAX_TIME_TICKS) {
-                time_tick ++;
-                printf("UNION,%zu,%zu,%zu,%zu,%d\n",
-                        uf_find(shared->uf,loc->root->ref + 1),
-                        old_a,
-                        old_b,
-                        ctx->id,
-                        time_tick);
-            }
-#endif
+
         } while ( !uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) );
         dfs_stack_push (loc->roots_stack, root_data);
 
@@ -531,15 +438,6 @@ ufscc_run  (run_t *run, wctx_t *ctx)
     ProfilerStart ("ufscc.perf");
 #endif
 
-#if SEARCH_COMPLETE_GRAPH
-    int init_state = dlopen_get_worker_initial_state (ctx->id, W);
-    int inits = 0;
-    while (1)
-    {
-        inits ++;
-        loc->target->ref = init_state;
-#endif
-
     ufscc_init (ctx);
 
     // continue until we are done exploring the graph or interrupted
@@ -565,15 +463,6 @@ ufscc_run  (run_t *run, wctx_t *ctx)
             backtrack (ctx);
         }
     }
-
-#if SEARCH_COMPLETE_GRAPH
-        init_state = dlopen_get_new_initial_state (init_state);
-        if (init_state == -1) {
-            Warning(info, "Number of inits : %d", inits);
-            break;
-        }
-    }
-#endif
 
 #if HAVE_PROFILER
     if (ctx->id == 0)
@@ -607,10 +496,6 @@ ufscc_reduce (run_t *run, wctx_t *ctx)
     reduced->claimfound             += cnt->claimfound;
     reduced->claimsuccess           += cnt->claimsuccess;
     reduced->cum_max_stack          += ctx->counters->level_max;
-
-#if LTL_CHECK
-    reduced->accepting              += cnt->accepting;
-#endif
 }
 
 
@@ -640,11 +525,6 @@ ufscc_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info, "- claim success count:      %d", reduced->claimsuccess);
     Warning(info, "- cum. max stack depth:     %d", reduced->cum_max_stack);
     Warning(info, " ");
-#if LTL_CHECK
-    Warning(info, "State space has %d states, %d are accepting",
-            reduced->unique_states, reduced->accepting);
-    Warning(info, " ");
-#endif
 
     run_report_total (run);
 
