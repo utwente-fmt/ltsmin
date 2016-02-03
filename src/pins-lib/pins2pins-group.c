@@ -34,6 +34,7 @@ static char            *row_perm = NULL;
 static char            *col_perm = NULL;
 static int             graph_metrics = 0;
 static int             group_exit = 0;
+static int             group_time = 0;
 
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
@@ -59,6 +60,7 @@ struct poptOption group_options[] = {
     { "graph-metrics", 0, POPT_ARG_NONE, &graph_metrics, 0, "print metrics of the symmetrized dependency matrix", NULL },
 #endif
     { "regroup-exit", 0, POPT_ARG_NONE, &group_exit, 0, "exit after regrouping is done", NULL },
+    { "regroup-time", 0, POPT_ARG_NONE, &group_time, 0, "print the timing information of each transformation", NULL },
     POPT_TABLEEND
 };
 
@@ -600,8 +602,12 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
 
         dm_cost_t cost = DM_WEIGHTED_EVENT_SPAN;
 
+        rt_timer_t trans_timer = NULL;
+        if (group_time) trans_timer = RTcreateTimer();
+
         char               *tok;
         while ((tok = strsep (&spec, sep)) != NULL) {
+            if (group_time) RTstartTimer(trans_timer);
             if (strcmp (tok, "sw") == 0) {
                 Print1 (info, "Regroup Select Write matrix");
                 selection = inf->mayw;
@@ -799,8 +805,14 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 Fatal (1, error, "Unknown regrouping specification: '%s'",
                        tok);
             }
+            if (group_time) {
+                RTstopTimer(trans_timer);
+                RTprintTimer(infoShort, trans_timer, "Transformation took");
+                RTresetTimer(trans_timer);
+            }
         }
         RTfree(spec_full);
+        RTdeleteTimer(trans_timer);
     }
 }
 

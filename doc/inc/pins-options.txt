@@ -59,6 +59,9 @@ given by the option *-r*,*--regroup*, will only be applied on the dependency mat
 *--regroup-exit*::
     Exit with 0 when regrouping is done.
 
+*--regroup-time*::
+    Print timing information of each transformation, given in sequence *--regroup* (*-r*).
+
 *--mucalc*='FILE'|'FORMULA'::
     Compute a parity game for the mu-calculus formula.
 +
