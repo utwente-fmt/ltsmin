@@ -15,8 +15,10 @@ extern void MCRL2initGreybox(int argc,const char *argv[],void *stack_bottom);
 /**< Initialize ATerm library and MCRL2 library up to the loading of a specification. */
 
 extern void MCRL2loadGreyboxModel(model_t model,const char*name);
-/**< @brief Factory method for creating a model.
- */
+/**< @brief Factory method for creating a model. */
+
+extern void MCRL2CompileGreyboxModel(model_t model, const char *filename);
+/**< @brief Factory method for compiling a model. */
 
 #ifdef __cplusplus
 }

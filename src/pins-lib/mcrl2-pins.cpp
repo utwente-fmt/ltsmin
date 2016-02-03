@@ -334,6 +334,7 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_POST: {
         Warning(debug,"mcrl2 init");
         GBregisterLoader("lps", MCRL2loadGreyboxModel);
+        GBregisterLoader("txt", MCRL2CompileGreyboxModel);
         if (mcrl2_verbosity > 0) {
             Warning(info, "increasing mcrl2 verbosity level by %d", mcrl2_verbosity);
             mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(mcrl2_logger::get_reporting_level()) + mcrl2_verbosity);
@@ -356,6 +357,23 @@ struct poptOption mcrl2_options[] = {
     { "mcrl2-internal-edge-labels", 0, POPT_ARG_VAL, &readable_edge_labels, 0, "use mcrl2-internal edge label encoding", NULL },
     POPT_TABLEEND
 };
+
+void
+MCRL2CompileGreyboxModel(model_t model, const char *filename)
+{
+    const char* command = "txt2lps %s %s.lps";
+    char buf[snprintf(NULL, 0, command, filename, filename) + 1];
+    sprintf(buf, command, filename, filename);
+
+    Warning(info, "Compiling .txt to .lps with txt2lps ...");
+
+    if (system(buf) != 0) Abort("Could not launch 'txt2lps', make sure it is on your PATH");
+
+    char newfile[strlen(filename) + 4 + 1];
+    sprintf(newfile, "%s.lps", filename);
+
+    MCRL2loadGreyboxModel(model, newfile);
+}
 
 static int
 MCRL2getTransitionsLong (model_t m, int group, int *src, TransitionCB cb, void *ctx)
