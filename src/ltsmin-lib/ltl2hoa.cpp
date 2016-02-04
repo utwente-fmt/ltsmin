@@ -134,7 +134,12 @@ ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
     HREassert(aut->num_sets() == 1, "Multiple acceptance sets for BA");
   ba->acceptance_set = acceptance_set;
 
-  HREassert(aut->get_init_state_number() == 0, "Initial state is nonzero");
+  // the initial state is not always 0, thus we create a map for the state numbers
+  int state_map[ba->state_count];
+  for (int i=0; i<ba->state_count; i++)
+    state_map[i] = i;
+  state_map[aut->get_init_state_number()] = 0;
+  state_map[0] = aut->get_init_state_number();
 
   // fill in the predicates
   int i = 0;
@@ -149,7 +154,8 @@ ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
 
   // states are numbered from 0 to n-1
   int index = 0; // globally unique index
-  for (int s = 0; s < ba->state_count; s++) {
+  for (int _s = 0; _s < ba->state_count; _s++) {
+    int s = state_map[_s];
     // iterate over the outgoing edges to count it 
     int transition_count = 0;
     for (auto& t: aut->out(s)) 
@@ -169,7 +175,7 @@ ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
     // iterate over the transitions
     int trans_index = 0;
     for (auto& t: aut->out(s)) {
-        bs->transitions[trans_index].to_state = (int) t.dst;
+        bs->transitions[trans_index].to_state = state_map[(int) t.dst];
         bs->transitions[trans_index].pos      = (int*) RTmalloc(sizeof(int) * 2);
         bs->transitions[trans_index].neg      = (int*) RTmalloc(sizeof(int) * 2);
 
@@ -215,7 +221,7 @@ ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
 
         bs->transitions[trans_index++].index  = index++;
     }
-    ba->states[s] = bs;
+    ba->states[_s] = bs;
   }
 
   return ba;
