@@ -43,9 +43,13 @@ typedef struct counter_s {
 struct alg_local_s {
     dfs_stack_t         search_stack;         // search stack (D)
     dfs_stack_t         roots_stack;          // roots stack (R)
+    uint32_t            acc_mark;             // acceptance mark
     counter_t           cnt;
     state_info_t       *target;               // auxiliary state
     state_info_t       *root;                 // auxiliary state
+    uint32_t            state_acc;            // acceptance info for ctx->state
+    uint32_t            target_acc;           // acceptance info for target
+    uint32_t            root_acc;             // acceptance info for root
     wctx_t             *rctx;                 // reachability for trace construction
 };
 
@@ -89,6 +93,14 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
     ctx->local->target = state_info_create ();
     ctx->local->root   = state_info_create ();
 
+    // extend state with TGBA acceptance marks information
+    state_info_add_simple (ctx->state, sizeof (uint32_t),
+                          &ctx->local->state_acc);
+    state_info_add_simple (ctx->local->target, sizeof (uint32_t),
+                          &ctx->local->target_acc);
+    state_info_add_simple (ctx->local->root, sizeof (uint32_t),
+                          &ctx->local->root_acc);
+
     size_t len               = state_info_serialize_int_size (ctx->state);
     ctx->local->search_stack = dfs_stack_create (len);
     ctx->local->roots_stack  = dfs_stack_create (len);
@@ -124,7 +136,6 @@ ufscc_local_deinit   (run_t *run, wctx_t *ctx)
     (void) run;
 }
 
-int acc_count = 0; // TEMP: TODO: REMOVE
 
 static void
 ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
@@ -135,23 +146,20 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     alg_local_t        *loc       = ctx->local;
     raw_data_t          stack_loc;
 
-    /*if (acc_count++ < 30) {
-        Warning(info, "(%zu->%zu) Group: %d, Acceptance: %d",
-            ctx->state->ref,
-            successor->ref,
-            ti->group,
-            ti->acc_set);
-    } else {
-        Abort("exit");
-    }*/
-
     ctx->counters->trans++;
 
     // self-loop
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
-        if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(ctx->state))) {
-            report_lasso (ctx, ctx->state->ref);
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+            // TODO: also check in UF[uf.find(state)].acc_set
+            if (shared->ltl && GBTGBAIsAccepting(ctx->model, ti->acc_set) ) {
+                report_lasso (ctx, ctx->state->ref);
+            }
+        } else { // BA
+            if (shared->ltl && pins_state_is_accepting (ctx->model, state_info_state(ctx->state)) ) {
+                report_lasso (ctx, ctx->state->ref);
+            }
         }
         return;
     } else if (EXPECT_FALSE(trc_output && !seen && ti != &GB_NO_TRANSITION)) {
@@ -159,6 +167,10 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         ref_t *succ_parent = get_parent_ref(loc->rctx, successor->ref);
         atomic_write (succ_parent, ctx->state->ref);
     }
+
+    // add acceptance set to state TODO
+    loc->state_acc = ti->acc_set;
+
 
     stack_loc = dfs_stack_push (loc->search_stack, NULL);
     state_info_serialize (successor, stack_loc);

@@ -12,7 +12,6 @@
 // #define UFDEBUG
 typedef uint64_t sz_w;
 #define WORKER_BITS 64
-#define LAZY_REMOVAL 1
 
 
 typedef enum uf_status_e {
@@ -38,9 +37,10 @@ struct uf_state_s {
                                               // (one bit for each worker)
     ref_t               parent;               // the parent in the UF tree
     ref_t               list_next;            // next list item 'pointer'
+    uint32_t            acc_set;              // TGBA acceptance set
     unsigned char       uf_status;            // the UF status of the state
     unsigned char       list_status;          // the list status
-    char                pad[6];               // padding for data alignment
+    char                pad[2];               // padding for data alignment
 };
 
 
@@ -95,14 +95,8 @@ pick_e
 uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
 {
     // invariant: every consecutive non-LOCK state is in the same set
-
-#if LAZY_REMOVAL
     ref_t               a, b, c;
     list_status         a_status, b_status;
-#else
-    ref_t               a, b;
-    list_status         a_status;
-#endif
 
     a = state;
 
@@ -129,7 +123,6 @@ uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
 
         // if a is TOMB and only element, then the SCC is DEAD
 
-#if LAZY_REMOVAL
         if (a == b || b == 0) {
             if ( uf_mark_dead (uf, a) )
                 return PICK_MARK_DEAD;
@@ -161,19 +154,6 @@ uf_pick_from_list (const uf_t *uf, ref_t state, ref_t *ret)
         atomic_write (&uf->array[a].list_next, c);
 
         a = c; // continue searching from c
-#else
-        // in case no lazy removal, we need to traverse the complete list
-        // to find out if there are any LIVE states remaining
-        if (b == state || b == 0) {
-            if ( uf_mark_dead (uf, a) )
-                return PICK_MARK_DEAD;
-            return PICK_DEAD;
-        }
-
-
-        a = b; // continue searching from b
-
-#endif
     }
 }
 
@@ -308,6 +288,7 @@ uf_union (const uf_t *uf, ref_t a, ref_t b)
 {
     ref_t               a_r, b_r, a_l, b_l, a_n, b_n, r, q;
     sz_w                q_w, r_w;
+    uint32_t            q_a, r_a;
 
     while ( 1 ) {
 
@@ -361,6 +342,19 @@ uf_union (const uf_t *uf, ref_t a, ref_t b)
 
     // update parent
     atomic_write (&uf->array[q].parent, r);
+
+
+    // only update acceptance set for r if q adds acceptance marks
+    r_a = atomic_read (&uf->array[q].acc_set);
+    q_a = atomic_read (&uf->array[r].acc_set);
+    if ( (q_a | r_a) != r_a) {
+        // update!
+        fetch_or (&uf->array[r].acc_set, q_a);
+        while (atomic_read (&uf->array[r].parent) != 0) {
+            r = uf_find (uf, r);
+            fetch_or (&uf->array[r].acc_set, q_a);
+        }
+    }
 
     // only update worker set for r if q adds workers
     q_w = atomic_read (&uf->array[q].p_set);
@@ -478,6 +472,39 @@ uf_unlock_list (const uf_t *uf, ref_t a_l)
 {
     // HREassert (atomic_read (&uf->array[a_l].list_status) == LIST_LOCK);
     atomic_write (&uf->array[a_l].list_status, LIST_LIVE);
+}
+
+
+/* **************************** TGBA acceptance **************************** */
+
+/**
+ * unites the acceptance set of the uf representative with acc (via logical OR)
+ * returns the new acceptance set for the uf representative
+ */
+uint32_t
+uf_add_acc (const uf_t *uf, ref_t state, uint32_t acc)
+{
+    ref_t    r     = uf_find (uf, state);
+    uint32_t r_acc = atomic_read (&uf->array[r].acc_set);
+
+    // only unite if it updates the acceptance set
+    if ( (r_acc | acc) != r_acc) {
+        // update!
+        r_acc = or_fetch (&uf->array[r].acc_set, acc);
+        while (atomic_read (&uf->array[r].parent) != 0) {
+            r = uf_find (uf, r);
+            r_acc = or_fetch (&uf->array[r].acc_set, acc);
+        }
+    }
+    return r_acc;
+}
+
+
+uint32_t
+uf_get_acc (const uf_t *uf, ref_t state)
+{
+    ref_t r = uf_find (uf, state);
+    return  atomic_read (&uf->array[r].acc_set);
 }
 
 

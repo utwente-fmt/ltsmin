@@ -565,6 +565,13 @@ GBaddLTL (model_t model)
     int             sl_count = dm_nrows (p_sl);
     int             new_sl_count = sl_count + 1;
 
+    ctx->sl_idx_accept = sl_count;
+
+    // set the TGBA acceptance set
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+        GBsetTGBAAcceptance (ltlmodel, ba->acceptance_set);
+    }
+
     // add buchi label (at end)
     ctx->sl_idx_accept = sl_count;
     lts_type_set_state_label_count (ltstype_new, new_sl_count);

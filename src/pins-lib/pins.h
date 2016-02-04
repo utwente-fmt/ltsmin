@@ -494,6 +494,16 @@ extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void
 \brief Get the state labels and all transitions in one call.
 */
 
+extern void GBsetTGBAAcceptance(model_t model, int acc_set);
+/**<
+\brief Sets the TGBA acceptance condition
+*/
+
+extern int GBTGBAIsAccepting(model_t model, int acc_set);
+/**<
+\brief Return if the given acceptance set is equal to the ltsmin_buchi acceptance_set
+*/
+
 extern int GBtransitionInGroup(model_t model, int* labels, int group);
 /**<
 \brief Return if a transition labelled with labels potentially occurs in group

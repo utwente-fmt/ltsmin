@@ -27,6 +27,7 @@ struct grey_box_model {
     matrix_t *dna_info; // do not accord info
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
+    int acceptance_set;
     int *group_visibility;
     int *label_visibility;
 	int *s0;
@@ -1352,6 +1353,18 @@ void GBregisterPreLoader(const char*extension,pins_loader_t loader){
     } else {
         Abort("model type registry overflow");
     }
+}
+
+void
+GBsetTGBAAcceptance (model_t model, int acc_set)
+{
+    model->acceptance_set = acc_set;
+}
+
+int
+GBTGBAIsAccepting (model_t model, int acc_set)
+{
+    return model->acceptance_set == acc_set;
 }
 
 struct poptOption greybox_options[]={
