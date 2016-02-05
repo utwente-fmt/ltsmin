@@ -477,6 +477,14 @@ uf_unlock_list (const uf_t *uf, ref_t a_l)
 
 /* **************************** TGBA acceptance **************************** */
 
+
+uint32_t
+uf_get_acc (const uf_t *uf, ref_t state)
+{
+    ref_t r = uf_find (uf, state);
+    return  atomic_read (&uf->array[r].acc_set);
+}
+
 /**
  * unites the acceptance set of the uf representative with acc (via logical OR)
  * returns the new acceptance set for the uf representative
@@ -484,6 +492,10 @@ uf_unlock_list (const uf_t *uf, ref_t a_l)
 uint32_t
 uf_add_acc (const uf_t *uf, ref_t state, uint32_t acc)
 {
+    // just return the acceptance set if nothing is added
+    if (acc == 0)
+        return uf_get_acc (uf, state);
+
     ref_t    r     = uf_find (uf, state);
     uint32_t r_acc = atomic_read (&uf->array[r].acc_set);
 
@@ -497,14 +509,6 @@ uf_add_acc (const uf_t *uf, ref_t state, uint32_t acc)
         }
     }
     return r_acc;
-}
-
-
-uint32_t
-uf_get_acc (const uf_t *uf, ref_t state)
-{
-    ref_t r = uf_find (uf, state);
-    return  atomic_read (&uf->array[r].acc_set);
 }
 
 

@@ -63,9 +63,9 @@ bool             uf_try_grab (const uf_t *uf, ref_t a);
 
 /* **************************** TGBA acceptance **************************** */
 
-extern uint32_t  uf_add_acc (const uf_t *uf, ref_t state, uint32_t acc);
-
 extern uint32_t  uf_get_acc (const uf_t *uf, ref_t state);
+
+extern uint32_t  uf_add_acc (const uf_t *uf, ref_t state, uint32_t acc);
 
 
 /* ******************************** testing ******************************** */
