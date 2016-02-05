@@ -151,13 +151,13 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     // self-loop
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
-        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-            // TODO: also check in UF[uf.find(state)].acc_set
-            if (shared->ltl && GBTGBAIsAccepting(ctx->model, ti->acc_set) ) {
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+            uint32_t acc = uf_add_acc (shared->uf, successor->ref, ti->acc_set);
+            if (GBTGBAIsAccepting(ctx->model, acc) ) {
                 report_lasso (ctx, ctx->state->ref);
             }
-        } else { // BA
-            if (shared->ltl && pins_state_is_accepting (ctx->model, state_info_state(ctx->state)) ) {
+        } else if (shared->ltl) { // BA
+            if (pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) ) {
                 report_lasso (ctx, ctx->state->ref);
             }
         }
@@ -168,12 +168,15 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         atomic_write (succ_parent, ctx->state->ref);
     }
 
-    // add acceptance set to state TODO
-    loc->state_acc = ti->acc_set;
-
-
     stack_loc = dfs_stack_push (loc->search_stack, NULL);
     state_info_serialize (successor, stack_loc);
+
+    // add acceptance set to the state
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && ti->acc_set > 0) {
+        state_info_deserialize (loc->target, stack_loc); // search_stack TOP
+        loc->target_acc = ti->acc_set;
+        state_info_serialize (loc->target, stack_loc);
+    }
 
     (void) ti;
 }
@@ -255,9 +258,18 @@ successor (wctx_t *ctx)
 
     if (loc->target->ref == ctx->state->ref) { // self loop
 
+        // TODO: is this dead code?
+
         loc->cnt.claimfound ++; // implies CLAIM_FOUND
-        if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(ctx->state))) {
-            report_lasso (ctx, ctx->state->ref);
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+            uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref, loc->state_acc);
+            if (GBTGBAIsAccepting(ctx->model, acc) ) {
+                report_lasso (ctx, ctx->state->ref);
+            }
+        } else if (shared->ltl) { // BA
+            if (pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) ) {
+                report_lasso (ctx, ctx->state->ref);
+            }
         }
 
         dfs_stack_pop (loc->search_stack);
@@ -304,6 +316,13 @@ successor (wctx_t *ctx)
         Debug ("cycle: %zu  --> %zu", loc->target->ref, ctx->state->ref);
 
         if (uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1)) {
+            // add transition acceptance set
+            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+                uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref, loc->state_acc);
+                if (GBTGBAIsAccepting(ctx->model, acc) ) {
+                    report_lasso (ctx, ctx->state->ref);
+                }
+            }
             dfs_stack_pop (loc->search_stack);
             return; // also no chance of new accepting cycle
         }
@@ -318,11 +337,18 @@ successor (wctx_t *ctx)
         //   Union (R.POP(), FROM)
         // R.PUSH (TO')
         ref_t               accepting = DUMMY_IDX;
+        uint32_t            acc_set   = loc->state_acc;
         do {
             root_data = dfs_stack_pop (loc->roots_stack); // UF Stack POP
             state_info_deserialize (loc->root, root_data); // roots_stack TOP
 
-            if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(loc->root))) {
+            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+                // add the acceptance set from the previous root, not the current one
+                // otherwise we could add the acceptance set for the edge
+                // betweem two SCCs (which cannot be part of a cycle)
+                uf_add_acc (shared->uf, loc->root->ref, acc_set);
+                acc_set = loc->root_acc;
+            } else if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(loc->root))) {
                 accepting = loc->root->ref;
             }
             Debug ("Uniting: %zu and %zu", loc->root->ref, ctx->state->ref);
@@ -333,7 +359,12 @@ successor (wctx_t *ctx)
         dfs_stack_push (loc->roots_stack, root_data);
 
         // after uniting SCC, report lasso
-        if (accepting != DUMMY_IDX) {
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+            acc_set = uf_get_acc (shared->uf, ctx->state->ref);
+            if (GBTGBAIsAccepting(ctx->model, acc_set) ) {
+                report_lasso (ctx, ctx->state->ref);
+            }
+        } else if (accepting != DUMMY_IDX) {
             report_lasso (ctx, accepting);
         }
 
