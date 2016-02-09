@@ -1,8 +1,8 @@
 /**
- * C wrapper for the C++ file ltl2hoa.cpp
+ * C wrapper for the C++ file ltl2spot.cpp
  */
-#ifndef LTL2HOA_H
-#define LTL2HOA_H
+#ifndef LTL2SPOT_H
+#define LTL2SPOT_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,11 +10,11 @@ extern "C" {
 
 #include <ltsmin-lib/ltsmin-buchi.h>
 
-void ltsmin_ltl2hoa(ltsmin_expr_t e, int to_tgba);
+void ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba);
 ltsmin_buchi_t *ltsmin_hoa_buchi();
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // LTL2HOA_H
+#endif // LTL2SPOT_H
