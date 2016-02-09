@@ -472,8 +472,6 @@ backtrack (wctx_t *ctx)
 void
 ufscc_run  (run_t *run, wctx_t *ctx)
 {
-    Abort("ENDING PROGRAM"); // TODO: remove
-
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
 
