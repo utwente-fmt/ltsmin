@@ -22,7 +22,7 @@ extern "C" {
 #include <ctype.h>
 
 #include <hre/user.h>
-#include <ltsmin-lib/ltl2hoa.h>
+#include <ltsmin-lib/ltl2spot.h>
 #include <ltsmin-lib/ltl2ba-lex-helper.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
@@ -252,7 +252,7 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
 
 
 void 
-ltsmin_ltl2hoa(ltsmin_expr_t e, int to_tgba) 
+ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba) 
 {
   // construct the LTL formula and store the predicates
   char *buff = ltl_to_store(e);

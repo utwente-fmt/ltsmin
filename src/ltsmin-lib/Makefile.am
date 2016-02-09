@@ -14,7 +14,7 @@ libltsmin_la_SOURCES += ltl2ba-lex.c ltl2ba-lex.h
 libltsmin_la_SOURCES += ltl2ba-lex-helper.c ltl2ba-lex-helper.h
 
 if HAVE_SPOT
-libltsmin_la_SOURCES += ltl2hoa.cpp ltl2hoa.h
+libltsmin_la_SOURCES += ltl2spot.cpp ltl2spot.h
 endif
 
 libltsmin_la_SOURCES += lts-type.c lts-type.h

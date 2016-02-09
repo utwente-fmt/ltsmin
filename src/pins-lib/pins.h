@@ -246,9 +246,9 @@ extern pins_ltl_type_t PINS_LTL;
 PINS_BUCHI_TYPE_BA refers to the (state-based) Buchi Automaton obtained
 from ltl2ba.
 PINS_BUCHI_TYPE_TGBA refers to the Transition Based Generalized Buchi
-Automaton obtained from Spot (via ltl2hoa).
+Automaton obtained from Spot (via ltl2spot).
 PINS_BUCHI_TYPE_SPOTBA refers to the (state-based) Buchi Automaton
-obtained from Spot (via ltl2hoa).
+obtained from Spot (via ltl2spot).
 */
 typedef enum {
     PINS_BUCHI_TYPE_BA,

@@ -14,7 +14,7 @@
 #include <ltsmin-lib/ltl2ba-lex.h>
 
 #ifdef HAVE_SPOT
-#include <ltsmin-lib/ltl2hoa.h>
+#include <ltsmin-lib/ltl2spot.h>
 #endif
 
 #include <ltsmin-lib/ltsmin-standard.h>
@@ -471,7 +471,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
 #ifdef HAVE_SPOT
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
             PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
-            ltsmin_ltl2hoa(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA);
+            ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA);
             ba = ltsmin_hoa_buchi();
         } else {
 #endif
