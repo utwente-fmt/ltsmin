@@ -152,7 +152,7 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            uint32_t acc = uf_add_acc (shared->uf, successor->ref, ti->acc_set);
+            uint32_t acc = uf_add_acc (shared->uf, successor->ref + 1, ti->acc_set);
             if (GBTGBAIsAccepting(ctx->model, acc) ) {
                 report_lasso (ctx, ctx->state->ref);
             }
@@ -262,7 +262,7 @@ successor (wctx_t *ctx)
 
         loc->cnt.claimfound ++; // implies CLAIM_FOUND
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref, loc->state_acc);
+            uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref + 1, loc->state_acc);
             if (GBTGBAIsAccepting(ctx->model, acc) ) {
                 report_lasso (ctx, ctx->state->ref);
             }
@@ -318,7 +318,7 @@ successor (wctx_t *ctx)
         if (uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1)) {
             // add transition acceptance set
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-                uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref, loc->state_acc);
+                uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref + 1, loc->state_acc);
                 if (GBTGBAIsAccepting(ctx->model, acc) ) {
                     report_lasso (ctx, ctx->state->ref);
                 }
@@ -346,7 +346,7 @@ successor (wctx_t *ctx)
                 // add the acceptance set from the previous root, not the current one
                 // otherwise we could add the acceptance set for the edge
                 // betweem two SCCs (which cannot be part of a cycle)
-                uf_add_acc (shared->uf, loc->root->ref, acc_set);
+                uf_add_acc (shared->uf, loc->root->ref + 1, acc_set);
                 acc_set = loc->root_acc;
             } else if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(loc->root))) {
                 accepting = loc->root->ref;
@@ -360,7 +360,7 @@ successor (wctx_t *ctx)
 
         // after uniting SCC, report lasso
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            acc_set = uf_get_acc (shared->uf, ctx->state->ref);
+            acc_set = uf_get_acc (shared->uf, ctx->state->ref + 1);
             if (GBTGBAIsAccepting(ctx->model, acc_set) ) {
                 report_lasso (ctx, ctx->state->ref);
             }
@@ -472,6 +472,8 @@ backtrack (wctx_t *ctx)
 void
 ufscc_run  (run_t *run, wctx_t *ctx)
 {
+    Abort("ENDING PROGRAM"); // TODO: remove
+
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
 
