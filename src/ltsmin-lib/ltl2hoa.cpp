@@ -68,7 +68,7 @@ ltl_to_store(ltsmin_expr_t e)
       case LTL_FUTURE:    at += sprintf(at, " <> "); break;
       case LTL_GLOBALLY:  at += sprintf(at, " [] "); break;
       case LTL_UNTIL:     at += sprintf(at, " U "); break;
-      case LTL_RELEASE:   at += sprintf(at, " V "); break;
+      case LTL_RELEASE:   at += sprintf(at, " R "); break;
       case LTL_NEXT:      at += sprintf(at, " X "); break;
       case LTL_EQUIV:     at += sprintf(at, " <-> "); break;
       case LTL_IMPLY:     at += sprintf(at, " -> "); break;
@@ -107,9 +107,11 @@ get_predicate_index(std::vector<std::string> pred_vec, std::string predicate)
 }
 
 
-ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
+
+static ltsmin_buchi_t *
+create_ltsmin_buchi(spot::twa_graph_ptr& aut)
 {
-  // ensure that the automaton is deterministic
+  // ensure that the automaton is deterministic (apparently this is not possible)
   //HREassert(spot::is_deterministic(aut), "The automaton is not deterministic");
 
   // We need the dictionary to print the BDDs that label the edges
@@ -156,10 +158,19 @@ ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
   int index = 0; // globally unique index
   for (int _s = 0; _s < ba->state_count; _s++) {
     int s = state_map[_s];
+
     // iterate over the outgoing edges to count it 
     int transition_count = 0;
-    for (auto& t: aut->out(s)) 
+    for (auto& t: aut->out(s)) {
+      std::string cond = spot::bdd_format_formula(dict, t.cond);
+      // count the number of '|' occurrences in the predicates
+      for (int c_i=0; c_i<cond.length(); c_i++) {
+        if (cond.at(c_i) == '|') {
+          transition_count ++;
+        }
+      }
       transition_count ++;
+    }
 
     // create the transitions
     ltsmin_buchi_state_t * bs = NULL;
@@ -178,11 +189,20 @@ ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
         bs->transitions[trans_index].to_state = state_map[(int) t.dst];
         bs->transitions[trans_index].pos      = (int*) RTmalloc(sizeof(int) * 2);
         bs->transitions[trans_index].neg      = (int*) RTmalloc(sizeof(int) * 2);
+        bs->transitions[trans_index].index    = index++;
+
+        // parse the acceptance sets
+        bs->transitions[trans_index].acc_set  = 0;
+        if (isTGBA) {
+          for (unsigned acc : t.acc.sets()) {
+            bs->transitions[trans_index].acc_set |= (1 << ((uint32_t) acc));
+          }
+        }
 
         // transition conditions, parse the sat formula to the pos and neg bitsets
         bs->transitions[trans_index].pos[0]   = 0;
         bs->transitions[trans_index].neg[0]   = 0;
-        std::string cond = spot::bdd_format_sat(dict, t.cond);
+        std::string cond = spot::bdd_format_formula(dict, t.cond);
         int pred_start = -1;
         bool is_neg = false;
         for (int c_i=0; c_i<cond.length(); c_i++) {
@@ -206,20 +226,23 @@ ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
             case '!':
               is_neg = true;
               break;
+            case '|': {
+              // create a new transition
+              trans_index ++;
+              bs->transitions[trans_index].to_state = state_map[(int) t.dst];
+              bs->transitions[trans_index].pos      = (int*) RTmalloc(sizeof(int) * 2);
+              bs->transitions[trans_index].neg      = (int*) RTmalloc(sizeof(int) * 2);
+              bs->transitions[trans_index].index    = index++;
+              bs->transitions[trans_index].acc_set  = bs->transitions[trans_index-1].acc_set;
+              bs->transitions[trans_index].pos[0]   = 0;
+              bs->transitions[trans_index].neg[0]   = 0;
+              } break;
             default:
               break;
           }
         }
 
-        // parse the acceptance sets
-        bs->transitions[trans_index].acc_set  = 0;
-        if (isTGBA) {
-          for (unsigned acc : t.acc.sets()) {
-            bs->transitions[trans_index].acc_set |= (1 << ((uint32_t) acc));
-          }
-        }
-
-        bs->transitions[trans_index++].index  = index++;
+        trans_index ++;
     }
     ba->states[_s] = bs;
   }
@@ -227,12 +250,17 @@ ltsmin_buchi_t *create_ltsmin_buchi(std::ostream& out, spot::twa_graph_ptr& aut)
   return ba;
 }
 
-void ltsmin_ltl2hoa(ltsmin_expr_t e, int to_tgba) {
+
+void 
+ltsmin_ltl2hoa(ltsmin_expr_t e, int to_tgba) 
+{
   // construct the LTL formula and store the predicates
   char *buff = ltl_to_store(e);
   
   // create and run a system command that produces the HOA
   std::string ltl = std::string(buff);
+
+  //std::cerr << "LTL Formula: " << ltl << std::endl;
 
   // use Spot to parse the LTL and create an automata
   spot::parse_error_list pel;
@@ -245,10 +273,16 @@ void ltsmin_ltl2hoa(ltsmin_expr_t e, int to_tgba) {
     trans.set_type(spot::postprocessor::TGBA);
   else
     trans.set_type(spot::postprocessor::BA);
+  trans.set_pref(spot::postprocessor::Deterministic);
   spot_automaton = trans.run(f);
+
+  //spot::print_hoa(std::cout, spot_automaton); // print the HOA
 }
 
-ltsmin_buchi_t *ltsmin_hoa_buchi() {
-  ltsmin_buchi_t *ret = create_ltsmin_buchi(std::cout, spot_automaton);
+
+ltsmin_buchi_t *
+ltsmin_hoa_buchi() 
+{
+  ltsmin_buchi_t *ret = create_ltsmin_buchi(spot_automaton);
   return ret;
 }
