@@ -27,7 +27,7 @@ ltsmin_expr_lookup(ltsmin_expr_t e, char *text, ltsmin_expr_list_t **le_list)
         pp_le_list = (ltsmin_expr_list_t**)&((*pp_le_list)->next);
     }
     // alloc room for this predicate expression
-    *pp_le_list = tl_emalloc(sizeof(ltsmin_expr_list_t));
+    *pp_le_list = (ltsmin_expr_list_t*) RTmalloc(sizeof(ltsmin_expr_list_t));
     (*pp_le_list)->text = strdup(text);
     (*pp_le_list)->expr = e;
     Debug ("LTL Symbol table: record expression %p as '%s'", e, text);
