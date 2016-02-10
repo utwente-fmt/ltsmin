@@ -22,7 +22,7 @@ acx_spot=no
 for f in $CHECK_DIR; do
     if test -f "${f}/include/spot/tl/parse.hh" -a -f "${f}/include/bddx.h"; then
         LIBDDD_INCLUDE="${f}"
-        AC_SUBST([SPOT_CPPFLAGS],["-I${f}/include -std=c++11"])
+        AC_SUBST([SPOT_CPPFLAGS],["-I${f}/include -I${f}/include/spot -std=c++11"])
         AC_SUBST([SPOT_LIBS],["-lspot -lbddx"])
         AC_SUBST([SPOT_LDFLAGS],["-L${f}/lib"])
         acx_spot=yes
