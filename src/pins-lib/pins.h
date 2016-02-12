@@ -983,4 +983,24 @@ extern void GBsetExit(model_t model, ExitCB exit);
  */
 extern void GBExit(model_t model);
 
+/**
+ * \brief set state vector permutation.
+ */
+extern void GBsetVarPerm(model_t model, int* perm);
+
+/**
+ * \brief get state vector permutation.
+ */
+extern int* GBgetVarPerm(model_t model);
+
+/**
+ * \brief set group permutation.
+ */
+extern void GBsetGroupPerm(model_t model, int* perm);
+
+/**
+ * \brief get group permutation.
+ */
+extern int* GBgetGroupPerm(model_t model);
+
 #endif

@@ -1031,7 +1031,11 @@ str2vec(const int max_size, const char *perm, int *vec)
 model_t
 GBregroup (model_t model)
 {
-    if (regroup_spec != NULL || col_ins != NULL || row_perm != NULL || col_perm != NULL) {
+    if (
+        regroup_spec != NULL ||
+        col_ins != NULL ||
+        row_perm != NULL || col_perm != NULL ||
+        GBgetVarPerm(model) != NULL || GBgetGroupPerm(model) != NULL) {
 
         Print1(info, "Initializing regrouping layer");
 
@@ -1075,6 +1079,16 @@ GBregroup (model_t model)
         inf.old_mustw = mustw;
 
         split_matrices(&inf);
+
+        if (GBgetGroupPerm(model) != NULL) {
+            Warning(info, "Got group permutation from language front-end; permuting rows");
+            apply_permutation(&inf, GBgetGroupPerm(model), NULL);
+        }
+
+        if (GBgetVarPerm(model) != NULL) {
+            Warning(info, "Got state vector permutation from language front-end; permuting columns");
+            apply_permutation(&inf, NULL, GBgetVarPerm(model));
+        }
 
         if (row_perm != NULL) {
             Warning(info, "Permuting rows according to given vector");

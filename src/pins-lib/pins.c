@@ -69,6 +69,9 @@ struct grey_box_model {
 	struct static_info_matrix * static_info_matrices;
 
 	ExitCB exit;
+
+	int* var_perm;
+	int* group_perm;
 };
 
 struct static_info_matrix{
@@ -497,6 +500,10 @@ model_t GBcreateBase(){
 	model->static_info_index=SIcreate();
 	model->static_info_matrices=NULL;
 	ADD_ARRAY(SImanager(model->static_info_index),model->static_info_matrices,struct static_info_matrix);
+
+	model->var_perm = NULL;
+	model->group_perm = NULL;
+
 	return model;
 }
 
@@ -656,6 +663,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
 
     model->exit = wrapped_exit_default;
+
+    model->var_perm = default_src->var_perm;
+    model->group_perm = default_src->group_perm;
 }
 
 void* GBgetContext(model_t model){
@@ -1516,4 +1526,20 @@ void GBsetExit(model_t model, ExitCB exit)
 void GBExit(model_t model)
 {
     if (model->exit != NULL) model->exit(model);
+}
+
+void GBsetVarPerm(model_t model, int* perm) {
+    model->var_perm = perm;
+}
+
+int* GBgetVarPerm(model_t model) {
+    return model->var_perm;
+}
+
+void GBsetGroupPerm(model_t model, int* perm) {
+    model->group_perm = perm;
+}
+
+int* GBgetGroupPerm(model_t model) {
+    return model->group_perm;
 }
