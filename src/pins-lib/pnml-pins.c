@@ -22,6 +22,8 @@
 #define NUM_PLACES SIgetCount(context->pnml_places)
 #define NUM_ARCS SIgetCount(context->pnml_arcs)
 
+static int noack = 0;
+
 static void
 pnml_popt(poptContext con,
          enum poptCallbackReason reason,
@@ -34,6 +36,11 @@ pnml_popt(poptContext con,
         break;
     case POPT_CALLBACK_REASON_POST:
         GBregisterLoader("pnml", PNMLloadGreyboxModel);
+
+        if (noack != 0 && noack != 1 && noack != 2) {
+            Abort("Option --noack only accepts value 1 or 2");
+        }
+
         return;
     case POPT_CALLBACK_REASON_OPTION:
         break;
@@ -43,6 +50,7 @@ pnml_popt(poptContext con,
 
 struct poptOption pnml_options[]= {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)&pnml_popt, 0 , NULL , NULL },
+    { "noack" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &noack , 0 , "Set Noack order to apply","<[1|2]>" },
     POPT_TABLEEND
 };
 
@@ -534,6 +542,188 @@ attach_arcs(pnml_context_t* context)
     }
 }
 
+/*
+ * if type == ARC_OUT, compute |.t \cap S|
+ * if type == ARC_IN, compute |t. \cap S|
+ */
+static inline double
+noack_num_pre_or_post(pnml_context_t* context, int transition, arc_dir_t type, int* assigned)
+{
+    const transition_t* transs = context->transitions;
+    double result = .0;
+
+    for (arc_t* arc = context->arcs + transs[transition].start; arc->transition == transition; arc++) {
+        if (arc->type == type && assigned[arc->place]) result += 1.0;
+    }
+
+    return result;
+}
+
+static inline double
+noack_g1(pnml_context_t* context, int transition, int* assigned)
+{
+    const double weight = noack_num_pre_or_post(context, transition, ARC_IN, assigned);
+    if (weight == .0) return .1;
+    else return weight;
+}
+
+static inline double
+noack_h(pnml_context_t* context, int transition, int* assigned)
+{
+    const double weight = noack_num_pre_or_post(context, transition, ARC_OUT, assigned);
+    if (weight == .0) return .2;
+    else return 2.0 * weight;
+}
+
+static int*
+noack1(pnml_context_t* context)
+{
+    Warning(info, "Computing Noack1 order");
+
+    rt_timer_t timer = RTcreateTimer();
+    RTstartTimer(timer);
+
+    arc_t* arcs = context->arcs;
+
+    const transition_t* transs = context->transitions;
+
+    int num_assigned = 0;
+    int assigned[NUM_PLACES];
+    memset(assigned, 0, sizeof(int[NUM_PLACES]));
+
+    int* order = RTmalloc(sizeof(int[NUM_PLACES]));
+
+    while (num_assigned < NUM_PLACES) {
+        double weights[NUM_PLACES];
+        memset(weights, 0, sizeof(double[NUM_PLACES]));
+
+        int num_arcs[NUM_PLACES];
+        memset(num_arcs, 0, sizeof(int[NUM_PLACES]));
+        for (arc_t* arc = arcs; arc->type != ARC_LAST; arc++) {
+            const int place = arc->place;
+            if (assigned[place]) continue;
+
+            const int trans = arc->transition;
+            const arc_dir_t type = arc->type;
+
+            num_arcs[place]++;
+
+            if (transs[trans].in_arcs == 0 || transs[trans].out_arcs == 0) continue;
+
+            if (type == ARC_OUT) {
+                weights[place] +=
+                    (noack_g1(context, trans, assigned) / transs[trans].in_arcs) +
+                    ((2.0 * noack_num_pre_or_post(context, trans, ARC_OUT, assigned)) / transs[trans].out_arcs);
+            } else { // type == ARC_IN
+                weights[place] +=
+                    (noack_h(context, trans, assigned) / transs[trans].out_arcs) +
+                    ((noack_num_pre_or_post(context, trans, ARC_IN, assigned) + 1.0) / transs[trans].in_arcs);
+            }
+        }
+
+        int max_place = -1;
+        double max_weight = -1.0;
+        for (int i = 0; i < NUM_PLACES; i++) {
+            if (!assigned[i]) {
+                const double weight = weights[i] / num_arcs[i];
+                if (weight > max_weight) {
+                    max_weight = weight;
+                    max_place = i;
+                }
+            }
+        }
+
+        assigned[max_place] = 1;
+
+        order[NUM_PLACES - ++num_assigned] = max_place;
+    }
+
+    RTstopTimer(timer);
+    RTprintTimer(info, timer, "Computing Noack1 order took");
+    RTdeleteTimer(timer);
+
+    return order;
+}
+
+static inline double
+noack_g2(pnml_context_t* context, int transition, int* assigned)
+{
+    const double weight = noack_num_pre_or_post(context, transition, ARC_OUT, assigned);
+    if (weight == .0) return .1;
+    else return 2.0 * weight;
+}
+
+static int*
+noack2(pnml_context_t* context)
+{
+    Warning(info, "Computing Noack2 order");
+
+    rt_timer_t timer = RTcreateTimer();
+    RTstartTimer(timer);
+
+    arc_t* arcs = context->arcs;
+
+    const transition_t* transs = context->transitions;
+
+    int num_assigned = 0;
+    int assigned[NUM_PLACES];
+    memset(assigned, 0, sizeof(int[NUM_PLACES]));
+
+    int* order = RTmalloc(sizeof(int[NUM_PLACES]));
+
+    while (num_assigned < NUM_PLACES) {
+        double weights[NUM_PLACES];
+        memset(weights, 0, sizeof(double[NUM_PLACES]));
+
+        int num_arcs[NUM_PLACES];
+        memset(num_arcs, 0, sizeof(int[NUM_PLACES]));
+        for (arc_t* arc = arcs; arc->type != ARC_LAST; arc++) {
+            const int place = arc->place;
+            if (assigned[place]) continue;
+
+            const int trans = arc->transition;
+            const arc_dir_t type = arc->type;
+
+            num_arcs[place]++;
+
+            if (type == ARC_OUT) {
+                if (transs[trans].in_arcs > 0) {
+                    weights[place] += noack_g1(context, trans, assigned) / transs[trans].in_arcs;
+                }
+                if (transs[trans].out_arcs > 0) {
+                    weights[place] += noack_g2(context, trans, assigned) / transs[trans].out_arcs;
+                }
+            } else if (type == ARC_IN && transs[trans].in_arcs > 0 && transs[trans].out_arcs > 0) {
+                weights[place] +=
+                    (noack_h(context, trans, assigned) / transs[trans].out_arcs) +
+                    ((noack_num_pre_or_post(context, trans, ARC_IN, assigned) + 1.0) / transs[trans].in_arcs);
+            }
+        }
+
+        int max_place = -1;
+        double max_weight = -1.0;
+        for (int i = 0; i < NUM_PLACES; i++) {
+            if (!assigned[i]) {
+                const double weight = weights[i] / num_arcs[i];
+                if (weight > max_weight) {
+                    max_weight = weight;
+                    max_place = i;
+                }
+            }
+        }
+
+        assigned[max_place] = 1;
+
+        order[NUM_PLACES - ++num_assigned] = max_place;
+    }
+
+    RTstopTimer(timer);
+    RTprintTimer(info, timer, "Computing Noack2 order took");
+    RTdeleteTimer(timer);
+
+    return order;
+}
+
 void
 PNMLloadGreyboxModel(model_t model, const char* name)
 {
@@ -633,6 +823,17 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     xmlFreeDoc(doc);
 
     attach_arcs(context);
+
+    switch (noack) {
+        case 1:
+            GBsetVarPerm(model, noack1(context));
+            break;
+        case 2:
+            GBsetVarPerm(model, noack2(context));
+            break;
+        default:
+            break;
+    }
 
     lts_type_set_state_label_count (ltstype, context->num_guards);
     matrix_t* sl_info = RTmalloc(sizeof(matrix_t));
