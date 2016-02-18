@@ -22,6 +22,7 @@
 typedef struct tarjan_state_s {
     uint32_t            index;
     uint32_t            lowlink;
+    uint32_t            acc_set;
 } tarjan_state_t;
 
 
@@ -89,11 +90,15 @@ renault_local_init (run_t *run, wctx_t *ctx)
                           &ctx->local->target_tarjan.index);
     state_info_add_simple (ctx->local->target, sizeof (uint32_t),
                           &ctx->local->target_tarjan.lowlink);
+    state_info_add_simple (ctx->local->target, sizeof (uint32_t),
+                          &ctx->local->target_tarjan.acc_set);
 
     state_info_add_simple (ctx->state, sizeof (uint32_t),
                           &ctx->local->state_tarjan.index);
     state_info_add_simple (ctx->state, sizeof (uint32_t),
                           &ctx->local->state_tarjan.lowlink);
+    state_info_add_simple (ctx->state, sizeof (uint32_t),
+                          &ctx->local->state_tarjan.acc_set);
 
     size_t len               = state_info_serialize_int_size (ctx->state);
     ctx->local->search_stack = dfs_stack_create (len);
@@ -103,6 +108,8 @@ renault_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.tarjan_counter  = 0;
     ctx->local->cnt.unique_states   = 0;
     ctx->local->cnt.unique_trans    = 0;
+    ctx->local->state_tarjan.acc_set  = 0;
+    ctx->local->target_tarjan.acc_set = 0;
 
     shared->ltl = GBgetAcceptingStateLabelIndex(ctx->model) != -1;
 
@@ -143,7 +150,12 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     // self-loop
     if (ctx->state->ref == successor->ref) {
-        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(successor)) ) {
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+            uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, ti->acc_set);
+            if (GBTGBAIsAccepting(ctx->model, acc) ) {
+                ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+            }
+        } if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(successor)) ) {
             // TODO: this cycle report won't work correctly
             ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
         }
@@ -163,6 +175,12 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         r_uf_union (shared->uf, ctx->state->ref, successor->ref);
 
         // TODO: this cycle report won't work correctly
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+            uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, ti->acc_set);
+            if (GBTGBAIsAccepting(ctx->model, acc) ) {
+                ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+            }
+        } 
         if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)))
             ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, ctx->state);
         if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(successor)))
@@ -172,11 +190,23 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         if (loc->state_tarjan.lowlink > loc->target_tarjan.lowlink)
             loc->state_tarjan.lowlink = loc->target_tarjan.lowlink;
 
+        // add acceptance set to the state
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && ti->acc_set > 0)
+            loc->state_tarjan.acc_set |= ti->acc_set;
+
     } else {
         // unseen state ==> push to search_stack
         raw_data_t stack_loc = dfs_stack_push (loc->search_stack, NULL);
         state_info_serialize (successor, stack_loc);
+
+        // add acceptance set to the state
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && ti->acc_set > 0) {
+            state_info_deserialize (loc->target, stack_loc); // search_stack TOP
+            loc->state_tarjan.acc_set = ti->acc_set;
+            state_info_serialize (loc->target, stack_loc);
+        }
     }
+
 
     (void) ti; (void) seen;
 }
@@ -300,6 +330,7 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
     r_uf_alg_shared_t  *shared     = (r_uf_alg_shared_t*) ctx->run->shared;
     raw_data_t          state_data;
     ref_t               accepting  = DUMMY_IDX;
+    uint32_t            acc_set    = 0;
 
     Debug ("Found SCC with root %zu", root);
 
@@ -311,7 +342,13 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
         state_info_deserialize (loc->target, state_data);
         if (loc->target_tarjan.lowlink < root_low) break;
 
-        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(loc->target))) {
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+            // add the acceptance set from the previous root, not the current one
+            // otherwise we could add the acceptance set for the edge
+            // betweem two SCCs (which cannot be part of a cycle)
+            r_uf_add_acc (shared->uf, loc->target->ref, acc_set);
+            acc_set = loc->target_tarjan.acc_set;
+        } else if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(loc->target))) {
             accepting = loc->target->ref;
         }
 
@@ -323,10 +360,15 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
 
         state_data = dfs_stack_top (loc->tarjan_stack);
     }
-    if (accepting != DUMMY_IDX) {
+
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
+        acc_set = r_uf_get_acc (shared->uf, root);
+        if (GBTGBAIsAccepting(ctx->model, acc_set) ) {
+            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, root);
+        }
+    } else if (accepting != DUMMY_IDX) {
         ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, accepting);
     }
-
 
     // move the root of the SCC (since it is not on tarjan_stack)
     move_scc (ctx, root);

@@ -22,7 +22,8 @@ typedef enum r_uf_status_e {
 struct r_uf_state_s {
     ref_t               parent;               // the parent in the UF tree
     unsigned char       r_uf_status;          // the UF status of the state
-    char                pad[7];               // padding for data alignment
+    uint32_t            acc_set;              // TGBA acceptance set
+    char                pad[3];               // padding for data alignment
 };
 
 
@@ -136,6 +137,7 @@ bool
 r_uf_union (const r_uf_t *uf, ref_t a, ref_t b)
 {
     ref_t               a_r, b_r, root, other;
+    uint32_t            q_a, r_a;
 
     while ( 1 ) {
 
@@ -162,6 +164,20 @@ r_uf_union (const r_uf_t *uf, ref_t a, ref_t b)
         if (atomic_read (&uf->array[root].parent) != root) {
             atomic_write (&uf->array[other].parent, other);
             continue;
+        }
+
+        break;
+    }
+
+    // only update acceptance set for r if q adds acceptance marks
+    r_a = atomic_read (&uf->array[root].acc_set);
+    q_a = atomic_read (&uf->array[other].acc_set);
+    if ( (q_a | r_a) != r_a) {
+        // update!
+        fetch_or (&uf->array[root].acc_set, q_a);
+        while (atomic_read (&uf->array[root].parent) != root) {
+            root = r_uf_find (uf, root);
+            fetch_or (&uf->array[root].acc_set, q_a);
         }
     }
 
@@ -211,6 +227,42 @@ r_uf_mark_dead (const r_uf_t *uf, ref_t state)
     HREassert (r_uf_is_dead (uf, state), "state should be dead");
 
     return result;
+}
+
+/* **************************** TGBA acceptance **************************** */
+
+
+uint32_t
+r_uf_get_acc (const r_uf_t *uf, ref_t state)
+{
+    ref_t r = r_uf_find (uf, state);
+    return  atomic_read (&uf->array[r].acc_set);
+}
+
+/**
+ * unites the acceptance set of the uf representative with acc (via logical OR)
+ * returns the new acceptance set for the uf representative
+ */
+uint32_t
+r_uf_add_acc (const r_uf_t *uf, ref_t state, uint32_t acc)
+{
+    // just return the acceptance set if nothing is added
+    if (acc == 0)
+        return r_uf_get_acc (uf, state);
+
+    ref_t    r     = r_uf_find (uf, state);
+    uint32_t r_acc = atomic_read (&uf->array[r].acc_set);
+
+    // only unite if it updates the acceptance set
+    if ( (r_acc | acc) != r_acc) {
+        // update!
+        r_acc = or_fetch (&uf->array[r].acc_set, acc);
+        while (atomic_read (&uf->array[r].parent) != r) {
+            r = r_uf_find (uf, r);
+            r_acc = or_fetch (&uf->array[r].acc_set, acc);
+        }
+    }
+    return r_acc;
 }
 
 
