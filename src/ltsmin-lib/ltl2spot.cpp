@@ -124,7 +124,6 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
   
   ba->state_count     = aut->num_states();
   ba->predicate_count = aut->ap().size();
-  ba->trans_count     = aut->num_edges();
 
   // create bitset for the acceptance set
   uint32_t acceptance_set = 0;
@@ -246,6 +245,9 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
     }
     ba->states[_s] = bs;
   }
+
+  // NB: not necessarily equal to num_edges
+  ba->trans_count = index;
 
   return ba;
 }
