@@ -11,10 +11,6 @@
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/fast_set.h>
 
-#ifdef SEARCH_COMPLETE_GRAPH
-#include <mc-lib/dlopen_extra.h>
-#endif
-
 #ifdef HAVE_PROFILER
 #include <gperftools/profiler.h>
 #endif
@@ -109,11 +105,6 @@ renault_local_init (run_t *run, wctx_t *ctx)
     ctx->local->visited_states =
             fset_create (sizeof (ref_t), sizeof (raw_data_t), 10, dbs_size);
 
-#ifdef SEARCH_COMPLETE_GRAPH
-    // provide the input file name to dlopen_setup
-    dlopen_setup (files[0]);
-#endif
-
     (void) run; 
 }
 
@@ -176,25 +167,6 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 }
 
 
-#ifdef SEARCH_COMPLETE_GRAPH
-/**
- * bypasses pins to directly handle the successor
- * assumes that we only require state->ref
- */
-static inline void
-permute_complete (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
-{
-    wctx_t             *ctx = (wctx_t *) arg;
-    alg_local_t        *loc = ctx->local;
-
-    loc->target->ref = (ref_t) dst[0];
-    renault_handle (ctx, loc->target, ti, 0);
-
-    (void) cpy;
-}
-#endif
-
-
 /**
  * make a stackframe on search_stack and handle the successors of ctx->state
  */
@@ -207,14 +179,7 @@ explore_state (wctx_t *ctx)
     dfs_stack_enter (loc->search_stack);
     increase_level (ctx->counters);
 
-#ifdef SEARCH_COMPLETE_GRAPH
-    // bypass the pins interface by directly handling the successors
-    int                 ref_arr[2];
-    ref_arr[0] = (int) ctx->state->ref;
-    trans = dlopen_next_state (NULL, 0, ref_arr, permute_complete, ctx);
-#else
     trans = permute_trans (ctx->permute, ctx->state, renault_handle, ctx);
-#endif
 
     ctx->counters->explored++;
     run_maybe_report1 (ctx->run, (work_counter_t *) ctx->counters, "");
@@ -231,16 +196,11 @@ renault_init (wctx_t *ctx)
 {
     transition_info_t   ti = GB_NO_TRANSITION;
 
-#ifdef SEARCH_COMPLETE_GRAPH
-    alg_local_t        *loc = ctx->local;
-    renault_handle (ctx, loc->target, &ti, 0);
-#else
     renault_handle (ctx, ctx->initial, &ti, 0);
 
     // reset explored and transition count
     ctx->counters->explored = 0;
     ctx->counters->trans    = 0;
-#endif
 }
 
 
@@ -372,18 +332,6 @@ renault_run  (run_t *run, wctx_t *ctx)
     ProfilerStart ("renault.perf");
 #endif
 
-#ifdef SEARCH_COMPLETE_GRAPH
-    int              init_state = dlopen_get_worker_initial_state (ctx->id, W);
-    int              inits      = 0;
-
-    // loop until every state of the graph has been visited
-    while ( 1 )
-    {
-        inits ++;
-        // use loc->target as a dummy for the initial state
-        loc->target->ref = init_state;
-#endif
-
     renault_init (ctx);
 
     // continue until we are done exploring the graph
@@ -470,15 +418,6 @@ renault_run  (run_t *run, wctx_t *ctx)
             dfs_stack_pop (loc->search_stack);
         }
     }
-
-#ifdef SEARCH_COMPLETE_GRAPH
-        init_state = dlopen_get_new_initial_state (init_state);
-        if (init_state == -1) {
-            Warning(info, "Number of inits : %d", inits);
-            break;
-        }
-    }
-#endif
 
 #ifdef HAVE_PROFILER
     if (ctx->id == 0)
