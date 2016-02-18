@@ -59,6 +59,7 @@ struct alg_local_s {
  */
 typedef struct uf_alg_shared_s {
     r_uf_t             *uf;                   // shared union-find structure
+    bool                ltl;                  // LTL property present?
 } r_uf_alg_shared_t;
 
 
@@ -80,6 +81,7 @@ void
 renault_local_init (run_t *run, wctx_t *ctx)
 {
     ctx->local         = RTmallocZero (sizeof (alg_local_t));
+    r_uf_alg_shared_t    *shared = (r_uf_alg_shared_t*) ctx->run->shared;
     ctx->local->target = state_info_create ();
 
     // extend state_info with tarjan_state information
@@ -101,6 +103,8 @@ renault_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.tarjan_counter  = 0;
     ctx->local->cnt.unique_states   = 0;
     ctx->local->cnt.unique_trans    = 0;
+
+    shared->ltl = GBgetAcceptingStateLabelIndex(ctx->model) != -1;
 
     ctx->local->visited_states =
             fset_create (sizeof (ref_t), sizeof (raw_data_t), 10, dbs_size);
@@ -138,8 +142,13 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     ctx->counters->trans++;
 
     // self-loop
-    if (ctx->state->ref == successor->ref)
+    if (ctx->state->ref == successor->ref) {
+        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(successor)) ) {
+            // TODO: this cycle report won't work correctly
+            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+        }
         return;
+    }
 
     // completed SCC
     if (r_uf_is_dead (shared->uf, successor->ref))
@@ -152,6 +161,12 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (found) {
         // previously visited state ==> update lowlink and unite state
         r_uf_union (shared->uf, ctx->state->ref, successor->ref);
+
+        // TODO: this cycle report won't work correctly
+        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)))
+            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, ctx->state);
+        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(successor)))
+            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
 
         state_info_deserialize (loc->target, *addr);
         if (loc->state_tarjan.lowlink > loc->target_tarjan.lowlink)
@@ -284,6 +299,7 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
     alg_local_t        *loc        = ctx->local;
     r_uf_alg_shared_t  *shared     = (r_uf_alg_shared_t*) ctx->run->shared;
     raw_data_t          state_data;
+    ref_t               accepting  = DUMMY_IDX;
 
     Debug ("Found SCC with root %zu", root);
 
@@ -291,19 +307,26 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
     //   and put the states in the same UF set
     state_data = dfs_stack_top (loc->tarjan_stack);
     while ( state_data != NULL ) {
+        // check if state_data belongs to a different SCC
+        state_info_deserialize (loc->target, state_data);
+        if (loc->target_tarjan.lowlink < root_low) break;
 
-       // check if state_data belongs to a different SCC
-       state_info_deserialize (loc->target, state_data);
-       if (loc->target_tarjan.lowlink < root_low) break;
+        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(loc->target))) {
+            accepting = loc->target->ref;
+        }
 
-       // unite the root of the SCC with the current state
-       r_uf_union (shared->uf, root, loc->target->ref);
+        // unite the root of the SCC with the current state
+        r_uf_union (shared->uf, root, loc->target->ref);
 
-       move_scc (ctx, loc->target->ref);
-       dfs_stack_pop (loc->tarjan_stack);
+        move_scc (ctx, loc->target->ref);
+        dfs_stack_pop (loc->tarjan_stack);
 
-       state_data = dfs_stack_top (loc->tarjan_stack);
+        state_data = dfs_stack_top (loc->tarjan_stack);
     }
+    if (accepting != DUMMY_IDX) {
+        ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, accepting);
+    }
+
 
     // move the root of the SCC (since it is not on tarjan_stack)
     move_scc (ctx, root);
