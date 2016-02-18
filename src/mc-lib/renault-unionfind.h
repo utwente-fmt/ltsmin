@@ -83,6 +83,12 @@ extern bool      r_uf_is_dead (const r_uf_t *uf, ref_t state);
 
 extern bool      r_uf_mark_dead (const r_uf_t *uf, ref_t state);
 
+/* **************************** TGBA acceptance **************************** */
+
+extern uint32_t  r_uf_get_acc (const r_uf_t *uf, ref_t state);
+
+extern uint32_t  r_uf_add_acc (const r_uf_t *uf, ref_t state, uint32_t acc);
+
 /* ******************************** testing ******************************** */
 
 extern ref_t     r_uf_debug (const r_uf_t *uf, ref_t state);
