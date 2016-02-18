@@ -185,11 +185,16 @@ void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
             // perform transition
             dst_buchi[ctx->ltl_idx] = ctx->ba->states[i]->transitions[j].to_state;
 
+            // create new transition info, since provided ti may be of wrong size
+            transition_info_t *ti2 = RTmalloc(sizeof(transition_info_t));
+            ti2->labels = ti->labels;
+            ti2->group = ti->group;
+            ti2->por_proviso = ti->por_proviso;
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
-                ti->acc_set = ctx->ba->states[i]->transitions[j].acc_set;
+                ti2->acc_set = ctx->ba->states[i]->transitions[j].acc_set;
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
+            infoctx->cb(infoctx->user_context, ti2, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -250,10 +255,8 @@ void ltl_spin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
             ti2->labels = ti->labels;
             ti2->group = ti->group;
             ti2->por_proviso = ti->por_proviso;
-            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-                int acc_set = ctx->ba->states[i]->transitions[j].acc_set;
-                ti2->acc_set = acc_set;
-            }
+            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
+                ti2->acc_set = ctx->ba->states[i]->transitions[j].acc_set;
 
             // callback, emit new state, move allowed
             infoctx->cb(infoctx->user_context, ti2, dst_buchi,cpy);
@@ -339,8 +342,13 @@ void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
             // perform transition
             dst_buchi[ctx->ltl_idx] = ctx->ba->states[i]->transitions[j].to_state;
 
+            // create new transition info, since provided ti may be of wrong size
+            transition_info_t *ti2 = RTmalloc(sizeof(transition_info_t));
+            ti2->labels = ti->labels;
+            ti2->group = ti->group;
+            ti2->por_proviso = ti->por_proviso;
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
-                ti->acc_set = ctx->ba->states[i]->transitions[j].acc_set;
+                ti2->acc_set = ctx->ba->states[i]->transitions[j].acc_set;
 
             // callback, emit new state, move allowed
             infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
