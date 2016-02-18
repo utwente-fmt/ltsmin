@@ -108,8 +108,8 @@ print_matrix_stats(std::vector<std::map<int, double> > const & matrix, std::vect
         Warning(l, "bandwidth: %d", bw);
         Warning(l, "profile: %.*g", DBL_DIG, profile);
         Warning(l, "span: %.*g", DBL_DIG, spn);
-        Warning(l, "average wavefront: %.*g", (int) std::ceil(std::log10(matrix.size())), avg_wavefront);
-        Warning(l, "RMS wavefront: %.*g", (int) std::ceil(std::log10(matrix.size())), rms_wavefront);
+        Warning(l, "average wavefront: %.*g", (int) std::ceil(std::log10(matrix.size() * matrix.size())), avg_wavefront);
+        Warning(l, "RMS wavefront: %.*g", (int) std::ceil(std::log10(matrix.size() * matrix.size())), rms_wavefront);
     }
 }
 

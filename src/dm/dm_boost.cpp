@@ -169,8 +169,8 @@ graph_stats(std::vector<Vertex> inv_perm, Graph g, typename property_map<Graph, 
         Warning(l, "bandwidth: %zu", bandwidth(g, make_iterator_property_map(&perm[0], index_map, perm[0])));
         Warning(l, "profile: %zu", profile(g, make_iterator_property_map(&perm[0], index_map, perm[0])));
         Warning(l, "span: %zu", span(g, make_iterator_property_map(&perm[0], index_map, perm[0])));
-        Warning(l, "average wavefront: %.*g", (int) std::ceil(std::log10(num_vertices(g))), aver_wavefront(g, make_iterator_property_map(&perm[0], index_map, perm[0])));
-        Warning(l, "RMS wavefront: %.*g", (int) std::ceil(std::log10(num_vertices(g))), rms_wavefront(g, make_iterator_property_map(&perm[0], index_map, perm[0])));
+        Warning(l, "average wavefront: %.*g", (int) std::ceil(std::log10(num_vertices(g) * num_vertices(g))), aver_wavefront(g, make_iterator_property_map(&perm[0], index_map, perm[0])));
+        Warning(l, "RMS wavefront: %.*g", (int) std::ceil(std::log10(num_vertices(g) * num_vertices(g))), rms_wavefront(g, make_iterator_property_map(&perm[0], index_map, perm[0])));
     }
 }
 
