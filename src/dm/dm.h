@@ -107,6 +107,7 @@ typedef enum { DM_EVENT_SPAN, DM_WEIGHTED_EVENT_SPAN } dm_cost_t;
 extern void dm_anneal(matrix_t* m, dm_cost_t cost, const int timeout);
 extern void dm_optimize(matrix_t* m);
 extern void dm_all_perm(matrix_t* m);
+extern void dm_FORCE(matrix_t* m);
 
 extern void dm_horizontal_flip(matrix_t* m);
 extern void dm_vertical_flip(matrix_t* m);

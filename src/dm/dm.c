@@ -1722,3 +1722,109 @@ dm_weighted_event_span(const matrix_t* const m, int* const spans)
 
     return res;
 }
+
+/////////////////////////////////////////////////////////////////////
+// FORCE: A Fast and Easy-To-Implement Variable-Ordering Heuristic //
+/////////////////////////////////////////////////////////////////////
+
+/*
+ * FORCE formula 3.1: Compute Center Of Gravity for each hyperedge/row.
+ */
+static void
+FORCE_COGs(matrix_t* m, double* cogs)
+{
+    memset(cogs, 0, sizeof(double[dm_nrows(m)]));
+    for (int i = 0; i < dm_nrows(m); i++) {
+        for (int j = 0; j < dm_ncols(m); j++) {
+            if (dm_is_set(m, i, j)) cogs[i] += j;
+        }
+        cogs[i] /= dm_ones_in_row(m, i);
+    }
+}
+
+/* tentative locations */
+struct tent_s {
+    double weight;
+    int column;
+};
+
+/*
+ * Formula 3.2: Compute all tentative locations/rows
+ */
+static void
+FORCE_tents(matrix_t* m, double* cogs, struct tent_s* tents)
+{
+    memset(tents, 0, sizeof(struct tent_s[dm_ncols(m)]));
+    for (int i = 0; i < dm_ncols(m); i++) {
+        tents[i].column = i;
+        for (int j = 0; j < dm_nrows(m); j++) {
+            if (dm_is_set(m, j, i)) tents[i].weight += cogs[j];
+        }
+        tents[i].weight /= dm_ones_in_col(m, i);
+    }
+}
+
+/*
+ * Compare tentative locations
+ */
+static int
+compare_tents(const void *a, const void *b)
+{
+    const struct tent_s* aa = (const struct tent_s*) a;
+    const struct tent_s* bb = (const struct tent_s*) b;
+
+    if (aa->weight - bb->weight < 0.0) return -1;
+    else return 1;
+}
+
+/*
+ * FORCE algorithm to reduce event span.
+ */
+void
+dm_FORCE(matrix_t* m)
+{
+    // piece of memory for COGs
+    double cogs[dm_nrows(m)];
+
+    // piece of memory for tentative locations
+    struct tent_s tents[dm_ncols(m)];
+
+    double old_span = 0.0;
+    double new_span = dm_nrows(m) * (double) dm_ncols(m);
+
+    // Paper says c*log10(dm_ncols(m)); we pick dm_ncols(m)
+    int iterations = dm_ncols(m);
+    do {
+        old_span = new_span;
+
+        // compute COGSs
+        FORCE_COGs(m, cogs);
+
+        // compute tentative locations
+        FORCE_tents(m, cogs, tents);
+
+        // sort tentative locations
+        qsort(tents, dm_ncols(m), sizeof(struct tent_s), compare_tents);
+
+        // create permutation
+        int perm[dm_ncols(m)];
+        for (int i = 0; i < dm_ncols(m); i++) {
+            perm[i] = tents[i].column;
+        }
+
+        // create permutation groups and permute columns
+        permutation_group_t* groups;
+        int n;
+        dm_create_permutation_groups(&groups, &n, perm, dm_ncols(m));
+        for (int i = 0; i < n; i++) {
+            dm_permute_cols(m, &groups[i]);
+            dm_free_permutation_group(&groups[i]);
+        }
+        RTfree(groups);
+
+        // compute gains
+        new_span = dm_event_span(m, NULL);
+        iterations--;
+    } while (iterations > 0 && old_span > new_span);
+    Warning(infoLong, "FORCE took %d iterations", dm_ncols(m) - iterations);
+}

@@ -49,6 +49,7 @@ struct poptOption group_options[] = {
 #ifdef HAVE_VIENNACL
       ", vcm, vacm, vgps, vn"
 #endif
+        ", f"
           , "<(T,)+>" },
     { "cw-max-cols", 0, POPT_ARG_INT, &cw_max_cols, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> columns", "<num>" },
     { "cw-max-rows", 0, POPT_ARG_INT, &cw_max_rows, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> rows", "<num>" },
@@ -784,6 +785,10 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
             else if (strcasecmp (tok, "mm") == 0) {
                 Print1 (info, "Regroup Matrix Metrics");
                 print_event_span(selection);
+            } else if (strcasecmp (tok, "f") == 0) {
+                Print1 (info, "Regroup FORCE");
+                dm_FORCE(selection);
+                inf_copy_col_headers(selection, inf);
             } else if (strcasecmp (tok, "gsa") == 0) {
                 const char         *macro = "gc,gr,csa,rs";
                 Print1 (info, "Regroup macro Simulated Annealing: %s", macro);

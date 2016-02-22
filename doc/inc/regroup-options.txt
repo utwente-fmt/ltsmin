@@ -117,3 +117,6 @@ vacm;;
   
 vgps;;
   Apply ViennaCl's Gibbs-Poole-Stockmeyer ordering.
+  
+f;;
+  Apply FORCE ordering.
