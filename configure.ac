@@ -112,12 +112,18 @@ AC_LANG_RESTORE
 dnl Checks for programs.
 ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
+AC_ARG_ENABLE([dist],
+              [AS_HELP_STRING([--disable-dist],
+               [do not build distributed tools, that require MPI])],,
+              enable_dist=yes)
+AS_IF([test x"$enable_dist" = "xyes"],[
 AC_LANG_PUSH([C])
 AX_MPI([have_mpi=yes],[AC_MSG_WARN([unable to find working MPI C complier wrapper])])
 AC_LANG_POP([C])
 AC_LANG_PUSH([C++])
 AX_MPI([have_mpi=yes],[AC_MSG_WARN([unable to find working MPI C++ complier wrapper])])
 AC_LANG_POP([C++])
+])
 
 AC_PROG_CC_C99
 AS_IF([test x"$ac_cv_prog_cc_c99" = xno],
