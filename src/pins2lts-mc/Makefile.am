@@ -119,8 +119,8 @@ nodist_EXTRA_opaal2lts_mc_SOURCES = automake-force-linker.cxx # required by Boos
 # pnml2lts-mc
 pnml2lts_mc_SOURCES   = $(mc_sources)
 pnml2lts_mc_SOURCES  += ../pins-lib/pnml-pins.c ../pins-lib/pnml-pins.h
-pnml2lts_mc_LDADD     = $(MC_LIBS) $(XML_LIBS)
-pnml2lts_mc_CPPFLAGS  = -DPNML $(MC_CPPFLAGS) $(XML_CPPFLAGS)
+pnml2lts_mc_LDADD     = $(XML_LIBS) $(MC_LIBS)
+pnml2lts_mc_CPPFLAGS  = -DPNML $(XML_CPPFLAGS) $(MC_CPPFLAGS)
 nodist_EXTRA_pnml2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # prob2lts-mc

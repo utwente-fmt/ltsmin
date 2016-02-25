@@ -115,8 +115,8 @@ nodist_EXTRA_prom2lts_dist_SOURCES = automake-force-linker.cxx # required by Boo
 # pnml2lts-dist
 pnml2lts_dist_SOURCES   = ../pins2lts-dist.c
 pnml2lts_dist_SOURCES  += ../../pins-lib/pnml-pins.c ../../pins-lib/pnml-pins.h
-pnml2lts_dist_LDADD     = $(PINS_LIBS) $(XML_LIBS)
-pnml2lts_dist_CPPFLAGS  = -DPNML $(DIST_CPPFLAGS) $(XML_CPPFLAGS)
+pnml2lts_dist_LDADD     = $(XML_LIBS) $(PINS_LIBS)
+pnml2lts_dist_CPPFLAGS  = -DPNML $(XML_CPPFLAGS) $(DIST_CPPFLAGS)
 pnml2lts_dist_LDFLAGS   = $(AM_LDFLAGS)
 nodist_EXTRA_pnml2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 

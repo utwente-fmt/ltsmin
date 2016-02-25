@@ -124,16 +124,15 @@ nodist_EXTRA_prom2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 # pnml2lts-sym
 pnml2lts_sym_SOURCES   = pins2lts-sym.c
 pnml2lts_sym_SOURCES  += ../pins-lib/pnml-pins.c ../pins-lib/pnml-pins.h
-pnml2lts_sym_LDADD     = $(PINS_LIBS) $(VSET_LIBS) $(XML_LIBS)
-pnml2lts_sym_CPPFLAGS  = -DPNML $(SYM_CPP_FLAGS) $(XML_CPPFLAGS)
+pnml2lts_sym_LDADD     = $(XML_LIBS) $(PINS_LIBS) $(VSET_LIBS) 
+pnml2lts_sym_CPPFLAGS  = -DPNML $(XML_CPPFLAGS) $(SYM_CPP_FLAGS)
 pnml2lts_sym_LDFLAGS   = $(SYM_LDFLAGS)
 nodist_EXTRA_pnml2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prob2lts-sym
 prob2lts_sym_SOURCES   = pins2lts-sym.c
 prob2lts_sym_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
-prob2lts_sym_LDADD     = $(PINS_LIBS)
-prob2lts_sym_LDADD    += $(PROB_LIBS) $(VSET_LIBS)
+prob2lts_sym_LDADD     = $(PROB_LIBS) $(PINS_LIBS) $(VSET_LIBS)
 prob2lts_sym_CPPFLAGS  = -DPROB $(SYM_CPP_FLAGS)
 prob2lts_sym_LDFLAGS   = $(SYM_LD_FLAGS)
 nodist_EXTRA_prob2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
