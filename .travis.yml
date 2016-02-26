@@ -49,6 +49,8 @@ env:
     WITH_PROB="yes"
     GHCVER="7.10.3"
     HAPPYVER="1.19.5"
+    ZMQ_NAME="zeromq-4.1.4"
+    ZMQ_URL="http://download.zeromq.org/$ZMQ_NAME.tar.gz"
 
 addons:
   apt:
@@ -60,7 +62,6 @@ addons:
     packages:
       - gcc-4.9
       - g++-4.9
-      - libzmq3-dev
       - cmake
       - libyaml-dev
       - libpopt-dev
@@ -71,6 +72,8 @@ addons:
       - ghc-7.10.3
       - ghc-7.10.3-dyn
       - happy-1.19.5
+      - libnuma-dev
+      - liblzma-dev
       
 before_install:
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; 
@@ -82,7 +85,6 @@ install:
     asciidoc
     xmlto
     viennacl
-    zmq
     cmake
     ant
     ghc
@@ -104,8 +106,19 @@ install:
   - if [ "$CC" = "gcc" ]; then export CC="gcc-4.9"; fi
   - if [ "$CXX" = "g++" ]; then export CXX="g++-4.9"; fi
     
+  # install zmq from source, since libzmq3-dev in apt is missing dependencies for a full static LTSmin build (pgm and sodium are missing)
+  # I filed a bug report here: https://github.com/travis-ci/travis-ci/issues/5701
+  - if [ $WITH_PROB = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libzmq.a" ]; then 
+    wget "$ZMQ_URL" -P /tmp &&
+    tar -xf "/tmp/$ZMQ_NAME.tar.gz" -C /tmp &&
+    pushd /tmp/$ZMQ_NAME &&
+    ./autogen.sh &&
+    ./configure --enable-static --enable-shared --prefix="$HOME/ltsmin-deps" --without-libsodium --without-pgm --without-documentation &&
+    make -j2 &&
+    make install &&
+    popd; fi
+    
   # install czmq from source
-  # but only static libraries; we want to merge them into prob2lts-*
   # since czmq is not distributed in Ubuntu.
   # the LDFLAGS is necessary, because of a bug: https://github.com/zeromq/czmq/issues/1323
   - if [ $WITH_PROB = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libczmq.a" ]; then 
@@ -113,7 +126,7 @@ install:
     tar -xf "/tmp/v$CZMQ_VERSION.tar.gz" -C /tmp &&
     pushd /tmp/czmq-$CZMQ_VERSION &&
     ./autogen.sh &&
-    ./configure --disable-shared --prefix="$HOME/ltsmin-deps" &&
+    ./configure --enable-static --enable-shared --prefix="$HOME/ltsmin-deps" --with-libzmq="$HOME/ltsmin-deps" &&
     make -j2 LDFLAGS="-lpthread" &&
     make install &&
     popd; fi
@@ -170,7 +183,7 @@ install:
     wget "$VIENNACL_URL" -P /tmp &&
     tar xf "/tmp/$VIENNACL_NAME.tar.gz" -C /tmp &&
     cp -R "/tmp/$VIENNACL_NAME/viennacl" "$HOME/ltsmin-deps/include"; fi
-
+    
 before_script:
   # export necessary variables
   # bin
@@ -187,9 +200,9 @@ before_script:
 
 script:
   - ./ltsminreconf &&
-    ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include"
+    ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make -j2; fi
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make -j2 LDFLAGS="-static-libstdc++ -static-libgcc"; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make -j2 LDFLAGS="-Wl,--no-export-dynamic -lltdl -lnuma -llzma -all-static"; fi
   - make dist &&
     export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
     mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TRAVIS_TAG-source.tgz"
