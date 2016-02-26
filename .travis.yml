@@ -201,8 +201,8 @@ before_script:
 script:
   - ./ltsminreconf &&
     ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make -j2; fi
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make -j2 LDFLAGS="-Wl,--no-export-dynamic -lltdl -lnuma -llzma -all-static"; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make -j2 CFLAGS="-DNDEBUG"; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make -j2 CFLAGS="-DNDEBUG"; fi
   - make dist &&
     export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
     mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TRAVIS_TAG-source.tgz"
