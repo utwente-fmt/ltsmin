@@ -68,8 +68,9 @@ uf_create ()
                sizeof (int[8]));
 
     uf_t               *uf = RTmalloc    (sizeof (uf_t));
+    // allocate one entry extra since [0] is not used
     uf->array              = RTalignZero (sizeof(int[8]),
-                                    sizeof (uf_state_t) * (1ULL << dbs_size) );
+                             sizeof (uf_state_t) * ( (1ULL << dbs_size) + 1 ) );
     return uf;
 }
 
