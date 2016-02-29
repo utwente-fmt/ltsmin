@@ -145,13 +145,20 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     raw_data_t         *addr;
     hash32_t            hash;
     int                 found;
+    uint32_t            acc_set   = 0;
+
+    // TGBA acceptance
+    if (ti->labels != NULL && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+        int el_index = GBgetAccSetEdgeLabelIndex (ctx->model);
+        acc_set = ti->labels[el_index];
+    }
 
     ctx->counters->trans++;
 
     // self-loop
     if (ctx->state->ref == successor->ref) {
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, ti->acc_set);
+            uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, acc_set);
             if (GBTGBAIsAccepting(ctx->model, acc) ) {
                 ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
             }
@@ -176,7 +183,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
         // TODO: this cycle report won't work correctly
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, ti->acc_set);
+            uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, acc_set);
             if (GBTGBAIsAccepting(ctx->model, acc) ) {
                 ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
             }
@@ -191,8 +198,8 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             loc->state_tarjan.lowlink = loc->target_tarjan.lowlink;
 
         // add acceptance set to the state
-        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && ti->acc_set > 0)
-            loc->state_tarjan.acc_set |= ti->acc_set;
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && acc_set > 0)
+            loc->state_tarjan.acc_set |= acc_set;
 
     } else {
         // unseen state ==> push to search_stack
@@ -200,9 +207,9 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         state_info_serialize (successor, stack_loc);
 
         // add acceptance set to the state
-        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && ti->acc_set > 0) {
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && acc_set > 0) {
             state_info_deserialize (loc->target, stack_loc); // search_stack TOP
-            loc->state_tarjan.acc_set = ti->acc_set;
+            loc->state_tarjan.acc_set = acc_set;
             state_info_serialize (loc->target, stack_loc);
         }
     }
