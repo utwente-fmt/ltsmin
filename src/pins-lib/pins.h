@@ -150,11 +150,10 @@ typedef struct transition_info {
     int* labels;                    // edge labels, NULL, or pointer to the edge label(s)
     int  group;                     // holds transition group or -1 if unknown
     int  por_proviso;               // provides information on the cycle proviso (ltl) to the por layer
-    int  acc_set;                   // transition acceptance marks for TGBA
 } transition_info_t;
 
 #define GB_UNKNOWN_GROUP -1
-#define GB_TI(A,B) {(A),(B), 0, 0}     // transition_info_t initialization macro
+#define GB_TI(A,B) {(A),(B), 0}     // transition_info_t initialization macro
 static const transition_info_t GB_NO_TRANSITION = GB_TI(NULL, GB_UNKNOWN_GROUP);
 
 /**
@@ -502,6 +501,16 @@ extern void GBsetTGBAAcceptance(model_t model, int acc_set);
 extern int GBTGBAIsAccepting(model_t model, int acc_set);
 /**<
 \brief Return if the given acceptance set is equal to the ltsmin_buchi acceptance_set
+*/
+
+extern int GBgetAccSetEdgeLabelIndex(model_t model);
+/**<
+\brief Get index of acceptance set edge label
+*/
+
+extern int GBsetAccSetEdgeLabelIndex(model_t model, int index);
+/**<
+\brief Set index of acceptance set edge label
 */
 
 extern int GBtransitionInGroup(model_t model, int* labels, int group);

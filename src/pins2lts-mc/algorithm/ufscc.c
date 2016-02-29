@@ -145,6 +145,13 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     uf_alg_shared_t    *shared    = (uf_alg_shared_t*) ctx->run->shared;
     alg_local_t        *loc       = ctx->local;
     raw_data_t          stack_loc;
+    uint32_t            acc_set   = 0;
+
+    // TGBA acceptance
+    if (ti->labels != NULL && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+        int el_index = GBgetAccSetEdgeLabelIndex (ctx->model);
+        acc_set = ti->labels[el_index];
+    }
 
     ctx->counters->trans++;
 
@@ -152,7 +159,7 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            uint32_t acc = uf_add_acc (shared->uf, successor->ref + 1, ti->acc_set);
+            uint32_t acc = uf_add_acc (shared->uf, successor->ref + 1, acc_set);
             if (GBTGBAIsAccepting(ctx->model, acc) ) {
                 report_lasso (ctx, ctx->state->ref);
             }
@@ -172,9 +179,9 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     state_info_serialize (successor, stack_loc);
 
     // add acceptance set to the state
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && ti->acc_set > 0) {
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && acc_set > 0) {
         state_info_deserialize (loc->target, stack_loc); // search_stack TOP
-        loc->target_acc = ti->acc_set;
+        loc->target_acc = acc_set;
         state_info_serialize (loc->target, stack_loc);
     }
 
