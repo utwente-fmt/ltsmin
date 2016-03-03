@@ -263,26 +263,6 @@ successor (wctx_t *ctx)
     // FROM = parent    = loc->target
     // TO   = successor = ctx->state
 
-    if (loc->target->ref == ctx->state->ref) { // self loop
-
-        // TODO: is this dead code?
-
-        loc->cnt.claimfound ++; // implies CLAIM_FOUND
-        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref + 1, loc->state_acc);
-            if (GBTGBAIsAccepting(ctx->model, acc) ) {
-                report_lasso (ctx, ctx->state->ref);
-            }
-        } else if (shared->ltl) { // BA
-            if (pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) ) {
-                report_lasso (ctx, ctx->state->ref);
-            }
-        }
-
-        dfs_stack_pop (loc->search_stack);
-        return;
-    }
-
     // early backtrack if parent is explored ==> all its children are explored
     if ( !uf_is_in_list (shared->uf, loc->target->ref + 1) ) {
         dfs_stack_pop (loc->search_stack);
