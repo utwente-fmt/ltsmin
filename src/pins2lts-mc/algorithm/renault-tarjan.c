@@ -198,7 +198,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             loc->state_tarjan.lowlink = loc->target_tarjan.lowlink;
 
         // add acceptance set to the state
-        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && acc_set > 0)
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
             loc->state_tarjan.acc_set |= acc_set;
 
     } else {
@@ -207,7 +207,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         state_info_serialize (successor, stack_loc);
 
         // add acceptance set to the state
-        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && acc_set > 0) {
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
             state_info_deserialize (loc->target, stack_loc); // search_stack TOP
             loc->state_tarjan.acc_set = acc_set;
             state_info_serialize (loc->target, stack_loc);

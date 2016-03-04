@@ -179,7 +179,7 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     state_info_serialize (successor, stack_loc);
 
     // add acceptance set to the state
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && acc_set > 0) {
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
         state_info_deserialize (loc->target, stack_loc); // search_stack TOP
         loc->target_acc = acc_set;
         state_info_serialize (loc->target, stack_loc);
