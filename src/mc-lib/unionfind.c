@@ -287,6 +287,8 @@ uf_sameset (const uf_t *uf, ref_t a, ref_t b)
 bool
 uf_union (const uf_t *uf, ref_t a, ref_t b)
 {
+    if (a == b) return 1;
+    
     ref_t               a_r, b_r, a_l, b_l, a_n, b_n, r, q;
     sz_w                q_w, r_w;
     uint32_t            q_a, r_a;
