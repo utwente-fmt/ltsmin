@@ -348,8 +348,8 @@ uf_union (const uf_t *uf, ref_t a, ref_t b)
 
 
     // only update acceptance set for r if q adds acceptance marks
-    r_a = atomic_read (&uf->array[q].acc_set);
-    q_a = atomic_read (&uf->array[r].acc_set);
+    r_a = atomic_read (&uf->array[r].acc_set);
+    q_a = atomic_read (&uf->array[q].acc_set);
     if ( (q_a | r_a) != r_a) {
         // update!
         fetch_or (&uf->array[r].acc_set, q_a);
