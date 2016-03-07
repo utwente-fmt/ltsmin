@@ -203,6 +203,7 @@ explore_state (wctx_t *ctx)
     // push the state on the roots stack
     state_info_set (loc->root,  ctx->state->ref, LM_NULL_LATTICE);
     stack_loc = dfs_stack_push (loc->roots_stack, NULL);
+    loc->root_acc = loc->state_acc;
     state_info_serialize (loc->root, stack_loc);
 
     increase_level (ctx->counters);
@@ -338,7 +339,7 @@ successor (wctx_t *ctx)
             } else if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(loc->root))) {
                 accepting = loc->root->ref;
             }
-            Debug ("Uniting: %zu and %zu", loc->root->ref, ctx->state->ref);
+            Debug ("Uniting: %zu and %zu", loc->root->ref, ctx->target->ref);
 
             uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
 
@@ -450,6 +451,7 @@ backtrack (wctx_t *ctx)
         // Found w in List(v) ==> push w on stack and search its successors
         state_info_set (ctx->state, state_picked - 1, LM_NULL_LATTICE);
         state_data = dfs_stack_push (loc->search_stack, NULL);
+        loc->state_acc = 0; // the acceptance marks should already be stored in the SCC
         state_info_serialize (ctx->state, state_data);
         explore_state (ctx);
     }
