@@ -8,7 +8,7 @@
 
 #define MBLOCK 16
 
-#define DEBUG(...) {}
+#define DEBUG(...) Warning(info,__VA_ARGS__)
 //define DEBUG Debug
 
 struct array {
@@ -19,14 +19,14 @@ struct array {
 };
 
 struct array_manager {
-	int block;
-	int size;
+	size_t block;
+	size_t size;
 	int managed;
 	int managed_size;
 	struct array *arrays;
 };
 
-array_manager_t create_manager(int block_size){
+array_manager_t create_manager(size_t block_size){
 	array_manager_t man=(array_manager_t)RTmalloc(sizeof(struct array_manager));
 	man->block=block_size;
 	man->size=block_size;
@@ -48,15 +48,15 @@ void destroy_manager(array_manager_t man)
 }
 
 
-int array_size(array_manager_t man){
+size_t array_size(array_manager_t man){
 	return man->size;
 }
 
-static void fix_array(struct array ref,int old_size,int new_size){
+static void fix_array(struct array ref,size_t old_size,size_t new_size){
 	void*tmp;
 	void*old=*ref.ar;
 	tmp=RTrealloc(*ref.ar,new_size*ref.e_size);
-	HREassert (tmp, "realloc from %d to %d * %d failed",old_size,new_size,ref.e_size);
+	HREassert (tmp, "realloc from %zu to %zu * %d failed",old_size,new_size,ref.e_size);
     DEBUG("%x -> %x",*ref.ar,tmp);
     *ref.ar=tmp;
     if (ref.callback) {
@@ -86,12 +86,12 @@ void add_array(array_manager_t man,void**ar,int e_size,array_resize_cb callback,
 	DEBUG("added array with e_size %d",e_size);
 }
 
-void ensure_access(array_manager_t man,int index){
+void ensure_access(array_manager_t man,size_t index){
 	if (index < man->size) return;
 	if (index/man->block > 10) man->block=man->block*2;
-	int old=man->size;
+	size_t old=man->size;
 	man->size=((index+man->block)/man->block)*man->block;
-	DEBUG("resize from %d to %d",old,man->size);
+	DEBUG("resize from %zu to %zu",old,man->size);
 	for(int i=0;i<man->managed;i++){
 		fix_array(man->arrays[i],old,man->size);
 	}
