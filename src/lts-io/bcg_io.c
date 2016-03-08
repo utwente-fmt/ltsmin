@@ -61,7 +61,7 @@ static void bcg_file_push(lts_file_t src,lts_file_t dst){
     }
     uint32_t root=src->root;
     lts_write_init(dst,0,&root);
-    bcg_type_state_number bcg_s1, bcg_s2;
+    BCG_TYPE_STATE_NUMBER bcg_s1, bcg_s2;
     BCG_TYPE_LABEL_NUMBER bcg_label_number;
     BCG_OT_ITERATE_PLN (src->graph, bcg_s1, bcg_label_number, bcg_s2) {
         uint32_t src_ofs=bcg_s1;
