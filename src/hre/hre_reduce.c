@@ -51,9 +51,9 @@ static void reduce_action(void* context,hre_msg_t msg){
     }
     case UInt64:
     {
-        int len=msg->tail/4-2;
-        uint32_t *out=(uint32_t *)ctx->reduce_out[turn];
-        uint32_t *in=(uint32_t *)&msg->buffer[8];
+        int len=msg->tail/8-1;
+        uint64_t *out=(uint64_t *)ctx->reduce_out[turn];
+        uint64_t *in=(uint64_t *)&msg->buffer[8];
         switch(op){
         case Sum:
             for(int i=0;i<len;i++) out[i]+=in[i];
