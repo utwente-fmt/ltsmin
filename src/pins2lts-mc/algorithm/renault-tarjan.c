@@ -199,7 +199,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
         // add acceptance set to the state
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
-            loc->state_tarjan.acc_set |= acc_set;
+            loc->target_tarjan.acc_set |= acc_set;
 
     } else {
         // unseen state ==> push to search_stack
@@ -209,7 +209,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         // add acceptance set to the state
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
             state_info_deserialize (loc->target, stack_loc); // search_stack TOP
-            loc->state_tarjan.acc_set = acc_set;
+            loc->target_tarjan.acc_set = acc_set;
             state_info_serialize (loc->target, stack_loc);
         }
     }
@@ -483,6 +483,7 @@ renault_run  (run_t *run, wctx_t *ctx)
 
             } else {
                 // lowlink < index ==> LIVE SCC ==> move to tarjan_stack
+                loc->target_tarjan.acc_set = loc->state_tarjan.acc_set;
                 move_tarjan (ctx, ctx->state, state_data);
                 update_parent (ctx, loc->state_tarjan.lowlink);
             }
