@@ -636,6 +636,8 @@ void
 reach_destroy_local      (run_t *run, wctx_t *ctx)
 {
     if (ctx->local->lts != NULL) {
+        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
+        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         lts_file_close (ctx->local->lts);
     }
     RTfree (ctx->local);
