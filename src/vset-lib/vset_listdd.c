@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
+#ifdef __APPLE__
+#include <alloca.h>
+#endif
 
 #include <hre/user.h>
 #include <vset-lib/vdom_object.h>
