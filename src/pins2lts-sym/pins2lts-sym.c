@@ -4148,7 +4148,8 @@ VOID_TASK_1(actual_main, void*, arg)
 
     /* check for unsupported options */
     if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
-    if (inhibit_matrix != NULL && sat_strategy != NO_SAT) Abort("maximal progress is incompatibale with saturation");
+    if (inhibit_matrix != NULL && sat_strategy != NO_SAT) Abort("Maximal progress is incompatibale with saturation.");
+    if (files[1] != NULL && strcmp(files[1] + strlen(files[1]) - 4, ".etf") != 0) Abort("Only ETF output format is supported.");
 
     /* turn off Lace for now to speed up while not using parallelism */
     lace_suspend();
