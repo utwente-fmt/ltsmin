@@ -45,12 +45,15 @@
         pages = {227-245}
     }
  *
- * @Article{BBR10,
-        author={Laarman, Alfons W. and Pater, Elwin and van de Pol, Jaco C. and Weber, Michael},
-        title =        "{Guard-based Partial-Order Reduction (Extended Version)}",
-        journal =      "International Journal on Software Tools for Technology Transfer (STTT)",
-        year =         "2014",
-        optnote =      "Special Section on SPIN 13"
+ * @Article{LaarmanSTTT2014,
+        author="Laarman, Alfons and Pater, Elwin and Pol, Jaco and Hansen, Henri",
+        title="Guard-based partial-order reduction",
+        journal="International Journal on Software Tools for Technology Transfer",
+        year="2014",
+        pages="1--22",
+        issn="1433-2787",
+        doi="10.1007/s10009-014-0363-9",
+        url="http://dx.doi.org/10.1007/s10009-014-0363-9"
     }
  *
  * Improved safety / liveness provisos added by Alfons Laarman according to
