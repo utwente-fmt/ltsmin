@@ -35,5 +35,7 @@ distcheck-hook:
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
 
+if HAVE_SPINS_COMPILER
 spins/spins.jar:
 	test -f $@ || (cd "${top_srcdir}/spins/src" && $(ANT))
+endif
