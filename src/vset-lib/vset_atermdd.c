@@ -273,7 +273,7 @@ static long count_set_2(ATerm set){
 }
 
 static void
-count_set(ATerm set, long *nodes, bn_int_t *elements)
+count_set(ATerm set, long *nodes, double *elements)
 {
   long idx;
 
@@ -289,7 +289,7 @@ count_set(ATerm set, long *nodes, bn_int_t *elements)
   assert(idx<elem_size);
   bn_set_digit(&elem_count[idx],1);
   idx=count_set_2(set);
-  bn_init_copy(elements,&elem_count[idx]);
+  if (elements != NULL) *elements = bn_int2double(&elem_count[idx]);
   ATindexedSetDestroy(count_is);
   for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
   RTfree(elem_count);
@@ -301,11 +301,11 @@ count_set(ATerm set, long *nodes, bn_int_t *elements)
 }
 
 static void set_count_list(vset_t set,long *nodes,double *elements){
-  count_set(set->set,nodes,(bn_int_t *)elements);
+  count_set(set->set,nodes,elements);
 }
 
 static void rel_count_list(vrel_t rel,long *nodes,double *elements){
-  count_set(rel->rel,nodes,(bn_int_t *)elements);
+  count_set(rel->rel,nodes,elements);
 }
 
 static ATbool set_member(ATerm set,ATerm *a){
