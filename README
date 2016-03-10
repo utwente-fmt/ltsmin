@@ -48,8 +48,7 @@ linear temporal logic.
  - Cygwin/Windows (tested on Windows 7 with Cygwin 1.7)
  
 For the use of the multi-core BDD package Sylvan and the multi-core
-reachability algorithms (*2lts-mc), we further recommend using a 64-bit OS
-(Cygwin is still only 32 bit).
+reachability algorithms (*2lts-mc), we further recommend using a 64-bit OS.
 
 * Installation Instructions
 If you are building the software from a Git repository rather than a
