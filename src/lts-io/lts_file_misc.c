@@ -67,7 +67,8 @@ void lts_file_copy(lts_file_t src,lts_file_t dst){
 lts_type_t single_action_type(){
     lts_type_t ltstype=lts_type_create();
     lts_type_set_state_length(ltstype,0);
-    lts_type_add_type(ltstype,LTSMIN_EDGE_TYPE_ACTION_PREFIX,NULL);
+    int typeno = lts_type_add_type(ltstype,LTSMIN_EDGE_TYPE_ACTION_PREFIX,NULL);
+    HREassert (typeno == 0);
     lts_type_set_edge_label_count(ltstype,1);
     lts_type_set_edge_label_name(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     lts_type_set_edge_label_type(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
