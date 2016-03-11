@@ -5,6 +5,9 @@
  *      Author: laarman
  */
 
+#ifndef PROPERTY_SEMANTICS_H
+#define PROPERTY_SEMANTICS_H
+
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <pins-lib/pins.h>
 #include <ltsmin-lib/ltsmin-parse-env.h>
@@ -73,3 +76,5 @@ eval_predicate(model_t model, ltsmin_expr_t e, transition_info_t *ti, int *state
     }
     return 0;
 }
+
+#endif // PROPERTY_SEMANTICS_H
