@@ -38,6 +38,7 @@
  */
 
 #define LTSMIN_TYPE_BOOL                "bool"
+#define LTSMIN_TYPE_GUARD               "guard"
 
 
 /**
@@ -49,6 +50,9 @@
 #define LTSMIN_VALUE_ACTION_PROGRESS    "progress"  // progress actions
 /* A value that contains "<progress>" is counted as a progress transition */
 #define LTSMIN_VALUE_STATEMENT_PROGRESS "<progress>"
+#define LTSMIN_VALUE_GUARD_FALSE        LTSMIN_VALUE_BOOL_FALSE // GBchunkPutAt(.., 0)
+#define LTSMIN_VALUE_GUARD_TRUE         LTSMIN_VALUE_BOOL_TRUE  // GBchunkPutAt(.., 1)
+#define LTSMIN_VALUE_GUARD_MAYBE        "maybe"
 
 
 /**

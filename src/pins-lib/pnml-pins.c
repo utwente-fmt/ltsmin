@@ -782,7 +782,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     lts_type_set_edge_label_type(ltstype, 0, "action");
     lts_type_set_edge_label_typeno(ltstype, 0, act_type);
 
-    const int bool_type = lts_type_add_type(ltstype, LTSMIN_TYPE_BOOL, NULL);
+    const int guard_type = lts_type_add_type(ltstype, LTSMIN_TYPE_GUARD, NULL);
 
     for (int i = 0; i < NUM_PLACES; ++i) {
         lts_type_set_state_typeno(ltstype, i, int_type);
@@ -792,8 +792,9 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     GBsetLTStype(model, ltstype); // must set ltstype before setting initial state
                                   // creates tables for types!
 
-    GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-    GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE ), 1);
+    GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+    GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE ), 1);
+    GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
 
     dm_create(dm_info, NUM_TRANSS, NUM_PLACES);
     dm_create(dm_read_info, NUM_TRANSS, NUM_PLACES);
@@ -845,7 +846,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
         char label_name[snprintf(NULL, 0, g, SIget(context->pnml_places, arc->place), arc->num) + 1];
         sprintf(label_name, g, SIget(context->pnml_places, arc->place), arc->num);
         lts_type_set_state_label_name (ltstype, i, label_name);
-        lts_type_set_state_label_typeno (ltstype, i, bool_type);
+        lts_type_set_state_label_typeno (ltstype, i, guard_type);
         dm_set(sl_info, i, arc->place);
     }
     GBsetStateLabelInfo(model, sl_info);
