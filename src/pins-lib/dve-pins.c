@@ -343,7 +343,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
              lts_type_set_format (ltstype, i, LTStypeEnum);
         }
     }
-    int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
+    int guard_is_new, guard_type = lts_type_add_type (ltstype, LTSMIN_TYPE_GUARD, &guard_is_new);
 
     lts_type_set_state_length(ltstype, state_length);
 
@@ -369,12 +369,12 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     for(int i=0; i < nguards; i++) {
         snprintf(buf, 256, "%s_%d", LTSMIN_LABEL_TYPE_GUARD_PREFIX, i);
         lts_type_set_state_label_name (ltstype, i, buf);
-        lts_type_set_state_label_typeno (ltstype, i, bool_type);
+        lts_type_set_state_label_typeno (ltstype, i, guard_type);
     }
     if (have_property()) {
         lts_type_set_state_label_name (ltstype, nguards,
                                        "buchi_accept_dve2");
-        lts_type_set_state_label_typeno (ltstype, nguards, bool_type);
+        lts_type_set_state_label_typeno (ltstype, nguards, guard_type);
         GBsetAcceptingStateLabelIndex (model,nguards);
     }
 
@@ -389,9 +389,10 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
         }
     }
 
-    if (bool_is_new) {
-        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
+    if (guard_is_new) {
+        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE), 1);
+        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
     }
 
     lts_type_validate(ltstype);

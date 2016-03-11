@@ -316,7 +316,8 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         }
     }
 
-    int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
+    int guard_is_new;
+    int guard_type = lts_type_add_type (ltstype, LTSMIN_TYPE_GUARD, &guard_is_new);
 
     lts_type_set_state_length(ltstype, state_length);
 
@@ -351,9 +352,10 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetNextStateLong (model, prom_get_successor);
     GBsetActionsLong (model, prom_get_actions);
 
-    if (bool_is_new) {
-        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE ), 1);
+    if (guard_is_new) {
+        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE ), 1);
+        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
     }
 
     // setting values for types
@@ -375,7 +377,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         HREassert (i >= nguards || has_prefix(name, LTSMIN_LABEL_TYPE_GUARD_PREFIX),
                    "Label %d was expected to ba a guard instead of '%s'", i, name);
         lts_type_set_state_label_name (ltstype, i, name);
-        lts_type_set_state_label_typeno (ltstype, i, bool_type);
+        lts_type_set_state_label_typeno (ltstype, i, guard_type);
     }
 
     lts_type_validate(ltstype); // done with ltstype

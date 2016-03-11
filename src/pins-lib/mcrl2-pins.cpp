@@ -494,7 +494,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
         lts_type_set_edge_label_type(ltstype, i, pins->data_type(pins->edge_label_type(i)).name().c_str());
     }
 #ifdef MCRL2_GUARDS
-    int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
+    int guard_is_new, guard_type = lts_type_add_type (ltstype, LTSMIN_TYPE_GUARD, &guard_is_new);
 #endif
 
     GBsetLTStype(m,ltstype);
@@ -554,9 +554,10 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
 
 #ifdef MCRL2_GUARDS
 
-    if (bool_is_new) {
-        GBchunkPutAt(m, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        GBchunkPutAt(m, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
+    if (guard_is_new) {
+        GBchunkPutAt(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+        GBchunkPutAt(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE),  1);
+        GBchunkPutAt(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
     }
 
     // init state labels
@@ -567,7 +568,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     for(int i = 0;i < sl_size; i++) {
         const std::string& name = pins->guard_name(i);
         lts_type_set_state_label_name (ltstype, i, name.c_str());
-        lts_type_set_state_label_typeno (ltstype, i, bool_type);
+        lts_type_set_state_label_typeno (ltstype, i, guard_type);
     }
 
     lts_type_validate(ltstype); // done with ltstype
