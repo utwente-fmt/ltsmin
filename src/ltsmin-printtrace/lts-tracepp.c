@@ -135,7 +135,7 @@ output_text(lts_t trace, FILE* output_file) {
         int state_lbls[sLbls];
         int edge_lbls[eLbls];
 
-        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
+        uint32_t i = (x != 0 && x == trace->transitions ? trace->dest[x-1] : x);
         fprintf(output_file, "state %d/%d\n",i,trace->transitions);
         if (i != 0) {
             // previous state
@@ -316,7 +316,7 @@ output_text_table(lts_t trace, FILE* output_file) {
         int prev_edge_lbls[eLbls];
         int edge_lbls[eLbls];
 
-        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
+        uint32_t i = (x != 0 && x == trace->transitions ? trace->dest[x-1] : x);
         for(int j=0; j<N; ++j) prev_state[j] = state[j];
         if (N) TreeUnfold(trace->state_db, i, state);
         fprintf(output_file, "%.3d: [",i);
@@ -410,7 +410,7 @@ output_csv(lts_t trace, FILE* output_file) {
         int state[N];
         char tmp[BUFLEN];
 
-        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
+        uint32_t i = (x != 0 && x == trace->transitions ? trace->dest[x-1] : x);
         if (N) TreeUnfold(trace->state_db, i, state);
         for(int j=0; j<N; ++j) {
             int typeno = lts_type_get_state_typeno(trace->ltstype, j);
