@@ -42,7 +42,7 @@ pins_add_edge_label_visible (model_t model, int act_label, int act_index)
 {
     int *visibles = GBgetPorGroupVisibility (model);
     HREassert (visibles != NULL, "pins_add_edge_label_visible: No (lower) PINS layer uses POR visibility.");
-    int label_count = pins_get_state_label_count (model);
+    int label_count = pins_get_edge_label_count (model);
     int groups = pins_get_group_count (model);
     int labels[label_count];
     for (int i = 0; i < label_count; i++)
