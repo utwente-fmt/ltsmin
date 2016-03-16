@@ -49,9 +49,7 @@ ltsmin_expr_lookup_value(ltsmin_expr_t top, ltsmin_expr_t e, int typeno,
         break;
     case LTStypeEnum:
     case LTStypeChunk:
-        c.data = env->buffer;
-        c.len = LTSminSPrintExpr(c.data, e, env);
-        HREassert (c.len < ENV_BUFFER_SIZE, "Buffer overflow in print expression");
+        c.data = SIgetC(env->values, e->idx, (int*) &c.len);
         lookup_type_value (e, typeno, c, model, format==LTStypeEnum);
         Debug ("Bound '%s' to %d in table for type '%s'", c.data,
                e->num, lts_type_get_state_type(GBgetLTStype(model),typeno));
