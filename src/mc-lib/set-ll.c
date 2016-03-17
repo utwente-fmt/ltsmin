@@ -128,7 +128,7 @@ static const datatype_t DATATYPE_HRE_STR = {
 /**
  * Implementation:
  * A lockless hash map maintains the string to index map, while thread-specific
- * arrays (balloc[]) maintain the inverse mapping. A key is added to a threads
+ * arrays (balloc[]) maintain the inverse mapping. A key is added to a thread's
  * local array if it won the race to insert the key in the table.
  * Workers lookup the values found in the table in eachother's arrays, hence it
  * may be the case this value is not yet inserted by the array owner. In that
@@ -139,12 +139,12 @@ static const datatype_t DATATYPE_HRE_STR = {
 typedef struct local_s {
     isb_allocator_t     balloc;
     size_t              count;  // TODO: lazy updates with positive feedback
-    size_t              offset;
     char                pad[CACHE_LINE_SIZE - 2*sizeof(size_t) - sizeof(isb_allocator_t)];
 } local_t;
 
 struct set_ll_s {
     hashtable_t        *ht;                 // Lockless hash table
+    size_t              workers;
     local_t             local[MAX_WORKERS]; // Local indexing arrays
     set_ll_allocator_t *alloc;
 };
@@ -159,7 +159,7 @@ typedef struct str_s {
  * GLOBAL invariant: forall i : count[i] == size(balloc[i]) \/
  *                              count[i] == size(balloc[i]) + 1
  *
- * The first conjuct holds when a worker just installed a key/idx in the hash
+ * The first conjunct holds when a worker just installed a key/idx in the hash
  * table, but not yet in its local balloc. Immediately after such a situation
  * the worker insert such a key in balloc. The second conjunct then holds.
  */
@@ -167,15 +167,13 @@ char    *
 set_ll_get (set_ll_t *set, int idx, int *len)
 {
     size_t              read;
-    size_t              workers = HREpeers(HREglobal());
-    size_t              worker = idx % workers;
+    size_t              worker = idx % set->workers;
     isb_allocator_t     balloc = set->local[worker].balloc;
-    size_t              index = idx / workers;
-    size_t              offset = set->local[worker].offset;
+    size_t              index = idx / set->workers;
     while ((read = atomic_read(&set->local[worker].count)) == index) {} // poll
     HREassert (index < read, "Invariant violated %zu !< %zu (idx=%d)", index, read, idx);
     // TODO: memory fence?
-    str_t              *str = (str_t *)isba_index (balloc, index - offset);
+    str_t              *str = (str_t *)isba_index (balloc, index);
     HREassert (str != NULL, "Value %d (%zu/%zu) not in lockless string set", idx, index, worker);
     *len = str->len;
     Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p",
@@ -192,10 +190,9 @@ set_ll_put (set_ll_t *set, char *str, int len)
                 str, len, strlen(str), &str[len+1]);
     hre_context_t       global = HREglobal ();
     size_t              worker = HREme (global);
-    size_t              workers = HREpeers (global);
     isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = set->local[worker].count;
-    uint64_t            value = (uint64_t)index * workers + worker;
+    uint64_t            value = (uint64_t)index * set->workers + worker;
     HREassert (value < (1ULL<<32), "Exceeded int value range for chunk %s, the %zu'st insert for worker %zu", str, index, worker);
     map_key_t           idx = value; // global index
 
@@ -233,20 +230,18 @@ set_ll_put (set_ll_t *set, char *str, int len)
 static int
 set_ll_max (set_ll_t *set)
 {
-    size_t              workers = HREpeers (HREglobal());
     size_t              references = 0;
-    for (size_t i = 0; i < workers; i++)
-        if (references < set->local[i].count) references = set->local[i].count;
+    for (size_t i = 0; i < set->workers; i++)
+        references = max(references, set->local[i].count);
     return references;
 }
 
 static double
 set_ll_stdev (set_ll_t *set)
 {
-    size_t              workers = HREpeers (HREglobal());
     statistics_t stats;
     statistics_init(&stats);
-    for (size_t i = 0; i < workers; i++)
+    for (size_t i = 0; i < set->workers; i++)
         statistics_record(&stats, set->local[i].count);
     return statistics_stdev(&stats);
 }
@@ -255,9 +250,8 @@ set_ll_stdev (set_ll_t *set)
 int
 set_ll_count (set_ll_t *set)
 {
-    size_t              workers = HREpeers (HREglobal());
     size_t              references = 0;
-    for (size_t i = 0; i < workers; i++)
+    for (size_t i = 0; i < set->workers; i++)
         references += set->local[i].count;
     Debug ("Count %p: %zu", set ,references);
     return references;
@@ -266,13 +260,11 @@ set_ll_count (set_ll_t *set)
 void
 set_ll_install (set_ll_t *set, char *name, int len, int idx)
 {
-    size_t              workers = HREpeers (HREglobal());
-    size_t              worker = idx % workers;
-    size_t              index = idx / workers;
-    size_t              offset = set->local[worker].offset;
+    size_t              worker = idx % set->workers;
+    size_t              index = idx / set->workers;
     isb_allocator_t     balloc = set->local[worker].balloc;
     if ((size_t)idx < set->local[worker].count) {
-        str_t              *str = (str_t *)isba_index (balloc, index - offset);
+        str_t              *str = (str_t *)isba_index (balloc, index);
         HREassert (str, "Corruption in set.");
         HREassert (strncmp(str->ptr, name, min(str->len,len)) == 0,
                    "String '%s' already inserted at %d, while trying to insert "
@@ -295,9 +287,10 @@ set_ll_install (set_ll_t *set, char *name, int len, int idx)
     str_t               string = {.ptr = (char *)clone, .len = len};
 
     RTswitchAlloc (set->alloc->shared);
-    isba_push_int (balloc, (int*)&string);
+    while (isba_size_int(balloc) < index + 1) {
+        isba_push_int (balloc, (int*)&string);
+    }
     RTswitchAlloc (false);
-    set->local[worker].offset += index - set->local[worker].count;
     atomic_write (&set->local[worker].count, index + 1); // signal done
 
     Debug ("Bind (%d)\t<--(%zu,%zu)-> (%s,%d) %zu", idx, worker, index, name,
@@ -372,6 +365,7 @@ set_ll_create (set_ll_allocator_t *alloc)
     RTswitchAlloc (alloc->shared); // global allocation of table, ballocs and set
     set_ll_t           *set = RTmalloc (sizeof(set_ll_t));
     set->ht = ht_alloc (&DATATYPE_HRE_STR, INIT_HT_SCALE);
+    set->workers = HREpeers(HREglobal());
     for (int i = 0; i < HREpeers(HREglobal()); i++) {
         set->local[i].balloc = isba_create(sizeof(str_t) / sizeof(int));
         set->local[i].count = 0;
