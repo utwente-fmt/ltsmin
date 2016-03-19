@@ -315,7 +315,6 @@ struct inv_check_s
     vset_t container;
     struct inv_check_s* left;
     struct inv_check_s* right;
-    double num_states;
 };
 
 struct inv_check_s** inv_expr_info = NULL;
