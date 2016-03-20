@@ -111,7 +111,7 @@ create_pins_model ()
 {
     model_t             model = GBcreateBase ();
 
-#if defined(PROB)
+#if defined(PROB) || defined(NO_CCT)
     GBsetChunkMap (model, HREgreyboxTableFactory());
 #else
     table_factory_t     factory = cct_create_table_factory  (global->tables);
@@ -216,5 +216,6 @@ main (int argc, char *argv[])
 
     GBExit (model);
 
+    HREbarrier (HREglobal());
     HREexit (global->exit_status);
 }
