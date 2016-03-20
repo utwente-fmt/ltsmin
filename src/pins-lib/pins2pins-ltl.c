@@ -97,7 +97,7 @@ ltl_sl_short(model_t model, int label, int *state)
         HREassert (val < ctx->ba->state_count);
         return ctx->ba->states[val]->accept;
     } else {
-        return GBgetStateLabelShort(GBgetParent(model), label, state);
+        return GBgetStateLabelShort(ctx->parent, label, state + 1);
     }
 }
 
@@ -110,7 +110,7 @@ ltl_sl_long(model_t model, int label, int *state)
         HREassert (val < ctx->ba->state_count);
         return ctx->ba->states[val]->accept;
     } else {
-        return GBgetStateLabelLong(GBgetParent(model), label, state);
+        return GBgetStateLabelLong(ctx->parent, label, state + 1);
     }
 }
 
@@ -118,7 +118,7 @@ static void
 ltl_sl_all(model_t model, int *state, int *labels)
 {
     ltl_context_t *ctx = GBgetContext(model);
-    GBgetStateLabelsAll(GBgetParent(model), state, labels);
+    GBgetStateLabelsAll(ctx->parent, state + 1, labels);
     int val = state[ctx->ltl_idx] == -1 ? 0 : state[ctx->ltl_idx];
     HREassert (val < ctx->ba->state_count);
     labels[ctx->sl_idx_accept] = ctx->ba->states[val]->accept;
@@ -173,7 +173,7 @@ ltl_ltsmin_long (model_t self, int group, int *src, TransitionCB cb,
 {
     ltl_context_t *ctx = GBgetContext(self);
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, -1};
-    GBgetTransitionsLong(ctx->parent, group, src+1, ltl_ltsmin_cb, &new_ctx);
+    GBgetTransitionsLong(ctx->parent, group, src + 1, ltl_ltsmin_cb, &new_ctx);
     return new_ctx.ntbtrans;
 }
 
@@ -194,7 +194,7 @@ ltl_ltsmin_all (model_t self, int *src, TransitionCB cb,
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
     // evaluate predicates (on source, so before hand!)
     new_ctx.predicate_evals = eval (&new_ctx, NULL, src + 1); /* No EVARS! */
-    GBgetTransitionsAll(ctx->parent, src+1, ltl_ltsmin_cb, &new_ctx);
+    GBgetTransitionsAll(ctx->parent, src + 1, ltl_ltsmin_cb, &new_ctx);
     return new_ctx.ntbtrans;
 }
 
@@ -251,7 +251,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
     // evaluate predicates (on source, so before hand!)
     new_ctx.predicate_evals = eval (&new_ctx, NULL, src + 1); /* No EVARS! */
-    GBgetTransitionsAll(ctx->parent, src+1, ltl_spin_cb, &new_ctx);
+    GBgetTransitionsAll(ctx->parent, src + 1, ltl_spin_cb, &new_ctx);
     if (0 == new_ctx.ntbtrans) { // deadlock, let buchi continue
         int dst_buchi[ctx->len];
         memcpy (dst_buchi + 1, src + 1, ctx->old_len * sizeof(int) );
@@ -333,7 +333,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
         ltl_textbook_cb(&new_ctx, &ti, src + 1,NULL);
         return new_ctx.ntbtrans;
     } else {
-        GBgetTransitionsAll(ctx->parent, src+1, ltl_textbook_cb, &new_ctx);
+        GBgetTransitionsAll(ctx->parent, src + 1, ltl_textbook_cb, &new_ctx);
         return new_ctx.ntbtrans;
     }
 }
