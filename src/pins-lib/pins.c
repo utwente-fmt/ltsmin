@@ -498,6 +498,8 @@ model_t GBcreateBase(){
 	model->static_info_matrices=NULL;
 	ADD_ARRAY(SImanager(model->static_info_index),model->static_info_matrices,struct static_info_matrix);
 
+	model->exit = NULL;
+
 	model->var_perm = NULL;
 	model->group_perm = NULL;
 
