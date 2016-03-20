@@ -64,11 +64,14 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                       ti != &GB_NO_TRANSITION )) // race, but ok:
         atomic_write (&shared->parent_ref[successor->ref], ctx->state->ref);
 
-    if (!is_progress && seen && ecd_has_state(loc->cyan, successor) && run_stop(ctx->run)) {
-        Warning (info, " ");
-        Warning (info, "Non-progress cycle FOUND at depth %zu!", cnt->level_cur);
-        Warning (info, " ");
-        handle_error_trace (ctx);
+    if (!is_progress && seen && ecd_has_state(loc->cyan, successor)) {
+        global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
+        if (run_stop(ctx->run)) {
+            Warning (info, " ");
+            Warning (info, "Non-progress cycle FOUND at depth %zu!", cnt->level_cur);
+            Warning (info, " ");
+            handle_error_trace (ctx);
+        }
     }
 
     // dfs_fifo_dfs/dfs_fifo_bfs also check this, but we want a clean stack for LB!
@@ -271,11 +274,6 @@ dfs_fifo_run  (run_t *run, wctx_t *ctx)
         dfs_fifo_sbfs (ctx);
     } else {
         dfs_fifo_bfs (ctx);
-    }
-
-    if (trc_output && global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
-        // "other" threads sync with the one who write the counter example
-        HREbarrier (HREglobal());
     }
 
     (void) run;

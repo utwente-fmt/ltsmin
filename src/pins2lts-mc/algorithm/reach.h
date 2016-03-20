@@ -118,6 +118,8 @@ deadlock_detect (wctx_t *ctx, size_t count)
     state_data_t        state = state_info_state (ctx->state);
     if (GBstateIsValidEnd(ctx->model, state)) return;
     if ( !loc->inv_expr ) loc->counters.violations++;
+
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
     if (dlk_detect && (!no_exit || trc_output) && run_stop(ctx->run)) {
         Warning (info, " ");
         Warning (info, "Deadlock found in state at depth %zu!",
@@ -139,6 +141,7 @@ invariant_detect (wctx_t *ctx)
             eval_predicate(ctx->model, loc->inv_expr, NULL, state, N, loc->env)))
         return;
 
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
     loc->counters.violations++;
     if ((!no_exit || trc_output) && run_stop(ctx->run)) {
         Warning (info, " ");
@@ -162,6 +165,7 @@ action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
     alg_global_t       *sm = ctx->global;
 
     loc->counters.errors++;
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
     if ((!no_exit || trc_output) && run_stop(ctx->run)) {
         raw_data_t          data = dfs_stack_push (sm->stack, NULL);
         state_info_serialize (successor, data);
