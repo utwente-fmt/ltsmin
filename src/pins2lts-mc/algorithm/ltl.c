@@ -68,6 +68,7 @@ void
 ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
                    state_info_t *cycle_closing_state)
 {
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
     /* Stop other workers, exit if some other worker was first here */
     if ( !run_stop(run) )
         return;
@@ -81,6 +82,5 @@ ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
         state_info_serialize (cycle_closing_state, data);
         find_and_write_dfs_stack_trace (model, stack);
     }
-    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
 }
 

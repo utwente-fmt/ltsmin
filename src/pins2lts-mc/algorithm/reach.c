@@ -45,10 +45,6 @@ handle_error_trace (wctx_t *ctx)
     size_t              level = ctx->counters->level_cur;
 
     if (trc_output) {
-
-        // wait for other threads to complete
-        HREbarrier (HREglobal());
-
         if (strategy[0] & Strat_TA) {
             dfs_stack_leave (sm->stack);
             find_and_write_dfs_stack_trace (ctx->model, sm->stack);
@@ -59,7 +55,6 @@ handle_error_trace (wctx_t *ctx)
                                 shared->parent_ref, ctx->initial->ref);
         }
     }
-    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
 }
 
 size_t
@@ -622,11 +617,6 @@ reach_run (run_t *run, wctx_t *ctx)
         }
         break;
     default: Abort ("Missing case in reach_run.");
-    }
-
-    if (trc_output && global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
-        // "other" threads sync with the one who write the counter example
-        HREbarrier (HREglobal());
     }
 }
 
