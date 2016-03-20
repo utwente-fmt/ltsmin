@@ -111,9 +111,8 @@ create_pins_model ()
 {
     model_t             model = GBcreateBase ();
 
-    cct_cont_t         *cont = cct_create_cont (global->tables);
-    GBsetChunkMethods (model, (newmap_t)cct_create_vt, cont, HREgreyboxI2C,
-                       HREgreyboxC2I, HREgreyboxCAtI, HREgreyboxCount);
+    table_factory_t     factory = cct_create_table_factory  (global->tables);
+    GBsetChunkMap (model, factory); //HREgreyboxTableFactory());
 
     Print1 (info, "Loading model from %s", files[0]);
 

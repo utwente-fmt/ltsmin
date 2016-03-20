@@ -1026,11 +1026,7 @@ int main (int argc, char *argv[]){
 	// Warning(info, "opening %s", files[0]);
     model = GBcreateBase();
 
-    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),
-                      HREgreyboxI2C,
-                      HREgreyboxC2I,
-                      HREgreyboxCAtI,
-                      HREgreyboxCount);
+    GBsetChunkMap (model, HREgreyboxTableFactory());
 
     // Load model from file
     GBloadFile(model, files[0]);

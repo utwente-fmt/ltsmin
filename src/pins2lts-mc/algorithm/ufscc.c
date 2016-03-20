@@ -797,9 +797,6 @@ report_lasso (wctx_t *ctx, ref_t accepting)
         construct_parent_path (ctx, trace_stack, shared->lasso_root, shared->lasso_root);
         dfs_stack_leave (trace_stack);
 
-        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
-        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
-
         Warning (info, "  ");
         Warning (info, "Writing counter example trace of length %zu", dfs_stack_size(trace_stack));
         find_and_write_dfs_stack_trace (ctx->model, trace_stack);

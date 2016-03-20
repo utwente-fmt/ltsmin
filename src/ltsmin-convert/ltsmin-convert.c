@@ -80,7 +80,7 @@ int main(int argc, char *argv[]){
                 case LTStypeChunk:
                 case LTStypeEnum:
                     Debug("creating table for type %s",name);
-                    value_table_t tmp=chunk_table_create(NULL,name);
+                    value_table_t tmp = simple_chunk_table_create(NULL,name);
                     Debug("set in %s",name);
                     lts_file_set_table(in,i,tmp);
                     Debug("set out %s",name);
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]){
                 case LTStypeChunk:
                 case LTStypeEnum:
                     Debug("creating table for type %s",name);
-                    value_table_t tmp=chunk_table_create(NULL,name);
+                    value_table_t tmp = simple_chunk_table_create(NULL,name);
                     Debug("set in %s",name);
                     lts_file_set_table(in,i,tmp);
                     Debug("set out %s",name);

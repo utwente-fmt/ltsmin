@@ -9,11 +9,13 @@
 #include <dm/dm.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/chunk_support.h>
+#include <util-lib/chunk_table_factory.h>
 #else
-#include <ltsmin/dm.h>
-#include <ltsmin/string-map.h>
-#include <ltsmin/lts-type.h>
 #include <ltsmin/chunk_support.h>
+#include <ltsmin/dm.h>
+#include <ltsmin/lts-type.h>
+#include <ltsmin/string-map.h>
+#include <ltsmin/chunk_table_factory.h>
 #endif
 
 /**
@@ -927,33 +929,13 @@ integers split the set into the subsets of even integers and odd integers.
 
 //@{
 
-/** The newmap method creates a new map, given the newmap context.
+/** \brief Set the chunk map.
+ *
+ *  The map factory should produce proper ValueTable objects
+ *  (see util-lib/chunk_table_factory.h)
  */
-typedef void*(*newmap_t)(void*newmap_context);
 
-/** Translate the given chunk to an integer with repect to the given map.
- */
-typedef int (*chunk2int_t)(void*map,void*chunk,int len);
-
-/** Put the given chunk at a location in the map.
- */
-typedef void (*chunkatint_t)(void*map,void*chunk,int len,int pos);
-
-/** Translate the given integer to a chunk with repect to the given map.
- */
-typedef void* (*int2chunk_t)(void*map,int idx,int*len);
-
-typedef int (*get_count_t)(void* object);
-
-/** Set the map factory method and the lookup methods for chunk maps.
- */
-extern void GBsetChunkMethods(model_t model,
-                              newmap_t newmap,
-                              void *newmap_context,
-                              int2chunk_t int2chunk,
-                              chunk2int_t chunk2int,
-                              chunkatint_t chunkat,
-                              get_count_t get_count);
+extern void GBsetChunkMap(model_t model, table_factory_t factory);
 
 /**
 \brief Copy map factory methods, lookup methods AND chunk maps.
@@ -971,6 +953,14 @@ extern void GBgrowChunkMaps(model_t model, int old_n);
 \brief Initializes unset model parameters from default_src.
 */
 extern void GBinitModelDefaults (model_t *p_model, model_t default_src);
+
+/**
+ * \brief Get table iterator.
+ *
+ * @param model The model in question.
+ * @param type_no The type the chunk maps to/from.
+ */
+extern table_iterator_t GBchunkIterator(model_t model, int type_no);
 
 /**
  * \brief Get the number of different chunks of type type_no.

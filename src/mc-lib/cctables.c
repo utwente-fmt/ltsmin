@@ -1,13 +1,14 @@
 #include <hre/config.h>
 
 #include <pthread.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/atomics.h>
 #include <mc-lib/cctables.h>
 #include <mc-lib/set-ll.h>
-#include <util-lib/chunk_support.h>
 
 
 /**
@@ -42,67 +43,23 @@
 static const size_t MAX_TABLES = 500;
 
 
-/**
-\typedef a chunk table
-use malloc
-*/
-typedef struct table_s table_t;
 
 struct cct_map_s {
     ticket_rwlock_t         rw_lock;
     bool                    shared;   // shared or private allocation
-    table_t                *table;
+    value_table_t          *table;    // list of tables (pointers)
     set_ll_allocator_t     *set_allocator;
 };
 
-struct table_s {
-    void                   *string_set;
-    cct_map_t              *map;
-};
-
-struct cct_cont_s {
-    size_t                  map_index;
-    cct_map_t              *map;
-};
-
-size_t
-cct_print_stats(log_t log, log_t details, lts_type_t ltstype, cct_map_t *map)
-{
-    size_t                  i = 0;
-    size_t                  total = 0;
-    total += set_ll_print_alloc_stats(log, map->set_allocator);
-    while (map->table[i].string_set != NULL) {
-        char                   *name = lts_type_get_type(ltstype, i);
-        total += set_ll_print_stats(details, map->table[i].string_set, name);
-        i++;
-    }
-    Warning (log, "Total memory used for chunk indexing: %zuMB", total >> 20);
-    return total;
-}
-
-double
-cct_finalize(cct_map_t *map, char *bogus)
-{
-    size_t                  i = 0;
-    double                  underwater = 0;
-    while (map->table[i].string_set != NULL) {
-        underwater += set_ll_finalize (map->table[i].string_set, bogus);
-        i++;
-    }
-    return underwater / i;
-}
 
 cct_map_t *
-cct_create_map(bool shared)
+cct_create_map (bool shared)
 {
     RTswitchAlloc (shared); // global shared-memory allocation?
     cct_map_t              *map = RTmalloc(sizeof(cct_map_t));
     map->shared = shared;
-    map->table = RTmalloc(sizeof(table_t[MAX_TABLES]));
+    map->table = RTmallocZero (sizeof(value_table_t[MAX_TABLES]));
     RTswitchAlloc (false);
-
-    for (size_t i = 0; i < MAX_TABLES; i++)
-        map->table[i].string_set = NULL;
 
     rwticket_init (&map->rw_lock);
 
@@ -110,79 +67,135 @@ cct_create_map(bool shared)
     return map;
 }
 
-cct_cont_t *
-cct_create_cont(cct_map_t *tables)
-{ 
-    // can be locally allocated
-    cct_cont_t *container = RTmalloc(sizeof(cct_cont_t));
-    container->map_index = 0;
-    container->map = tables;
-    return container;
+
+/**
+\typedef a chunk table
+use malloc
+*/
+struct value_table_s {
+    set_ll_t               *string_set;
+    cct_map_t              *map;
+};
+
+size_t
+cct_print_stats (log_t log, log_t details, lts_type_t ltstype, cct_map_t *map)
+{
+    size_t                  i = 0;
+    size_t                  total = 0;
+    total += set_ll_print_alloc_stats(log, map->set_allocator);
+    while (map->table[i] != NULL) {
+        char                   *name = lts_type_get_type(ltstype, i);
+        total += set_ll_print_stats(details, map->table[i]->string_set, name);
+        i++;
+    }
+    Warning (log, "Total memory used for chunk indexing: %zuMB", total >> 20);
+    return total;
 }
 
 static value_index_t
-put_chunk(value_table_t vt,chunk item)
+put_chunk (value_table_t vt,chunk item)
 {
-    table_t            *table = *((table_t **)vt);
-    return set_ll_put(table->string_set, item.data, item.len);
+    return set_ll_put(vt->string_set, item.data, item.len);
 }
 
 static void
-put_at_chunk(value_table_t vt,chunk item,value_index_t pos)
+put_at_chunk (value_table_t vt,chunk item,value_index_t pos)
 {
-    table_t            *table = *((table_t **)vt);
-    rwticket_wrlock (&table->map->rw_lock);
-    set_ll_install(table->string_set, item.data, item.len, pos);
-    rwticket_wrunlock (&table->map->rw_lock);
+    rwticket_wrlock (&vt->map->rw_lock);
+    set_ll_install(vt->string_set, item.data, item.len, pos);
+    rwticket_wrunlock (&vt->map->rw_lock);
 }
 
 static chunk
-get_chunk(value_table_t vt,value_index_t idx)
+get_chunk (value_table_t vt,value_index_t idx)
 {
-    table_t            *table = *((table_t **)vt);
     int                 len;
-    const char         *data = set_ll_get(table->string_set, (int)idx, &len);
+    const char         *data = set_ll_get(vt->string_set, (int)idx, &len);
     return chunk_ld(len, (char *)data);
 }
 
 static int
-get_count(value_table_t vt)
+get_count (value_table_t vt)
 {
-    table_t            *table = *((table_t **)vt);
-    return set_ll_count(table->string_set);
+    return set_ll_count(vt->string_set);
 }
 
-static void *
-new_map(void* context)
-{
-    cct_cont_t *cont = context;
-    cct_map_t *map = cont->map;
-    rwticket_rdlock (&map->rw_lock);
-    if (cont->map_index >= MAX_TABLES)
-        Abort("Chunk table limit reached: %zu.", MAX_TABLES);
-    table_t *table = &map->table[cont->map_index++];
-    rwticket_rdunlock (&map->rw_lock);
-    if (!table->string_set) {
-        rwticket_wrlock (&map->rw_lock);
-        if (!table->string_set) {
-            table->string_set = set_ll_create(map->set_allocator);
-            table->map = map;
-        }
-        rwticket_wrunlock (&map->rw_lock);
-    }
-    return table;
+struct table_iterator_s {
+    set_ll_iterator_t     *it;
+};
+
+static chunk it_next (table_iterator_t it){
+    chunk               c;
+    c.data = set_ll_iterator_next (it->it, (int *)&c.len);
+    return c;
 }
 
-value_table_t
-cct_create_vt(cct_cont_t *ctx)
+static int it_has_next (table_iterator_t it){
+    return set_ll_iterator_has_next (it->it);
+}
+
+static table_iterator_t
+iterator_create (value_table_t vt) {
+    table_iterator_t it = ITcreateBase (sizeof (struct table_iterator_s));
+    it->it = set_ll_iterator (vt->string_set);
+    ITnextSet (it, it_next);
+    IThasNextSet (it, it_has_next);
+    return it;
+}
+
+
+struct table_factory_s {
+    size_t                  map_index;
+    cct_map_t              *map;            //shared
+};
+
+static value_table_t
+cct_create_vt (table_factory_t tf, int index)
 {
-    cct_cont_t         *cont = ctx;
-    value_table_t vt = VTcreateBase("CCT map", sizeof(table_t *));
+    cct_map_t              *map = tf->map;
+    RTswitchAlloc (map->shared);
+    value_table_t           vt = VTcreateBase ("Concurrent chunk map",
+                                               sizeof(struct value_table_s));
+    RTswitchAlloc (false);
     VTdestroySet(vt,NULL);
     VTputChunkSet(vt,put_chunk);
     VTputAtChunkSet(vt,put_at_chunk);
     VTgetChunkSet(vt,get_chunk);
     VTgetCountSet(vt,get_count);
-    *((void **)vt) = new_map(cont);
+    VTiteratorSet(vt,iterator_create);
+    vt->string_set = set_ll_create (map->set_allocator, index);
+    vt->map = map;
     return vt;
 }
+
+static value_table_t
+new_map (table_factory_t tf)
+{
+    cct_map_t              *map = tf->map;
+    rwticket_rdlock (&map->rw_lock);
+    if (tf->map_index >= MAX_TABLES)
+        Abort("Chunk table limit reached: %zu.", MAX_TABLES);
+    rwticket_rdunlock (&map->rw_lock);
+    size_t                  index = tf->map_index++;
+    if (!map->table[index]) {
+        rwticket_wrlock (&map->rw_lock);
+        if (!map->table[index]) {
+            map->table[index] = cct_create_vt (tf, index);
+        }
+        rwticket_wrunlock (&map->rw_lock);
+    }
+    return map->table[index];
+}
+
+
+table_factory_t
+cct_create_table_factory (cct_map_t *map)
+{
+    // can be locally allocated
+    table_factory_t         factory = TFcreateBase (sizeof(struct table_factory_s));
+    TFnewTableSet (factory, new_map);
+    factory->map_index = 0;
+    factory->map = map;
+    return factory;
+}
+

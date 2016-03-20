@@ -2,6 +2,7 @@
 
 #include <inttypes.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <hre/user.h>
@@ -139,20 +140,25 @@ static const datatype_t DATATYPE_HRE_STR = {
 typedef struct local_s {
     isb_allocator_t     balloc;
     size_t              count;  // TODO: lazy updates with positive feedback
+    size_t              bogii;
     char                pad[CACHE_LINE_SIZE - 2*sizeof(size_t) - sizeof(isb_allocator_t)];
 } local_t;
 
 struct set_ll_s {
+    int                 typeno;
     hashtable_t        *ht;                 // Lockless hash table
     size_t              workers;
     local_t             local[MAX_WORKERS]; // Local indexing arrays
     set_ll_allocator_t *alloc;
+    size_t              bogus_count;
 };
 
 typedef struct str_s {
     char               *ptr;
     int                 len;
+    int                 bogus;
 } __attribute__((__packed__)) str_t;
+
 
 /**
  *
@@ -171,13 +177,14 @@ set_ll_get (set_ll_t *set, int idx, int *len)
     isb_allocator_t     balloc = set->local[worker].balloc;
     size_t              index = idx / set->workers;
     while ((read = atomic_read(&set->local[worker].count)) == index) {} // poll
-    HREassert (index < read, "Invariant violated %zu !< %zu (idx=%d)", index, read, idx);
+    HREassert (index < read, "%d Invariant violated %zu !< %zu (idx=%d)", set->typeno, index, read, idx);
     // TODO: memory fence?
     str_t              *str = (str_t *)isba_index (balloc, index);
     HREassert (str != NULL, "Value %d (%zu/%zu) not in lockless string set", idx, index, worker);
+    HREassert (!str->bogus, "Value %d (%zu/%zu) not in lockless string set: -1", idx, index, worker);
     *len = str->len;
-    Debug ("Index(%d)\t--(%zu,%zu)--> (%s,%d) %p",
-           idx, worker, index, str->ptr, str->len, str->ptr);
+    Debug ("%d Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", set->typeno,
+           idx, index, worker, str->ptr, str->len, str->ptr);
     HRE_ASSERT (str->len == (int)strlen(str->ptr), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
                 str->ptr, str->len, strlen(str->ptr), &str->ptr[str->len+1]);
     return str->ptr;
@@ -212,49 +219,50 @@ set_ll_put (set_ll_t *set, char *str, int len)
 
     if (old == DOES_NOT_EXIST) {
         // install value in balloc (late)
-        str_t               string = {.ptr = (char *)clone, .len = len};
+        str_t               string = {.ptr = (char *)clone, .len = len, .bogus = 0};
         RTswitchAlloc (set->alloc->shared); // in case balloc allocates a block
         isba_push_int (balloc, (int*)&string);
         RTswitchAlloc (false);
         atomic_write (&set->local[worker].count, index + 1); // signal done
-        Debug ("Write(%zu)\t<--(%zu,%zu)-- (%s,%d) %p",
-               (size_t)idx, worker, index, str, len, (void*)clone);
+        Debug ("%d Write(%zu)\t<--(%zu,%zu)-- (%s,%d) %p",
+               set->typeno, (size_t)idx, index, worker, str, len, (void*)clone);
     } else {
         idx = old - 1;
-        Debug ("Find (%zu)\t<--(%zu,%zu)-- (%s,%d) %p", (size_t)idx,
-               (size_t)idx % workers, (size_t)idx / workers, str, len, (void *)clone);
+        Debug ("%d Find (%zu)\t<--(%zu,%zu)-- (%s,%d) %p", set->typeno, (size_t)idx,
+               (size_t)idx / set->workers, (size_t)idx % set->workers, str, len, (void *)clone);
     }
     return (int)idx;
 }
-
-static int
-set_ll_max (set_ll_t *set)
-{
-    size_t              references = 0;
-    for (size_t i = 0; i < set->workers; i++)
-        references = max(references, set->local[i].count);
-    return references;
-}
-
-static double
-set_ll_stdev (set_ll_t *set)
-{
-    statistics_t stats;
-    statistics_init(&stats);
-    for (size_t i = 0; i < set->workers; i++)
-        statistics_record(&stats, set->local[i].count);
-    return statistics_stdev(&stats);
-}
-
 
 int
 set_ll_count (set_ll_t *set)
 {
     size_t              references = 0;
     for (size_t i = 0; i < set->workers; i++)
-        references += set->local[i].count;
+        references += set->local[i].count - set->local[i].bogii;
     Debug ("Count %p: %zu", set ,references);
     return references;
+}
+
+static str_t
+next_bogus (set_ll_t *set, size_t worker)
+{
+    return (str_t) { .ptr = "", 0, .bogus = 1 };
+
+    // No need for unique bogus values (just saving the code here)
+    char                unique[LTSMIN_PATHNAME_MAX];
+    set_ll_slab_t      *slab = set->alloc->slabs[worker];
+
+    size_t              idx = set->local[worker].bogii * set->workers + worker;
+    snprintf (unique, LTSMIN_PATHNAME_MAX, "uniqueZ#@^$%zu", idx);
+    slab->cur_len = strlen(unique);
+    str_t               str = { .ptr = strclone (unique, slab),
+                                .len = strlen (unique),
+                                .bogus = 1 };
+    slab->cur_len = SIZE_MAX;
+
+    set->local[worker].bogii++;
+    return str;
 }
 
 void
@@ -283,51 +291,31 @@ set_ll_install (set_ll_t *set, char *name, int len, int idx)
 
     if (old - 1 == (size_t)idx)
         return;
-    str_t               string = {.ptr = (char *)clone, .len = len};
     //HREassert (old == DOES_NOT_EXIST);
 
     RTswitchAlloc (set->alloc->shared);
-    while (isba_size_int(balloc) < index + 1) {
-        isba_push_int (balloc, (int*)&string);
+    while (isba_size_int(balloc) < index) {
+        str_t               str = next_bogus (set, worker);
+        isba_push_int (balloc, (int *) &str);
     }
+    str_t               string = {.ptr = (char *)clone, .len = len, .bogus = 0};
+    isba_push_int (balloc, (int *) &string);
     RTswitchAlloc (false);
+
     atomic_write (&set->local[worker].count, index + 1); // signal done
 
-    Debug ("Bind (%d)\t<--(%zu,%zu)-> (%s,%d) %zu", idx, worker, index, name,
-                                                     len, (size_t) clone);
+    Debug ("%d Bind (%d)\t<--(%zu,%zu)-> (%s,%d) %zu",
+           set->typeno, idx, worker, index, name, len, (size_t) clone);
 }
 
-double
-set_ll_finalize (set_ll_t *set, char *bogus)
+static double
+set_ll_stdev (set_ll_t *set)
 {
-    size_t              workers = HREpeers (HREglobal());
-    size_t              max_local = set_ll_max (set);
-    set_ll_slab_t      *slab = set->alloc->slabs[0];
-    HREassert (strlen(bogus) < LTSMIN_PATHNAME_MAX - strlen("4294967296"));
-    char                unique[LTSMIN_PATHNAME_MAX];
-    size_t              count = 0;
-
-    size_t              added = 0;
-    for (size_t i = 0; i < workers; i++) {
-        isb_allocator_t     balloc = set->local[i].balloc;
-        RTswitchAlloc (set->alloc->shared);
-        while (set->local[i].count < max_local) {
-            snprintf (unique, LTSMIN_PATHNAME_MAX, "%s (unique %zu)", bogus, count++);
-            slab->cur_key = NULL;
-            slab->cur_len = strlen(unique);
-            str_t               str = { .ptr = strclone (unique, slab),
-                                        .len = strlen(unique) };
-            slab->cur_len = SIZE_MAX;
-
-
-            isba_push_int (balloc, (int*)&str);
-            set->local[i].count++;
-        }
-        RTswitchAlloc (false);
-    }
-    double              underwater = workers * max_local;
-    underwater /= underwater - added;
-    return underwater;
+    statistics_t stats;
+    statistics_init(&stats);
+    for (size_t i = 0; i < set->workers; i++)
+        statistics_record(&stats, set->local[i].count);
+    return statistics_stdev(&stats);
 }
 
 size_t
@@ -346,7 +334,7 @@ set_ll_print_stats (log_t log, set_ll_t *set, char *name)
 
 
 size_t
-set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *alloc)
+set_ll_print_alloc_stats (log_t log, set_ll_allocator_t *alloc)
 {
     size_t              workers = HREpeers(HREglobal());
     size_t              strings = 0; // string storage in byte
@@ -360,16 +348,18 @@ set_ll_print_alloc_stats(log_t log, set_ll_allocator_t *alloc)
 }
 
 set_ll_t *
-set_ll_create (set_ll_allocator_t *alloc)
+set_ll_create (set_ll_allocator_t *alloc, int typeno)
 {
     RTswitchAlloc (alloc->shared); // global allocation of table, ballocs and set
     set_ll_t           *set = RTmalloc (sizeof(set_ll_t));
     set->ht = ht_alloc (&DATATYPE_HRE_STR, INIT_HT_SCALE);
     set->workers = HREpeers(HREglobal());
+    set->bogus_count = 0;
+    set->typeno = typeno;
     for (int i = 0; i < HREpeers(HREglobal()); i++) {
         set->local[i].balloc = isba_create(sizeof(str_t) / sizeof(int));
         set->local[i].count = 0;
-        set->local[i].offset = 0;
+        set->local[i].bogii = 0;
     }
     RTswitchAlloc (false);
 
@@ -387,4 +377,68 @@ set_ll_destroy (set_ll_t *set)
         isba_destroy (set->local[i].balloc);
     RTfree (set);
     RTswitchAlloc (false);
+}
+
+
+struct set_ll_iterator_s {
+    set_ll_t           *set;
+    size_t              index;
+    size_t              worker;
+    size_t              done;
+    size_t              count;
+};
+
+static inline void
+advance_index (set_ll_iterator_t* it)
+{
+    it->worker++;
+    if (it->worker == it->set->workers) {
+        it->worker = 0;
+        it->index++;
+    }
+}
+
+void
+prep (set_ll_iterator_t *it)
+{
+    while (it->index >= it->set->local[it->worker].count) {
+        advance_index (it);
+    }
+}
+
+char *
+set_ll_iterator_next (set_ll_iterator_t *it, int *len)
+{
+    HREassert (set_ll_iterator_has_next(it),
+               "Table iterator out of bounds %zu >= %zu (worker %zu)",
+               it->index, it->count, it->worker);
+    prep (it);
+
+    isb_allocator_t     balloc = it->set->local[it->worker].balloc;
+    str_t              *str = (str_t *)isba_index (balloc, it->index);
+    advance_index (it);
+    if (str->bogus) {
+        return set_ll_iterator_next (it, len);
+    }
+    it->done++;
+    *len = str->len;
+    return str->ptr;
+}
+
+int
+set_ll_iterator_has_next (set_ll_iterator_t *it)
+{
+    return it->done < it->count;
+}
+
+set_ll_iterator_t *
+set_ll_iterator (set_ll_t *set)
+{
+    set_ll_iterator_t  *it = RTmalloc (sizeof (set_ll_iterator_t)); // local
+    it->set = set;
+    it->index = 0;
+    it->done = 0;
+    it->worker = 0;
+    it->count = set_ll_count (set);
+    return it;
 }
