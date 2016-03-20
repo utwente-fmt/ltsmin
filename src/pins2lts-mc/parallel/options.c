@@ -60,7 +60,7 @@ options_static_init      (model_t model, bool timed)
 {
     if (files[1]) {
         Print1 (info,"Writing output to %s", files[1]);
-        if (strategy[0] & ~Strat_PBFS) {
+        if (strategy[0] != Strat_PBFS) {
             Print1 (info,"Switching to PBFS algorithm for LTS write");
             strategy[0] = Strat_PBFS;
         }
@@ -68,7 +68,7 @@ options_static_init      (model_t model, bool timed)
 
     if (strategy[0] == Strat_None)
         strategy[0] = (GBgetAcceptingStateLabelIndex(model) < 0 ?
-              (strategy[0] == Strat_TA ? Strat_SBFS : Strat_BFS) : Strat_CNDFS);
+              (timed ? Strat_SBFS : Strat_BFS) : Strat_CNDFS);
 
     if (timed) {
         if (!(strategy[0] & (Strat_CNDFS|Strat_Reach)))
