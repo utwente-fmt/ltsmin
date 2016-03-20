@@ -129,7 +129,7 @@ static void lts_read_dir(archive_t archive,lts_t lts){
         char data[len];
         chunk tmp_chunk=chunk_ld(len,data);
         string2chunk(line,&tmp_chunk);
-        if (i!=(int)VTputChunk(lts->values[type_no],tmp_chunk)) Abort("inconsistent");
+        VTputAtChunk(lts->values[type_no], tmp_chunk, i);
     }
     DSclose(&input);
     Print(infoShort,"got labels");

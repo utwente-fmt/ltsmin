@@ -189,9 +189,7 @@ static value_table_t set_table(lts_file_t file,int type_no,value_table_t table){
         int len=DSreadVL(ds);
         char data[len];
         DSread(ds,data,len);
-        if (VTputChunk(table,chunk_ld(len,data))!=L){
-             Abort("position of chunk %u was not preserved",L);
-        }
+        VTputAtChunk (table, chunk_ld(len,data), L);
         Debug("element %u length %d",L,len);
     }
     if (L == 0) {
