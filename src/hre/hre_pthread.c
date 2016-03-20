@@ -197,10 +197,11 @@ static void* thread_main(void*arg){
 }
 
 void hre_thread_exit(hre_context_t ctx, int code){
-    (void)ctx;(void)code;
-    Debug("thread exit");
-    pthread_exit(NULL);
-    exit(code); // avoid warning in cygwin
+    (void) ctx;
+    Debug("thread exit(%d)", code);
+    intptr_t c = code;
+    pthread_exit ((void *) c);
+    //exit(code); // avoid warning in cygwin
 }
 
 static void *
@@ -275,7 +276,7 @@ set_thread_stack_size()
     if (pthread_attr_init(&attr)){
         AbortCall("pthread_attr_init");
     }
-    size_t stack_size=32 * 1024 * 1024;
+    size_t stack_size = 128 * 1024 * 1024;
     if (pthread_attr_setstacksize(&attr, stack_size)){
         AbortCall("pthread_attr_setstacksize to %zu",stack_size);
     }
@@ -285,8 +286,7 @@ set_thread_stack_size()
 void HREpthreadRun(int threads){
     pthread_t thr[threads];
     /* Caused huge performance regression in MC tool */
-    //pthread_attr_t attr;
-    //attr = set_thread_stack_size();
+    //pthread_attr_t attr = set_thread_stack_size();
     struct shared_area *shared = create_shared_region(PTHREAD_SHARED_SIZE*threads,false);
     hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
 
@@ -316,14 +316,17 @@ void HREpthreadRun(int threads){
         }
     }
     Debug("waiting for threads");
+    int code = HRE_EXIT_SUCCESS;
     for(int i=0;i<threads;i++){
-        if (pthread_join(thr[i],NULL)) {
+        intptr_t c;
+        if (pthread_join(thr[i], (void **)&c)) {
             Abort("couldn't join with thread %d",i);
         }
+        if (c != HRE_EXIT_SUCCESS) code = c;
         Debug("joined with thread %d",i);
         //pthread_attr_destroy(attr+i);
     }
-    HREexit(HRE_EXIT_SUCCESS);
+    HREexit(code);
 }
 
 static void hre_process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));

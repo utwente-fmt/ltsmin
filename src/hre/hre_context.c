@@ -61,7 +61,7 @@ static void process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
 static void process_exit(hre_context_t ctx,int code){
     (void)ctx;
     if (code) {
-        exit(HRE_EXIT_FAILURE);
+        exit(code);
     } else {
         exit(HRE_EXIT_SUCCESS);
     }
