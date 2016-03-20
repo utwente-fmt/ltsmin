@@ -283,8 +283,8 @@ set_ll_install (set_ll_t *set, char *name, int len, int idx)
 
     if (old - 1 == (size_t)idx)
         return;
-    HREassert (old == DOES_NOT_EXIST);
     str_t               string = {.ptr = (char *)clone, .len = len};
+    //HREassert (old == DOES_NOT_EXIST);
 
     RTswitchAlloc (set->alloc->shared);
     while (isba_size_int(balloc) < index + 1) {

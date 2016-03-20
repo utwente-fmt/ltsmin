@@ -257,7 +257,7 @@ void SIputCAt(string_index_t si,const char*str,int len,int pos){
 
 	idx=SIlookupC(si,str,len);
 	if (idx==pos) return;
-	HREassert (idx==SI_INDEX_FAILED, "Cannot put %s at %d: already at %d",str,pos,idx);
+	HREassert (SIget(si,pos)==NULL, "Cannot put %s at %d: position filled",str,pos);
 	PutEntry(si,str,len,pos);
 }
 
