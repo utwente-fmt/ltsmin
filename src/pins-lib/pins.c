@@ -1327,12 +1327,11 @@ GBwrapModel(model_t model)
             }
             /* synchronize with other processes */
             HREbarrier(HREglobal());
-            HREabort(LTSMIN_EXIT_SUCCESS);
         } else {
             /* wait for main process */
             HREbarrier(HREglobal());
-            /* at this point, we are killed by HREabort */
         }
+        HREabort(LTSMIN_EXIT_SUCCESS);
     }
 
     /* if 'print labels', print and abort */
@@ -1345,12 +1344,11 @@ GBwrapModel(model_t model)
             chunk_table_print(info, model);
             /* synchronize with other processes */
             HREbarrier(HREglobal());
-            HREabort(LTSMIN_EXIT_SUCCESS);
         } else {
             /* wait for main process */
             HREbarrier(HREglobal());
-            /* at this point, we are killed by HREabort */
         }
+        HREabort(LTSMIN_EXIT_SUCCESS);
     }
 
     return model;
