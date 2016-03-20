@@ -76,8 +76,6 @@ ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
     Warning (info, "Accepting cycle FOUND at depth %zu!", level);
     Warning (info, " ");
     if (trc_output) {
-        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
-        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         /* Write last state to stack to close cycle */
         state_data_t data = dfs_stack_push (stack, NULL);
         state_info_serialize (cycle_closing_state, data);

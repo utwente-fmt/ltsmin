@@ -14,6 +14,7 @@
 
 #include <util-lib/chunk_support.h>
 
+
 /**
 \brief type of a value index
 */
@@ -26,7 +27,7 @@ A value table is a pointer to the user area of the object.
 Note that this area is preceeded by a system area, so do not
 use free and realloc directly!
 */
-typedef struct value_table_s* value_table_t;
+typedef struct value_table_s *value_table_t;
 
 /**
 \brief Type of a value table factory function.
@@ -37,11 +38,6 @@ typedef value_table_t(*value_table_create_t)(void* context,char*type_name);
 \brief Create an abstract base for a value table.
 */
 extern value_table_t VTcreateBase(char*type_name,size_t user_size);
-
-/**
-\brief Factory function that creates chunk based value tables.
-*/
-extern value_table_t chunk_table_create(void* context,char*type_name);
 
 /**
 \brief Change the size of the user portion of the value table object.
@@ -78,21 +74,58 @@ extern void VTgetNative(value_table_t vt,value_index_t idx,...);
 typedef void(*get_native_t)(value_table_t vt,value_index_t idx,va_list args);
 extern void VTgetNativeSet(value_table_t vt,get_native_t method);
 
+/**
+\brief Insert or retrieve a chunk.
+*/
 extern value_index_t VTputChunk(value_table_t vt,chunk item);
 typedef value_index_t(*put_chunk_t)(value_table_t vt,chunk item);
 extern void VTputChunkSet(value_table_t vt,put_chunk_t method);
 
+/**
+\brief Insert or retrieve a chunk at a particular index.
+*/
 extern void VTputAtChunk(value_table_t vt,chunk item,value_index_t pos);
 typedef void(*put_at_chunk_t)(value_table_t vt,chunk item,value_index_t pos);
 extern void VTputAtChunkSet(value_table_t vt,put_at_chunk_t method);
 
+/**
+\brief Retrive the chunk associated with an index
+*/
 extern chunk VTgetChunk(value_table_t vt,value_index_t idx);
 typedef chunk(*get_chunk_t)(value_table_t vt,value_index_t idx);
 extern void VTgetChunkSet(value_table_t vt,get_chunk_t method);
 
+/**
+\brief Number of chunks.
+*/
 extern int VTgetCount(value_table_t vt);
 typedef int(*vt_get_count_t)(value_table_t vt);
 extern void VTgetCountSet(value_table_t vt,vt_get_count_t method);
+
+
+typedef struct table_iterator_s *table_iterator_t;
+
+/**
+\brief Retrieve chunk table iterator.
+Iterator implementations guarantee that that chunks are iterated in order
+(according to indexing).
+WARNING: this order might not be dense!
+*/
+extern table_iterator_t VTiterator(value_table_t vt);
+typedef table_iterator_t(*vt_iterator_t)(value_table_t vt);
+extern void VTiteratorSet(value_table_t vt,vt_iterator_t method);
+
+
+table_iterator_t ITcreateBase (size_t user_size);
+
+extern chunk ITnext (table_iterator_t vt);
+typedef chunk (*it_next_t)(table_iterator_t vt);
+extern void ITnextSet (table_iterator_t vt, it_next_t method);
+
+extern int IThasNext (table_iterator_t vt);
+typedef int (*it_has_next_t)(table_iterator_t vt);
+extern void IThasNextSet (table_iterator_t vt, it_has_next_t method);
+
 
 /**
 \brief Abstract type for multi column tables.

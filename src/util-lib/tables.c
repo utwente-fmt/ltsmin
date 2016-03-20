@@ -8,21 +8,23 @@
 #include <util-lib/tables.h>
 #include <util-lib/dynamic-array.h>
 
+
 struct value_table_s {
-    char *type_name;
-    size_t user_size;
-    user_destroy_t destroy;
-    put_native_t put_native;
-    get_native_t get_native;
-    put_chunk_t put_chunk;
-    put_at_chunk_t put_at_chunk;
-    get_chunk_t get_chunk;
-    vt_get_count_t get_count;
+    char               *type_name;
+    size_t              user_size;
+    user_destroy_t      destroy;
+    put_native_t        put_native;
+    get_native_t        get_native;
+    put_chunk_t         put_chunk;
+    put_at_chunk_t      put_at_chunk;
+    get_chunk_t         get_chunk;
+    vt_get_count_t      get_count;
+    vt_iterator_t       get_iterator;
 };
 
-static const size_t system_size=((sizeof(struct value_table_s)+7)/8)*8;
-#define SYS2USR(var) ((value_table_t)(((char*)(var))+system_size))
-#define USR2SYS(var) ((value_table_t)(((char*)(var))-system_size))
+static const size_t vt_size=((sizeof(struct value_table_s)+7)/8)*8;
+#define SYS2USR(var) ((value_table_t)(((char*)(var))+vt_size))
+#define USR2SYS(var) ((value_table_t)(((char*)(var))-vt_size))
 
 static value_index_t missing_put_native(value_table_t vt,va_list args){
     (void)vt;(void)args;
@@ -58,16 +60,23 @@ static int missing_get_count(value_table_t vt){
     return -1;
 }
 
+static table_iterator_t missing_get_iterator (value_table_t vt) {
+    (void)vt;
+    Abort("method get_iterator has not been set");
+    return NULL;
+}
+
 value_table_t VTcreateBase(char*type_name,size_t user_size){
-    value_table_t object=(value_table_t)RTmallocZero(system_size+user_size);
+    value_table_t object = (value_table_t)RTmallocZero(vt_size + user_size);
     object->type_name=strdup(type_name);
     object->user_size=user_size;
     object->destroy=NULL;
-    object->put_native=missing_put_native;
-    object->get_native=missing_get_native;
-    object->put_chunk=missing_put_chunk;
-    object->get_chunk=missing_get_chunk;
-    object->get_count=missing_get_count;
+    object->put_native  = missing_put_native;
+    object->get_native  = missing_get_native;
+    object->put_chunk   = missing_put_chunk;
+    object->get_chunk   = missing_get_chunk;
+    object->get_count   = missing_get_count;
+    object->get_iterator= missing_get_iterator;
     return SYS2USR(object);
 }
 
@@ -132,6 +141,73 @@ void VTgetCountSet(value_table_t vt,vt_get_count_t method){
     value_table_t object=USR2SYS(vt);
     object->get_count=method?method:missing_get_count;
 }
+
+void VTiteratorSet (value_table_t vt, vt_iterator_t method) {
+    value_table_t object=USR2SYS(vt);
+    object->get_iterator = method;
+}
+
+table_iterator_t VTiterator(value_table_t vt) {
+    value_table_t object=USR2SYS(vt);
+    return object->get_iterator (vt);
+}
+
+#undef SYS2USR
+#undef USR2SYS
+
+
+struct table_iterator_s {
+    it_next_t           next;
+    it_has_next_t       has_next;
+};
+
+static const size_t iterator_size=((sizeof(struct table_iterator_s)+7)/8)*8;
+#define SYS2USR(var) ((table_iterator_t)(((char*)(var))+iterator_size))
+#define USR2SYS(var) ((table_iterator_t)(((char*)(var))-iterator_size))
+
+
+static chunk missing_next(table_iterator_t it){
+    (void) it;
+    Abort ("method next has not been set");
+    return (chunk){ .data = NULL, .len = 0 };
+}
+
+static int missing_has_next(table_iterator_t it){
+    (void) it;
+    Abort ("method has_next has not been set");
+    return -1;
+}
+
+table_iterator_t ITcreateBase (size_t user_size) {
+    table_iterator_t object = (table_iterator_t) RTmallocZero (iterator_size+user_size);
+    object->next = missing_next;
+    object->has_next = missing_has_next;
+    return SYS2USR(object);
+}
+
+chunk ITnext (table_iterator_t vt) {
+    table_iterator_t object=USR2SYS(vt);
+    return object->next (vt);
+}
+
+void ITnextSet (table_iterator_t vt, it_next_t method) {
+    table_iterator_t object=USR2SYS(vt);
+    object->next = method;
+}
+
+int IThasNext (table_iterator_t vt) {
+    table_iterator_t object=USR2SYS(vt);
+    return object->has_next (vt);
+}
+
+void IThasNextSet (table_iterator_t vt, it_has_next_t method) {
+    table_iterator_t object=USR2SYS(vt);
+    object->has_next = method;
+}
+
+
+#undef SYS2USR
+#undef USR2SYS
 
 
 struct matrix_table_struct{
@@ -395,6 +471,8 @@ static uint32_t MTsort(matrix_table_t mt,uint32_t *next,uint32_t offset,uint32_t
                 break;
         }
     }
+    Abort ("Unexpected");
+    return 0;
 }
 
 void MTsimplify(matrix_table_t dst, matrix_table_t src){

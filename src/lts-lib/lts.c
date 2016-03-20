@@ -233,7 +233,7 @@ void lts_set_sig(lts_t lts,lts_type_t type){
             break;
         case LTStypeChunk:
         case LTStypeEnum:
-            values[i]=chunk_table_create(NULL,sort);
+            values[i] = simple_chunk_table_create(NULL,sort);
             break;
         }
     }
@@ -480,11 +480,12 @@ void lts_merge(lts_t lts1,lts_t lts2){
         int T1=lts_type_get_edge_label_typeno(lts1->ltstype,0);
         int T2=lts_type_get_edge_label_typeno(lts2->ltstype,0);
         if (lts2->values[T2]!=NULL){
-            int N=VTgetCount(lts2->values[T2]);
-            int map[N];
-            for(int i=0;i<N;i++){
-                chunk c=VTgetChunk(lts2->values[T2],i);
-                map[i]=VTputChunk(lts1->values[T1],c);
+            int C = VTgetCount (lts2->values[T2]);
+            int map[C];
+            table_iterator_t it = VTiterator (lts2->values[T2]);
+            for (int i = 0; IThasNext(it); i++) {
+                chunk c = ITnext (it);
+                map[i] = VTputChunk (lts1->values[T1], c);
             }
             for(uint32_t i=0;i<lts2->transitions;i++){
                 lts1->label[trans_count+i]=map[lts2->label[i]];
@@ -502,19 +503,20 @@ void lts_merge(lts_t lts1,lts_t lts2){
             int T2=lts_type_get_state_label_typeno(lts2->ltstype,0);
             if (lts2->values[T2]!=NULL){
                 Print(info,"copying chunks");
-                int N=VTgetCount(lts2->values[T2]);
-                int map[N];
-                for(int i=0;i<N;i++){
-                    chunk c=VTgetChunk(lts2->values[T2],i);
-                    map[i]=VTputChunk(lts1->values[T1],c);
+                int C = VTgetCount (lts2->values[T2]);
+                int map[C];
+                table_iterator_t it = VTiterator (lts2->values[T2]);
+                for (int i = 0; IThasNext(it); i++) {
+                    chunk c = ITnext (it);
+                    map[i] = VTputChunk (lts1->values[T1], c);
                 }
                 Print(info,"copying labels");
-                for(uint32_t i=0;i<lts2->states;i++){
-                    lts1->properties[state_count+i]=map[lts2->properties[i]];
+                for (uint32_t i=0;i<lts2->states;i++){
+                    lts1->properties[state_count+i] = map[lts2->properties[i]];
                 }
             } else {
-                for(uint32_t i=0;i<lts2->states;i++){
-                    lts1->properties[state_count+i]=lts2->properties[i];
+                for (uint32_t i=0;i<lts2->states;i++){
+                    lts1->properties[state_count+i] = lts2->properties[i];
                 }
             }
         } else {
@@ -631,7 +633,7 @@ lts_t lts_encode_edge(lts_t lts){
             }
             res->src[edge]=i+1;
             res->dest[edge]=i+1;
-            res->label[edge]=VTputChunk(res->values[0],chunk_str(label));;
+            res->label[edge]=VTputChunk(res->values[0],chunk_str(label));
             edge++;
         }
     }
@@ -670,7 +672,7 @@ lts_t lts_encode_edge(lts_t lts){
             }
             res->src[edge]=lts->src[i]+1;
             res->dest[edge]=lts->dest[i]+1;
-            res->label[edge]=VTputChunk(res->values[0],chunk_str(label));;
+            res->label[edge]=VTputChunk(res->values[0],chunk_str(label));
             edge++;
         }
     }

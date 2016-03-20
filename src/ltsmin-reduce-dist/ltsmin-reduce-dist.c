@@ -105,10 +105,11 @@ int main(int argc, char*argv[]){
         case BRANCHING_REDUCTION_SET:
         case BRANCHING_REDUCTION_TCF_SET:
         {
-            value_table_t vt=SLTStable(lts,typeno);
-            int count=VTgetCount(vt);
-            for(int i=0;i<count;i++){
-                chunk c=VTgetChunk(vt,i);
+            value_table_t vt = SLTStable(lts,typeno);
+
+            table_iterator_t it = VTiterator (vt);
+            for (int i = 0; IThasNext(it); i++) {
+                chunk c = ITnext (vt);
                 if (c.len==3 && !strncmp(c.data,LTSMIN_EDGE_VALUE_TAU,3)){
                     if (tau>=0) Fatal(1,error,"more than one silent action");
                     tau=i;

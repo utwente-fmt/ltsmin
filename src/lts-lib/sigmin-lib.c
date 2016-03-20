@@ -25,6 +25,14 @@ static void DSwriteLN(stream_t stream,char* string){
     DSwrite(stream,"\n",strlen("\n"));
 }
 
+static void
+write_chunk (stream_t output, chunk label_c)
+{
+    char label_s[label_c.len * 2 + 6];
+    chunk2string (label_c, sizeof label_s, label_s);
+    DSwriteLN (output, label_s);
+}
+
 static void lts_write_dir(archive_t archive,string_map_t map,lts_t lts,int segments){
     if (map) arch_set_write_policy(archive,map);
     dir_info_t info=DIRinfoCreate(segments);
@@ -51,11 +59,16 @@ static void lts_write_dir(archive_t archive,string_map_t map,lts_t lts,int segme
     info->initial_seg=lts->root_list[0]%segments;
     info->initial_ofs=lts->root_list[0]/segments;
     output=arch_write(archive,"TermDB");
-    for(i=0;i<info->label_count;i++){
-        chunk label_c=VTgetChunk(lts->values[type_no],i);
-        char label_s[label_c.len*2+6];
-        chunk2string(label_c,sizeof label_s,label_s);
-        DSwriteLN(output,label_s);
+    int last_idx = 0;
+    table_iterator_t it = VTiterator (lts->values[type_no]);
+    while (IThasNext(it)) {
+        chunk label_c = ITnext (it);
+        int idx = VTputChunk (lts->values[type_no], label_c);
+        while (last_idx < idx) { // fill non-dense indices
+            write_chunk (output, (chunk){0, ""});
+            last_idx++;
+        }
+        write_chunk (output, label_c);
     }
     DSclose(&output);
     src_out=(stream_t*)RTmalloc(segments*sizeof(stream_t));
@@ -294,10 +307,10 @@ lts_t lts_copy(lts_t orig){
     int T=lts_type_get_type_count(orig->ltstype);
     for(int i=0;i<T;i++){
         if (orig->values[i]) {
-            int N=VTgetCount(orig->values[i]);
-            for(int j=0;j<N;j++){
-                chunk c=VTgetChunk(orig->values[i],j);
-                VTputAtChunk(copy->values[i],c,j);
+            table_iterator_t it = VTiterator (orig->values[i]);
+            for (int j = 0; IThasNext(it); j++) {
+                chunk c = ITnext (it);
+                VTputAtChunk (copy->values[i], c, j);
             }
         }
     }

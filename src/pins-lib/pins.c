@@ -51,14 +51,9 @@ struct grey_box_model {
 	transition_in_group_t transition_in_group;
 	covered_by_grey_t covered_by;
     covered_by_grey_t covered_by_short;
-	void* newmap_context;
-	newmap_t newmap;
-	int2chunk_t int2chunk;
-	chunk2int_t chunk2int;
-    chunkatint_t chunkatint;
-	get_count_t get_count;
+    table_factory_t chunk_factory;
+	void **map;
 	chunk2pretty_t chunk2pretty;
-	void** map;
 	string_set_t default_filter;
 	
 	int mucalc_node_count;
@@ -494,13 +489,8 @@ model_t GBcreateBase(){
 	model->state_labels_group=state_labels_default_group;
 	model->state_labels_all=state_labels_default_all;
 	model->transition_in_group=transition_in_group_default;
-	model->newmap_context=NULL;
-	model->newmap=NULL;
-	model->int2chunk=NULL;
-	model->chunk2int=NULL;
-	model->chunk2pretty=NULL;
 	model->map=NULL;
-	model->get_count=NULL;
+	model->chunk_factory=NULL;
 	model->use_guards=0;
 	model->mucalc_node_count = 0;
 	
@@ -690,7 +680,7 @@ void GBsetLTStype(model_t model,lts_type_t info){
 	    int N=lts_type_get_type_count(info);
 	    model->map=RTmallocZero(N*sizeof(void*));
 	    for(int i=0;i<N;i++){
-		    model->map[i]=model->newmap(model->newmap_context);
+		    model->map[i] = TFnewTable (model->chunk_factory);
 	    }
     }
 }
@@ -1023,15 +1013,8 @@ int GBtransitionInGroup(model_t model,int* labels,int group){
 	return model->transition_in_group(model,labels,group);
 }
 
-void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
-	int2chunk_t int2chunk,chunk2int_t chunk2int,chunkatint_t chunkatint,
-	get_count_t get_count){
-	model->newmap_context=newmap_context;
-	model->newmap=newmap;
-	model->int2chunk=int2chunk;
-	model->chunk2int=chunk2int;
-	model->chunkatint=chunkatint;
-	model->get_count=get_count;
+void GBsetChunkMap(model_t model, table_factory_t factory){
+	model->chunk_factory = factory;
 }
 
 void GBcopyChunkMaps(model_t dst, model_t src)
@@ -1040,13 +1023,7 @@ void GBcopyChunkMaps(model_t dst, model_t src)
  * copying, bad things are likely to happen when dst is used.
  */
 {
-
-    dst->newmap_context = src->newmap_context;
-    dst->newmap = src->newmap;
-    dst->int2chunk = src->int2chunk;
-    dst->chunk2int = src->chunk2int;
-    dst->chunkatint = src->chunkatint;
-    dst->get_count = src->get_count;
+    dst->chunk_factory = src->chunk_factory;
 
     int N    = lts_type_get_type_count(GBgetLTStype(src));
     dst->map = RTmallocZero(N*sizeof(void*));
@@ -1059,14 +1036,14 @@ void GBcopyChunkMaps(model_t dst, model_t src)
 void GBgrowChunkMaps(model_t model, int old_n)
 {
     void **old_map = model->map;
-    int N=lts_type_get_type_count(GBgetLTStype(model));
-    model->map=RTmallocZero(N*sizeof(void*));
-    for(int i=0;i<N;i++){
+    int N = lts_type_get_type_count(GBgetLTStype(model));
+    model->map = RTmallocZero(N*sizeof(void*));
+    for(int i=0; i < N; i++) {
         HREassert(old_map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
         if (i < old_n) {
             model->map[i] = old_map[i];
         } else {
-            model->map[i]=model->newmap(model->newmap_context);
+            model->map[i] = TFnewTable (model->chunk_factory);
         }
     }
     RTfree (old_map);
@@ -1074,42 +1051,39 @@ void GBgrowChunkMaps(model_t model, int old_n)
 
 void GBchunkPutAt(model_t model,int type_no,const chunk c,int pos){
     HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-    model->chunkatint(model->map[type_no],c.data,c.len,pos);
+    VTputAtChunk (model->map[type_no], c, pos);
 }
 
 int GBchunkPut(model_t model,int type_no,const chunk c){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-	return model->chunk2int(model->map[type_no],c.data,c.len);
+    HREassert (model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
+    VTputChunk (model->map[type_no], c);
 }
 
 chunk GBchunkGet(model_t model,int type_no,int chunk_no){
     HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-	chunk_len len;
-	int tmp;
-	char* data=(char*)model->int2chunk(model->map[type_no],chunk_no,&tmp);
-	len=(chunk_len)tmp;
-	return chunk_ld(len,data);
+	return VTgetChunk (model->map[type_no], chunk_no);
 }
 
-int GBchunkPrettyPrint(model_t model,int pos,int chunk_no){
-    if (model->chunk2pretty == NULL)
-    {
-        if (model->parent == NULL)
-        {
-            return chunk_no;
-        }
+void GBsetPrettyPrint(model_t model, chunk2pretty_t chunk2pretty) {
+    model->chunk2pretty = chunk2pretty;
+}
+
+int GBchunkPrettyPrint(model_t model, int pos, int chunk_no){
+    if (model->chunk2pretty == NULL) {
+        if (model->parent == NULL) return chunk_no;
         return GBchunkPrettyPrint(model->parent, pos, chunk_no);
     }
     return model->chunk2pretty(model, pos, chunk_no);
 }
 
-void GBsetPrettyPrint(model_t model,chunk2pretty_t chunk2pretty){
-    model->chunk2pretty = chunk2pretty;
-}
-
 int GBchunkCount(model_t model,int type_no){
     HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-	return model->get_count(model->map[type_no]);
+	return VTgetCount (model->map[type_no]);
+}
+
+table_iterator_t GBchunkIterator(model_t model,int type_no){
+    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
+    return VTiterator (model->map[type_no]);
 }
 
 
@@ -1261,10 +1235,10 @@ void chunk_table_print(log_t log, model_t model) {
     int N=lts_type_get_type_count(t);
     int idx = 0;
     for(int i=0;i<N;i++){
-        int V = GBchunkCount(model, i);
-        for(int j=0;j<V;j++){
-            char *type = lts_type_get_type(t, i);
-            chunk c = GBchunkGet(model, i, j);
+        char *type = lts_type_get_type(t, i);
+        table_iterator_t it = GBchunkIterator (model, i);
+        while (IThasNext(it)) {
+            chunk c = ITnext (it);
             char name[c.len*2+6];
             chunk2string(c, sizeof name, name);
             HREprintf(log,"%4d: %s (%s)\n",idx, name, type);

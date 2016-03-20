@@ -49,8 +49,6 @@ handle_error_trace (wctx_t *ctx)
         // wait for other threads to complete
         HREbarrier (HREglobal());
 
-        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
-        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         if (strategy[0] & Strat_TA) {
             dfs_stack_leave (sm->stack);
             find_and_write_dfs_stack_trace (ctx->model, sm->stack);
@@ -636,8 +634,6 @@ void
 reach_destroy_local      (run_t *run, wctx_t *ctx)
 {
     if (ctx->local->lts != NULL) {
-        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
-        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         lts_file_close (ctx->local->lts);
     }
     RTfree (ctx->local);

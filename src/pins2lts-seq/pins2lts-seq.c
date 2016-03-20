@@ -222,13 +222,6 @@ static struct {
     .errors         = 0,
 };
 
-
-static void *
-new_string_index (void *context)
-{
-    return chunk_table_create (context, "GSEA table");
-}
-
 typedef struct gsea_state {
     int* state;
     int  count;
@@ -1846,12 +1839,8 @@ main (int argc, char *argv[])
     HREinitStart(&argc,&argv,1,2,(char**)files,"<model> [<lts>]");
 
     Warning (info, "Loading model from %s", files[0]);
-    opt.model=GBcreateBase();
-    GBsetChunkMethods(opt.model,new_string_index,NULL,
-                      (int2chunk_t)HREgreyboxI2C,
-                      (chunk2int_t)HREgreyboxC2I,
-                      (chunkatint_t)HREgreyboxCAtI,
-                      (get_count_t)HREgreyboxCount);
+    opt.model = GBcreateBase();
+    GBsetChunkMap (opt.model, simple_table_factory_create());
 
     GBloadFile(opt.model,files[0]);
     opt.model = GBwrapModel(opt.model);

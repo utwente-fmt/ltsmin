@@ -3384,11 +3384,7 @@ init_model(char *file)
 {
     Warning(info, "opening %s", file);
     model = GBcreateBase();
-    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),
-                      HREgreyboxI2C,
-                      HREgreyboxC2I,
-                      HREgreyboxCAtI,
-                      HREgreyboxCount);
+    GBsetChunkMap (model, HREgreyboxTableFactory());
 
     HREbarrier(HREglobal());
 

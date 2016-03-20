@@ -9,6 +9,7 @@
  dependent on an equal workload (number of inserts) among the different threads.
 */
 
+#include <stdbool.h>
 
 /**
 \typedef The string set.
@@ -38,16 +39,18 @@ extern int          set_ll_count    (set_ll_t *set);
  */
 void                set_ll_install  (set_ll_t *set, char *name, int len, int idx);
 
-extern set_ll_t    *set_ll_create   (set_ll_allocator_t *alloc);
-
-/**
-\brief Fill-in all indices in the set with bogus values to create a continuous
-        range as required by LTS io library.
- */
-extern double       set_ll_finalize (set_ll_t *set, char *bogus);
+extern set_ll_t    *set_ll_create   (set_ll_allocator_t *alloc, int typeno);
 
 extern size_t       set_ll_print_stats(log_t log, set_ll_t *set, char *name);
 
 extern void         set_ll_destroy  (set_ll_t *set);
+
+typedef struct set_ll_iterator_s set_ll_iterator_t;
+
+extern char *set_ll_iterator_next (set_ll_iterator_t *it, int *len);
+
+extern int set_ll_iterator_has_next (set_ll_iterator_t *it);
+
+extern set_ll_iterator_t *set_ll_iterator (set_ll_t *set);
 
 #endif

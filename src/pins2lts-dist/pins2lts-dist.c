@@ -590,13 +590,9 @@ int main(int argc, char*argv[]){
     ctx.tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
     memset(ctx.tcount,0,mpi_nodes*sizeof(int));
 
-    model_t model=GBcreateBase();
+    model_t model = GBcreateBase();
     ctx.model = model;
-    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),
-                      HREgreyboxI2C,
-                      HREgreyboxC2I,
-                      HREgreyboxCAtI,
-                      HREgreyboxCount);
+    GBsetChunkMap (model, HREgreyboxTableFactory());
 
     if (ctx.mpi_me == 0)
         GBloadFileShared(model,files[0]);
