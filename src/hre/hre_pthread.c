@@ -414,7 +414,7 @@ void* hre_privatefixedmem_get(hre_context_t context, size_t size){
 
     // The other workers attempt to map anoymous private memory to the same address
     if (HREme(context)!=0) {
-        Debug("trying private fixed memory %s at %p", fixedMemory);
+        Debug("trying private fixed memory at %p", fixedMemory);
         void* tmp = mmap(fixedMemory,size,PROT_READ|PROT_WRITE,MAP_FIXED|MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
         if (tmp == MAP_FAILED || tmp == (void *)-1) {
             AbortCall("mmap");
@@ -453,6 +453,7 @@ static void fork_popt(poptContext con,
         case POPT_CALLBACK_REASON_PRE:
         case POPT_CALLBACK_REASON_POST:
             Abort("unexpected call to hre_popt");
+            break;
         case POPT_CALLBACK_REASON_OPTION:
             if (!strcmp(opt->longName,"procs")){
                 if (arg) {
