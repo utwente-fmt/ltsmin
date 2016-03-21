@@ -207,7 +207,7 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
     if (statement_label != -1 && !force_progress_states) {
         int             statement_type = lts_type_get_edge_label_typeno (
                                                  ltstype, statement_label);
-        size_t          count = pins_chunk_count  (ctx->model, statement_type);
+        size_t          count = pins_chunk_count (ctx->model, statement_type);
         if (count >= K) {
             loc->progress = RTmallocZero (sizeof(int[K]));
             for (size_t i = 0; i < K; i++) {
@@ -266,7 +266,7 @@ dfs_fifo_run  (run_t *run, wctx_t *ctx)
     df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
     raw_data_t stack_loc = dfs_stack_push (ctx->global->in_stack, NULL);
     state_info_serialize (ctx->initial, stack_loc);
-    int acc = pins_state_is_accepting (ctx->model, state_info_state(ctx->initial));
+    int acc = pins_state_is_progress (ctx->model, state_info_state(ctx->initial));
     loc->seed = acc ? (ref_t)-1 : ctx->initial->ref;
     loc->df_counters.progress += acc;
 
