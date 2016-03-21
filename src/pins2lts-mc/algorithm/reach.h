@@ -26,6 +26,7 @@
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <mc-lib/lb.h>
 #include <mc-lib/statistics.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <util-lib/fast_set.h>
@@ -116,7 +117,7 @@ deadlock_detect (wctx_t *ctx, size_t count)
     alg_local_t        *loc = ctx->local;
     loc->counters.deadlocks++; // counting is costless
     state_data_t        state = state_info_state (ctx->state);
-    if (GBstateIsValidEnd(ctx->model, state)) return;
+    if (pins_state_is_valid_end(ctx->model, state)) return;
     if ( !loc->inv_expr ) loc->counters.violations++;
 
     global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;

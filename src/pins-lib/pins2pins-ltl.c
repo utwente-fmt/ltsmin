@@ -15,6 +15,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
 
 
@@ -413,7 +414,7 @@ GBaddLTL (model_t model)
     if (ltl_file == NULL) return model;
 
     lts_type_t ltstype = GBgetLTStype(model);
-    int old_idx = GBgetAcceptingStateLabelIndex (model);
+    int old_idx = pins_get_accepting_state_label_index (model);
     if (old_idx != -1) {
         Print1 (info, "LTL layer: model already has a ``%s'' property, overriding",
                lts_type_get_state_label_name(ltstype, old_idx));
@@ -467,12 +468,10 @@ GBaddLTL (model_t model)
     int             sl_count = dm_nrows (p_sl);
     int             new_sl_count = sl_count + 1;
 
-    ctx->sl_idx_accept = sl_count;
-    GBsetAcceptingStateLabelIndex (ltlmodel, ctx->sl_idx_accept);
-
     // add buchi label (at end)
+    ctx->sl_idx_accept = sl_count;
     lts_type_set_state_label_count (ltstype_new, new_sl_count);
-    lts_type_set_state_label_name (ltstype_new, ctx->sl_idx_accept, "buchi_accept_pins");
+    lts_type_set_state_label_name (ltstype_new, ctx->sl_idx_accept, LTSMIN_STATE_LABEL_ACCEPTING);
     lts_type_set_state_label_typeno (ltstype_new, ctx->sl_idx_accept, bool_type);
 
     // copy state labels

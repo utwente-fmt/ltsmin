@@ -1211,7 +1211,7 @@ static void
 valid_end_cb(void *context, int *src)
 {
     int *state = (int *) context;
-    if (!state[N] && !GBstateIsValidEnd(model, src)) {
+    if (!state[N] && !pins_state_is_valid_end(model, src)) {
         memcpy (state, src, sizeof(int[N]));
         state[N] = 1;
     }
@@ -1335,7 +1335,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         return;
 
     int dlk_state[1][N + 1];
-    if (GBgetValidEndStateLabelIndex(model) >= 0) {
+    if (pins_get_valid_end_state_label_index(model) >= 0) {
         dlk_state[0][N] = 0; // Did not find an invalid end state yet
         vset_enum (deadlocks, valid_end_cb, dlk_state[0]);
         if (!dlk_state[0][N])

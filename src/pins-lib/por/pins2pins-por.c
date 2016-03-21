@@ -270,7 +270,7 @@ all_guards (por_context *ctx, int i, matrix_t *m, int j)
 model_t
 GBaddPOR (model_t model)
 {
-    if (GBgetAcceptingStateLabelIndex(model) != -1) {
+    if (pins_get_accepting_state_label_index(model) != -1) {
         Print1  (info, "POR layer: model may be a buchi automaton.");
         Print1  (info, "POR layer: use LTSmin's own LTL layer (--ltl) for correct POR.");
     }

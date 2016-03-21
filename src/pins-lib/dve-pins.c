@@ -86,7 +86,7 @@ struct poptOption dve_options[]= {
 };
 
 typedef struct grey_box_context {
-    int todo;
+    int                 accepting_state_label_idx;
 } *gb_context_t;
 
 static void* dlHandle = NULL;
@@ -98,7 +98,8 @@ static char templatename[PATH_MAX];
 static int
 sl_long_p_g (model_t model, int label, int *state)
 {
-    if (label == GBgetAcceptingStateLabelIndex(model)) {
+    gb_context_t ctx = (gb_context_t) GBgetContext (model);
+    if (label == ctx->accepting_state_label_idx) {
         return buchi_is_accepting(model, state);
     } else {
         return get_guard(model, label, state);
@@ -109,7 +110,8 @@ static void
 sl_all_p_g (model_t model, int *state, int *labels)
 {
     get_guard_all(model, state, labels);
-    labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
+    gb_context_t ctx = (gb_context_t) GBgetContext (model);
+    labels[ctx->accepting_state_label_idx] = buchi_is_accepting(model, state);
 }
 
 static void
@@ -372,10 +374,11 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
         lts_type_set_state_label_typeno (ltstype, i, guard_type);
     }
     if (have_property()) {
-        lts_type_set_state_label_name (ltstype, nguards,
-                                       "buchi_accept_dve2");
+        lts_type_set_state_label_name (ltstype, nguards, LTSMIN_STATE_LABEL_ACCEPTING);
         lts_type_set_state_label_typeno (ltstype, nguards, guard_type);
-        GBsetAcceptingStateLabelIndex (model,nguards);
+        ctx->accepting_state_label_idx = nguards;
+    } else {
+        ctx->accepting_state_label_idx = -1;
     }
 
     GBsetLTStype(model, ltstype);
@@ -447,7 +450,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     if (have_property()) {
         for (int i=0; i<state_length; ++i) {
             if (strcmp ("LTL_property", lts_type_get_state_name(ltstype, i)) == 0) {
-                dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), i);
+                dm_set(sl_info, ctx->accepting_state_label_idx, i);
             }
         }
     }

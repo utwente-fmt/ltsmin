@@ -87,9 +87,9 @@ struct poptOption opaal_options[]= {
 };
 
 typedef struct grey_box_context {
-    int lattice_type;
-    int lattice_label_idx;
-    int todo;
+    int             lattice_type;
+    int             lattice_label_idx;
+    int             accepting_state_label_idx;
 } *gb_context_t;
 
 static void* dlHandle = NULL;
@@ -101,11 +101,11 @@ static char templatename[PATH_MAX];
 static int
 sl_long_p (model_t model, int label, int *state)
 {
-    if (label == GBgetAcceptingStateLabelIndex(model)) {
+    gb_context_t ctx = (gb_context_t) GBgetContext (model);
+    if (label == ctx->accepting_state_label_idx) {
         return buchi_is_accepting(model, state);
     }
-    else if (label == ((gb_context_t)GBgetContext(model))->lattice_label_idx) {
-        gb_context_t ctx = (gb_context_t)GBgetContext(model);
+    else if (label == ctx->lattice_label_idx) {
         lts_type_t ltstype = GBgetLTStype (model);
         int lattice_idx = lts_type_get_state_length(ltstype) - 2;
         void **lattice = (void **) &state[lattice_idx];
@@ -121,12 +121,12 @@ sl_long_p (model_t model, int label, int *state)
 static void
 sl_all_p (model_t model, int *state, int *labels)
 {
+    gb_context_t ctx = (gb_context_t) GBgetContext (model);
     HREassert (labels != NULL, "No labels");
-    if (GBgetAcceptingStateLabelIndex(model) > -1) {
-        labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
+    if (ctx->accepting_state_label_idx > -1) {
+        labels[ctx->accepting_state_label_idx] = buchi_is_accepting(model, state);
     }
 
-    gb_context_t ctx = (gb_context_t)GBgetContext(model);
     lts_type_t ltstype = GBgetLTStype (model);
     int lattice_idx = lts_type_get_state_length(ltstype) - 2;
     void **lattice = (void **) &state[lattice_idx];
@@ -140,11 +140,11 @@ sl_all_p (model_t model, int *state, int *labels)
 static int
 sl_long_p_g (model_t model, int label, int *state)
 {
-    if (label == GBgetAcceptingStateLabelIndex(model)) {
+    gb_context_t ctx = (gb_context_t) GBgetContext (model);
+    if (label == ctx->accepting_state_label_idx) {
         return buchi_is_accepting(model, state);
     }
-    else if (label == ((gb_context_t)GBgetContext(model))->lattice_label_idx) {
-        gb_context_t ctx = (gb_context_t)GBgetContext(model);
+    else if (label == ctx->lattice_label_idx) {
         lts_type_t ltstype = GBgetLTStype (model);
         int lattice_idx = lts_type_get_state_length(ltstype) - 2;
         void **lattice = (void **) &state[lattice_idx];
@@ -160,11 +160,11 @@ sl_long_p_g (model_t model, int label, int *state)
 static void
 sl_all_p_g (model_t model, int *state, int *labels)
 {
+    gb_context_t ctx = (gb_context_t) GBgetContext (model);
     get_guard_all(model, state, labels);
-    if (GBgetAcceptingStateLabelIndex(model) > -1) {
-        labels[GBgetAcceptingStateLabelIndex(model)] = buchi_is_accepting(model, state);
+    if (ctx->accepting_state_label_idx > -1) {
+        labels[ctx->accepting_state_label_idx] = buchi_is_accepting(model, state);
     }
-    gb_context_t ctx = (gb_context_t)GBgetContext(model);
     lts_type_t ltstype = GBgetLTStype (model);
     int lattice_idx = lts_type_get_state_length(ltstype) - 2;
     void **lattice = (void **) &state[lattice_idx];
@@ -511,10 +511,11 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     lts_type_set_state_label_typeno (ltstype, nguards, ctx->lattice_type);
     ctx->lattice_label_idx = nguards;
     if (have_property()) {
-        lts_type_set_state_label_name (ltstype, nguards+1,
-                                       "buchi_accept_opaal");
-        lts_type_set_state_label_typeno (ltstype, nguards+1, bool_type);
-        GBsetAcceptingStateLabelIndex (model,nguards+1);
+        lts_type_set_state_label_name (ltstype, nguards + 1, LTSMIN_STATE_LABEL_ACCEPTING);
+        lts_type_set_state_label_typeno (ltstype, nguards + 1, bool_type);
+        ctx->accepting_state_label_idx = nguards + 1;
+    } else {
+        ctx->accepting_state_label_idx = -1;
     }
 
     GBsetLTStype(model, ltstype);
@@ -572,7 +573,7 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     if (have_property()) {
         for (int i=0; i<state_length; ++i) {
             if (strcmp ("LTL_property", lts_type_get_state_name(ltstype, i)) == 0) {
-                dm_set(sl_info, GBgetAcceptingStateLabelIndex(model), i);
+                dm_set(sl_info, ctx->accepting_state_label_idx, i);
             }
         }
     }

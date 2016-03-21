@@ -27,9 +27,6 @@ struct grey_box_model {
     matrix_t *dna_info; // do not accord info
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
-    int sl_idx_buchi_accept;
-    int sl_idx_progress;
-    int sl_idx_valid_end;
     int *group_visibility;
     int *label_visibility;
 	int *s0;
@@ -471,9 +468,6 @@ model_t GBcreateBase(){
     model->dna_info=NULL;
     model->gnes_info=NULL;
     model->gnds_info=NULL;
-    model->sl_idx_buchi_accept = -1;
-    model->sl_idx_progress = -1;
-    model->sl_idx_valid_end = -1;
 	model->s0=NULL;
 	model->context=0;
     model->next_short=default_short;
@@ -580,15 +574,6 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->gnds_info == NULL)
         GBsetGuardNDSInfo(model, GBgetGuardNDSInfo (default_src));
-
-    if (GBgetAcceptingStateLabelIndex (default_src) >= 0)
-        GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
-
-    if (GBgetProgressStateLabelIndex (default_src) >= 0)
-        GBsetProgressStateLabelIndex(model, GBgetProgressStateLabelIndex (default_src));
-
-    if (GBgetValidEndStateLabelIndex (default_src) >= 0)
-        GBsetValidEndStateLabelIndex(model, GBgetValidEndStateLabelIndex (default_src));
 
     for (int i = 0; i < GBgetMatrixCount(default_src); i++) {
         const char* name = GBgetMatrixName(default_src, i);
@@ -1391,69 +1376,6 @@ void GBregisterPreLoader(const char*extension,pins_loader_t loader){
     } else {
         Abort("model type registry overflow");
     }
-}
-
-int
-GBgetAcceptingStateLabelIndex (model_t model)
-{
-    return model->sl_idx_buchi_accept;
-}
-
-int
-GBsetAcceptingStateLabelIndex (model_t model, int idx)
-{
-    int oldidx = model->sl_idx_buchi_accept;
-    model->sl_idx_buchi_accept = idx;
-    return oldidx;
-}
-
-int
-GBbuchiIsAccepting (model_t model, int *state)
-{
-    return model->sl_idx_buchi_accept >= 0 &&
-        GBgetStateLabelLong(model, model->sl_idx_buchi_accept, state);
-}
-
-int
-GBgetProgressStateLabelIndex (model_t model)
-{
-    return model->sl_idx_progress;
-}
-
-int
-GBsetProgressStateLabelIndex (model_t model, int idx)
-{
-    int oldidx = model->sl_idx_progress;
-    model->sl_idx_progress = idx;
-    return oldidx;
-}
-
-int
-GBstateIsProgress (model_t model, int *state)
-{
-    return model->sl_idx_progress >= 0 &&
-        GBgetStateLabelLong(model, model->sl_idx_progress, state);
-}
-
-int
-GBgetValidEndStateLabelIndex (model_t model)
-{
-    return model->sl_idx_valid_end;
-}
-
-int
-GBsetValidEndStateLabelIndex (model_t model, int idx)
-{
-    int oldidx = model->sl_idx_valid_end;
-    model->sl_idx_valid_end = idx;
-    return oldidx;
-}
-
-int
-GBstateIsValidEnd (model_t model, int *state)
-{
-    return model->sl_idx_valid_end >= 0 &&
-        GBgetStateLabelLong(model, model->sl_idx_valid_end, state);
 }
 
 struct poptOption greybox_options[]={

@@ -118,7 +118,7 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.accepting               = 0;
 #endif
 
-    shared->ltl = GBgetAcceptingStateLabelIndex(ctx->model) != -1;
+    shared->ltl = pins_get_accepting_state_label_index(ctx->model) != -1;
 
     if (shared->ltl && trc_output) {
         ctx->local->rctx = run_init (shared->reach_run, ctx->model);
@@ -163,7 +163,7 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
 #if LTL_CHECK
-        if ( GBbuchiIsAccepting(ctx->model, state_info_state(successor) ) ) {
+        if ( pins_state_is_accepting(ctx->model, state_info_state(successor) ) ) {
             ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
         }
 #endif
@@ -271,7 +271,7 @@ ufscc_init  (wctx_t *ctx)
 #endif
 
 #if LTL_CHECK
-        if ( GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state) ) ) {
+        if ( pins_state_is_accepting(ctx->model, state_info_state(ctx->state) ) ) {
             loc->cnt.accepting ++;
         }
 #endif
@@ -302,7 +302,7 @@ successor (wctx_t *ctx)
     if (loc->target->ref == ctx->state->ref) { // self loop
 
         loc->cnt.claimfound ++; // implies CLAIM_FOUND
-        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state))) {
+        if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(ctx->state))) {
             report_lasso (ctx, ctx->state->ref);
         }
 
@@ -355,7 +355,7 @@ successor (wctx_t *ctx)
             loc->cnt.unique_states ++;
             loc->cnt.unique_trans += trans;
 #if LTL_CHECK
-            if ( GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state) ) ) {
+            if ( pins_state_is_accepting(ctx->model, state_info_state(ctx->state) ) ) {
                 loc->cnt.accepting ++;
             }
 #endif
@@ -388,7 +388,7 @@ successor (wctx_t *ctx)
             root_data = dfs_stack_pop (loc->roots_stack); // UF Stack POP
             state_info_deserialize (loc->root, root_data); // roots_stack TOP
 
-            if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(loc->root))) {
+            if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(loc->root))) {
                 accepting = loc->root->ref;
             }
             Debug ("Uniting: %zu and %zu", loc->root->ref, ctx->state->ref);

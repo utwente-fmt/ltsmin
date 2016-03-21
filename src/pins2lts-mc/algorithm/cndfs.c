@@ -46,7 +46,7 @@ set_all_red2 (wctx_t *ctx, state_info_t *state)
 {
     if (update_color(ctx, state->ref, CRED, 1)) {
         ctx->local->counters.allred++;
-        if ( GBbuchiIsAccepting(ctx->model, state_info_state(state)) )
+        if ( pins_state_is_accepting(ctx->model, state_info_state(state)) )
             ctx->local->counters.accepting++; /* count accepting states */
     } else {
         ctx->local->red.allred++;
@@ -160,7 +160,7 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
         ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
     /* Mark states dangerous if necessary */
     if ( Strat_ENDFS == loc->strat &&
-         GBbuchiIsAccepting(ctx->model, state_info_state(successor)) &&
+         pins_state_is_accepting(ctx->model, state_info_state(successor)) &&
          state_store_get_colors (successor->ref) != CRED )
         state_store_try_color(successor->ref, GDANGEROUS, loc->rec_bits);
 
@@ -345,7 +345,7 @@ on_stack_accepting_up (wctx_t *ctx, int *accepting)
         Debug ("Added state %zu %s with depth %zu accepting depth",
                ctx->state->ref, (*accepting ? "(accepting)" : ""), cloc->accepting_depth);
         *depth = cloc->accepting_depth; // write currect accepting depth
-        *accepting = GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)) != 0;
+        *accepting = pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) != 0;
         cloc->accepting_depth += *accepting;
     }
     return on_stack;
@@ -399,7 +399,7 @@ endfs_red (wctx_t *ctx)
                 continue;
             }
 
-            accepting = GBbuchiIsAccepting (ctx->model, state_info_state(ctx->state)) != 0;
+            accepting = pins_state_is_accepting (ctx->model, state_info_state(ctx->state)) != 0;
             accepting_down (ctx, ctx->state, accepting);
 
             dfs_stack_pop (loc->stack);
@@ -463,7 +463,7 @@ endfs_blue (run_t *run, wctx_t *ctx)
                 continue;
             }
 
-            accepting = GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) != 0;
+            accepting = pins_state_is_accepting(ctx->model, state_info_state(loc->seed)) != 0;
 
             /* Mark state GGREEN on backtrack */
             update_color (ctx, loc->seed->ref, CBLUE, 1);

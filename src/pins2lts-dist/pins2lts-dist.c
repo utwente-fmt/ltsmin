@@ -19,6 +19,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/fast_hash.h>
@@ -119,7 +120,7 @@ static inline void
 deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 {
     if (count != 0) return;
-    if (GBstateIsValidEnd(ctx->model, state)) return;
+    if (pins_state_is_valid_end(ctx->model, state)) return;
     ctx->deadlocks++;
     if (!dlk_detect) return;
     ctx->violations++;
