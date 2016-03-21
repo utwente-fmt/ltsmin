@@ -335,6 +335,7 @@ extern void GBgetInitialState(model_t model, int* state);
  * @param context The context of where to write the new transition to.
  * @param transition_info The transition group responsible for the new state.
  * @param dst The new state.
+ * @param cpy Array indicating which indices i of the dst have been written (cpy[i] == 0)
  */
 typedef void(*TransitionCB)(void*context,transition_info_t*transition_info,int*dst,int*cpy);
 /**< @brief Type of the callback function for returning lists of transitions.
