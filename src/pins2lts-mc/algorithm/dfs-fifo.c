@@ -207,11 +207,11 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
     if (statement_label != -1 && !force_progress_states) {
         int             statement_type = lts_type_get_edge_label_typeno (
                                                  ltstype, statement_label);
-        size_t          count = GBchunkCount (ctx->model, statement_type);
+        size_t          count = pins_chunk_count  (ctx->model, statement_type);
         if (count >= K) {
             loc->progress = RTmallocZero (sizeof(int[K]));
             for (size_t i = 0; i < K; i++) {
-                chunk c = GBchunkGet (ctx->model, statement_type, i);
+                chunk c = pins_chunk_get  (ctx->model, statement_type, i);
                 loc->progress[i] = strstr(c.data, LTSMIN_VALUE_STATEMENT_PROGRESS) != NULL;
                 loc->progress_trans += loc->progress[i];
             }

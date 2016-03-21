@@ -4,6 +4,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/etf-util.h>
 #include <pins-lib/etf-pins.h>
+#include <pins-lib/pins-util.h>
 #include <hre/stringindex.h>
 #include <util-lib/tables.h>
 
@@ -275,7 +276,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
         Warning(infoLong,"Setting values for type %d (%s)",i,lts_type_get_type(ltstype,i));
         int count=etf_get_value_count(etf,i);
         for(int j=0;j<count;j++){
-            GBchunkPutAt(model,i,etf_get_value(etf,i,j),j);
+            pins_chunk_put_at (model,i,etf_get_value(etf,i,j),j);
         }
     }
 

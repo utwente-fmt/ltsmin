@@ -1508,7 +1508,7 @@ gsea_setup(const char *output)
             Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         int typeno = lts_type_get_edge_label_typeno(ltstype, opt.act_label);
         chunk c = chunk_str(opt.act_detect);
-        opt.act_index = GBchunkPut(opt.model, typeno, c);
+        opt.act_index = pins_chunk_put (opt.model, typeno, c);
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
         if (PINS_POR) {
             pins_add_edge_label_visible (opt.model, opt.act_label, opt.act_index);

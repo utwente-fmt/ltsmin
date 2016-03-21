@@ -415,7 +415,7 @@ parse_net(xmlNode* a_node, model_t model, uint32_t* init_state[])
                     else if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "transition") == 0) {
                         int num;
                         if ((num = SIlookup(context->pnml_transs, (char*) id)) == SI_INDEX_FAILED) Abort("missing transition");
-                        GBchunkPutAt(model, lts_type_find_type(GBgetLTStype(model), "action"), chunk_str((char*) xmlNodeGetContent(node)), num);
+                        pins_chunk_put_at (model, lts_type_find_type(GBgetLTStype(model), "action"), chunk_str((char*) xmlNodeGetContent(node)), num);
                     } else if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "place") == 0) {
                         int num;
                         if ((num = SIlookup(context->pnml_places, (char*) id)) == SI_INDEX_FAILED) Abort("missing place");
@@ -792,9 +792,9 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     GBsetLTStype(model, ltstype); // must set ltstype before setting initial state
                                   // creates tables for types!
 
-    GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-    GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE ), 1);
-    GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
+    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE ), 1);
+    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
 
     dm_create(dm_info, NUM_TRANSS, NUM_PLACES);
     dm_create(dm_read_info, NUM_TRANSS, NUM_PLACES);

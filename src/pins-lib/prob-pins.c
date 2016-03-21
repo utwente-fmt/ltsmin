@@ -141,7 +141,7 @@ pins2prob_state(model_t model, int* pins)
 
     Debugf("pins2prob state (%d): ", ctx->num_vars);
     for (size_t i = 0; i < ctx->num_vars; i++) {
-        chunk c = GBchunkGet(model, ctx->var_type[i], pins[i]);
+        chunk c = pins_chunk_get (model, ctx->var_type[i], pins[i]);
 
         prob.chunks[i].data = c.data;
         prob.chunks[i].size = c.len;
@@ -173,7 +173,7 @@ prob2pins_state(ProBState s, int *state, model_t model)
         for (unsigned int j = 0; j < c.len; j++) Debugf("%x", c.data[j]);
 #endif
         Debugf(",");
-        int chunk_id = GBchunkPut(model, ctx->var_type[i], c);
+        int chunk_id = pins_chunk_put (model, ctx->var_type[i], c);
         state[i] = chunk_id;
     }
     Debugf("\n");
@@ -193,7 +193,7 @@ get_successors_long(model_t model, int group, int *src, TransitionCB cb, void *c
 
     int operation_type = prob_ctx->op_type_no;
 
-    chunk op_name = GBchunkGet(model, operation_type, prob_ctx->op_type[group]);
+    chunk op_name = pins_chunk_get (model, operation_type, prob_ctx->op_type[group]);
 
     ProBState prob = pins2prob_state(model, src);
 
@@ -309,8 +309,8 @@ prob_load_model(model_t model)
     GBsetLTStype(model, ltstype);
 
     if (bool_is_new) {
-        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE ), 1);
+        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
+        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE ), 1);
     }
 
     const int num_groups = init.transition_groups.size;
@@ -320,7 +320,7 @@ prob_load_model(model_t model)
     string_index_t op_si = SIcreate();
     for (int i = 0; i < num_groups; i++) {
         const char* name = init.transition_groups.chunks[i].data;
-        const int at = GBchunkPut(model, ctx->op_type_no, chunk_str(name));
+        const int at = pins_chunk_put (model, ctx->op_type_no, chunk_str(name));
         ctx->op_type[i] = at;
         SIputAt(op_si,name,i);
     }

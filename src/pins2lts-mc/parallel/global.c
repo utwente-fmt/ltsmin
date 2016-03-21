@@ -87,7 +87,7 @@ init_action_labels (model_t model)
                   LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         act_type = lts_type_get_edge_label_typeno (ltstype, act_label);
         chunk c = chunk_str(act_detect);
-        act_index = GBchunkPut (model, act_type, c);
+        act_index = pins_chunk_put  (model, act_type, c);
     }
 }
 

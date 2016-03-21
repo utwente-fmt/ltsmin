@@ -84,9 +84,9 @@ str_group (dlk_check_context_t *ctx, int group)
     int label = lts_type_find_edge_label (ltstype, LTSMIN_EDGE_TYPE_STATEMENT);
     if (label) return "NULL";
     int type = lts_type_get_edge_label_typeno (ltstype, label);
-    int count = GBchunkCount (model, type);
+    int count = pins_chunk_count  (model, type);
     if (count < ctx->groups) return "NULL";
-    chunk c = GBchunkGet (model, type, group);
+    chunk c = pins_chunk_get  (model, type, group);
     return c.data;
 }
 
@@ -183,9 +183,9 @@ print_group_name (dlk_check_context_t *ctx, int group, int idx)
     if (statement_label != -1) {
         int             statement_type = lts_type_get_edge_label_typeno (
                                                  ltstype, statement_label);
-        size_t          count = GBchunkCount (model, statement_type);
+        size_t          count = pins_chunk_count  (model, statement_type);
         HREassert (count >= K, "Missing group names in LTSMIN_EDGE_TYPE_STATEMENT edge labels");
-        chunk c = GBchunkGet (model, statement_type, group);
+        chunk c = pins_chunk_get  (model, statement_type, group);
         Printf (error, "Group %d (%d) name: %s\n", group, idx, c.data);
     } else {
         Printf (error, "Group %d (%d)\n", group, idx);

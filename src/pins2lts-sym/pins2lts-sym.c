@@ -1103,7 +1103,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
             Abort("ti->labels is null");
         }
         if (seen_actions_test(act_index)) { // is this the first time we encounter this action?
-            char *action=GBchunkGet(model,action_typeno,act_index).data;
+            char *action=pins_chunk_get (model,action_typeno,act_index).data;
 
             if (strncmp(act_detect,action,strlen(act_detect))==0)  {
                 Warning(info, "found action: %s", action);
@@ -3164,10 +3164,10 @@ output_types(FILE *tbl_file)
         fprint_ltsmin_ident(tbl_file, lts_type_get_type(ltstype, i));
         fprintf(tbl_file, "\n");
 
-        int values = GBchunkCount(model,i);
+        int values = pins_chunk_count (model,i);
 
         for (int j = 0; j < values; j++) {
-            chunk c    = GBchunkGet(model, i, j);
+            chunk c    = pins_chunk_get (model, i, j);
             size_t len = c.len * 2 + 6;
             char str[len];
 
@@ -3340,7 +3340,7 @@ directed(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
         Abort("Guided forward search requires action");
 
     chunk c = chunk_str(act_detect);
-    act_index = GBchunkPut(model, action_typeno, c); // now only used for guidance heuristics
+    act_index = pins_chunk_put (model, action_typeno, c); // now only used for guidance heuristics
 
     total_count = establish_group_order(group_order, &initial_count);
 
@@ -3911,8 +3911,8 @@ void init_spg(model_t model)
                 true_index = 0; // enforced by mucalc parser (mucalc-grammar.lemon / mucalc-syntax.c)
                 false_index = 1;
             } else { // required for the PBES language module.
-                true_index = GBchunkPut(model, var_type_no, chunk_str("true"));
-                false_index = GBchunkPut(model, var_type_no, chunk_str("false"));
+                true_index = pins_chunk_put (model, var_type_no, chunk_str("true"));
+                false_index = pins_chunk_put (model, var_type_no, chunk_str("false"));
             }
         }
     }
@@ -3920,7 +3920,7 @@ void init_spg(model_t model)
     int proj[1] = {var_pos}; // position 0 encodes the variable
     variable_projection = vproj_create(domain, p_len, proj);
 
-    num_vars = GBchunkCount(model, var_type_no); // number of propositional variables
+    num_vars = pins_chunk_count (model, var_type_no); // number of propositional variables
     if (GBhaveMucalc()) {
         num_vars = GBgetMucalcNodeCount(model); // number of mu-calculus subformulae
     }
