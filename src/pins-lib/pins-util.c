@@ -5,6 +5,7 @@
 
 #include <dm/dm.h>
 #include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins-util.h>
 
 
@@ -70,4 +71,54 @@ pins_add_state_label_visible (model_t model, int index)
     int                *visible = GBgetPorStateLabelVisibility(model);
     HREassert (visible != NULL, "pins_add_state_label_visible: No (lower) PINS layer uses POR visibility.");
     visible[index] = 1;
+}
+
+int
+pins_get_accepting_state_label_index (model_t model)
+{
+    lts_type_t          ltstype = GBgetLTStype (model);
+    return lts_type_find_state_label (ltstype, LTSMIN_STATE_LABEL_ACCEPTING);
+}
+int
+pins_get_progress_state_label_index (model_t model)
+{
+    lts_type_t          ltstype = GBgetLTStype (model);
+    return lts_type_find_state_label (ltstype, LTSMIN_STATE_LABEL_PROGRESS);
+}
+
+int
+pins_get_valid_end_state_label_index (model_t model)
+{
+    lts_type_t          ltstype = GBgetLTStype (model);
+    return lts_type_find_state_label (ltstype, LTSMIN_STATE_LABEL_VALID_END);
+}
+
+static inline int
+evalBoolGuard (int label, model_t model, int *src)
+{
+    if (label == -1) return 0;
+    int val = GBgetStateLabelLong (model, label, src);
+    HREassert (val == 0 || val == 1, "Boolean state label expected, found: %d", val);
+    return val;
+}
+
+int
+pins_state_is_accepting (model_t model, int *src)
+{
+    int label = pins_get_accepting_state_label_index (model);
+    return evalBoolGuard (label, model, src);
+}
+
+int
+pins_state_is_progress (model_t model, int *src)
+{
+    int label = pins_get_progress_state_label_index (model);
+    return evalBoolGuard (label, model, src);
+}
+
+int
+pins_state_is_valid_end (model_t model, int *src)
+{
+    int label = pins_get_valid_end_state_label_index (model);
+    return evalBoolGuard (label, model, src);
 }

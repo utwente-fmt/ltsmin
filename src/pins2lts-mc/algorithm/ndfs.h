@@ -9,6 +9,7 @@
 #include <stdlib.h>
 
 #include <hre/stringindex.h>
+#include <pins-lib/pins-util.h>
 #include <pins2lts-mc/algorithm/ltl.h>
 
 extern int              all_red;
@@ -92,7 +93,7 @@ set_all_red (wctx_t *ctx, state_info_t *state)
 {
     if (state_store_try_color(state->ref, GRED, ctx->local->rec_bits)) {
         ctx->local->counters.allred++;
-        if ( GBbuchiIsAccepting(ctx->model, state_info_state(state)) )
+        if ( pins_state_is_accepting(ctx->model, state_info_state(state)) )
             ctx->local->counters.accepting++; /* count accepting states */
     } else {
         ctx->local->red.allred++;
@@ -104,7 +105,7 @@ set_red (wctx_t *ctx, state_info_t *state)
 {
     if (state_store_try_color(state->ref, GRED, ctx->local->rec_bits)) {
         ctx->local->red_work.explored++;
-        if ( GBbuchiIsAccepting(ctx->model, state_info_state(state)) )
+        if ( pins_state_is_accepting(ctx->model, state_info_state(state)) )
             ctx->local->counters.accepting++; /* count accepting states */
     } else {
         ctx->local->red.bogus_red++;

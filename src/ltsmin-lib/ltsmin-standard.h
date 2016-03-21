@@ -98,5 +98,14 @@ are part of a single hyper edge.
 /* Guard prefixes */
 #define LTSMIN_LABEL_TYPE_GUARD_PREFIX  "guard"
 
+/* Buchi accepting states for (automata-baseD) LTL checking */
+#define LTSMIN_STATE_LABEL_ACCEPTING    "buchi_accept"
+
+/* progress states for livelock detection */
+#define LTSMIN_STATE_LABEL_PROGRESS     "progress_state"
+
+/* SPIN's valid end states, for distinguishing between harmless and erroneous deadlocks */
+#define LTSMIN_STATE_LABEL_VALID_END    "valid_end_state"
+
 
 #endif /* LTSMIN_STANDARD_H_ */

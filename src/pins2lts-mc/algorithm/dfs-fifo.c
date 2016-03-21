@@ -57,7 +57,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     work_counter_t     *cnt = ctx->counters;
     ctx->counters->trans++;
     bool is_progress = loc->progress_trans > 0 ? loc->progress[ti->group] : // ! progress transition
-            GBstateIsProgress(ctx->model, state_info_state(successor));     // ! progress state
+            pins_state_is_progress(ctx->model, state_info_state(successor));     // ! progress state
 
 
     if (EXPECT_FALSE( trc_output && !seen && successor->ref != ctx->state->ref &&
@@ -231,7 +231,7 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
            // Use progress states
            Print1 (info, "No progress transitions defined for DFS_FIFO, "
                          "using progress states via progress state label")
-           int progress_sl = GBgetProgressStateLabelIndex (ctx->model);
+           int progress_sl = pins_get_progress_state_label_index (ctx->model);
            HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
            pins_add_state_label_visible (ctx->model, progress_sl);
        }
@@ -266,7 +266,7 @@ dfs_fifo_run  (run_t *run, wctx_t *ctx)
     df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
     raw_data_t stack_loc = dfs_stack_push (ctx->global->in_stack, NULL);
     state_info_serialize (ctx->initial, stack_loc);
-    int acc = GBbuchiIsAccepting (ctx->model, state_info_state(ctx->initial));
+    int acc = pins_state_is_accepting (ctx->model, state_info_state(ctx->initial));
     loc->seed = acc ? (ref_t)-1 : ctx->initial->ref;
     loc->df_counters.progress += acc;
 

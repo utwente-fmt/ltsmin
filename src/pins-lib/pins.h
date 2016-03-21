@@ -471,51 +471,6 @@ extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void
 \brief Get the state labels and all transitions in one call.
 */
 
-extern int GBgetAcceptingStateLabelIndex(model_t model);
-/**<
-\brief Get index of accepting state label
-*/
-
-extern int GBsetAcceptingStateLabelIndex(model_t model, int index);
-/**<
-\brief Set index of accepting state label
-*/
-
-extern int GBbuchiIsAccepting(model_t model, int* src);
-/**<
-\brief Return accepting/not-accepting for a given state, false if undefined
-*/
-
-extern int GBgetProgressStateLabelIndex(model_t model);
-/**<
-\brief Get index of progress state label
-*/
-
-extern int GBsetProgressStateLabelIndex(model_t model, int index);
-/**<
-\brief Set index of progress state label
-*/
-
-extern int GBstateIsProgress(model_t model, int* src);
-/**<
-\brief Return progress/non-progress for a given state, false if undefined
-*/
-
-extern int GBgetValidEndStateLabelIndex(model_t model);
-/**<
-\brief Get index of valid end state label
-*/
-
-extern int GBsetValidEndStateLabelIndex(model_t model, int index);
-/**<
-\brief Set index of valid end state label
-*/
-
-extern int GBstateIsValidEnd(model_t model, int* src);
-/**<
-\brief Return valid end/invalid end for a given state, false if undefined
-*/
-
 extern int GBtransitionInGroup(model_t model, int* labels, int group);
 /**<
 \brief Return if a transition labelled with labels potentially occurs in group

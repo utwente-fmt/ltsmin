@@ -71,8 +71,8 @@ ndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
      * on the stack here, in order to calculate all-red correctly later.
      */
     if ( ecd && nn_color_eq(color, NNCYAN) &&
-            (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)) ||
-             GBbuchiIsAccepting(ctx->model, state_info_state(successor))) ) {
+            (pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) ||
+             pins_state_is_accepting(ctx->model, state_info_state(successor))) ) {
         /* Found cycle in blue search */
         ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
     } else if ((loc->strat == Strat_LNDFS && !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits)) ||
@@ -175,9 +175,9 @@ ndfs_blue (run_t *run, wctx_t *ctx)
                 /* exit if backtrack hits seed, leave stack the way it was */
                 nn_set_color (&loc->color_map, loc->seed->ref, NNPINK);
                 loc->counters.allred++;
-                if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) )
+                if ( pins_state_is_accepting(ctx->model, state_info_state(loc->seed)) )
                     loc->counters.accepting++;
-            } else if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) ) {
+            } else if ( pins_state_is_accepting(ctx->model, state_info_state(loc->seed)) ) {
                 /* call red DFS for accepting states */
                 ndfs_red (ctx, loc->seed->ref);
                 nn_set_color (&loc->color_map, loc->seed->ref, NNPINK);

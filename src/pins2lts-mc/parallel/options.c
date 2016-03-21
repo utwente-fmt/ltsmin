@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 
+#include <pins-lib/pins-util.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/dfs-fifo.h>
@@ -67,7 +68,7 @@ options_static_init      (model_t model, bool timed)
     }
 
     if (strategy[0] == Strat_None)
-        strategy[0] = (GBgetAcceptingStateLabelIndex(model) < 0 ?
+        strategy[0] = (pins_get_accepting_state_label_index(model) < 0 ?
               (timed ? Strat_SBFS : Strat_BFS) : Strat_CNDFS);
 
     if (timed) {

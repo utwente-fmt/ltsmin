@@ -84,7 +84,7 @@ lndfs_blue (run_t *run, wctx_t *ctx)
                 /* all successors are red */
                 wait_seed (ctx, loc->seed->ref);
                 set_all_red (ctx, loc->seed);
-            } else if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) ) {
+            } else if ( pins_state_is_accepting(ctx->model, state_info_state(loc->seed)) ) {
                 /* call red DFS for accepting states */
                 lndfs_red (ctx, loc->seed->ref);
             } else if (all_red && ctx->counters->level_cur > 0 &&

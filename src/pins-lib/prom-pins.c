@@ -376,6 +376,17 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         const char *name = prom_get_label_name (i);
         HREassert (i >= nguards || has_prefix(name, LTSMIN_LABEL_TYPE_GUARD_PREFIX),
                    "Label %d was expected to ba a guard instead of '%s'", i, name);
+
+        if (strcmp (ACCEPTING_STATE_LABEL_NAME, name) == 0) {
+            name = LTSMIN_STATE_LABEL_ACCEPTING;
+        }
+        if(strcmp(PROGRESS_STATE_LABEL_NAME, name) == 0) {
+            name = LTSMIN_STATE_LABEL_PROGRESS;
+        }
+        if(strcmp(VALID_END_STATE_LABEL_NAME, name) == 0) {
+            name = LTSMIN_STATE_LABEL_VALID_END;
+        }
+
         lts_type_set_state_label_name (ltstype, i, name);
         lts_type_set_state_label_typeno (ltstype, i, guard_type);
     }
@@ -398,20 +409,6 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetStateLabelsGroup(model, sl_group);
     GBsetStateLabelLong(model, (get_label_method_t)prom_get_label);
     GBsetStateLabelsAll(model, (get_label_all_method_t)sl_all);
-
-    // check for properties (label order: guard,..,guard,accept,end,progress,etc)
-    for(int i = 0; i < sl_size; i++) {
-        const char *name = prom_get_label_name (i);
-        if (strcmp (ACCEPTING_STATE_LABEL_NAME, name) == 0) {
-            GBsetAcceptingStateLabelIndex (model, i);
-        }
-        if(strcmp(PROGRESS_STATE_LABEL_NAME, name) == 0) {
-            GBsetProgressStateLabelIndex (model, i);
-        }
-        if(strcmp(VALID_END_STATE_LABEL_NAME, name) == 0) {
-            GBsetValidEndStateLabelIndex (model, i);
-        }
-    }
 
     // initialize the state read/write dependency matrices
     int ngroups = prom_get_transition_groups();
