@@ -711,7 +711,7 @@ int main(int argc, char*argv[]){
         for(int i=0;i<T;i++){
             int typeno=lts_type_find_type(ltstype,lts_type_get_type(trace_type,i));
             if (typeno<0) continue;
-            void *table=GBgetChunkMap(model,typeno);
+            value_table_t table = GBgetChunkMap (model, typeno);
             Debug("address of table %d/%d: %p",i,typeno,table);
             lts_file_set_table(ctx.trace,i,table);
         }
@@ -725,7 +725,7 @@ int main(int argc, char*argv[]){
             Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         int typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
         chunk c = chunk_str(act_detect);
-        act_index = GBchunkPut(model, typeno, c);
+        act_index = pins_chunk_put (model, typeno, c);
         Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect) {

@@ -122,3 +122,38 @@ pins_state_is_valid_end (model_t model, int *src)
     int label = pins_get_valid_end_state_label_index (model);
     return evalBoolGuard (label, model, src);
 }
+
+void
+pins_chunk_put_at (model_t model,int type_no,const chunk c,int pos)
+{
+    value_table_t map = GBgetChunkMap (model, type_no);
+    VTputAtChunk (map, c, pos);
+}
+
+int
+pins_chunk_put (model_t model,int type_no,const chunk c)
+{
+    value_table_t map = GBgetChunkMap (model, type_no);
+    return VTputChunk (map, c);
+}
+
+chunk
+pins_chunk_get (model_t model,int type_no,int chunk_no)
+{
+    value_table_t map = GBgetChunkMap (model, type_no);
+    return VTgetChunk (map, chunk_no);
+}
+
+int
+pins_chunk_count (model_t model,int type_no)
+{
+    value_table_t map = GBgetChunkMap (model, type_no);
+    return VTgetCount (map);
+}
+
+table_iterator_t
+pins_chunk_iterator (model_t model,int type_no)
+{
+    value_table_t map = GBgetChunkMap (model, type_no);
+    return VTiterator (map);
+}

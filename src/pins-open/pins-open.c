@@ -144,7 +144,7 @@ void CAESAR_PRINT_STATE(CAESAR_TYPE_FILE f,CAESAR_TYPE_STATE s) {
 		for(i=0; i < state_labels; i++) {
 			if (i>0)
 				fprintf(f, ";");
-			c=GBchunkGet(model,lts_type_get_state_label_typeno(ltstype,i),labels[i]);
+			c=pins_chunk_get (model,lts_type_get_state_label_typeno(ltstype,i),labels[i]);
 			char str[c.len*2+6];
 			chunk2string(c,sizeof str,str);
 			fprintf(f, "%s", str);
@@ -192,7 +192,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
         }
         for(i=0; i < edge_labels; i++) {
             char *name=lts_type_get_edge_label_name(ltstype,i);
-            c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,i),l->label[i]);
+            c=pins_chunk_get (model,lts_type_get_edge_label_typeno(ltstype,i),l->label[i]);
             if (c.len==3 && strncmp(c.data, LTSMIN_EDGE_VALUE_TAU, c.len)==0)
                 clen=strlen(tau);
             else
@@ -247,7 +247,7 @@ CAESAR_TYPE_STRING CAESAR_STRING_LABEL(CAESAR_TYPE_LABEL l) {
         ofs+=N;
         for(i=0;i<state_labels;i++){
             char*name=lts_type_get_state_label_name(ltstype,i);
-            c=GBchunkGet(model,lts_type_get_state_label_typeno(ltstype,i),l->label[ofs+i]);
+            c=pins_chunk_get (model,lts_type_get_state_label_typeno(ltstype,i),l->label[ofs+i]);
             n=strlen(name)+c.len*2+7;
             if (b-p < n) { 
                 u = p-s;
@@ -342,14 +342,14 @@ void CAESAR_DELTA_STATE(CAESAR_TYPE_FILE f,CAESAR_TYPE_STATE s1,CAESAR_TYPE_STAT
 			if (s1->state[i] == s2->state[i])
 				fprintf(f, "-");
 			else {
-				c=GBchunkGet(model,lts_type_get_state_label_typeno(ltstype,i),labels1[i]);
+				c=pins_chunk_get (model,lts_type_get_state_label_typeno(ltstype,i),labels1[i]);
 				{
 					char str[c.len*2+6];
 					chunk2string(c,sizeof str,str);
 					fprintf(f, "%s", str);
 				}
 				fprintf(f, ":=");
-				c=GBchunkGet(model,lts_type_get_state_label_typeno(ltstype,i),labels2[i]);
+				c=pins_chunk_get (model,lts_type_get_state_label_typeno(ltstype,i),labels2[i]);
 				{
 					char str[c.len*2+6];
 					chunk2string(c,sizeof str,str);
@@ -440,7 +440,7 @@ void CAESAR_START_STATE(CAESAR_TYPE_STATE s) {
 CAESAR_TYPE_BOOLEAN CAESAR_VISIBLE_LABEL(CAESAR_TYPE_LABEL x) {
 	CAESAR_TYPE_BOOLEAN vis = CAESAR_TRUE;
 	if (edge_labels==1) {
-		chunk c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,0),x->label[0]);
+		chunk c=pins_chunk_get (model,lts_type_get_edge_label_typeno(ltstype,0),x->label[0]);
 		if (c.len==3 && strncmp(c.data, LTSMIN_EDGE_VALUE_TAU, c.len)==0)
 			vis =CAESAR_FALSE;
 	}
@@ -465,7 +465,7 @@ CAESAR_TYPE_STRING CAESAR_GATE_LABEL(CAESAR_TYPE_LABEL l) {
 	chunk c;
 	
 	if (edge_labels==1) {
-		c=GBchunkGet(model,lts_type_get_edge_label_typeno(ltstype,0),l->label[0]);
+		c=pins_chunk_get (model,lts_type_get_edge_label_typeno(ltstype,0),l->label[0]);
 		i = 0;
 		while(i < c.len && strchr(" \t(),.:!?;[]{}",c.data[i])==0)
 			i++;

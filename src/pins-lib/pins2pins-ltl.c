@@ -492,8 +492,8 @@ GBaddLTL (model_t model)
     GBgrowChunkMaps(ltlmodel, type_count);
 
     if (bool_is_new) {
-        GBchunkPutAt(ltlmodel, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        GBchunkPutAt(ltlmodel, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
+        pins_chunk_put_at (ltlmodel, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
+        pins_chunk_put_at (ltlmodel, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
     }
 
     /* Fix matrixes */

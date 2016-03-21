@@ -12,6 +12,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
+#include <pins-lib/pins-util.h>
 #include <hre/stringindex.h>
 #include <util-lib/treedbs.h>
 
@@ -45,7 +46,7 @@ torx_transition (void *arg, transition_info_t *ti, int *dst, int *cpy)
     int                 vis = 0;
     chunk               c;
     if (edge_labels > 0) {
-        c = GBchunkGet (ctx->model,
+        c = pins_chunk_get  (ctx->model,
                         lts_type_get_edge_label_typeno (ctx->ltstype, 0),
                         ti->labels[0]);
         if (c.len != strlen(LTSMIN_EDGE_VALUE_TAU) || strncmp (c.data, LTSMIN_EDGE_VALUE_TAU, c.len) != 0)

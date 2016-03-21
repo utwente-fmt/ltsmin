@@ -11,6 +11,7 @@
 #include <hre-io/user.h>
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-mucalc.h>
 #include <ltsmin-lib/mucalc-grammar.h>
 #include <ltsmin-lib/mucalc-parse-env.h>
@@ -115,7 +116,7 @@ void mucalc_print_state(log_t log, mucalc_context_t* ctx, int* state)
                 break;
                 default:
                 {
-                    chunk c = GBchunkGet(ctx->parent, type_no, GBchunkPrettyPrint(ctx->parent, i, state[i]));
+                    chunk c = pins_chunk_get (ctx->parent, type_no, GBchunkPrettyPrint(ctx->parent, i, state[i]));
                     char value[c.len*2+6];
                     chunk2string(c, sizeof value, value);
                     Printf(log, "%s=%s", name, value);
@@ -156,7 +157,7 @@ void mucalc_cb (void* context, transition_info_t* ti, int* dst, int* cpy) {
     else if (node.expression->value!=-1 && ctx->action_label_index!=-1)
     {
         int* edge_labels = ti->labels;
-        chunk c = GBchunkGet(parent, ctx->action_label_type_no, edge_labels[ctx->action_label_index]);
+        chunk c = pins_chunk_get (parent, ctx->action_label_type_no, edge_labels[ctx->action_label_index]);
         char label[c.len*2+6];
         chunk2string(c, sizeof label, label);
         assert(strlen(label) >= 2);
@@ -830,7 +831,7 @@ void mucalc_add_proposition_values(model_t model)
                     char decode[len];
                     chunk data={.data=decode,.len=len};
                     string2chunk(value, &data);
-                    env->propositions[p].value_idx = GBchunkPut(model, env->propositions[p].state_typeno, data);
+                    env->propositions[p].value_idx = pins_chunk_put (model, env->propositions[p].state_typeno, data);
                     Print(infoLong, "State part %d matches the proposition id %s. Value stored at index %d.", i, id, env->propositions[p].value_idx);
                 }
                 else

@@ -1,12 +1,13 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <hre/config.h>
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <dm/dm.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/dlopen-pins.h>
 #include <pins-lib/dlopen-api.h>
+#include <pins-lib/pins-util.h>
 #include <util-lib/rationals.h>
-#include <hre/stringindex.h>
 #include <scoop.h>
 
 static int check_confluence=0;
@@ -158,19 +159,19 @@ void write_reward_label(char *str,int*label){
 }
 
 int action_get_index(char* val){
-    int res=GBchunkPut(main_model,action_type,chunk_str(val));
+    int res=pins_chunk_put (main_model,action_type,chunk_str(val));
 //    Warning(info,"get action index for %s : %d",val,res);
     return res;
 }
 
 int term_get_index(int pos,char* val){
-    int res=GBchunkPut(main_model,state_type[pos],chunk_str(val));
+    int res=pins_chunk_put (main_model,state_type[pos],chunk_str(val));
 //    Warning(info,"get %d index (%d) for %s : %d",pos,state_type[pos],val,res);
     return res;
 }
 
 char* term_get_value(int pos,int idx){
-    chunk res=GBchunkGet(main_model,state_type[pos],idx);
+    chunk res=pins_chunk_get (main_model,state_type[pos],idx);
 //    Warning(info,"lookup %d index (%d) for %d : %s",pos,state_type[pos],idx,res.data);
     return res.data;
 }
@@ -393,8 +394,8 @@ void common_load_model(model_t model,const char*name,int mapa){
     }
 
 	GBsetLTStype(model,ltstype);
-    GBchunkPutAt(model,bool_type,chunk_str("F"),0);
-    GBchunkPutAt(model,bool_type,chunk_str("T"),1);
+    pins_chunk_put_at (model,bool_type,chunk_str("F"),0);
+    pins_chunk_put_at (model,bool_type,chunk_str("T"),1);
 
     GBsetMatrix(model,LTSMIN_EDGE_TYPE_ACTION_CLASS,&context->class_matrix,PINS_STRICT,PINS_INDEX_OTHER,PINS_INDEX_GROUP);
     

@@ -14,6 +14,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/hashtable.h>
 #include <pins-lib/opaal-pins.h>
+#include <pins-lib/pins-util.h>
 #include <util-lib/chunk_support.h>
 #include <util-lib/util.h>
 
@@ -111,7 +112,7 @@ sl_long_p (model_t model, int label, int *state)
         void **lattice = (void **) &state[lattice_idx];
         const char* type_value = lattice_print(*lattice);
         chunk c = chunk_str((char*)type_value);
-        size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
+        size_t chunk_idx = pins_chunk_put (model, ctx->lattice_type, c);
         return chunk_idx;
     } else {
         Abort("unexpected state label requested: %d", label);
@@ -132,7 +133,7 @@ sl_all_p (model_t model, int *state, int *labels)
     void **lattice = (void **) &state[lattice_idx];
     const char* type_value = lattice_print(*lattice);
     chunk c = chunk_str((char*)type_value);
-    size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
+    size_t chunk_idx = pins_chunk_put (model, ctx->lattice_type, c);
 
     labels[ctx->lattice_label_idx] = chunk_idx;
 }
@@ -150,7 +151,7 @@ sl_long_p_g (model_t model, int label, int *state)
         void **lattice = (void **) &state[lattice_idx];
         const char* type_value = lattice_print(*lattice);
         chunk c = chunk_str((char*)type_value);
-        size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
+        size_t chunk_idx = pins_chunk_put (model, ctx->lattice_type, c);
         return chunk_idx;
     } else {
         return get_guard(model, label, state);
@@ -170,7 +171,7 @@ sl_all_p_g (model_t model, int *state, int *labels)
     void **lattice = (void **) &state[lattice_idx];
     const char* type_value = lattice_print(*lattice);
     chunk c = chunk_str((char*)type_value);
-    size_t chunk_idx = GBchunkPut(model, ctx->lattice_type, c);
+    size_t chunk_idx = pins_chunk_put (model, ctx->lattice_type, c);
 
     labels[ctx->lattice_label_idx] = chunk_idx;
 }
@@ -525,13 +526,13 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
         int type_value_count = get_state_variable_type_value_count(i);
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = get_state_variable_type_value(i, j);
-            GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
+            pins_chunk_put_at (model, i, chunk_str((char*)type_value), j);
         }
     }
 
     if (bool_is_new) {
-        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        GBchunkPutAt(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
+        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
+        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
     }
 
     lts_type_validate(ltstype);

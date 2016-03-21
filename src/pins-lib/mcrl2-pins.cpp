@@ -20,6 +20,8 @@ extern "C" {
 #include <dm/dm.h>
 #include <hre/user.h>
 #include <pins-lib/mcrl2-pins.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins-util.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 }
 
@@ -132,7 +134,7 @@ public:
             break;
         }
 
-        chunk c = GBchunkGet (model_, pt, idx);
+        chunk c = pins_chunk_get (model_, pt, idx);
         if (c.len == 0)
             Abort ("lookup of %d failed", idx);
 
@@ -140,7 +142,7 @@ public:
 
         std::string pretty = data_type(mt).print(data_type(mt).deserialize(s));
 
-        int pidx = GBchunkPut (model_, pt,
+        int pidx = pins_chunk_put (model_, pt,
                                        chunk_str(const_cast<char*>(pretty.c_str())));
         return pidx;
     }
@@ -171,7 +173,7 @@ public:
         if (finite_types && format == LTStypeEnum)
             Abort("lookup of %s failed", c.c_str());
 
-        int pidx = GBchunkPut (model_, pt,
+        int pidx = pins_chunk_put (model_, pt,
                                chunk_str(const_cast<char*>(c.c_str())));
         map_[mt].resize (pidx + 1, IDX_NOT_FOUND);
         map_[mt][pidx] = idx;
@@ -194,7 +196,7 @@ public:
             && map_[mt][idx] != IDX_NOT_FOUND)
             return map_[mt][idx];
 
-        chunk c = GBchunkGet (model_, pt, idx);
+        chunk c = pins_chunk_get (model_, pt, idx);
         if (c.len == 0)
             Abort ("lookup of %d failed", idx);
 
@@ -243,8 +245,8 @@ public:
             if (it != rmap_[mt].end())
                 continue;
 
-            int pidx = GBchunkPut(model_, pt,
-                                  chunk_str(const_cast<char*>((*i).c_str())));
+            int pidx = pins_chunk_put (model_, pt,
+                                       chunk_str(const_cast<char*>((*i).c_str())));
 
             map_[mt].resize (pidx + 1, IDX_NOT_FOUND);
             map_[mt][pidx] = midx;
@@ -555,9 +557,9 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
 #ifdef MCRL2_GUARDS
 
     if (guard_is_new) {
-        GBchunkPutAt(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-        GBchunkPutAt(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE),  1);
-        GBchunkPutAt(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
+        pins_chunk_put_at(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+        pins_chunk_put_at(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE),  1);
+        pins_chunk_put_at(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
     }
 
     // init state labels

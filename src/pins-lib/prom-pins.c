@@ -11,6 +11,7 @@
 #include <hre/runtime.h>
 #include <hre/unix.h>
 #include <ltsmin-lib/ltsmin-standard.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/prom-pins.h>
 #include <util-lib/chunk_support.h>
 #include <util-lib/util.h>
@@ -353,9 +354,9 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetActionsLong (model, prom_get_actions);
 
     if (guard_is_new) {
-        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE ), 1);
-        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
+        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE ), 1);
+        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
     }
 
     // setting values for types
@@ -363,7 +364,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         int type_value_count = prom_get_type_value_count(i);
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = prom_get_type_value_name(i, j);
-            GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
+            pins_chunk_put_at (model, i, chunk_str((char*)type_value), j);
         }
     }
 

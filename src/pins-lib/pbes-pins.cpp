@@ -18,8 +18,9 @@ extern "C" {
 
 #include <hre/user.h>
 #include <pins-lib/pbes-pins.h>
-#include <pins-lib/pins.h>
 #include <pins-lib/pg-types.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins-util.h>
 
 } // end of extern "C"
 
@@ -100,7 +101,7 @@ public:
 
     inline int put_chunk(int type_no, std::string value)
     {
-        int index = GBchunkPut(model_, type_no, chunk_str(const_cast<char*>(value.c_str())));
+        int index = pins_chunk_put(model_, type_no, chunk_str(const_cast<char*>(value.c_str())));
         return index;
     }
 
@@ -128,7 +129,7 @@ public:
 
     inline std::string get_chunk(int type_no, int index)
     {
-        chunk c = GBchunkGet(model_, type_no, index);
+        chunk c = pins_chunk_get(model_, type_no, index);
         if (c.len == 0) {
             Abort("lookup of %d failed", index);
         }

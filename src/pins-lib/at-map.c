@@ -2,9 +2,10 @@
 
 #include <aterm2.h>
 
+#include <hre/user.h>
 #include <pins-lib/at-map.h>
 #include <pins-lib/pins.h>
-#include <hre/user.h>
+#include <pins-lib/pins-util.h>
 #include <util-lib/chunk_support.h>
 
 
@@ -61,7 +62,7 @@ ATfindIndex (at_map_t map, ATerm t)
         } else {
             tmp = ATwriteToString (t);
         }
-        int idx = GBchunkPut (map->model, map->type_no, chunk_str (tmp));
+        int idx = pins_chunk_put  (map->model, map->type_no, chunk_str (tmp));
         i = ATmakeInt (idx);
         // Warning(info,"putting %s as %d",tmp,idx);
         ATtablePut (map->aterm2int, t, (ATerm) i);
@@ -80,7 +81,7 @@ ATfindTerm (at_map_t map, int idx)
         return map->int2aterm[idx];
     ATermInt        i = ATmakeInt (idx);
     // Warning(info,"missing index %d",idx);
-    chunk           c = GBchunkGet (map->model, map->type_no, idx);
+    chunk           c = pins_chunk_get  (map->model, map->type_no, idx);
     if (c.len == 0) {
         Abort("lookup of %d failed", idx);
     }

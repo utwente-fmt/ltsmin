@@ -19,9 +19,9 @@ lookup_type_value (ltsmin_expr_t e, int type, const chunk c,
                    model_t m, bool strict)
 {
     HREassert (NULL != c.data, "Empty chunk");
-    int count = GBchunkCount(m,type);
-    e->num = GBchunkPut(m,type,c);
-    if (strict && count != GBchunkCount(m,type)) // value was added
+    int count = pins_chunk_count (m,type);
+    e->num = pins_chunk_put (m,type,c);
+    if (strict && count != pins_chunk_count (m,type)) // value was added
         Warning (info, "Value for identifier '%s' cannot be found in table for enum type '%s'.",
                  c.data, lts_type_get_type(GBgetLTStype(m),type));
     e->lts_type = type;

@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 #include <mc-lib/lb.h>
+#include <pins-lib/pins-util.h>
 #include <pins2lts-mc/algorithm/owcty.h>
 
 // TODO: reuse reachability algorithms with CNDFS recursive run structure

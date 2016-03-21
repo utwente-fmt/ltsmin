@@ -1036,21 +1036,6 @@ void GBgrowChunkMaps(model_t model, int old_n)
     RTfree (old_map);
 }
 
-void GBchunkPutAt(model_t model,int type_no,const chunk c,int pos){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-    VTputAtChunk (model->map[type_no], c, pos);
-}
-
-int GBchunkPut(model_t model,int type_no,const chunk c){
-    HREassert (model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-    VTputChunk (model->map[type_no], c);
-}
-
-chunk GBchunkGet(model_t model,int type_no,int chunk_no){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-	return VTgetChunk (model->map[type_no], chunk_no);
-}
-
 void GBsetPrettyPrint(model_t model, chunk2pretty_t chunk2pretty) {
     model->chunk2pretty = chunk2pretty;
 }
@@ -1062,17 +1047,6 @@ int GBchunkPrettyPrint(model_t model, int pos, int chunk_no){
     }
     return model->chunk2pretty(model, pos, chunk_no);
 }
-
-int GBchunkCount(model_t model,int type_no){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-	return VTgetCount (model->map[type_no]);
-}
-
-table_iterator_t GBchunkIterator(model_t model,int type_no){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-    return VTiterator (model->map[type_no]);
-}
-
 
 void GBprintDependencyMatrix(FILE* file, model_t model) {
     Printf (info, "\nDependency matrix (combined read/write):\n");
@@ -1223,7 +1197,7 @@ void chunk_table_print(log_t log, model_t model) {
     int idx = 0;
     for(int i=0;i<N;i++){
         char *type = lts_type_get_type(t, i);
-        table_iterator_t it = GBchunkIterator (model, i);
+        table_iterator_t it = pins_chunk_iterator  (model, i);
         while (IThasNext(it)) {
             chunk c = ITnext (it);
             char name[c.len*2+6];
@@ -1401,7 +1375,7 @@ GBgetUseGuards(model_t model) {
     return model->use_guards;
 }
 
-void*
+value_table_t
 GBgetChunkMap(model_t model,int type_no)
 {
     HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");

@@ -13,6 +13,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/dve-pins.h>
+#include <pins-lib/pins-util.h>
 #include <util-lib/chunk_support.h>
 
 // dve2 ltsmin interface functions
@@ -388,14 +389,14 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
         int type_value_count = get_state_variable_type_value_count(i);
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = get_state_variable_type_value(i, j);
-            GBchunkPutAt(model, i, chunk_str((char*)type_value), j);
+            pins_chunk_put_at (model, i, chunk_str((char*)type_value), j);
         }
     }
 
     if (guard_is_new) {
-        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE), 1);
-        GBchunkPutAt(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
+        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE), 1);
+        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
     }
 
     lts_type_validate(ltstype);
