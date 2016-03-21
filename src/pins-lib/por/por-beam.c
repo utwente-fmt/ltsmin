@@ -2,6 +2,7 @@
 
 #include <limits.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <time.h>
 
 #include <dm/dm.h>
@@ -168,7 +169,7 @@ update_ns_scores (por_context* ctx, search_context_t *s, int group)
 static inline bool
 select_group (por_context* ctx, search_context_t *s, int group)
 {
-    if (s->emit_status[group] & ES_QUEUED) { // already selected
+    if (s->emit_status[group] & (ES_QUEUED | ES_VISITED)) { // already selected
         Debugf ("(%d), ", group);
         return false;
     }
@@ -429,6 +430,7 @@ beam_search (por_context *ctx)
         int             group;
         while (s->work_enabled->count == 0 && s->work_disabled->count > 0) {
             group = s->work_disabled->data[--s->work_disabled->count];
+            HREassert (s->emit_status[group] & ES_QUEUED);
             if (s->emit_status[group] & ES_VISITED) continue;
             s->emit_status[group] |= ES_VISITED;
 
@@ -446,6 +448,7 @@ beam_search (por_context *ctx)
         // if the current search context has enabled transitions, handle all of them
         while (s->work_enabled->count > 0 && beam_cmp(s, beam->search[1]) <= 0) {
             group = s->work_enabled->data[--s->work_enabled->count];
+            HREassert (s->emit_status[group] & ES_QUEUED);
             if (s->emit_status[group] & ES_VISITED) continue;
             s->emit_status[group] |= ES_VISITED;
 
@@ -500,6 +503,7 @@ beam_min_invisible_group (por_context* ctx, search_context_t *s)
             min_group = group;
         }
     }
+    HREassert (min_group != -1, "No min invisible group found. %zu candidates", ctx->enabled_list->count);
     return min_group;
 }
 
@@ -512,7 +516,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
     beam_t             *beam = (beam_t *) ctx->alg;
     while (true) {
         search_context_t   *s = beam->search[0];
-        if (s->enabled->count == ctx->enabled_list->count) {
+        if (s->enabled->count == ctx->enabled_list->count || ctx->enabled_list->count <= 1) {
             Debugf ("BEAM %d needs no (invisible) key\n", s->idx);
             break;
         }
@@ -629,8 +633,7 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
     search_context_t   *s = beam->search[0];
     int emitted = 0;
     // if the score is larger then the number of enabled transitions, emit all
-    if (ctx->enabled_list->count <= 1 ||
-            s->enabled->count >= ctx->enabled_list->count) {
+    if (s->enabled->count >= ctx->enabled_list->count || ctx->enabled_list->count <= 1) {
         // return all enabled
         prov_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_all (ctx, ctx->enabled_list, &provctx, src);
