@@ -36,3 +36,4 @@ include/
 /src/ltsmin-lib/mucalc-lexer.h
 /examples/*.lps
 /examples/brp.pbes
+nbproject
