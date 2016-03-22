@@ -79,6 +79,8 @@ typedef struct beam_s {
 static inline void
 incr_ns_update (por_context *ctx, int group, int new_group_score)
 {
+    HREassert (new_group_score > 0);
+
     int oldgroup_score = ctx->group_score[group];
     if (oldgroup_score == new_group_score) return;
 
@@ -105,27 +107,29 @@ por_transition_costs (por_context *ctx)
         int visibleNes = ctx->visible_nes_enabled * ctx->ngroups
                         + bms_count (ctx->visible, VISIBLE_NES)
                         - ctx->visible_nes_enabled;
+        if (NO_DYN_VIS) {
+            visibleNes = visibleNes = visible;
+        }
+        if (NO_V) {
+            visible = visibleNes = visibleNes = ctx->enabled_list->count * ctx->ngroups;
+        }
         for (int i = 0; i < ctx->ngroups; i++) {
             int             new_score;
-            int             vis;
             if (ctx->group_status[i] == GS_DISABLED) {
                 new_score = 1;
-            } else if ((vis = ctx->visible->set[i])) {
-                if (NO_V) {
-                    new_score = ctx->enabled_list->count * ctx->ngroups;
-                } else {
-                    bool nes = vis & (1 << VISIBLE_NES);
-                    bool nds = vis & (1 << VISIBLE_NDS);
-                    if (NO_DYN_VIS || (nes && nds)) {
-                        new_score = visible;
-                    } else if (nes) {
-                        new_score = visibleNds;
-                    } else {
-                        new_score = visibleNes;
-                    }
-                }
             } else {
-                new_score = ctx->ngroups;
+                int vis = ctx->visible->set[i];
+                bool nes = (vis & (1 << VISIBLE_NES)) != 0;
+                bool nds = (vis & (1 << VISIBLE_NDS)) != 0;
+                if (vis && nes == nds) { // visible & group | visible & nes & nds
+                    new_score = visible;
+                } else if (nes) {
+                    new_score = visibleNds;
+                } else if (nds) {
+                    new_score = visibleNes;
+                } else {
+                    new_score = ctx->ngroups;
+                }
             }
             incr_ns_update (ctx, i, new_score);
         }
@@ -297,13 +301,17 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group)
     }
 
     // V proviso only for LTL
-    if ((PINS_LTL || SAFETY) && is_visible(ctx, group)) {
+    int             vis;
+    if ((PINS_LTL || SAFETY) && (vis = ctx->visible->set[group])) {
         if (NO_V) { // Use Peled's stronger visibility proviso:
             s->enabled->count = ctx->enabled_list->count; // selects all enabled
             return;
         }
         Debugf ("visible=[ ");
-        if (NO_DYN_VIS) {
+
+        bool            nes = (vis & (1 << VISIBLE_NES)) != 0;
+        bool            nds = (vis & (1 << VISIBLE_NDS)) != 0;
+        if (NO_DYN_VIS || nes == nds) { // visible & group | visible & nes & nds
             select_all (ctx, s, ctx->visible->lists[VISIBLE]);
         } else {
             int newNDS = ctx->visible_nes->set[group] ^ s->visible_nds; // g in NES ==> NDS C Ts
@@ -385,7 +393,7 @@ beam_sort (por_context *ctx)
 
     // didn't move and no more work
     if (beam->search[0] == s && s->work_disabled->count == 0 && s->work_enabled->count == 0) {
-        Debugf ("bailing out, no more work (selected: %d)\n", s->enabled->count);
+        Debugf ("bailing out, no more work (selected: %d, en-count: %d)\n", s->idx, s->enabled->count);
         HRE_ASSERT (check_sort(ctx), "unsorted!");
         return false;
     }

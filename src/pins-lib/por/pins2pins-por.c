@@ -23,7 +23,7 @@
 
 int SAFETY = 0;
 int NO_L12 = 0;
-int NO_DYN_VIS = 0;
+int NO_DYN_VIS = 1;
 int NO_V = 0;
 int NO_MCNDS = 0;
 int PREFER_NDS = 0;
@@ -132,6 +132,8 @@ struct poptOption por_options[]={
 
 /**
  * Initialize the structures to record visible groups.
+ *
+ * Disabled NDS / NES dynamic visibility. It is probably incorrect (NO_DYN_VIS == 1).
  */
 static inline void
 init_visible_labels (por_context* ctx)
@@ -170,6 +172,8 @@ init_visible_labels (por_context* ctx)
 
         HREassert (++c <= 8, "Only 8 dynamic labels supported currently.");
     }
+    ctx->visible_nes->types = c;
+    ctx->visible_nds->types = c;
     int vgroups = bms_count(ctx->visible, VISIBLE_GROUP);
     if (!NO_DYN_VIS && vgroups > 0 && vgroups != bms_count(ctx->visible, VISIBLE)) {
         Print1 (info, "Turning off dynamic visibility in presence of visible groups");
