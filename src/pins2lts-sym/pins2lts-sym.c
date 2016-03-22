@@ -782,6 +782,27 @@ learn_labels_par(vset_t states)
     for (int i = 0; i < num_inv_sl_used; i++) SYNC(eval_label);
 }
 
+static void
+inv_info_destroy(ltsmin_expr_t e, ltsmin_parse_env_t env, struct inv_check_s* c)
+{
+    switch(e->token) {
+    case PRED_NOT:
+        inv_info_destroy(e->arg1, env, c->left);
+        break;
+    case PRED_AND:
+    case PRED_OR:
+        inv_info_destroy(e->arg1, env, c->left);
+        inv_info_destroy(e->arg2, env, c->right);
+        break;
+    case PRED_SVAR:
+        vset_destroy(c->left->container);
+        RTfree(c->left);
+        break;
+    }
+    vset_destroy(c->container);
+    RTfree(c);
+}
+
 #define eval_predicate_set_par(e, env, c, s) CALL(eval_predicate_set_par, (e), (env), (c), (s))
 VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, struct inv_check_s*, c, vset_t, states)
 {
@@ -943,6 +964,8 @@ check_inv(vset_t states, const int level)
                     vset_copy(inv_expr_info[i]->container, inv_set[i]);
                     eval_predicate_set(inv_expr[i], inv_parse_env[i], states, inv_expr_info[i]);
                     if (!vset_equal(inv_set[i], inv_expr_info[i]->container)) {
+                        inv_info_destroy(inv_expr[i], inv_parse_env[i], inv_expr_info[i]);
+                        vset_destroy(inv_set[i]);
                         Warning(info, " ");
                         Warning(info, "Invariant violation (%s) found at depth %d!", inv_detect[i], level);
                         Warning(info, " ");
@@ -960,9 +983,10 @@ check_inv(vset_t states, const int level)
                             }
                             Warning(info, "continuing...")
                         }
+                    } else {
+                        vset_clear(inv_set[i]);
+                        vset_clear(inv_expr_info[i]->container);
                     }
-                    vset_clear(inv_set[i]);
-                    vset_clear(inv_expr_info[i]->container);
                 }
             }
         }
@@ -981,15 +1005,18 @@ TASK_3(int, check_inv_par_go, vset_t, states, int, i, int, level)
             else eval_predicate_set(inv_expr[i], inv_parse_env[i], states, inv_expr_info[i]);
 
             if (!vset_equal(inv_set[i], inv_expr_info[i]->container)) {
+                inv_info_destroy(inv_expr[i], inv_parse_env[i], inv_expr_info[i]);
+                vset_destroy(inv_set[i]);
                 Warning(info, " ");
                 Warning(info, "Invariant violation (%s) found at depth %d!", inv_detect[i], level);
                 Warning(info, " ");
                 inv_violated[i] = 1;
                 res = 1;
                 add_fetch(&num_inv_violated, 1);
+            } else {
+                vset_clear(inv_expr_info[i]->container);
+                vset_clear(inv_set[i]);
             }
-            vset_clear(inv_expr_info[i]->container);
-            vset_clear(inv_set[i]);
         }
     }
     return res;
