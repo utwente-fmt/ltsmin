@@ -47,8 +47,6 @@ const int*  (*get_transition_read_dependencies)(int t);
 const int*  (*get_transition_actions_read_dependencies)(int t);
 const int*  (*get_transition_may_write_dependencies)(int t);
 const int*  (*get_transition_must_write_dependencies)(int t);
-covered_by_grey_t   covered_by;
-covered_by_grey_t   covered_by_short;
 
 enum {
     SL_IDX_BUCHI_ACCEPT = 0,
@@ -559,6 +557,4 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
     GBsetNextStateAll  (model, (next_method_black_t) get_successors);
     GBsetNextStateLong (model, (next_method_grey_t)  get_successor);
     GBsetActionsLong (model, (next_method_grey_t) get_action);
-    GBsetIsCoveredBy (model, covered_by);
-    GBsetIsCoveredByShort (model, covered_by_short);
 }
