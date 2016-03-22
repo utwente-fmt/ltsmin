@@ -17,11 +17,11 @@ if HAVE_VIENNACL
 LIBS += ../dm/libdm_viennacl.la
 endif
 
+SUBDIRS  = por
+
 noinst_LTLIBRARIES  = libpins.la
 
 pkginclude_HEADERS = dlopen-api.h pins.h
-
-SUBDIRS  = por
 
 if HAVE_LIBSTEP_INFO
 noinst_LTLIBRARIES += libmcrl-pins.la
@@ -85,4 +85,5 @@ libpins_la_SOURCES += pins2pins-ltl.c
 libpins_la_SOURCES += property-semantics.c property-semantics.h
 libpins_la_CPPFLAGS = -DNXT $(AM_CPPFLAGS) -I${top_srcdir}/ltl2ba
 libpins_la_LIBADD    =
+libpins_la_LIBADD   += por/libpor.la
 libpins_la_LIBADD   += ../ltsmin-lib/libmucalc.la 
