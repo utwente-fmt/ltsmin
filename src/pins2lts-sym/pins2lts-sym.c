@@ -4121,12 +4121,12 @@ VOID_TASK_1(actual_main, void*, arg)
     if (act_detect != NULL) init_action_detection();
 
     /* initialize invariant detection */
-    int group_vis[nGrps];
-    memset(&group_vis, 0, sizeof(int[nGrps]));
+    int* group_vis = RTmalloc(sizeof(int[nGrps]));
+    memset(group_vis, 0, sizeof(int[nGrps]));
     GBsetPorGroupVisibility(model, group_vis);
 
-    int label_vis[sLbls];
-    memset(&label_vis, 0, sizeof(int[sLbls]));
+    int* label_vis = RTmalloc(sizeof(int[sLbls]));
+    memset(label_vis, 0, sizeof(int[sLbls]));
     GBsetPorStateLabelVisibility(model, label_vis);
 
     if (inv_detect != NULL) init_invariant_detection();
