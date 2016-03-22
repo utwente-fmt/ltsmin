@@ -32,8 +32,7 @@ typedef enum {
     DEL_E,  // set (EMITTED)
     DEL_Z,  // stack set
     DEL_R,  // set
-    DEL_VD,
-    DEL_VE,
+    DEL_V,
     DEL_COUNT
 } del_t;
 
@@ -46,8 +45,7 @@ struct del_ctx_s {
     int                *group_score;
     int                 invisible_enabled;
     bool                has_invisible;
-    int                 del_nes;
-    int                 del_nds;
+    bool                del_v;
 };
 
 del_ctx_t *
@@ -113,11 +111,9 @@ deletion_setup (model_t model, por_context* ctx, int* src, bool reset)
         int group = ctx->enabled_list->data[i];
         bms_push_new (del, DEL_K, group);
 
-        bool d = bms_has(ctx->visible, NO_DYN_VIS ? VISIBLE : VISIBLE_NDS, group);
-        bms_push_if (del, DEL_VD, group, d);
-        bool e = NO_DYN_VIS && bms_has(ctx->visible, VISIBLE_NES, group);
-        bms_push_if (del, DEL_VE, group, e);
-        delctx->invisible_enabled += !is_visible(ctx, group);
+        bool v = is_visible(ctx, group);
+        bms_push_if (del, DEL_V, group, v);
+        delctx->invisible_enabled += !v;
     }
     delctx->has_invisible = delctx->invisible_enabled != 0;
     Debug ("Deletion init |en| = %d \t|R| = %d",
@@ -128,7 +124,7 @@ deletion_setup (model_t model, por_context* ctx, int* src, bool reset)
  * del_nes and del_nds indicate whether the visibles have already been deleted
  */
 static inline bool
-deletion_delete (por_context* ctx, int *del_nes, int *del_nds)
+deletion_delete (por_context* ctx)
 {
     del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
     bms_t           *del = delctx->del;
@@ -173,50 +169,21 @@ deletion_delete (por_context* ctx, int *del_nes, int *del_nds)
 
         // Third, if a visible is deleted, then remove all enabled visible
         if ((SAFETY || PINS_LTL) && (NO_V ? del_enabled(ctx,z) : is_visible(ctx,z))) {
-            int newNDS = ctx->visible_nes->set[z] ^ *del_nds; // z in NES ==> Ts \ NDS(z)
-            if (NO_DYN_VIS || newNDS) {
-                for (int i = 0; i < del->lists[DEL_VD]->count; i++) {
-                    int x = del->lists[DEL_VD]->data[i];
-                    if (!NO_DYN_VIS && !(ctx->visible_nds->set[x] & newNDS))
-                        continue;
-                    if (bms_has(del, DEL_N, x) || bms_has(del, DEL_K, x)) {
-                        if (bms_rem(del, DEL_N, x)) ci_add (delctx->Nprime, x);
-                        if (bms_rem(del, DEL_K, x)) {
-                            ci_add (delctx->Kprime, x);
-                            if (bms_count(del, DEL_K) == 0) return true;
-                            delctx->invisible_enabled -= !is_visible(ctx, x);
-                            if (delctx->has_invisible && delctx->invisible_enabled == 0) return true;
-                        }
-                        if (bms_has(del,DEL_R,x)) return true; // enabled
-                        bms_push_new (del, DEL_Z, x);
+            for (int i = 0; i < del->lists[DEL_V]->count; i++) {
+                int x = del->lists[DEL_V]->data[i];
+                if (bms_has(del, DEL_N, x) || bms_has(del, DEL_K, x)) {
+                    if (bms_rem(del, DEL_N, x)) ci_add (delctx->Nprime, x);
+                    if (bms_rem(del, DEL_K, x)) {
+                        ci_add (delctx->Kprime, x);
+                        if (bms_count(del, DEL_K) == 0) return true;
+                        delctx->invisible_enabled -= !is_visible(ctx, x);
+                        if (delctx->has_invisible && delctx->invisible_enabled == 0) return true;
                     }
-                }
-                if (NO_DYN_VIS) {
-                    *del_nds = *del_nes = (1 << ctx->visible_nds->types) - 1; // all
-                } else {
-                    *del_nds |= newNDS;
+                    if (bms_has(del,DEL_R,x)) return true; // enabled
+                    bms_push_new (del, DEL_Z, x);
                 }
             }
-            int newNES = ctx->visible_nds->set[z] ^ *del_nes; // z in NDS ==> Ts \ NES(z)
-            if (!NO_DYN_VIS && newNES) {
-                for (int i = 0; i < del->lists[DEL_VE]->count; i++) {
-                    int x = del->lists[DEL_VE]->data[i];
-                    if (!NO_DYN_VIS && !(ctx->visible_nes->set[x] & newNES))
-                        continue;
-                    if (bms_has(del, DEL_N, x) || bms_has(del, DEL_K, x)) {
-                        if (bms_rem(del, DEL_N, x)) ci_add (delctx->Nprime, x);
-                        if (bms_rem(del, DEL_K, x)) {
-                            ci_add (delctx->Kprime, x);
-                            if (bms_count(del, DEL_K) == 0) return true;
-                            delctx->invisible_enabled -= !is_visible(ctx, x);
-                            if (delctx->has_invisible && delctx->invisible_enabled == 0) return true;
-                        }
-                        if (bms_has(del,DEL_R,x)) return true; // enabled
-                        bms_push_new (del, DEL_Z, x);
-                    }
-                }
-                *del_nes |= newNES;
-            }
+            delctx->del_v = true;
         }
 
         ci_add (delctx->Dprime, z);
@@ -257,8 +224,7 @@ deletion_analyze (por_context *ctx, ci_list *delete)
     if (delete->count == 0) return;
     del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
     bms_t              *del = delctx->del;
-    int                 del_nes = false;
-    int                 del_nds = false;
+    delctx->del_v = false;
 
     for (int i = 0; i < delete->count && bms_count(del, DEL_K) > 1; i++) {
         int v = delete->data[i];
@@ -270,9 +236,8 @@ deletion_analyze (por_context *ctx, ci_list *delete)
 
         Debug ("Deletion start from v = %d: |E| = %d \t|K| = %d", v, ctx->enabled_list->count, bms_count(del, DEL_K));
 
-        int             del_nes_old = del_nes;
-        int             del_nds_old = del_nds;
-        bool revert = deletion_delete (ctx, &del_nes, &del_nds);
+        int             del_v_old = delctx->del_v;
+        bool            revert = deletion_delete (ctx);
 
         while (bms_count(del, DEL_Z) != 0) bms_pop (del, DEL_Z);
 
@@ -304,17 +269,13 @@ deletion_analyze (por_context *ctx, ci_list *delete)
                     }
                 }
             }
-            del_nes &= del_nes_old; // remain only true if successfully removed before
-            del_nds &= del_nds_old; // remain only true if successfully removed before
+            delctx->del_v &= del_v_old; // remain only true if successfully removed before
         } else {
             ci_clear (delctx->Kprime);
             ci_clear (delctx->Nprime);
             ci_clear (delctx->Dprime);
         }
     }
-
-    delctx->del_nes = del_nes;
-    delctx->del_nds = del_nds;
 }
 
 static inline int
@@ -353,7 +314,7 @@ deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
         if (NO_L12) {
             provctx.force_proviso_true = del_all_stubborn(ctx,ctx->enabled_list);
         } else { // Deletion guarantees that I holds, but does V hold?
-            provctx.force_proviso_true = !delctx->del_nds && !delctx->del_nes;
+            provctx.force_proviso_true = !delctx->del_v;
             HRE_ASSERT (provctx.force_proviso_true ==
                         del_all_stubborn(ctx,ctx->visible->lists[VISIBLE]));
         }
@@ -371,13 +332,9 @@ deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
             }
             emitted += deletion_emit_new (ctx, &provctx, src);
         } else {
-            for (int i = 0; i < del->lists[DEL_VD]->count; i++) {
-                int x = del->lists[DEL_VD]->data[i];
-                del->set[x] |= 1<<DEL_R;
-            }
-            for (int i = 0; i < del->lists[DEL_VE]->count && !NO_DYN_VIS; i++) {
-                int x = del->lists[DEL_VE]->data[i];
-                del->set[x] |= 1<<DEL_R;
+            for (int i = 0; i < del->lists[DEL_V]->count; i++) {
+                int x = del->lists[DEL_V]->data[i];
+                del->set[x] |= 1 << DEL_R;
             }
             deletion_setup (model, ctx, src, false);
             deletion_analyze (ctx, ctx->enabled_list);
