@@ -792,30 +792,14 @@ VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, s
         case PRED_FALSE: {
             vset_clear(c->container);
         } break;
-        case PRED_SVAR: {
-            if (e->idx < N) { // state variable
-                Abort("Unhandled PRED_SVAR");
-            } else { // state label
-                vset_join(c->container, c->container, label_true[e->idx - N]);
-            }
-        } break;
-        case PRED_EQ: {
-            vset_join(c->container, c->container, c->left->container);
-        } break;
+        case PRED_SVAR: // assume state label
+            vset_join(c->container, c->container, label_true[e->idx - N]);            
+            break;
         case PRED_NOT: {
-            if (c->right != NULL) { // perform faster set minus for PRED_SVAR
-                /* following line is necessary, because we can't project
-                 * to a projected set. */
-                vset_project(c->right->container, states);
-                vset_minus(c->right->container, c->left->left->container);
-                vset_join(c->container, c->container, c->right->container);
-                vset_clear(c->right->container);
-            } else {
-                vset_copy(c->left->container, c->container);
-                eval_predicate_set_par(e->arg1, env, c->left, states);
-                vset_minus(c->container, c->left->container);
-                vset_clear(c->left->container);
-            }
+            vset_copy(c->left->container, c->container);
+            eval_predicate_set_par(e->arg1, env, c->left, states);
+            vset_minus(c->container, c->left->container);
+            vset_clear(c->left->container);            
         } break;
         case PRED_AND: {
             vset_copy(c->left->container, c->container);
@@ -846,55 +830,40 @@ VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, s
             HREabort (LTSMIN_EXIT_FAILURE);
     }
 }
+
 static void
 eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struct inv_check_s* c)
 {
     LACE_ME;
 
     switch (e->token) {
-        case PRED_EQ: {
-            vset_join(c->container, c->container, c->left->container);
-        } break;
         case PRED_TRUE: {
             // do nothing (c->container already contains everything)
         } break;
         case PRED_FALSE: {
             vset_clear(c->container);
         } break;
-        case PRED_SVAR: {
-            if (e->idx < N) { // state variable
-                Abort("Unhandled PRED_SVAR");
-            } else { // state label
-                /* following join is necessary because vset does not yet support
-                 * set projection of a projected set. */
-                vset_join(c->left->container, c->container, states);
-                if (inv_par) {
-                    volatile int* ptr = &label_locks[e->idx - N];
-                    while (!cas(ptr, 0, 1)) {
-                        lace_steal_random();
-                        ptr = &label_locks[e->idx - N];
-                    }
+        case PRED_SVAR: { // assume state label
+            /* following join is necessary because vset does not yet support
+             * set projection of a projected set. */
+            vset_join(c->left->container, c->container, states);
+            if (inv_par) {
+                volatile int* ptr = &label_locks[e->idx - N];
+                while (!cas(ptr, 0, 1)) {
+                    lace_steal_random();
+                    ptr = &label_locks[e->idx - N];
                 }
-                eval_label(e->idx - N, c->left->container);
-                if (inv_par) label_locks[e->idx - N] = 0;
-                vset_clear(c->left->container);
-                vset_join(c->container, c->container, label_true[e->idx - N]);
             }
+            eval_label(e->idx - N, c->left->container);
+            if (inv_par) label_locks[e->idx - N] = 0;
+            vset_clear(c->left->container);
+            vset_join(c->container, c->container, label_true[e->idx - N]);            
         } break;
         case PRED_NOT: {
-            if (c->right != NULL) { // perform faster set minus for PRED_SVAR
-                /* following line is necessary, because we can't project
-                 * to a projected set. */
-                vset_project(c->right->container, states);
-                vset_minus(c->right->container, c->left->left->container);
-                vset_join(c->container, c->container, c->right->container);
-                vset_clear(c->right->container);
-            } else {
-                vset_copy(c->left->container, c->container);
-                eval_predicate_set(e->arg1, env, states, c->left);
-                vset_minus(c->container, c->left->container);
-                vset_clear(c->left->container);
-            }
+            vset_copy(c->left->container, c->container);
+            eval_predicate_set(e->arg1, env, states, c->left);
+            vset_minus(c->container, c->left->container);
+            vset_clear(c->left->container);
         } break;
         case PRED_AND: {
             vset_copy(c->left->container, c->container);
@@ -3450,66 +3419,28 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
     if (!e) return NULL;
 
     struct inv_check_s* result = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
-    switch(e->node_type) {
-    case BINARY_OP:
-        if (e->token == PRED_EQ) {
-            if ((e->arg1->token == PRED_NUM && e->arg2->token == PRED_SVAR)) {
-                result->left = inv_info_prepare(e->arg2, env, i);
-                int val[1] = { -1 == e->num ? e->idx : e->num };
-                vset_add(result->left->container, val);
-            } else if (e->arg1->token == PRED_SVAR && e->arg2->token == PRED_NUM) {
-                result->left = inv_info_prepare(e->arg1, env, i);
-                int val[1] = { -1 == e->num ? e->idx : e->num };
-                vset_add(result->left->container, val);
-            } else Abort("unsupported sub expressions for ==");
-            result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
-        } else {
-            result->left = inv_info_prepare(e->arg1, env, i);
-            result->right = inv_info_prepare(e->arg2, env, i);
-            result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
-        }
-        break;
-    case UNARY_OP:
+    result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
+    switch(e->token) {
+    case PRED_NOT:
         result->left = inv_info_prepare(e->arg1, env, i);
-        if (e->arg1->token == PRED_EQ) { // speed up set minus
-            int proj[1];
-            if (e->arg1->arg1->token == PRED_SVAR) {
-                proj[0] = e->arg1->arg1->idx;
-            } else if (e->arg1->arg2->token == PRED_SVAR) {
-                proj[0] = e->arg1->arg2->idx;
-            } else {
-                Abort("unsupported");
-            }
-            result->right = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
-            result->right->container = vset_create(domain, 1, proj);
-        } else {
-            result->right = NULL;
-        }
-        result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
         break;
+    case PRED_AND:
+    case PRED_OR:
+        result->left = inv_info_prepare(e->arg1, env, i);
+        result->right = inv_info_prepare(e->arg2, env, i);
+        break;
+    case PRED_TRUE:
+    case PRED_FALSE:
+        break;
+    case PRED_SVAR:
+        if (e->idx >= N) {
+            result->left = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
+            result->left->container = vset_create(domain, -1, NULL);
+            break;
+        }
     default:
-        switch(e->token) {
-        case PRED_TRUE:
-        case PRED_FALSE:
-            result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
-            break;
-        case PRED_SVAR:
-            if (e->idx < N) { // state variable
-                int proj[1] = { e->idx };
-                result->container = vset_create(domain, 1, proj);
-            } else {
-                result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
-                result->left = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
-                result->left->container = vset_create(domain, -1, NULL);
-                result->right = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
-                result->right->container = vset_create(domain, l_projs[e->idx - N].len, l_projs[e->idx - N].proj);
-            }
-            break;
-        default:
-            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
-            HREabort (LTSMIN_EXIT_FAILURE);
-        }
-        break;
+        LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+        HREabort (LTSMIN_EXIT_FAILURE);
     }
     return result;
 }
