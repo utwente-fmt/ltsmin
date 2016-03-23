@@ -654,6 +654,10 @@ cndfs_reduce  (run_t *run, wctx_t *ctx)
 
     ndfs_reduce (run, ctx);
 
+    if (log_active(infoLong)) {
+        fset_print_statistics (cloc->fset, "Stack set: ");
+    }
+
     if (run->shared->rec != NULL) {
         alg_global_t           *sm = ctx->global;
         alg_reduce (run->shared->rec, sm->rec);
