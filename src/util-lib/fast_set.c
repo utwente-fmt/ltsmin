@@ -179,10 +179,9 @@ fset_find_loc (fset_t *dbs, mem_hash_t mem, void *key, size_t *ref,
 {
     size_t              k = dbs->key_length;
     mem |= FULL;
-    if (tomb) *tomb = NONE;
+    *tomb = NONE;
     mem_hash_t          h = mem;
     size_t              rh = 0;
-    size_t              todos = 0;
     dbs->lookups++;
     //Debug ("Locating key %zu,%zu with hash %u", ((size_t*)data)[0], ((size_t*)data)[1], mem);
     while (rh++ <= 1000) {
@@ -192,25 +191,18 @@ fset_find_loc (fset_t *dbs, mem_hash_t mem, void *key, size_t *ref,
         for (size_t i = 0; i < CACHE_LINE_MEM_SIZE; i++) {
             dbs->probes++;
             if (*memoized(dbs,*ref) == TOMB) {
-                dbs->todo[todos++] = *ref;
                 if (*tomb == NONE)
                     *tomb = *ref; // first found tombstone
             } else if (*memoized(dbs,*ref) == EMPTY) {
-                for (size_t i = 0; i < todos; i++) { // wipe out tail of tombs
-                    *memoized(dbs,dbs->todo[i]) = EMPTY;
-                    dbs->tombs--;
-                }
                 return false;
             } else { // bucket is filled:
-                if ((*memoized(dbs,*ref) & dbs->mask) != *ref) // not in home loc
-                    todos = 0;
-                if ( (mem == *memoized(dbs,*ref)) && (k == 0 ||
-                        memcmp (key, bucket(dbs,dbs->data,*ref), k) == 0) )
+                if ( mem == *memoized(dbs,*ref) &&
+                     memcmp (key, bucket(dbs,dbs->data,*ref), k) == 0 ) {
                     return true;
+                }
             }
             *ref = (*ref+1 == line_end ? line_begin : *ref+1); // next in line
         }
-        todos = 0;
         h = rehash (h, mem);
     }
     return FSET_FULL;
@@ -271,8 +263,8 @@ fset_find (fset_t *dbs, mem_hash_t *mem, void *key, void **data,
     mem_hash_t          tomb = NONE;
     size_t              k = dbs->key_length;
     HREassert (k != 0 || (key == NULL && mem != NULL && *mem != FULL), "Called keyless fast set with key or wrong hash");
-    mem_hash_t          h = (mem == NULL ? MurmurHash64(key, k, 0) : *mem);
-    bool                found = fset_find_loc (dbs, h, key, &ref, &tomb);
+    mem_hash_t          m = (mem == NULL ? MurmurHash64(key, k, 0) : *mem);
+    bool                found = fset_find_loc (dbs, m, key, &ref, &tomb);
 
     if (insert_absert && !found) {
         // insert:
@@ -282,19 +274,19 @@ fset_find (fset_t *dbs, mem_hash_t *mem, void *key, void **data,
         }
         if (dbs->key_length)
             memcpy (bucket(dbs, dbs->data, ref), key, k);
-        *memoized(dbs, ref) = h | FULL;
+        *memoized(dbs, ref) = m | FULL;
         dbs->load++;
         dbs->max_load = max (dbs->max_load, dbs->load);
         if (((dbs->tombs) << 1) > dbs->size) {
             bool res = resize (dbs, REHASH);                // >50% tombs ==> rehash
             HREassert (res, "Cannot rehash table?");
-            fset_find_loc (dbs, h, key, &ref, &tomb); // update ref
+            fset_find_loc (dbs, m, key, &ref, &tomb); // update ref
         } else if (((dbs->load + dbs->tombs) << 2) > dbs->size3) {
             if (!resize(dbs, GROW)) {                       // > 75% full ==> grow
                 Debug ("Hash table almost full (size = %zu, load = %zu, tombs = %zu)",
                        dbs->size, dbs->load, dbs->tombs);
             }
-            fset_find_loc (dbs, h, key, &ref, &tomb); // update ref
+            fset_find_loc (dbs, m, key, &ref, &tomb); // update ref
         }
     }
 
@@ -332,6 +324,7 @@ fset_create (size_t key_length, size_t data_length, size_t init_size,
 {
     HREassert (true == 1);
     HREassert (false == 0);
+    HREassert (key_length > 0);
     HREassert (sizeof(mem_hash_t) == 4);// CACHE_MEM
     HREassert (max_size < 32);          // FULL bit
     HREassert (init_size <= max_size);  // precondition
@@ -341,10 +334,8 @@ fset_create (size_t key_length, size_t data_length, size_t init_size,
     dbs->data_length = data_length;
     dbs->total_length = data_length + key_length;
     dbs->size_max = 1UL << max_size;
-    if (dbs->total_length) {
-        dbs->data = RTalign (CACHE_LINE_SIZE, dbs->total_length * dbs->size_max);
-        dbs->todo_data = RTalign (CACHE_LINE_SIZE, dbs->total_length * dbs->size_max);
-    }
+    dbs->data = RTalign (CACHE_LINE_SIZE, dbs->total_length * dbs->size_max);
+    dbs->todo_data = RTalign (CACHE_LINE_SIZE, dbs->total_length * dbs->size_max);
     dbs->hash = RTalignZero (CACHE_LINE_SIZE, sizeof(mem_hash_t) * dbs->size_max);
     dbs->todo = RTalign (CACHE_LINE_SIZE, 2 * sizeof(mem_hash_t) * dbs->size_max);
     dbs->delled_data = RTalign (CACHE_LINE_SIZE, data_length);
