@@ -84,7 +84,7 @@ options_static_init      (model_t model, bool timed)
             Abort ("POR with more than one worker only works in CNDFS!");
         if (proviso == Proviso_None) {
             Warning (info, "Forcing use of the an ignoring proviso");
-            proviso = strategy[0] & ~Strat_CNDFS ? Proviso_CNDFS : Proviso_Stack;
+            proviso = strategy[0] & Strat_CNDFS ? Proviso_CNDFS : Proviso_Stack;
         }
         if (proviso != Proviso_ForceNone) {
             if ((strategy[0] & Strat_CNDFS) && proviso != Proviso_CNDFS)

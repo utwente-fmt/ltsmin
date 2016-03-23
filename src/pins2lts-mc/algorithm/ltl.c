@@ -8,6 +8,7 @@
 
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins2lts-mc/algorithm/ltl.h>
+#include <pins2lts-mc/parallel/global.h>
 
 int              ecd = 1;
 
@@ -56,6 +57,10 @@ find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack)
         Warning (infoLong, "%zu\t(%zu),", ctx.state->ref, level - i);
         int val = SIputC (ctx.si, state.data, sizeof(struct val_s));
         trace[level - i - 1] = (ref_t) val;
+    }
+    if (trace[level-1] != level - 2) {
+        Warning (error, "Trace has no cycle. Writing erroneous trace for debugging purposes.");
+        global->exit_status = LTSMIN_EXIT_FAILURE;
     }
     trc_env_t          *trace_env = trc_create (model, get_stack_state, &ctx);
     Warning (info, "Writing trace to %s", trc_output);
