@@ -155,6 +155,7 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
     HREassert (cloc->accepting_depth > 0);
     size_t             *level;
     int onstack = fset_find (cloc->fset, NULL, &successor->ref, (void**)&level, false);
+    HREassert (onstack != FSET_FULL);
 
     if ( onstack && *level < cloc->accepting_depth )
         ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
@@ -191,6 +192,7 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
 
     size_t             *level;
     int onstack = fset_find (cloc->fset, NULL, &successor->ref, (void**)&level, false);
+    HREassert (onstack != FSET_FULL);
 
     /**
      * The following lines bear little resemblance to the algorithms in the
@@ -341,11 +343,12 @@ on_stack_accepting_up (wctx_t *ctx, int *accepting)
     size_t                 *depth;
     bool                    on_stack;
     on_stack = fset_find (cloc->fset, NULL, &ctx->state->ref, (void**)&depth, true);
+    HREassert (on_stack != FSET_FULL);
     if (!on_stack) {
+        *accepting = pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) != 0;
         Debug ("Added state %zu %s with depth %zu accepting depth",
                ctx->state->ref, (*accepting ? "(accepting)" : ""), cloc->accepting_depth);
         *depth = cloc->accepting_depth; // write currect accepting depth
-        *accepting = pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) != 0;
         cloc->accepting_depth += *accepting;
     }
     return on_stack;
@@ -360,6 +363,7 @@ endfs_red (wctx_t *ctx)
     size_t              seed_level = dfs_stack_nframes (loc->stack);
     int                 accepting = 0;
     int                 on_stack;
+    size_t              count = fset_count(cloc->fset);
 
     size_t               *level;
     while ( !run_is_stopped(ctx->run) ) {
@@ -368,8 +372,11 @@ endfs_red (wctx_t *ctx)
             state_info_deserialize (ctx->state, state_data);
 
             // seed is only state on both cyan and pink stack
-            on_stack = ctx->state->ref != loc->seed->ref ||
-                       fset_find (cloc->fset, NULL, &ctx->state->ref, (void**)&level, false);
+            on_stack = ctx->state->ref != loc->seed->ref;
+            if (!on_stack) {
+                on_stack = fset_find (cloc->fset, NULL, &ctx->state->ref, (void**)&level, false);
+                HREassert (on_stack != FSET_FULL);
+            }
 
             if (!on_stack && state_store_get_colors(ctx->state->ref) != CRED) {
                 on_stack_accepting_up (ctx, &accepting); //add to stack
@@ -404,6 +411,9 @@ endfs_red (wctx_t *ctx)
 
             dfs_stack_pop (loc->stack);
         }
+    }
+    if (!run_is_stopped(ctx->run)) {
+        HREassert (fset_count(cloc->fset) == count);
     }
 }
 
@@ -490,6 +500,9 @@ endfs_blue (run_t *run, wctx_t *ctx)
             dfs_stack_pop (loc->stack);
         }
     }
+
+    if (!run_is_stopped(ctx->run))
+        HREassert (fset_count(cloc->fset) == 0);
 
     // if the recursive strategy uses global bits (global pruning)
     // then do simple load balancing (only for the top-level strategy)
@@ -671,7 +684,10 @@ cndfs_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
     cndfs_alg_local_t  *cloc = (cndfs_alg_local_t *) ctx->local;
 
     void               *level;
-    seen = seen && fset_find (cloc->fset, NULL, &ref, &level, false);
+    if (!seen) {
+        seen = fset_find (cloc->fset, NULL, &ref, &level, false);
+        HREassert (seen != FSET_FULL);
+    }
     if (seen) return 1;
 
     uint32_t old = state_store_get_colors (ref) & 3;

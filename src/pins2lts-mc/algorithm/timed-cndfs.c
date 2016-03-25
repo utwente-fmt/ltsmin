@@ -250,6 +250,7 @@ ta_cndfs_previous (wctx_t *ctx, state_info_t *s)
     }
     void              *data;
     int res = fset_find (loc->cyan2, &hash, &s->ref, &data, false);
+    HREassert (res != FSET_FULL, "Cyan2 table full");
     HREassert (res, "state %zu not in Cyan2 table", s->ref);
     *(lm_loc_t *)data = loc->lloc;      // write new current pointer to hash map
 }
@@ -262,6 +263,7 @@ ta_cndfs_subsumes_cyan (wctx_t *ctx, state_info_t *s)
     hash32_t            hash = ref_hash (s->ref);
     void               *data;
     int res = fset_find (ta_loc->cyan2, &hash, &s->ref, &data, false);
+    HREassert (res != FSET_FULL, "Cyan2 table full");
     ta_loc->lloc = *(lm_loc_t *)data;
     if (!res)
         return false;
