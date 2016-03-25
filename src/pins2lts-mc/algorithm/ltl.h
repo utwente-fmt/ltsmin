@@ -33,7 +33,9 @@ static inline bool
 ecd_has_state (fset_t *table, state_info_t *s)
 {
     hash32_t            hash = ref_hash (s->ref);
-    return fset_find (table, &hash, &s->ref, NULL, false);
+    int seen = fset_find (table, &hash, &s->ref, NULL, false);
+    HREassert (seen != FSET_FULL);
+    return seen;
 }
 
 static inline uint32_t

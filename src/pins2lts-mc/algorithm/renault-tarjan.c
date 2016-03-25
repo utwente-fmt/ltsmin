@@ -176,6 +176,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     hash  = ref_hash (successor->ref);
     found = fset_find (loc->visited_states, &hash, &successor->ref,
                        (void **)&addr, false);
+    HREassert (found != FSET_FULL);
 
     if (found) {
         // previously visited state ==> update lowlink and unite state
@@ -302,6 +303,7 @@ move_tarjan (wctx_t *ctx, state_info_t *state, raw_data_t state_data)
     hash  = ref_hash (state->ref);
     found = fset_find (loc->visited_states, &hash, &state->ref,
                        (void**) &addr, false);
+    HREassert (found != FSET_FULL);
     HREassert (*addr == state_data, "Wrong addr?");
     HREassert (found, "Could not find key in set");
     *addr = tarjan_loc;
@@ -432,6 +434,7 @@ renault_run  (run_t *run, wctx_t *ctx)
             on_stack = fset_find (loc->visited_states, &hash,
                                   &ctx->state->ref, (void **) &addr, true);
 
+            HREassert (on_stack != FSET_FULL);
             if (!on_stack) {
                 // unseen state ==> initialize and explore
 

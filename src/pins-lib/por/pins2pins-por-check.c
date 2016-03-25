@@ -490,6 +490,7 @@ do_dfs_over_ns (dlk_check_context_t *ctx)
             check_commute (ctx, state); // empty tgt_out
 
             int seen = fset_find (ctx->set, NULL, state, NULL, true);
+            HREassert (seen != FSET_FULL);
             if (seen) {
                 dfs_stack_leave (ctx->tgt_in_stack);
                 dfs_stack_leave (ctx->stack); // throw away NS successors (next)
