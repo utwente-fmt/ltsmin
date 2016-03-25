@@ -108,8 +108,8 @@ por_popt (poptContext con, enum poptCallbackReason reason,
 
 struct poptOption por_options[]={
     {NULL, 0, POPT_ARG_CALLBACK, (void *)por_popt, 0, NULL, NULL},
-    { "por", 'p', POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL | POPT_ARGFLAG_SHOW_DEFAULT,
-      &algorithm, 0, "enable partial order reduction", "<|heur|del|scc>" },
+    { "por", 'p', POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL,
+      &algorithm, 0, "enable partial order reduction", "<heur|del> (default: heur)" },
     { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL , &weak , 0 , "Weak stubborn set theory" , NULL },
     { "leap" , 0, POPT_ARG_VAL  | POPT_ARGFLAG_OPTIONAL , &leap , 1 , "Leaping POR (Cartesian product of several disjoint stubborn sets)" , NULL },
 
