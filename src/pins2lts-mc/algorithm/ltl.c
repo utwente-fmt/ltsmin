@@ -58,7 +58,7 @@ find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack)
         int val = SIputC (ctx.si, state.data, sizeof(struct val_s));
         trace[level - i - 1] = (ref_t) val;
     }
-    if (trace[level-1] != level - 2) {
+    if (trace[level-1] >= level - 1) {
         Warning (error, "Trace has no cycle. Writing erroneous trace for debugging purposes.");
         global->exit_status = LTSMIN_EXIT_FAILURE;
     }
