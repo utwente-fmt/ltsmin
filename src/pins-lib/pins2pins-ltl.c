@@ -82,8 +82,8 @@ struct poptOption ltl_options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void *)ltl_popt, 0, NULL, NULL},
     {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "LTL formula or file with LTL formula",
      "<ltl-file>.ltl|<ltl formula>"},
-    {"ltl-semantics", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &ltl_semantics_name, 0,
-     "LTL semantics", "<spin|textbook|ltsmin>"},
+    {"ltl-semantics", 0, POPT_ARG_STRING, &ltl_semantics_name, 0,
+     "LTL semantics", "<spin|textbook|ltsmin> (default: \"spin\")"},
     {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
      "Buchi automaton type", "<ba|tgba|spotba>"},
     POPT_TABLEEND
@@ -776,6 +776,13 @@ GBaddLTL (model_t model)
         GBsetNextStateAll   (ltlmodel, ltl_textbook_all);
         break;
     default: Abort("Unknown LTL semantics.");
+    }
+
+    int        *cur_visibility = GBgetPorGroupVisibility  (model);
+    if (cur_visibility && new_ngroups != groups) {
+        int        *group_visibility = RTmallocZero( new_ngroups * sizeof(int) );
+        memcpy (group_visibility, cur_visibility, sizeof(int[groups]));
+        GBsetPorGroupVisibility  (ltlmodel, group_visibility);
     }
 
     GBinitModelDefaults (&ltlmodel, model);
