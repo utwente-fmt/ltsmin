@@ -1,12 +1,14 @@
 #include <hre/config.h>
 
-#include <stdlib.h>
-
-#include <pins-lib/pins.h>
 #include <pthread.h> // for pthread_key thread-specific variables
+#include <stdlib.h>
+#include <sys/socket.h> // for AF_UNIX etc
+
 #include <hre-io/user.h> // for streaming
 #include <ltsmin-lib/ltsmin-standard.h> // for LTSMIN_EXIT_FAILURE
-#include <sys/socket.h> // for AF_UNIX etc
+#include <pins-lib/pins.h>
+#include <pins-lib/pins2pins-fork.h>
+
 
 /**
  * Wraps a PINS interface in a separate process, communicating over UNIX socket

@@ -2,10 +2,11 @@
 
 #include <stdlib.h>
 
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/pins2pins-cache.h>
 #include <util-lib/dynamic-array.h>
-#include <hre/stringindex.h>
 
 static const int EL_OFFSET = 1;
 

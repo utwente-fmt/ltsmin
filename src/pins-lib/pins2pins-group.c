@@ -11,11 +11,12 @@
 #include <dm/dm.h>
 #include <hre/unix.h>
 #include <hre/user.h>
-#include <pins-lib/pins.h>
 #include <ltsmin-lib/lts-type.h>
+#include <ltsmin-lib/ltsmin-standard.h>
+#include <pins-lib/pins.h>
+#include <pins-lib/pins2pins-group.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/util.h>
-#include <ltsmin-lib/ltsmin-standard.h>
 
 #ifdef HAVE_BOOST
 #include <dm/dm_boost.h>

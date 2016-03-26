@@ -26,6 +26,7 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/property-semantics.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>

@@ -8,6 +8,7 @@
 #include <pins-lib/dlopen-api.h>
 #include <pins-lib/pins-util.h>
 #include <util-lib/rationals.h>
+#include <pins-lib/pins2pins-cache.h>
 #include <scoop.h>
 
 static int check_confluence=0;
