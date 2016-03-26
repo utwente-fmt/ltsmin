@@ -79,6 +79,14 @@ pins_get_accepting_state_label_index (model_t model)
     lts_type_t          ltstype = GBgetLTStype (model);
     return lts_type_find_state_label (ltstype, LTSMIN_STATE_LABEL_ACCEPTING);
 }
+
+int
+pins_get_weak_ltl_progress_state_label_index (model_t model)
+{
+    lts_type_t          ltstype = GBgetLTStype (model);
+    return lts_type_find_state_label (ltstype, LTSMIN_STATE_LABEL_WEAK_LTL_PROGRESS);
+}
+
 int
 pins_get_progress_state_label_index (model_t model)
 {
@@ -113,6 +121,13 @@ int
 pins_state_is_progress (model_t model, int *src)
 {
     int label = pins_get_progress_state_label_index (model);
+    return evalBoolGuard (label, model, src);
+}
+
+int
+pins_state_is_weak_ltl_progress (model_t model, int *src)
+{
+    int label = pins_get_weak_ltl_progress_state_label_index (model);
     return evalBoolGuard (label, model, src);
 }
 

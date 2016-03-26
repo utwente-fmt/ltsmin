@@ -46,6 +46,19 @@ typedef struct dfs_fifo_reduced_s {
 #define setV GRED
 #define setF GGREEN
 
+static inline bool
+has_progress (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
+{
+    df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
+    if (PINS_LTL) {
+        return pins_state_is_weak_ltl_progress (ctx->model, state_info_state (successor));
+    } else if (loc->progress_trans > 0) {
+        return loc->progress[ti->group] ; // ! progress transition
+    } else {
+        return pins_state_is_progress (ctx->model, state_info_state (successor));
+    }
+}
+
 static void
 construct_np_lasso (wctx_t* ctx, state_info_t* successor)
 {
@@ -98,11 +111,8 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
     alg_global_t       *sm = ctx->global;
     alg_shared_t       *shared = ctx->run->shared;
-    work_counter_t     *cnt = ctx->counters;
     ctx->counters->trans++;
-    bool is_progress = loc->progress_trans > 0 ? loc->progress[ti->group] : // ! progress transition
-            pins_state_is_progress(ctx->model, state_info_state(successor));     // ! progress state
-
+    bool                is_progress = has_progress (ctx, ti, successor);
 
     if (EXPECT_FALSE( trc_output && !seen && successor->ref != ctx->state->ref &&
                       ti != &GB_NO_TRANSITION )) // race, but ok:
@@ -241,6 +251,15 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
 
     loc->cyan = fset_create (sizeof(ref_t), 0, 10, 20);
+
+    if (PINS_LTL) {
+        int     label = pins_get_weak_ltl_progress_state_label_index(ctx->model);
+        HREassert (label != -1, "DFS-FIFO with LTL layer, but no special progress label found!");
+        Print1 (info, "DFS-FIFO for weak LTL, using special progress label %d", label);
+        HREassert (!PINS_POR, "DFS-FIFO for weak LTL is not supported yet in combination with POR.");
+        return;
+    }
+
     // find progress transitions
     lts_type_t      ltstype = GBgetLTStype (ctx->model);
     int             statement_label = lts_type_find_edge_label (

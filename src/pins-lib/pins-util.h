@@ -35,6 +35,11 @@ extern int pins_get_accepting_state_label_index (model_t model);
 extern int pins_get_progress_state_label_index (model_t model);
 
 /**
+ * Gets the index for the LTSMIN_STATE_LABEL_WEAK_LTL_PROGRESS (see ltsmin-standard.h)
+ */
+extern int pins_get_weak_ltl_progress_state_label_index (model_t model);
+
+/**
  * Gets the index for the LTSMIN_STATE_LABEL_VALID_END (see ltsmin-standard.h)
  */
 extern int pins_get_valid_end_state_label_index (model_t model);
@@ -48,6 +53,11 @@ extern int pins_state_is_accepting (model_t model, int *src);
 \brief Return progress/non-progress for a given state, false if undefined
 */
 extern int pins_state_is_progress (model_t model, int *src);
+
+/**
+\brief Return progress/non-progress for a given state, false if undefined
+*/
+extern int pins_state_is_weak_ltl_progress (model_t model, int *src);
 
 /**
 \brief Return valid end/invalid end for a given state, false if undefined
