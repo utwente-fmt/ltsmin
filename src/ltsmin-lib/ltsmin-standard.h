@@ -104,6 +104,9 @@ are part of a single hyper edge.
 /* progress states for livelock detection */
 #define LTSMIN_STATE_LABEL_PROGRESS     "progress_state"
 
+/* progress states for weak LTL as livelock detection (non-accepting is progress) */
+#define LTSMIN_STATE_LABEL_WEAK_LTL_PROGRESS     "weak_ltl_progress"
+
 /* SPIN's valid end states, for distinguishing between harmless and erroneous deadlocks */
 #define LTSMIN_STATE_LABEL_VALID_END    "valid_end_state"
 

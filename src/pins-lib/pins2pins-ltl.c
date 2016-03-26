@@ -22,6 +22,8 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
+#undef min
+#include <util-lib/util.h>
 
 
 static char *ltl_file = NULL;
@@ -94,12 +96,14 @@ typedef struct ltl_context {
     model_t         parent;
     int             ltl_idx;
     int             sl_idx_accept;
+    int             sl_idx_nonaccept;
     int             len;
     int             old_len;
     int             groups;
     int             old_groups;
     int             edge_labels;
     ltsmin_buchi_t *ba;
+    bool            is_weak;
 } ltl_context_t;
 
 typedef struct cb_context {
@@ -112,15 +116,23 @@ typedef struct cb_context {
     int             predicate_evals; // assume < 32 predicates..
 } cb_context;
 
+static inline int
+is_accepting (ltl_context_t *ctx, int *state)
+{
+    // state[0] must be the buchi automaton, because it's necessarily dependent
+    int val = state[ctx->ltl_idx] == -1 ? 0 : state[ctx->ltl_idx];
+    HREassert(val < ctx->ba->state_count);
+    return ctx->ba->states[val]->accept;
+}
+
 static int
 ltl_sl_short(model_t model, int label, int *state)
 {
     ltl_context_t *ctx = GBgetContext(model);
     if (label == ctx->sl_idx_accept) {
-        // state[0] must be the buchi automaton, because it's the only dependency
-        int val = state[0] == -1 ? 0 : state[0];
-        HREassert (val < ctx->ba->state_count);
-        return ctx->ba->states[val]->accept;
+        return is_accepting (ctx, state);
+    } else if (label == ctx->sl_idx_nonaccept) {
+        return !is_accepting (ctx, state);
     } else {
         return GBgetStateLabelShort(ctx->parent, label, state + 1);
     }
@@ -131,9 +143,9 @@ ltl_sl_long(model_t model, int label, int *state)
 {
     ltl_context_t *ctx = GBgetContext(model);
     if (label == ctx->sl_idx_accept) {
-        int val = state[ctx->ltl_idx] == -1 ? 0 : state[ctx->ltl_idx];
-        HREassert (val < ctx->ba->state_count);
-        return ctx->ba->states[val]->accept;
+        return is_accepting (ctx, state);
+    } else if (label == ctx->sl_idx_nonaccept) {
+        return !is_accepting (ctx, state);
     } else {
         return GBgetStateLabelLong(ctx->parent, label, state + 1);
     }
@@ -144,9 +156,10 @@ ltl_sl_all(model_t model, int *state, int *labels)
 {
     ltl_context_t *ctx = GBgetContext(model);
     GBgetStateLabelsAll(ctx->parent, state + 1, labels);
-    int val = state[ctx->ltl_idx] == -1 ? 0 : state[ctx->ltl_idx];
-    HREassert (val < ctx->ba->state_count);
-    labels[ctx->sl_idx_accept] = ctx->ba->states[val]->accept;
+    labels[ctx->sl_idx_accept] = is_accepting (ctx, state);
+    if (ctx->sl_idx_nonaccept != -1) {
+        labels[ctx->sl_idx_nonaccept] = !is_accepting (ctx, state);
+    }
 }
 
 static inline int
@@ -512,6 +525,63 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
     return atomic_read(&shared_ba);
 }
 
+typedef uint32_t visited_index_t;
+
+typedef struct scc_ctx_s {
+    ltsmin_buchi_t         *ba;
+    uint64_t                index;
+    uint64_t                scc_index;
+    visited_index_t        *vset;
+    ci_list                *stack;
+} scc_ctx_t;
+
+static bool
+scc_check_r (scc_ctx_t *ctx, int v)
+{
+    bool            root = true;
+    ctx->vset[v] = ctx->index++;
+    for (int i = 0; i < ctx->ba->states[v]->transition_count; i++) {
+        int                 w = ctx->ba->states[v]->transitions[i].to_state;
+        if (ctx->vset[w] == 0)
+            if (!scc_check_r (ctx, w)) return false;
+        root &= ctx->vset[v] <= ctx->vset[w];
+        ctx->vset[v] = min (ctx->vset[v], ctx->vset[w]);
+    }
+    if (root) {
+        size_t              acc_count = ctx->ba->states[v]->accept != 0;
+        size_t              scc_size = 1;
+        while (ci_count(ctx->stack) != 0 &&
+               ctx->vset[v] <= ctx->vset[ci_top(ctx->stack)]) {
+            int                 w = ci_pop (ctx->stack);
+            ctx->vset[w] = ctx->scc_index;
+            scc_size++;
+            acc_count += ctx->ba->states[w]->accept != 0;
+        }
+        ctx->index -= scc_size;
+        if (scc_size != acc_count && acc_count != 0) return false;
+        ctx->scc_index--;
+    } else {
+        ci_add (ctx->stack, v);
+    }
+    return true;
+}
+
+static bool
+is_weak (ltsmin_buchi_t *ba)
+{
+    visited_index_t    *seen = RTmallocZero(sizeof(uint32_t[ba->state_count]));
+    scc_ctx_t           ctx;
+    ctx.ba = ba;
+    ctx.vset = seen;
+    ctx.index = 1;
+    ctx.scc_index = ba->state_count - 1;
+    ctx.stack = ci_create (ba->state_count);
+    bool            weak = scc_check_r (&ctx, 0);
+    RTfree (seen);
+    ci_free (ctx.stack);
+    return weak;
+}
+
 /*
  * SHARED
  * por_model: if por layer is added por_model points to the model returned by the layer,
@@ -575,15 +645,28 @@ GBaddLTL (model_t model)
 
     matrix_t       *p_sl = GBgetStateLabelInfo (model);
     int             sl_count = dm_nrows (p_sl);
-    int             new_sl_count = sl_count + 1;
 
-    ctx->sl_idx_accept = sl_count;
+    ctx->is_weak = is_weak(ba);
+    int             new_sl_count;
+    if (ctx->is_weak) {
+        Print1 (info, "Weak Buchi automaton detected, adding non-accepting as progress label.");
+        new_sl_count = sl_count + 2;
+        lts_type_set_state_label_count (ltstype_new, new_sl_count);
+
+        ctx->sl_idx_nonaccept = sl_count + 1;
+        lts_type_set_state_label_name (ltstype_new, ctx->sl_idx_nonaccept, LTSMIN_STATE_LABEL_WEAK_LTL_PROGRESS);
+        lts_type_set_state_label_typeno (ltstype_new, ctx->sl_idx_nonaccept, bool_type);
+    } else {
+        ctx->sl_idx_nonaccept = -1;
+        new_sl_count = sl_count + 1;
+        lts_type_set_state_label_count (ltstype_new, new_sl_count);
+    }
 
     // add buchi label (at end)
     ctx->sl_idx_accept = sl_count;
-    lts_type_set_state_label_count (ltstype_new, new_sl_count);
     lts_type_set_state_label_name (ltstype_new, ctx->sl_idx_accept, LTSMIN_STATE_LABEL_ACCEPTING);
     lts_type_set_state_label_typeno (ltstype_new, ctx->sl_idx_accept, bool_type);
+
 
     // copy state labels
     for (int i = 0; i < sl_count; ++i) {
