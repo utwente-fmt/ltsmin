@@ -47,7 +47,7 @@ handle_error_trace (wctx_t *ctx)
     if (trc_output) {
         if (strategy[0] & Strat_TA) {
             dfs_stack_leave (sm->stack);
-            find_and_write_dfs_stack_trace (ctx->model, sm->stack);
+            find_and_write_dfs_stack_trace (ctx->model, sm->stack, false);
         } else {
             trc_env_t  *trace_env = trc_create (ctx->model, get_state, ctx);
             Warning (info, "Writing trace to %s", trc_output);
