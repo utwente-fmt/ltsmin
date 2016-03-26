@@ -24,7 +24,8 @@ typedef union trace_info_u {
     char                data[16];
 } trace_info_t;
 
-extern void find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack);
+extern void find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack,
+                                            bool is_lasso);
 
 extern void ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
                                state_info_t *cycle_closing_state);

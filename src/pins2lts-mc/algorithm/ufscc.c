@@ -716,7 +716,7 @@ report_lasso (wctx_t *ctx, ref_t accepting)
 
         Warning (info, "  ");
         Warning (info, "Writing counter example trace of length %zu", dfs_stack_size(trace_stack));
-        find_and_write_dfs_stack_trace (ctx->model, trace_stack);
+        find_and_write_dfs_stack_trace (ctx->model, trace_stack, true);
 
     } else {
         // slave

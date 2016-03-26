@@ -104,9 +104,9 @@ write_trace (trc_env_t *env, size_t trace_size, ref_t *trace)
     SIdestroy (&si);
 }
 
-void
-trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx,
-                    int level, ref_t *parent_ofs, ref_t start_idx)
+ref_t *
+trc_find_trace (ref_t dst_idx, int level, ref_t *parent_ofs, ref_t start_idx,
+                size_t *length)
 {
     rt_timer_t timer = RTcreateTimer ();
     RTstartTimer (timer);
@@ -131,7 +131,24 @@ trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx,
 
     RTstopTimer (timer);
     RTprintTimer (info, timer, "constructing the trace took");
-    trc_write_trace (env, trc_output, &trace[i], max_length - i);
+    *length = max_length - i;
+
+    ref_t              *trace2 = RTmalloc(sizeof(ref_t) * *length);
+    for (size_t x = 0; x < *length; x++) {
+        trace2[x] = trace[i + x];
+    }
+    RTfree (trace);
+    return trace2;
+}
+
+void
+trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx,
+                    int level, ref_t *parent_ofs, ref_t start_idx)
+{
+    size_t          length;
+    ref_t          *trace;
+    trace = trc_find_trace (dst_idx, level, parent_ofs, start_idx, &length);
+    trc_write_trace (env, trc_output, trace, length);
     RTfree (trace);
 }
 

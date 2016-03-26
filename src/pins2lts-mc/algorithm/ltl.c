@@ -42,7 +42,7 @@ new_state (trace_info_t     *out, state_info_t *si)
 }
 
 void
-find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack)
+find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack, bool is_lasso)
 {
     size_t              level = dfs_stack_nframes (stack) + 1;
     trace_ctx_t         ctx;
@@ -58,7 +58,7 @@ find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack)
         int val = SIputC (ctx.si, state.data, sizeof(struct val_s));
         trace[level - i - 1] = (ref_t) val;
     }
-    if (trace[level-1] >= level - 1) {
+    if (is_lasso && trace[level-1] >= level - 1) {
         Warning (error, "Trace has no cycle. Writing erroneous trace for debugging purposes.");
         global->exit_status = LTSMIN_EXIT_FAILURE;
     }
@@ -85,7 +85,7 @@ ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
         /* Write last state to stack to close cycle */
         state_data_t data = dfs_stack_push (stack, NULL);
         state_info_serialize (cycle_closing_state, data);
-        find_and_write_dfs_stack_trace (model, stack);
+        find_and_write_dfs_stack_trace (model, stack, true);
     }
 }
 

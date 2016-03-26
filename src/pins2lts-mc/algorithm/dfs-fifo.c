@@ -47,6 +47,50 @@ typedef struct dfs_fifo_reduced_s {
 #define setF GGREEN
 
 static void
+construct_np_lasso (wctx_t* ctx, state_info_t* successor)
+{
+    alg_global_t       *sm = ctx->global;
+    alg_shared_t       *shared = ctx->run->shared;
+    work_counter_t     *cnt = ctx->counters;
+    ref_t              *trace;
+    size_t              length;
+    size_t              level = cnt->level_cur;
+
+    Warning (info, " ");
+    Warning (info, "Non-progress cycle FOUND at depth %zu!", cnt->level_cur);
+    Warning (info, " ");
+
+    trace = trc_find_trace (successor->ref, level, shared->parent_ref,
+                            ctx->initial->ref, &length);
+    dfs_stack_t s = dfs_stack_create (state_info_serialize_int_size (ctx->state));
+    for (int i = 0; i < length; i++) {
+        raw_data_t d = dfs_stack_push (s, NULL);
+        state_info_set (ctx->state, trace[i], LM_NULL_LATTICE);
+        state_info_serialize (ctx->state, d);
+        dfs_stack_enter (s);
+    }
+    int idx = -1;
+    for (int i = 1; i < dfs_stack_nframes (sm->stack); i++) {
+        raw_data_t d = dfs_stack_peek_top (sm->stack, i);
+        state_info_deserialize (ctx->state, d);
+        if (ctx->state->ref == successor->ref) {
+            idx = i;
+            break;
+        }
+    }
+    HREassert(idx != -1, "Could not find successor %zu on DFS-FIFO stack.", successor->ref);
+    for (int i = idx - 1; i >= 1; i--) {
+        raw_data_t d = dfs_stack_peek_top (sm->stack, i);
+        dfs_stack_push (s, d);
+        dfs_stack_enter (s);
+    }
+    raw_data_t d = dfs_stack_push (s, NULL);
+    state_info_serialize (successor, d);
+    find_and_write_dfs_stack_trace (ctx->model, s, true);
+    dfs_stack_destroy (s);
+}
+
+static void
 dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                  int seen)
 {
@@ -67,10 +111,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (!is_progress && seen && ecd_has_state(loc->cyan, successor)) {
         global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
         if (run_stop(ctx->run)) {
-            Warning (info, " ");
-            Warning (info, "Non-progress cycle FOUND at depth %zu!", cnt->level_cur);
-            Warning (info, " ");
-            handle_error_trace (ctx);
+            construct_np_lasso (ctx, successor);
         }
     }
 
