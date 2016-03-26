@@ -10,6 +10,7 @@
 
 #include <mc-lib/treedbs-ll.h>
 #include <mc-lib/dbs-ll.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/timed.h> // LATTICE_BLOCK_SIZE
 #include <pins2lts-mc/parallel/global.h>

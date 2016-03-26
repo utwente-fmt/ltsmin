@@ -7,7 +7,14 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-cache.h>
+#include <pins-lib/pins2pins-fork.h>
+#include <pins-lib/pins2pins-group.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/pins2pins-mucalc.h>
+#include <pins-lib/pins2pins-mutex.h>
+#include <pins-lib/por/pins2pins-por.h>
+#include <pins-lib/por/pins2pins-por-check.h>
 #include <util-lib/treedbs.h>
 
 /** \file pins.c */

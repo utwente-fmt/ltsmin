@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <hre/user.h>
 
 #define max(a,b) ({ \
     typeof(a) _a = (a); \

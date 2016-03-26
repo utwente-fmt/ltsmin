@@ -21,8 +21,10 @@
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
-#include <pins-lib/property-semantics.h>
+#include <pins-lib/pins2pins-ltl.h>
 #undef min
+#include <pins-lib/por/pins2pins-por.h>
+#include <pins-lib/property-semantics.h>
 #include <util-lib/util.h>
 
 

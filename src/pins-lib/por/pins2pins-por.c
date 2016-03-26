@@ -19,7 +19,6 @@
 #include <pins-lib/por/por-leap.h>
 #include <util-lib/bitmultiset.h>
 #include <util-lib/dfs-stack.h>
-#include <util-lib/util.h>
 
 int SAFETY = 0;
 int NO_L12 = 0;

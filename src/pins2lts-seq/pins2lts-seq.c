@@ -18,6 +18,7 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <mc-lib/dbs-ll.h>
 #include <mc-lib/trace.h>
 #include <util-lib/bitset.h>

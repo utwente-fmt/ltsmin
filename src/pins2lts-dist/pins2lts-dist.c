@@ -21,6 +21,7 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/fast_hash.h>
 #include <util-lib/treedbs.h>

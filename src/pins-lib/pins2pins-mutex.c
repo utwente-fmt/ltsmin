@@ -6,6 +6,7 @@
 #include <pins-lib/pins.h>
 #include <pthread.h>
 #include <ltsmin-lib/ltsmin-standard.h> // for LTSMIN_EXIT_FAILURE
+#include <pins-lib/pins2pins-mutex.h>
 
 /**
  * Wraps a PINS interface in a mutex

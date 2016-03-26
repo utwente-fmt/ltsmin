@@ -1,12 +1,8 @@
 #ifndef PINS2PINS_POR
 #define PINS2PINS_POR
 
-#include <dm/dm.h>
-#include <hre/user.h>
-#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <util-lib/util.h>
-#include <util-lib/bitmultiset.h>
 
 
 /*
@@ -89,6 +85,35 @@
  * - detect bottom SCCs for weak cycle proviso (and communicate ignored
  * transitions to this layer?)
  *
+ */
+
+/**
+\brief The POR mode:
+
+no POR, POR, or POR with correctness check (invisible)
+*/
+
+typedef enum {
+    PINS_POR_NONE,
+    PINS_POR_ON,
+    PINS_POR_CHECK,
+} pins_por_t;
+
+/**
+ * \brief boolean indicating whether PINS uses POR
+ */
+extern pins_por_t PINS_POR;
+
+/**
+\brief Add POR layer before LTL layer
+*/
+extern model_t GBaddPOR(model_t model);
+
+extern struct poptOption por_options[];
+
+
+/**
+ * POR internals:
  */
 
 extern int NO_L12;

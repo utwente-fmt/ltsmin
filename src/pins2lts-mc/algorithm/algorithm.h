@@ -20,6 +20,7 @@
 #include <mc-lib/atomics.h>
 #include <mc-lib/stats.h>
 #include <mc-lib/trace.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/parallel/counter.h>
 #include <pins2lts-mc/parallel/global.h>
 #include <pins2lts-mc/parallel/options.h>

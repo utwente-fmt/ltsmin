@@ -198,23 +198,6 @@ typedef struct guard {
 //@{
 
 /**
-\brief The POR mode:
-
-no POR, POR, or POR with correctness check (invisible)
-*/
-
-typedef enum {
-    PINS_POR_NONE,
-    PINS_POR_ON,
-    PINS_POR_CHECK,
-} pins_por_t;
-
-/**
- * \brief boolean indicating whether PINS uses POR
- */
-extern pins_por_t PINS_POR;
-
-/**
 \brief The behaviour of the ltl buchi product
 
 PINS_LTL_TEXTBOOK adds an initial state to the model and labels
@@ -976,76 +959,6 @@ extern value_table_t GBgetChunkMap(model_t model,int type_no);
 /**
 \defgroup greybox_operators The Greybox operator suite.
 */
-
-//@{
-
-/**
-\brief Add caching of grey box short calls.
-*/
-extern model_t GBaddCache(model_t model);
-
-/**
-\brief Add LTL layer on top all other pins layers
-*/
-extern model_t GBaddLTL(model_t model);
-
-extern struct poptOption ltl_options[];
-
-/**
-\brief Add POR layer before LTL layer
-*/
-extern model_t GBaddPOR(model_t model);
-
-extern struct poptOption por_options[];
-
-/**
-\brief Add layer that checks vorrectness of POR reductions before LTL layer
-*/
-extern model_t GBaddPORCheck(model_t model);
-
-/**
-\brief Add mu-calculus layer
-*/
-extern model_t GBaddMucalc (model_t model, const char *mucalc_file);
-
-/**
-\brief Add multi-process fork wrapper
-*/
-extern model_t GBaddFork(model_t model);
-
-/**
-\brief Add mutex wrapper (for non thread-safe PINS models)
-*/
-extern model_t GBaddMutex(model_t model);
-
-
-//@{
-
-/**
-\brief Reorder and regroup transitions and state vectors
-*/
-extern model_t GBregroup(model_t model);
-
-extern struct poptOption group_options[];
-
-/**
- * \brief Returns 1 if the mucalc wrapper is active; 0 otherwise.
- */
-extern int GBhaveMucalc();
-
-/**
- * \brief Gets the number of subformulae of the mu-calculus property that is being checked.
- * Needed for the parity game solver.
- */
-extern int GBgetMucalcNodeCount(model_t model);
-
-/**
- * \brief Sets the number of subformulae of the mu-calculus property that is being checked.
- * Needed for the parity game solver.
- */
-extern void GBsetMucalcNodeCount(model_t model, int node_count);
-
-//@}
 
 /**
  * \brief Whether to use guards to speed up next-state computation.
