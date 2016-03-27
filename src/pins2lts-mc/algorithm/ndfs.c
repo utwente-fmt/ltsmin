@@ -19,8 +19,6 @@ int              all_red = 1;
 struct poptOption ndfs_options[] = {
     {"nar", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &all_red, 0,
      "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
-    {"no-ecd", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &ecd, 0,
-     "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
     POPT_TABLEEND
 };
 

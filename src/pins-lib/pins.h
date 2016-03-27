@@ -919,11 +919,6 @@ extern value_table_t GBgetChunkMap(model_t model,int type_no);
 \defgroup greybox_operators The Greybox operator suite.
 */
 
-/**
- * \brief Whether to use guards to speed up next-state computation.
- */
-extern int GBgetUseGuards(model_t model);
-
 typedef void(*ExitCB)(model_t model);
 
 /**

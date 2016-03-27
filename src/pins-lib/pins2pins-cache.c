@@ -165,8 +165,6 @@ GBaddCache (model_t model)
     GBgetInitialState (model, s0);
     GBsetInitialState (cached, s0);
 
-    GBsetDefaultFilter (cached, GBgetDefaultFilter(model));
-
     return cached;
 }
 

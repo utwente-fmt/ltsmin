@@ -10,6 +10,7 @@
 #include <pins-lib/pins2pins-cache.h>
 #include <pins-lib/pins2pins-fork.h>
 #include <pins-lib/pins2pins-group.h>
+#include <pins-lib/pins2pins-guards.h>
 #include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/pins2pins-mucalc.h>
 #include <pins-lib/pins2pins-mutex.h>
@@ -27,8 +28,8 @@ struct grey_box_model {
 	matrix_t *dm_may_write_info;
 	matrix_t *dm_must_write_info;
 	matrix_t *sl_info;
-    sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
-    guard_t** guards;
+    sl_group_t *sl_groups[GB_SL_GROUP_COUNT];
+    guard_t **guards;
     matrix_t *commutes_info; // commutes info
     matrix_t *gce_info; // guard co-enabled info
     matrix_t *dna_info; // do not accord info
@@ -39,9 +40,7 @@ struct grey_box_model {
     int *group_visibility;
     int *label_visibility;
 	int *s0;
-	int *guard_status;
-	int use_guards;
-	void*context;
+	void *context;
     next_method_grey_t next_short;
     next_method_grey_t next_short_r2w;
 	next_method_grey_t next_long;
@@ -71,8 +70,8 @@ struct grey_box_model {
 
 	ExitCB exit;
 
-	int* var_perm;
-	int* group_perm;
+	int *var_perm;
+	int *group_perm;
 };
 
 struct static_info_matrix{
@@ -496,7 +495,6 @@ model_t GBcreateBase(){
 	model->transition_in_group=transition_in_group_default;
 	model->map=NULL;
 	model->chunk_factory=NULL;
-	model->use_guards=0;
 	model->mucalc_node_count = 0;
 
 	model->static_info_index=SIcreate();
@@ -586,6 +584,9 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->gnds_info == NULL)
         GBsetGuardNDSInfo(model, GBgetGuardNDSInfo (default_src));
 
+    if (model->default_filter == NULL)
+        GBsetDefaultFilter (model, GBgetDefaultFilter(default_src));
+
     for (int i = 0; i < GBgetMatrixCount(default_src); i++) {
         const char* name = GBgetMatrixName(default_src, i);
         if (GBgetMatrixID(model, (char*) name) == SI_INDEX_FAILED) {
@@ -654,7 +655,6 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->covered_by_short == NULL)
         GBsetIsCoveredByShort(model, default_src->covered_by_short);
 
-    if (model->use_guards == 0) model->use_guards=default_src->use_guards;
     if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
 
     model->exit = wrapped_exit_default;
@@ -1148,31 +1148,11 @@ void GBprintStateLabelGroupInfo(FILE* file, model_t model) {
     }
 }
 
-int guards_all(model_t self,int*src,TransitionCB cb,void*context){
-
-    // fill guard status, request all guard values
-    GBgetStateLabelsAll (self, src, self->guard_status);
-
-    int res = 0;
-    for (size_t i = 0; i < pins_get_group_count(self); i++) {
-        guard_t *gt = self->guards[i];
-        int enabled = 1;
-        for (int j = 0; j < gt->count && enabled; j++) {
-            enabled &= self->guard_status[gt->guard[j]] != 0;
-        }
-        if (enabled) {
-            res+=self->next_long(self,i,src,cb,context);
-        }
-    }
-
-    return res;
-}
 
 /**********************************************************************
  * Grey box factory functionality
  */
 
-#define                 USE_GUARDS_OPTION "pins-guards"
 #define                 MAX_TYPES 16
 static char*            model_type[MAX_TYPES];
 static pins_loader_t    model_loader[MAX_TYPES];
@@ -1181,7 +1161,6 @@ static char            *model_type_pre[MAX_TYPES];
 static pins_loader_t    model_preloader[MAX_TYPES];
 static int              registered_pre=0;
 static int              matrix=0;
-static int              use_guards=0;
 static int              labels=0;
 static int              cache=0;
 pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
@@ -1223,6 +1202,8 @@ wrapModel(model_t model)
 {
     model = GBaddMutex(model); // Only adds mutex if PINS_REQUIRE_MUTEX_WRAPPER = 1
 
+    model = GBaddGuards (model);
+
     /* add partial order reduction */
     if (PINS_POR == PINS_POR_ON) {
         model = GBaddPOR(model);
@@ -1238,10 +1219,10 @@ wrapModel(model_t model)
     /* add mu calculus */
     if (mucalc_file) {
         if (PINS_LTL) {
-            Abort("The -mucalc option and -ltl options can not be combined.");
+            Abort("The --mucalc option and --ltl options can not be combined.");
         }
         if (PINS_POR) {
-            Abort("The -mucalc option and -por options can not be combined.");
+            Abort("The --mucalc option and --por options can not be combined.");
         }
         model = GBaddMucalc(model, mucalc_file);
     }
@@ -1312,26 +1293,6 @@ GBloadFile(model_t model, const char *filename, model_t *wrapped)
 {
     pins_loader_t   model_loader = find_loader (filename);
     model_loader (model, filename);
-
-    model->use_guards=use_guards;
-
-    /* if --pins-guards is set, then check implementation */
-    if (GBgetUseGuards(model)) {
-        /* check if a next_long function is implemented */
-        if (model->next_long == default_long) {
-            Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-        }
-
-        /* check if the implementation actually supports and exports guards */
-        sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-        if (model->guards == NULL || guards == NULL || guards->count == 0) {
-            Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-        }
-
-        model->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
-        model->next_all = guards_all;
-    }
-
     *wrapped = wrapModel(model);
 }
 
@@ -1401,19 +1362,14 @@ GBsetAccSetEdgeLabelIndex (model_t model, int idx)
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ USE_GUARDS_OPTION , 'g' , POPT_ARG_VAL , &use_guards , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
     { "mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
           "<mucalc-file>.mcf|<mucalc formula>"},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, guards_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, group_options, 0 , "Regrouping options", NULL },
-	POPT_TABLEEND	
+	POPT_TABLEEND
 };
-
-int
-GBgetUseGuards(model_t model) {
-    return model->use_guards;
-}
 
 value_table_t
 GBgetChunkMap(model_t model,int type_no)

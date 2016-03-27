@@ -79,6 +79,7 @@ libpins_la_SOURCES += pins2pins-cache.c pins2pins-cache.h
 libpins_la_SOURCES += pins2pins-fork.c pins2pins-fork.h
 libpins_la_SOURCES += pins2pins-mutex.c pins2pins-mutex.h
 libpins_la_SOURCES += pins2pins-group.c pins2pins-group.h
+libpins_la_SOURCES += pins2pins-guards.c pins2pins-guards.h
 libpins_la_SOURCES += pg-types.c pg-types.h
 libpins_la_SOURCES += pins2pins-mucalc.c pins2pins-mucalc.h
 libpins_la_SOURCES += pins2pins-ltl.c pins2pins-ltl.h
