@@ -599,8 +599,7 @@ int main(int argc, char*argv[]){
     if (ctx.mpi_me == 0)
         GBloadFileShared(model,files[0]);
     HREbarrier(HREglobal());
-    GBloadFile(model,files[0]);
-    model = GBwrapModel(model);
+    GBloadFile(model,files[0],&model);
 
     HREbarrier(HREglobal());
     Warning(info,"model created");

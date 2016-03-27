@@ -536,8 +536,7 @@ void CAESAR_INIT_GRAPH(void) {
 	                  (chunkatint_t)SIputCAt,
 	                  (get_count_t)SIgetCount);
 
-	GBloadFile(model,files[0]);
-    model = GBwrapModel(model);
+	GBloadFile(model,files[0],&model);
 
 	ltstype=GBgetLTStype(model);
 	N = lts_type_get_state_length(ltstype);

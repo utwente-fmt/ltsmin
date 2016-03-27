@@ -19,6 +19,8 @@ struct mutex_context
     size_t count;
 };
 
+int PINS_REQUIRE_MUTEX_WRAPPER = 0;
+
 static int
 mutex_next_short(model_t model, int group, int* src, TransitionCB cb, void* context)
 {
@@ -193,6 +195,8 @@ mutex_transition_in_group(model_t model, int *labels, int group)
 model_t
 GBaddMutex(model_t parent_model)
 {
+    if (!PINS_REQUIRE_MUTEX_WRAPPER) return parent_model;
+
     HREassert(parent_model != NULL, "No model");
 
     /* create new model */

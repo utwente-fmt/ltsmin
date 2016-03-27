@@ -248,10 +248,8 @@ extern pins_buchi_type_t PINS_BUCHI_TYPE;
  *
  * Given a model that has been initialized with data synchronization functions,
  * this method determines the type of model by extension and loads it.
- *
- * NOTE: Default wrappers are now applied by GBwrapModel.
  */
-void GBloadFile(model_t model, const char *filename);
+void GBloadFile(model_t model, const char *filename, model_t *wrapped);
 
 /**
 \brief Factory method for loading models concurrently.
@@ -263,14 +261,6 @@ the read-only variables of model.
 \see GBregisterPreLoader
 */
 extern void GBloadFileShared(model_t model,const char *filename);
-
-/**
- * \brief Method to wrap models according to the command line specification of users
- *
- * Given a model that has been initialized by GBloadFile, this method applies
- * the wrappers (default and command-line specified) to the model
- */
-model_t GBwrapModel(model_t model);
 
 /**
 \brief Get the basic LTS type or structure of the model.

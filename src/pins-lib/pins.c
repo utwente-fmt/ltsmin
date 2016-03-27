@@ -1221,46 +1221,11 @@ void chunk_table_print(log_t log, model_t model) {
     }
 }
 
-void
-GBloadFile(model_t model, const char *filename)
+static model_t
+wrapModel(model_t model)
 {
-    char *extension = strrchr(filename, '.');
-    if (extension) {
-        extension++;
-        for (int i = 0; i < registered; i++) {
-            if (0==strcmp (model_type[i], extension)) {
-                model_loader[i] (model, filename);
-                model->use_guards=use_guards;
+    model = GBaddMutex(model); // Only adds mutex if PINS_REQUIRE_MUTEX_WRAPPER = 1
 
-                /* if --pins-guards is set, then check implementation */
-                if (GBgetUseGuards(model)) {
-                    /* check if a next_long function is implemented */
-                    if (model->next_long == default_long) {
-                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                    }
-
-                    /* check if the implementation actually supports and exports guards */
-                    sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-                    if (model->guards == NULL || guards == NULL || guards->count == 0) {
-                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                    }
-
-                    model->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
-                    model->next_all = guards_all;
-                }
-
-                return;
-            }
-        }
-        Abort("No factory method has been registered for %s models", extension);
-    } else {
-        Abort("filename %s doesn't have an extension", filename);
-    }
-}
-
-model_t
-GBwrapModel(model_t model)
-{
     /* add partial order reduction */
     if (PINS_POR == PINS_POR_ON) {
         model = GBaddPOR(model);
@@ -1326,6 +1291,45 @@ GBwrapModel(model_t model)
     }
 
     return model;
+}
+
+void
+GBloadFile(model_t model, const char *filename, model_t *wrapped)
+{
+    char *extension = strrchr(filename, '.');
+    if (extension) {
+        extension++;
+        for (int i = 0; i < registered; i++) {
+            if (0==strcmp (model_type[i], extension)) {
+                model_loader[i] (model, filename);
+                model->use_guards=use_guards;
+
+                /* if --pins-guards is set, then check implementation */
+                if (GBgetUseGuards(model)) {
+                    /* check if a next_long function is implemented */
+                    if (model->next_long == default_long) {
+                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+                    }
+
+                    /* check if the implementation actually supports and exports guards */
+                    sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+                    if (model->guards == NULL || guards == NULL || guards->count == 0) {
+                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+                    }
+
+                    model->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
+                    model->next_all = guards_all;
+                }
+
+                return;
+            }
+        }
+        Abort("No factory method has been registered for %s models", extension);
+    } else {
+        Abort("filename %s doesn't have an extension", filename);
+    }
+
+    *wrapped = wrapModel(model);
 }
 
 void
