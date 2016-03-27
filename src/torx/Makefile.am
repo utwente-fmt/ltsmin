@@ -8,7 +8,7 @@ bin_PROGRAMS =
 # etf2torx
 bin_PROGRAMS += etf2torx
 etf2torx_SOURCES  = spec2torx.c
-etf2torx_SOURCES += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
+etf2torx_SOURCES += ../pins-lib/modules/etf-pins.c ../pins-lib/modules/etf-pins.h
 etf2torx_LDADD    = $(PINS_LIBS)
 etf2torx_LDFLAGS  = $(AM_LDFLAGS)
 etf2torx_CPPFLAGS = -DETF $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
@@ -17,7 +17,7 @@ nodist_EXTRA_etf2torx_SOURCES = ../automake-force-linker.cxx # required by Boost
 # pins2torx
 bin_PROGRAMS += pins2torx
 pins2torx_SOURCES  = spec2torx.c
-pins2torx_SOURCES += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pins2torx_SOURCES += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
 pins2torx_LDADD    = $(PINS_LIBS)
 if !BUILD_OS_IS_DARWIN
 pins2torx_LDFLAGS   = -Wl,-E $(AM_LDFLAGS)
@@ -30,7 +30,7 @@ if HAVE_DVE
 bin_PROGRAMS += dve2torx
 endif
 dve2torx_SOURCES  = spec2torx.c
-dve2torx_SOURCES += ../pins-lib/dve-pins.c ../pins-lib/dve-pins.h
+dve2torx_SOURCES += ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
 dve2torx_LDADD    = $(PINS_LIBS) $(DVE_LIBS)
 dve2torx_LDFLAGS  = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 dve2torx_CPPFLAGS = -DDIVINE $(TORX_CPPFLAGS) $(DIVINE_CPPFLAGS) $(AM_CPPFLAGS)
@@ -61,7 +61,7 @@ if HAVE_SPINS
 bin_PROGRAMS += prom2torx
 endif
 prom2torx_SOURCES  = spec2torx.c
-prom2torx_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
+prom2torx_SOURCES += ../pins-lib/modules/prom-pins.c ../pins-lib/modules/prom-pins.h
 prom2torx_LDADD    = $(PINS_LIBS) $(SPINS_LIBS)
 prom2torx_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)
 prom2torx_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(TORX_CPPFLAGS) $(AM_CPPFLAGS)

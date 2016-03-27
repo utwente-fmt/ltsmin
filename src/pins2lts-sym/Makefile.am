@@ -54,7 +54,7 @@ SYM_CPP_FLAGS += $(SYLVAN_CPPFLAGS)
 
 # etf2lts-sym
 etf2lts_sym_SOURCES   = pins2lts-sym.c
-etf2lts_sym_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
+etf2lts_sym_SOURCES  += ../pins-lib/modules/etf-pins.c ../pins-lib/modules/etf-pins.h
 etf2lts_sym_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
 etf2lts_sym_CPPFLAGS  = -DETF $(SYM_CPP_FLAGS)
 etf2lts_sym_LDFLAGS   = $(SYM_LDFLAGS)
@@ -62,7 +62,7 @@ nodist_EXTRA_etf2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pins2lts-sym
 pins2lts_sym_SOURCES   = pins2lts-sym.c
-pins2lts_sym_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pins2lts_sym_SOURCES  += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
 pins2lts_sym_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
 pins2lts_sym_CPPFLAGS  = -DPINS_DLL $(SYM_CPP_FLAGS)
 if !BUILD_OS_IS_DARWIN
@@ -106,7 +106,7 @@ nodist_EXTRA_pbes2lts_sym_SOURCES = automake-force-linker.cxx # req. by pbes
 
 # dve2lts-sym
 dve2lts_sym_SOURCES   = pins2lts-sym.c
-dve2lts_sym_SOURCES  += ../pins-lib/dve-pins.c ../pins-lib/dve-pins.h
+dve2lts_sym_SOURCES  += ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
 dve2lts_sym_LDADD     = $(PINS_LIBS)
 dve2lts_sym_LDADD    += $(VSET_LIBS) $(DVE_LIBS)
 dve2lts_sym_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(SYM_CPP_FLAGS)
@@ -115,7 +115,7 @@ nodist_EXTRA_dve2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prom2lts-sym
 prom2lts_sym_SOURCES  = pins2lts-sym.c
-prom2lts_sym_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
+prom2lts_sym_SOURCES += ../pins-lib/modules/prom-pins.c ../pins-lib/modules/prom-pins.h
 prom2lts_sym_LDADD    = $(PINS_LIBS)
 prom2lts_sym_LDADD   += $(VSET_LIBS) $(SPINS_LIBS)
 prom2lts_sym_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(SYM_CPP_FLAGS)
@@ -124,7 +124,7 @@ nodist_EXTRA_prom2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pnml2lts-sym
 pnml2lts_sym_SOURCES   = pins2lts-sym.c
-pnml2lts_sym_SOURCES  += ../pins-lib/pnml-pins.c ../pins-lib/pnml-pins.h
+pnml2lts_sym_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
 pnml2lts_sym_LDADD     = $(XML_LIBS) $(PINS_LIBS) $(VSET_LIBS) 
 pnml2lts_sym_CPPFLAGS  = -DPNML $(XML_CPPFLAGS) $(SYM_CPP_FLAGS)
 pnml2lts_sym_LDFLAGS   = $(SYM_LDFLAGS)
@@ -132,7 +132,7 @@ nodist_EXTRA_pnml2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prob2lts-sym
 prob2lts_sym_SOURCES   = pins2lts-sym.c
-prob2lts_sym_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h
+prob2lts_sym_SOURCES  += ../pins-lib/modules/prob-pins.c ../pins-lib/modules/prob-pins.h
 prob2lts_sym_LDADD     = $(PROB_LIBS) $(PINS_LIBS) $(VSET_LIBS)
 prob2lts_sym_CPPFLAGS  = -DPROB $(SYM_CPP_FLAGS)
 prob2lts_sym_LDFLAGS   = $(SYM_LD_FLAGS)

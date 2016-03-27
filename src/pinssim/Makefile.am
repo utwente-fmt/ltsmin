@@ -47,7 +47,7 @@ endif
 
 # pinssim-etf
 pinssim_etf_SOURCES   = pinssim.c
-pinssim_etf_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
+pinssim_etf_SOURCES  += ../pins-lib/modules/etf-pins.c ../pins-lib/modules/etf-pins.h
 pinssim_etf_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
 pinssim_etf_CPPFLAGS  = -DETF $(SYM_CPP_FLAGS)
 pinssim_etf_LDFLAGS   = $(SYM_LD_FLAGS)
@@ -55,7 +55,7 @@ nodist_EXTRA_pinssim_etf_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pinssim
 pinssim_SOURCES   = pinssim.c
-pinssim_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pinssim_SOURCES  += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
 pinssim_LDADD     = $(PINS_LIBS) $(VSET_LIBS)
 pinssim_CPPFLAGS  = -DPINS_DLL $(SYM_CPP_FLAGS)
 pinssim_LDFLAGS   = $(SYM_LD_FLAGS)
@@ -97,7 +97,7 @@ nodist_EXTRA_pinssim_pbes_SOURCES = automake-force-linker.cxx # req. by pbes
 
 # pinssim-dve
 pinssim_dve_SOURCES   = pinssim.c
-pinssim_dve_SOURCES  += ../pins-lib/dve-pins.c ../pins-lib/dve-pins.h
+pinssim_dve_SOURCES  += ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
 pinssim_dve_LDADD     = $(PINS_LIBS)
 pinssim_dve_LDADD    += $(VSET_LIBS) $(DVE_LIBS)
 pinssim_dve_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(SYM_CPPFLAGS)
@@ -106,7 +106,7 @@ nodist_EXTRA_pinssim_dve_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pinssim-prom
 pinssim_prom_SOURCES  = pinssim.c
-pinssim_prom_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
+pinssim_prom_SOURCES += ../pins-lib/modules/prom-pins.c ../pins-lib/modules/prom-pins.h
 pinssim_prom_LDADD    = $(PINS_LIBS)
 pinssim_prom_LDADD   += $(VSET_LIBS) $(SPINS_LIBS)
 pinssim_prom_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(SYM_CPPFLAGS)

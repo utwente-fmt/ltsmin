@@ -19,9 +19,9 @@ extern "C" {
 
 #include <dm/dm.h>
 #include <hre/user.h>
-#include <pins-lib/mcrl2-pins.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/modules/mcrl2-pins.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 }
 

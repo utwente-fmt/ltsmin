@@ -44,7 +44,7 @@ endif
 
 # pins2lts-seq
 pins2lts_seq_SOURCES   = pins2lts-seq.c
-pins2lts_seq_SOURCES  += ../pins-lib/dlopen-pins.c ../pins-lib/dlopen-pins.h
+pins2lts_seq_SOURCES  += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
 pins2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 pins2lts_seq_LDADD    += $(VSET_LIBS)
 pins2lts_seq_CPPFLAGS  = -DPINS_DLL $(SEQ_CPPFLAGS)
@@ -56,7 +56,7 @@ nodist_EXTRA_pins2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 # etf2lts-seq
 etf2lts_seq_SOURCES   = pins2lts-seq.c
-etf2lts_seq_SOURCES  += ../pins-lib/etf-pins.c ../pins-lib/etf-pins.h
+etf2lts_seq_SOURCES  += ../pins-lib/modules/etf-pins.c ../pins-lib/modules/etf-pins.h
 etf2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 etf2lts_seq_LDADD    += $(VSET_LIBS)
 etf2lts_seq_CPPFLAGS  = -DETF $(SEQ_CPPFLAGS)
@@ -88,7 +88,7 @@ nodist_EXTRA_pbes2lts_seq_SOURCES = automake-force-linker.cxx #req. by pbes
 
 # dve2lts-seq
 dve2lts_seq_SOURCES   = pins2lts-seq.c
-dve2lts_seq_SOURCES  += ../pins-lib/dve-pins.c ../pins-lib/dve-pins.h
+dve2lts_seq_SOURCES  += ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
 dve2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 dve2lts_seq_LDADD    += $(VSET_LIBS) $(DVEC_LIBS)
 dve2lts_seq_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(SEQ_CPPFLAGS)
@@ -97,7 +97,7 @@ nodist_EXTRA_dve2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prom2lts-seq
 prom2lts_seq_SOURCES  = pins2lts-seq.c
-prom2lts_seq_SOURCES += ../pins-lib/prom-pins.c ../pins-lib/prom-pins.h
+prom2lts_seq_SOURCES += ../pins-lib/modules/prom-pins.c ../pins-lib/modules/prom-pins.h
 prom2lts_seq_LDADD    = $(HRE_LIB) $(PINS_LIBS)
 prom2lts_seq_LDADD   += $(VSET_LIBS) $(SPINS_LIBS)
 prom2lts_seq_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(SEQ_CPPFLAGS)
@@ -106,14 +106,14 @@ nodist_EXTRA_prom2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 # pnml2lts-seq
 pnml2lts_seq_SOURCES   = pins2lts-seq.c
-pnml2lts_seq_SOURCES  += ../pins-lib/pnml-pins.c ../pins-lib/pnml-pins.h
+pnml2lts_seq_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
 pnml2lts_seq_LDADD     = $(XML_LIBS) $(VSET_LIBS) $(HRE_LIB) $(PINS_LIBS)
 pnml2lts_seq_CPPFLAGS  = -DPNML $(XML_CPPFLAGS) $(SEQ_CPPFLAGS)
 nodist_EXTRA_pnml2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prob2lts-seq
 prob2lts_seq_SOURCES   = pins2lts-seq.c
-prob2lts_seq_SOURCES  += ../pins-lib/prob-pins.c ../pins-lib/prob-pins.h 
+prob2lts_seq_SOURCES  += ../pins-lib/modules/prob-pins.c ../pins-lib/modules/prob-pins.h 
 prob2lts_seq_LDADD     = $(PROB_LIBS) $(VSET_LIBS) $(HRE_LIB) $(PINS_LIBS)
 prob2lts_seq_CPPFLAGS  = -DPROB $(SEQ_CPPFLAGS)
 nodist_EXTRA_prob2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset

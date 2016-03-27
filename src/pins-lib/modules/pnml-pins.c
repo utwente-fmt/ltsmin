@@ -16,7 +16,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/atomics.h>
-#include <pins-lib/pnml-pins.h>
+#include <pins-lib/modules/pnml-pins.h>
 
 #define NUM_TRANSS SIgetCount(context->pnml_transs)
 #define NUM_PLACES SIgetCount(context->pnml_places)

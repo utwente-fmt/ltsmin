@@ -17,10 +17,10 @@ extern "C" {
 #include <sys/stat.h>
 
 #include <hre/user.h>
-#include <pins-lib/pbes-pins.h>
 #include <pins-lib/pg-types.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/modules/pbes-pins.h>
 
 } // end of extern "C"
 

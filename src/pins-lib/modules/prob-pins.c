@@ -13,9 +13,9 @@
 #include <hre/unix.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
-#include <pins-lib/prob-pins.h>
 #include <prob-lib/prob_helpers.h>
 #include <prob-lib/prob_client.h>
+#include <pins-lib/modules/prob-pins.h>
 #include <util-lib/chunk_support.h>
 #include <util-lib/util.h>
 

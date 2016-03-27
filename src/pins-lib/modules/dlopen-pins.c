@@ -11,8 +11,8 @@
 
 #include <dm/dm.h>
 #include <hre/user.h>
-#include <pins-lib/dlopen-pins.h>
 #include <pins-lib/dlopen-api.h>
+#include <pins-lib/modules/dlopen-pins.h>
 #include <hre/stringindex.h>
 #include <util-lib/tables.h>
 

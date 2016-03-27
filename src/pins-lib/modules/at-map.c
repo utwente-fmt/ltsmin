@@ -3,9 +3,9 @@
 #include <aterm2.h>
 
 #include <hre/user.h>
-#include <pins-lib/at-map.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/modules/at-map.h>
 #include <util-lib/chunk_support.h>
 
 
