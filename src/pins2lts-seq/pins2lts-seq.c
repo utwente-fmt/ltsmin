@@ -1843,8 +1843,7 @@ main (int argc, char *argv[])
     opt.model = GBcreateBase();
     GBsetChunkMap (opt.model, simple_table_factory_create());
 
-    GBloadFile(opt.model,files[0]);
-    opt.model = GBwrapModel(opt.model);
+    GBloadFile(opt.model,files[0],&opt.model);
 
     lts_type_t ltstype=GBgetLTStype(opt.model);
     global.N=lts_type_get_state_length(ltstype);

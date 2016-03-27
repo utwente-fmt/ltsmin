@@ -1029,8 +1029,7 @@ int main (int argc, char *argv[]){
     GBsetChunkMap (model, HREgreyboxTableFactory());
 
     // Load model from file
-    GBloadFile(model, files[0]);
-    model = GBwrapModel(model);
+    GBloadFile(model, files[0], &model);
     fprintf(stdout,CYAN "INFO: " RESET " Loaded file: %s \n",files[0]);
   
     // if (argc >= 2){

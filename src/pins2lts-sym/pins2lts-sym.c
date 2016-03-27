@@ -24,8 +24,10 @@
 #include <pins-lib/pg-types.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
-#include <pins-lib/property-semantics.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-mutex.h>
+#include <pins-lib/property-semantics.h>
+#include <pins-lib/pins2pins-mucalc.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
@@ -3389,9 +3391,8 @@ init_model(char *file)
 
     HREbarrier(HREglobal());
 
-    GBloadFile(model, file);
-    if (!SPEC_MT_SAFE) model = GBaddMutex(model);
-    model = GBwrapModel(model);
+    PINS_REQUIRE_MUTEX_WRAPPER = 1;
+    GBloadFile(model, file, &model);
 
     HREbarrier(HREglobal());
 

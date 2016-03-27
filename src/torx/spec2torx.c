@@ -131,8 +131,7 @@ main (int argc, char *argv[])
     model_t             model = GBcreateBase ();
     GBsetChunkMap (model, simple_table_factory_create());
 
-    GBloadFile (model, files[0]);
-    model = GBwrapModel(model);
+    GBloadFile (model, files[0], &model);
 
     lts_type_t          ltstype = GBgetLTStype (model);
     N = lts_type_get_state_length (ltstype);
