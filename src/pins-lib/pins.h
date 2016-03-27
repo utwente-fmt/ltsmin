@@ -179,12 +179,6 @@ typedef struct sl_group {
 extern struct poptOption greybox_options[];
 
 /**
-\brief Options for greybox management module including
-LTL options.
- */
-extern struct poptOption greybox_options_ltl[];
-
-/**
 \brief A struct to store guards per transition group
 */
 typedef struct guard {
@@ -198,29 +192,6 @@ typedef struct guard {
 //@{
 
 /**
-\brief The behaviour of the ltl buchi product
-
-PINS_LTL_TEXTBOOK adds an initial state to the model and labels
-the incoming edges with the properties of in the buchi automaton
-PINS_LTL_SPIN labels the outgoing edges with the properties of
-the buchi automaton. Additionally, the SPIN semantics accounts
-for deadlocks in the LTS by letting the buchi continues upon deadlock.
-PINS_LTL_LTSMIN Like SPIN semantics, but without the deadlock provision.
-This allows LTSmin to maintain an efficient dependency matrix as
-deadlock detection is non-local (it depends on the conjunction of all
-guards from all transition groups).
-*/
-typedef enum {
-    PINS_LTL_NONE,
-    PINS_LTL_TEXTBOOK,
-    PINS_LTL_SPIN,
-    PINS_LTL_LTSMIN
-} pins_ltl_type_t;
-
-/**
- * \brief boolean indicating whether PINS uses LTL
- */
-extern pins_ltl_type_t PINS_LTL;
 
 /**
 \brief The type of the Buchi automaton
@@ -242,8 +213,6 @@ typedef enum {
  * \brief buchi type for the LTL automaton
  */
 extern pins_buchi_type_t PINS_BUCHI_TYPE;
-
-/**
  * \brief Factory method for loading models.
  *
  * Given a model that has been initialized with data synchronization functions,

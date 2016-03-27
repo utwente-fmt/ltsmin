@@ -2,6 +2,7 @@
 #define POR_INTERNAL
 
 #include <pins-lib/pins.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/por/por-leap.h>
 #include <util-lib/bitmultiset.h>

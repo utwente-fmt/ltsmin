@@ -7,6 +7,7 @@
 
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/parallel/color.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <util-lib/fast_set.h>
 
 extern struct poptOption ndfs_options[];

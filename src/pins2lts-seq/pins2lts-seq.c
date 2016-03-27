@@ -17,6 +17,7 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/property-semantics.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <mc-lib/dbs-ll.h>
@@ -190,7 +191,8 @@ static struct poptOption options[] = {
       "select proviso for ltl/por", "<closedset|stack|color>"},
     { "max" , 0 , POPT_ARG_LONGLONG|POPT_ARGFLAG_SHOW_DEFAULT , &opt.max , 0 ,"maximum search depth", "<int>"},
     SPEC_POPT_OPTIONS,
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options_ltl , 0 , "PINS options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, development_options , 0 , "Development options" , NULL },
     POPT_TABLEEND
