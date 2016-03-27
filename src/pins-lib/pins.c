@@ -61,7 +61,7 @@ struct grey_box_model {
 	void **map;
 	chunk2pretty_t chunk2pretty;
 	string_set_t default_filter;
-	
+
 	int mucalc_node_count;
 
 	/** Index of static information matrices. */
@@ -452,7 +452,7 @@ static int next_matching_default(model_t model,int label_idx,int value,int*src,T
     ctx.group_idx=lts_type_find_edge_label(model->ltstype,LTSMIN_EDGE_TYPE_HYPEREDGE_GROUP);
     ctx.value=value;
     ctx.count=0;
-    ctx.group_val=0;        
+    ctx.group_val=0;
     GBgetTransitionsAll(model,src,matching_callback,&ctx);
     return ctx.count;
 }
@@ -498,7 +498,7 @@ model_t GBcreateBase(){
 	model->chunk_factory=NULL;
 	model->use_guards=0;
 	model->mucalc_node_count = 0;
-	
+
 	model->static_info_index=SIcreate();
 	model->static_info_matrices=NULL;
 	ADD_ARRAY(SImanager(model->static_info_index),model->static_info_matrices,struct static_info_matrix);
@@ -1184,10 +1184,7 @@ static int              matrix=0;
 static int              use_guards=0;
 static int              labels=0;
 static int              cache=0;
-pins_por_t              PINS_POR = PINS_POR_NONE;
-pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
 pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
-static const char      *regroup_options = NULL;
 
 static char *mucalc_file = NULL;
 
@@ -1293,40 +1290,46 @@ wrapModel(model_t model)
     return model;
 }
 
-void
-GBloadFile(model_t model, const char *filename, model_t *wrapped)
+static pins_loader_t
+find_loader (const char* filename)
 {
-    char *extension = strrchr(filename, '.');
+    char* extension = strrchr (filename, '.');
     if (extension) {
         extension++;
         for (int i = 0; i < registered; i++) {
-            if (0==strcmp (model_type[i], extension)) {
-                model_loader[i] (model, filename);
-                model->use_guards=use_guards;
-
-                /* if --pins-guards is set, then check implementation */
-                if (GBgetUseGuards(model)) {
-                    /* check if a next_long function is implemented */
-                    if (model->next_long == default_long) {
-                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                    }
-
-                    /* check if the implementation actually supports and exports guards */
-                    sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-                    if (model->guards == NULL || guards == NULL || guards->count == 0) {
-                        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                    }
-
-                    model->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
-                    model->next_all = guards_all;
-                }
-
-                return;
+            if (0 == strcmp (model_type[i], extension)) {
+                return model_loader[i];
             }
         }
         Abort("No factory method has been registered for %s models", extension);
     } else {
         Abort("filename %s doesn't have an extension", filename);
+    }
+}
+
+void
+GBloadFile(model_t model, const char *filename, model_t *wrapped)
+{
+    pins_loader_t   model_loader = find_loader (filename);
+    model_loader (model, filename);
+
+    model->use_guards=use_guards;
+
+    /* if --pins-guards is set, then check implementation */
+    if (GBgetUseGuards(model)) {
+        /* check if a next_long function is implemented */
+        if (model->next_long == default_long) {
+            Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+        }
+
+        /* check if the implementation actually supports and exports guards */
+        sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+        if (model->guards == NULL || guards == NULL || guards->count == 0) {
+            Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+        }
+
+        model->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
+        model->next_all = guards_all;
     }
 
     *wrapped = wrapModel(model);
@@ -1400,17 +1403,11 @@ struct poptOption greybox_options[]={
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
 	{ USE_GUARDS_OPTION , 'g' , POPT_ARG_VAL , &use_guards , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
 	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
-    {"mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
+    { "mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
           "<mucalc-file>.mcf|<mucalc formula>"},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, group_options, 0 , "Regrouping options", NULL },
 	POPT_TABLEEND	
-};
-
-struct poptOption greybox_options_ltl[]={
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , NULL, NULL },
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
-    POPT_TABLEEND
 };
 
 int

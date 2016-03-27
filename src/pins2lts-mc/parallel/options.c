@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/dfs-fifo.h>
@@ -235,7 +236,8 @@ struct poptOption alg_options_extra[] = {
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, perm_options, 0, "Permutation options", NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, alg_ltl_options, 0, /*"LTL options"*/ NULL, NULL},
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, ndfs_options, 0, /*"NDFS options"*/ NULL, NULL},
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options_ltl, 0, "PINS options", NULL},
+    {NULL, 0, POPT_ARG_INCLUDE_TABLE, greybox_options, 0, "PINS options", NULL},
+    {NULL, 0 ,POPT_ARG_INCLUDE_TABLE, ltl_options, 0, "LTL options", NULL },
     POPT_TABLEEND
 };
 

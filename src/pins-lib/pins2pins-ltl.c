@@ -28,9 +28,10 @@
 #include <util-lib/util.h>
 
 
-static char *ltl_file = NULL;
-static const char *ltl_semantics_name = "none";
-static const char *buchi_type = "ba";
+static char            *ltl_file = NULL;
+static const char      *ltl_semantics_name = "none";
+static const char      *buchi_type = "ba";
+pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
 
 static si_map_entry db_ltl_semantics[]={
     {"none",    PINS_LTL_NONE},

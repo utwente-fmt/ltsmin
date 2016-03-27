@@ -37,6 +37,7 @@ static int leap = 0;
 static const char *algorithm = "heur";
 static const char *weak = "no";
 
+pins_por_t              PINS_POR = PINS_POR_NONE;
 
 static si_map_entry por_weak[]={
     {"no",      WEAK_NONE},
