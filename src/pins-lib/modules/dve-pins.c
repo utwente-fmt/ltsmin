@@ -12,8 +12,8 @@
 #include <hre/unix.h>
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
-#include <pins-lib/dve-pins.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/modules/dve-pins.h>
 #include <util-lib/chunk_support.h>
 
 // dve2 ltsmin interface functions

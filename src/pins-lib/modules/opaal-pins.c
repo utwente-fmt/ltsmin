@@ -13,7 +13,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/hashtable.h>
-#include <pins-lib/opaal-pins.h>
+#include <pins-lib/modules/opaal-pins.h>
 #include <pins-lib/pins-util.h>
 #include <util-lib/chunk_support.h>
 #include <util-lib/util.h>

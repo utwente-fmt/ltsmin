@@ -46,7 +46,7 @@ endif
 
 # etf2lts-dist
 etf2lts_dist_SOURCES   = ../pins2lts-dist.c
-etf2lts_dist_SOURCES  += ../../pins-lib/etf-pins.c ../../pins-lib/etf-pins.h
+etf2lts_dist_SOURCES  += ../../pins-lib/modules/etf-pins.c ../../pins-lib/modules/etf-pins.h
 etf2lts_dist_LDADD     = $(PINS_LIBS)
 etf2lts_dist_CPPFLAGS  = -DETF $(DIST_CPPFLAGS)
 nodist_EXTRA_etf2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
@@ -61,7 +61,7 @@ nodist_EXTRA_mapa2lts_dist_SOURCES = automake-force-linker.cxx # required by Boo
 
 # pins2lts-dist
 pins2lts_dist_SOURCES   = ../pins2lts-dist.c
-pins2lts_dist_SOURCES  += ../../pins-lib/dlopen-pins.c ../../pins-lib/dlopen-pins.h
+pins2lts_dist_SOURCES  += ../../pins-lib/modules/dlopen-pins.c ../../pins-lib/modules/dlopen-pins.h
 pins2lts_dist_LDADD     = $(PINS_LIBS)
 pins2lts_dist_CPPFLAGS  = -DPINS_DLL $(DIST_CPPFLAGS)
 if !BUILD_OS_IS_DARWIN
@@ -96,7 +96,7 @@ nodist_EXTRA_pbes2lts_dist_SOURCES = automake-force-linker.cxx
 
 # dve2lts-dist
 dve2lts_dist_SOURCES   = ../pins2lts-dist.c
-dve2lts_dist_SOURCES  += ../../pins-lib/dve-pins.c ../../pins-lib/dve-pins.h
+dve2lts_dist_SOURCES  += ../../pins-lib/modules/dve-pins.c ../../pins-lib/modules/dve-pins.h
 dve2lts_dist_LDADD     = $(PINS_LIBS)
 dve2lts_dist_LDADD    += $(DVEC_LIBS)
 dve2lts_dist_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(DIST_CPPFLAGS)
@@ -105,7 +105,7 @@ nodist_EXTRA_dve2lts_dist_SOURCES = automake-force-linker.cxx # required by Boos
 
 # prom2lts-dist
 prom2lts_dist_SOURCES  = ../pins2lts-dist.c
-prom2lts_dist_SOURCES += ../../pins-lib/prom-pins.c ../../pins-lib/prom-pins.h
+prom2lts_dist_SOURCES += ../../pins-lib/modules/prom-pins.c ../../pins-lib/modules/prom-pins.h
 prom2lts_dist_LDADD    = $(PINS_LIBS)
 prom2lts_dist_LDADD   += $(SPINS_LIBS)
 prom2lts_dist_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(DIST_CPPFLAGS)
@@ -114,7 +114,7 @@ nodist_EXTRA_prom2lts_dist_SOURCES = automake-force-linker.cxx # required by Boo
 
 # pnml2lts-dist
 pnml2lts_dist_SOURCES   = ../pins2lts-dist.c
-pnml2lts_dist_SOURCES  += ../../pins-lib/pnml-pins.c ../../pins-lib/pnml-pins.h
+pnml2lts_dist_SOURCES  += ../../pins-lib/modules/pnml-pins.c ../../pins-lib/modules/pnml-pins.h
 pnml2lts_dist_LDADD     = $(XML_LIBS) $(PINS_LIBS)
 pnml2lts_dist_CPPFLAGS  = -DPNML $(XML_CPPFLAGS) $(DIST_CPPFLAGS)
 pnml2lts_dist_LDFLAGS   = $(AM_LDFLAGS)
@@ -122,7 +122,7 @@ nodist_EXTRA_pnml2lts_dist_SOURCES = automake-force-linker.cxx # required by Boo
 
 # prob2lts-dist
 prob2lts_dist_SOURCES   = ../pins2lts-dist.c
-prob2lts_dist_SOURCES  += ../../pins-lib/prob-pins.c ../../pins-lib/prob-pins.h
+prob2lts_dist_SOURCES  += ../../pins-lib/modules/prob-pins.c ../../pins-lib/modules/prob-pins.h
 prob2lts_dist_LDADD     = $(PROB_LIBS) $(PINS_LIBS)
 prob2lts_dist_CPPFLAGS  = -DPROB $(DIST_CPPFLAGS)
 prob2lts_dist_LDFLAGS   = $(AM_LDFLAGS)

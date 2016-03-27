@@ -43,28 +43,28 @@ endif
 CXXFLAGS = @CXXFLAGS@ -Wno-unused-parameter
 
 # libmapa-pins
-libmapa_pins_la_SOURCES   = mapa-pins.c mapa-pins.h
+libmapa_pins_la_SOURCES   = modules/mapa-pins.c modules/mapa-pins.h
 libmapa_pins_la_CPPFLAGS  = -I${top_srcdir}/scoop/src $(AM_CPPFLAGS)
 libmapa_pins_la_LDFLAGS   = $(AM_LDFLAGS)
 #libmapa_pins_la_LDFLAGS   = -L${top_builddir}/scoop/src $(AM_LDFLAGS)
 # libmapa_pins_la_LIBADD    = -lscoop 
 
 # libmcrl-pins
-libmcrl_pins_la_SOURCES   = mcrl-pins.c mcrl-pins.h
-libmcrl_pins_la_SOURCES  += at-map.c at-map.h
+libmcrl_pins_la_SOURCES   = modules/mcrl-pins.c modules/mcrl-pins.h
+libmcrl_pins_la_SOURCES  += modules/at-map.c modules/at-map.h
 libmcrl_pins_la_CPPFLAGS  = -DMCRL -DNDEBUG $(MCRL_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl_pins_la_LDFLAGS   = $(MCRL_LDFLAGS) $(MCRL_LDFLAGS) $(AM_LDFLAGS)
 libmcrl_pins_la_LIBADD    = $(MCRL_LIBS) $(LIBS) 
 
 # libmcrl2-pins
-libmcrl2_pins_la_SOURCES  = mcrl2-pins.cpp mcrl2-pins.h
+libmcrl2_pins_la_SOURCES  = modules/mcrl2-pins.cpp modules/mcrl2-pins.h
 libmcrl2_pins_la_CPPFLAGS = -DMCRL2 -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
 libmcrl2_pins_la_CXXFLAGS = $(MCRL2_PINS_CXXFLAGS) $(AM_CXXFLAGS)
 libmcrl2_pins_la_LDFLAGS  = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libmcrl2_pins_la_LIBADD   = $(MCRL2_PINS_LIBS) $(LIBS)
 
 # libpbes-pins
-libpbes_pins_la_SOURCES   = pbes-pins.cpp pbes-pins.h
+libpbes_pins_la_SOURCES   = modules/pbes-pins.cpp modules/pbes-pins.h
 libpbes_pins_la_CPPFLAGS  = -DLTSMIN_PBES -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
 libpbes_pins_la_CXXFLAGS = $(MCRL2_PINS_CXXFLAGS) $(AM_CXXFLAGS)
 libpbes_pins_la_LDFLAGS   = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)

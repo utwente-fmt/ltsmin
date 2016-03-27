@@ -4,9 +4,9 @@
 #include <hre/user.h>
 #include <dm/dm.h>
 #include <ltsmin-lib/ltsmin-standard.h>
-#include <pins-lib/dlopen-pins.h>
 #include <pins-lib/dlopen-api.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/modules/dlopen-pins.h>
 #include <util-lib/rationals.h>
 #include <pins-lib/pins2pins-cache.h>
 #include <scoop.h>

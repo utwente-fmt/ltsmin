@@ -9,8 +9,8 @@
 #include <dm/dm.h>
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
-#include <pins-lib/at-map.h>
-#include <pins-lib/mcrl-pins.h>
+#include <pins-lib/modules/at-map.h>
+#include <pins-lib/modules/mcrl-pins.h>
 
 static char *mcrl_args="-alt rw";
 
