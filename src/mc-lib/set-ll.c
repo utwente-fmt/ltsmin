@@ -68,6 +68,8 @@ set_ll_init_allocator (bool shared)
     return alloc;
 }
 
+typedef uint32_t len_t;
+
 /**
  * We might receive stings from the hash table that are not the one currently
  * being inserted, for example during a resize. This function remedies that.
@@ -78,20 +80,27 @@ get_length (char *str, set_ll_slab_t *slab)
     size_t              len = 0;
     if (str == slab->cur_key) {
         len = slab->cur_len;
-        HREassert (len == strlen(str), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'.",
-                   str, len, strlen(str), &str[len]);
     } else {
-        len = strlen(str);
+        char               *l = str - sizeof(len_t);
+        len = *(len_t *) l;
     }
     return len;
+}
+
+static int
+strcomp (char *s1, char *s2, set_ll_slab_t *slab)
+{
+    size_t          l1 = get_length (s1, slab);
+    size_t          l2 = get_length (s2, slab);
+    if (l1 != l2) return l1 - l2;
+
+    return memcmp (s1, s2, l1);
 }
 
 static uint32_t
 strhash (char *str, set_ll_slab_t *slab)
 {
     size_t              len = get_length (str, slab);
-    HRE_ASSERT (len == strlen(str), "Incorrect length passed for '%s', %zu instead of %zu. Rest: '%s'",
-                str, len, strlen(str), &str[len+1]);
     uint64_t h = MurmurHash64(str, len, 0);
     return (h & 0xFFFFFFFF) ^ (h >> 32);
 }
@@ -101,13 +110,20 @@ strclone (char *str, set_ll_slab_t *slab)
 {
     char               *mem = (char *)slab->mem;
     char               *ptr = mem + slab->next;
-    size_t              len = get_length (str, slab) + 1; // '\0'
+    size_t              len = get_length (str, slab);
     HREassert (slab->cur_len != SIZE_MAX, "Failed to pass length via static.");
-    slab->next += len;
+    slab->next += len + sizeof(len_t) + 1; // '\0'
     slab->total++;
     HREassert (slab->next < slab->size, "Local slab of %zu from worker "
                "%d exceeded: %zu", slab->size, HREme(HREglobal()), slab->next);
+
+    // fill length:
+    *((len_t *) ptr) = (len_t) len;
+
+    // fill string:
+    ptr += sizeof(len_t);
     memmove (ptr, str, len);
+    ptr[len] = '\0';      // for easy retrieval, if strings are inserted
     return (void *) ptr;
 }
 
@@ -120,7 +136,7 @@ strfree (char *str)
 
 static const size_t INIT_HT_SCALE = 8;
 static const datatype_t DATATYPE_HRE_STR = {
-    (cmp_fun_t)strcmp,
+    (cmp_fun_t)strcomp,
     (hash_fun_t)strhash,
     (clone_fun_t)strclone,
     (free_fun_t)strfree
@@ -153,12 +169,34 @@ struct set_ll_s {
     size_t              bogus_count;
 };
 
-typedef struct str_s {
-    char               *ptr;
-    int                 len;
-    int                 bogus;
-} __attribute__((__packed__)) str_t;
+/**
+ * Integer encoding a pointer to a potentially bogus value.
+ * The value pointer equals the absolute value of the integer
+ * If the integer is negative, the value is bogus.
+ */
+typedef intptr_t  str_t;
 
+static inline bool
+is_bogus (str_t s)
+{
+    return s < 0;
+}
+
+static inline char *
+pval (str_t s)
+{
+    const str_t ret[2] = { s, -s };
+    return (char *) ret[ s < 0 ];
+}
+
+/**
+ * Pointers should point to the value whose length is stored right before it
+ */
+static inline len_t
+plen (str_t s)
+{
+    return * ((len_t *) (pval(s) - sizeof(len_t)));
+}
 
 /**
  *
@@ -179,22 +217,18 @@ set_ll_get (set_ll_t *set, int idx, int *len)
     while ((read = atomic_read(&set->local[worker].count)) == index) {} // poll
     HREassert (index < read, "%d Invariant violated %zu !< %zu (idx=%d)", set->typeno, index, read, idx);
     // TODO: memory fence?
-    str_t              *str = (str_t *)isba_index (balloc, index);
-    HREassert (str != NULL, "Value %d (%zu/%zu) not in lockless string set", idx, index, worker);
-    HREassert (!str->bogus, "Value %d (%zu/%zu) not in lockless string set: -1", idx, index, worker);
-    *len = str->len;
+    str_t               str = * (str_t *) isba_index (balloc, index);
+    HREassert (pval(str) != NULL, "Value %d (%zu/%zu) not in lockless string set", idx, index, worker);
+    HREassert (!is_bogus(str), "Value %d (%zu/%zu) not in lockless string set: -1", idx, index, worker);
+    *len = plen (str);
     Debug ("%d Index(%d)\t--(%zu,%zu)--> (%s,%d) %p", set->typeno,
-           idx, index, worker, str->ptr, str->len, str->ptr);
-    HRE_ASSERT (str->len == (int)strlen(str->ptr), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
-                str->ptr, str->len, strlen(str->ptr), &str->ptr[str->len+1]);
-    return str->ptr;
+           idx, index, worker, pval(str), plen(str), pval(str));
+    return pval (str);
 }
 
 int
 set_ll_put (set_ll_t *set, char *str, int len)
 {
-    HRE_ASSERT (len == (int)strlen(str), "Incorrect length passed for '%s', %d instead of %zu. Rest: '%s'",
-                str, len, strlen(str), &str[len+1]);
     hre_context_t       global = HREglobal ();
     size_t              worker = HREme (global);
     isb_allocator_t     balloc = set->local[worker].balloc;
@@ -219,17 +253,16 @@ set_ll_put (set_ll_t *set, char *str, int len)
 
     if (old == DOES_NOT_EXIST) {
         // install value in balloc (late)
-        str_t               string = {.ptr = (char *)clone, .len = len, .bogus = 0};
         RTswitchAlloc (set->alloc->shared); // in case balloc allocates a block
-        isba_push_int (balloc, (int*)&string);
+        isba_push_int (balloc, (int *) &clone);
         RTswitchAlloc (false);
         atomic_write (&set->local[worker].count, index + 1); // signal done
         Debug ("%d Write(%zu)\t<--(%zu,%zu)-- (%s,%d) %p",
-               set->typeno, (size_t)idx, index, worker, str, len, (void*)clone);
+               set->typeno, (size_t)idx, index, worker, pval(clone), len, (void *)pval(clone));
     } else {
         idx = old - 1;
         Debug ("%d Find (%zu)\t<--(%zu,%zu)-- (%s,%d) %p", set->typeno, (size_t)idx,
-               (size_t)idx / set->workers, (size_t)idx % set->workers, str, len, (void *)clone);
+               (size_t)idx / set->workers, (size_t)idx % set->workers, pval(clone), len, (void *)pval(clone));
     }
     return (int)idx;
 }
@@ -244,25 +277,13 @@ set_ll_count (set_ll_t *set)
     return references;
 }
 
+static len_t LEN = 0;
+
 static str_t
 next_bogus (set_ll_t *set, size_t worker)
 {
-    return (str_t) { .ptr = "", 0, .bogus = 1 };
-
-    // No need for unique bogus values (just saving the code here)
-    char                unique[LTSMIN_PATHNAME_MAX];
-    set_ll_slab_t      *slab = set->alloc->slabs[worker];
-
-    size_t              idx = set->local[worker].bogii * set->workers + worker;
-    snprintf (unique, LTSMIN_PATHNAME_MAX, "uniqueZ#@^$%zu", idx);
-    slab->cur_len = strlen(unique);
-    str_t               str = { .ptr = strclone (unique, slab),
-                                .len = strlen (unique),
-                                .bogus = 1 };
-    slab->cur_len = SIZE_MAX;
-
-    set->local[worker].bogii++;
-    return str;
+    return - (str_t) ( ((char *)&LEN) + sizeof(len_t) );
+    (void) worker; (void) set;
 }
 
 void
@@ -271,19 +292,22 @@ set_ll_install (set_ll_t *set, char *name, int len, int idx)
     size_t              worker = idx % set->workers;
     size_t              index = idx / set->workers;
     isb_allocator_t     balloc = set->local[worker].balloc;
-    if ((size_t)idx < set->local[worker].count) {
-        str_t              *str = (str_t *)isba_index (balloc, index);
-        HREassert (str, "Corruption in set.");
-        HREassert (strncmp(str->ptr, name, min(str->len,len)) == 0,
-                   "String '%s' already inserted at %d, while trying to insert "
-                   "'%s' there", str->ptr, idx, name);
-        return;
-    }
-    set_ll_slab_t      *slab = set->alloc->slabs[worker];
-    map_key_t           clone, old, key = (map_key_t)name;
 
+    set_ll_slab_t      *slab = set->alloc->slabs[worker];
     slab->cur_key = name;
     slab->cur_len = len; // avoid having to recompute the length
+
+    if ((size_t)idx < set->local[worker].count) {
+        str_t              str = *(str_t *) isba_index (balloc, index);
+        HREassert (pval(str) != NULL, "Corruption in set.");
+        HREassert (strcomp(pval(str), name, slab) == 0,
+                   "String '%s' already inserted at %d, while trying to insert "
+                   "'%s' there", pval(str), idx, name);
+        slab->cur_len = SIZE_MAX;
+        return;
+    }
+    map_key_t           clone, old, key = (map_key_t)name;
+
     RTswitchAlloc (set->alloc->shared);
     old = ht_cas_empty (set->ht, key, idx + 1, &clone, slab);
     RTswitchAlloc (false);
@@ -298,9 +322,10 @@ set_ll_install (set_ll_t *set, char *name, int len, int idx)
         str_t               str = next_bogus (set, worker);
         isba_push_int (balloc, (int *) &str);
     }
-    str_t               string = {.ptr = (char *)clone, .len = len, .bogus = 0};
-    isba_push_int (balloc, (int *) &string);
+    isba_push_int (balloc, (int *) &clone);
     RTswitchAlloc (false);
+
+    HREassert (isba_size_int(balloc) == index + 1);
 
     atomic_write (&set->local[worker].count, index + 1); // signal done
 
@@ -415,14 +440,14 @@ set_ll_iterator_next (set_ll_iterator_t *it, int *len)
     prep (it);
 
     isb_allocator_t     balloc = it->set->local[it->worker].balloc;
-    str_t              *str = (str_t *)isba_index (balloc, it->index);
+    str_t               str = * (str_t *) isba_index (balloc, it->index);
     advance_index (it);
-    if (str->bogus) {
+    if (is_bogus(str)) {
         return set_ll_iterator_next (it, len);
     }
     it->done++;
-    *len = str->len;
-    return str->ptr;
+    *len = plen(str);
+    return pval(str);
 }
 
 int

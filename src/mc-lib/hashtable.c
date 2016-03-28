@@ -147,7 +147,7 @@ hash32 (hashtable_t *ht, map_key_t key, void *ctx)
 // Record if the entry being returned is empty. Otherwise the caller will have to waste time
 // re-comparing the keys to confirm that it did not lose a race to fill an empty entry.
 static volatile entry_t *hti_lookup (hti_t *hti, map_key_t key, uint32_t key_hash,
-                                     int *is_empty) {
+                                     int *is_empty, void *ctx) {
     TRACE("h2", "hti_lookup(key %p in hti %p)", key, hti);
     *is_empty = 0;
 
@@ -184,7 +184,7 @@ static volatile entry_t *hti_lookup (hti_t *hti, map_key_t key, uint32_t key_has
                 // quick check to rule out non-equal keys without doing a complete compare.
                 if ((key_hash >> 16) == (ent_key >> 48)) {
 #endif
-                    if (hti->ht->key_type->cmp(GET_PTR(ent_key), (void *)key) == 0) {
+                    if (hti->ht->key_type->cmp(GET_PTR(ent_key), (void *)key, ctx) == 0) {
                         TRACE("h1", "hti_lookup: found entry %p with key %p", ent, GET_PTR(ent_key));
                         return ent;
 #ifndef NBD32
@@ -314,7 +314,7 @@ static int hti_copy_entry (hti_t *ht1, volatile entry_t *ht1_ent,
     }
 
     int ht2_ent_is_empty;
-    volatile entry_t *ht2_ent = hti_lookup(ht2, key, key_hash, &ht2_ent_is_empty);
+    volatile entry_t *ht2_ent = hti_lookup(ht2, key, key_hash, &ht2_ent_is_empty, ctx);
     TRACE("h0", "hti_copy_entry: copy entry %p to entry %p", ht1_ent, ht2_ent);
 
     // It is possible that there isn't any room in the new table either.
@@ -386,7 +386,7 @@ static map_val_t hti_cas (hti_t *hti, map_key_t key, uint32_t key_hash,
     HREassert(key);
 
     int is_empty;
-    volatile entry_t *ent = hti_lookup(hti, key, key_hash, &is_empty);
+    volatile entry_t *ent = hti_lookup(hti, key, key_hash, &is_empty, ctx);
 
     // There is no room for <key>, grow the table and try again.
     if (ent == NULL) {
@@ -497,9 +497,9 @@ static map_val_t hti_cas (hti_t *hti, map_key_t key, uint32_t key_hash,
 }
 
 //
-static map_val_t hti_get (hti_t *hti, map_key_t key, uint32_t key_hash) {
+static map_val_t hti_get (hti_t *hti, map_key_t key, uint32_t key_hash, void *ctx) {
     int is_empty;
-    volatile entry_t *ent = hti_lookup(hti, key, key_hash, &is_empty);
+    volatile entry_t *ent = hti_lookup(hti, key, key_hash, &is_empty, ctx);
 
     // When hti_lookup() returns NULL it means we hit the reprobe limit while
     // searching the table. In that case, if a copy is in progress the key
@@ -507,7 +507,7 @@ static map_val_t hti_get (hti_t *hti, map_key_t key, uint32_t key_hash) {
     if (EXPECT_FALSE(ent == NULL)) {
         hti_t *n = ((hti_t)atomic_read(hti)).next;
         if (n != NULL)
-            return hti_get(hti->next, key, key_hash); // recursive tail-call
+            return hti_get(hti->next, key, key_hash, ctx); // recursive tail-call
         return DOES_NOT_EXIST;
     }
 
@@ -519,22 +519,22 @@ static map_val_t hti_get (hti_t *hti, map_key_t key, uint32_t key_hash) {
     if (EXPECT_FALSE(IS_TAGGED(ent_val, TAG1))) {
         if (EXPECT_FALSE(ent_val != COPIED_VALUE && ent_val != TAG_VALUE(TOMBSTONE, TAG1))) {
             hti_t *n = ((hti_t)atomic_read(hti)).next;
-            int did_copy = hti_copy_entry(hti, ent, key_hash, n, NULL);
+            int did_copy = hti_copy_entry(hti, ent, key_hash, n, ctx);
             if (did_copy) {
                 (void)add_fetch(&hti->num_entries_copied, 1);
             }
         }
         hti_t *n = ((hti_t)atomic_read(hti)).next;
-        return hti_get(n, key, key_hash); // tail-call
+        return hti_get(n, key, key_hash, ctx); // tail-call
     }
 
     return (ent_val == TOMBSTONE) ? DOES_NOT_EXIST : ent_val;
 }
 
 //
-map_val_t ht_get (hashtable_t *ht, map_key_t key) {
-    uint32_t key_hash = hash32(ht, key, NULL);
-    return hti_get(ht->hti, key, key_hash);
+map_val_t ht_get (hashtable_t *ht, map_key_t key, void *ctx) {
+    uint32_t key_hash = hash32(ht, key, ctx);
+    return hti_get(ht->hti, key, key_hash, ctx);
 }
 
 // returns true if copy is done
@@ -646,12 +646,12 @@ map_val_t ht_cas (hashtable_t *ht, map_key_t key, map_val_t expected_val,
 
 // Remove the value in <ht> associated with <key>. Returns the value removed, or DOES_NOT_EXIST if there was
 // no value for that key.
-map_val_t ht_remove (hashtable_t *ht, map_key_t key, map_key_t *clone_key) {
+map_val_t ht_remove (hashtable_t *ht, map_key_t key, map_key_t *clone_key, void *ctx) {
     hti_t *hti = ht->hti;
     map_val_t val;
-    uint32_t key_hash = hash32(ht, key, NULL);
+    uint32_t key_hash = hash32(ht, key, ctx);
     do {
-        val = hti_cas(hti, key, key_hash, CAS_EXPECT_WHATEVER, DOES_NOT_EXIST, clone_key, NULL);
+        val = hti_cas(hti, key, key_hash, CAS_EXPECT_WHATEVER, DOES_NOT_EXIST, clone_key, ctx);
         if (val != COPIED_VALUE)
             return val == TOMBSTONE ? DOES_NOT_EXIST : val;
         HREassert(hti->next);
@@ -715,13 +715,13 @@ void ht_print (hashtable_t *ht, int verbose) {
     }
 }
 
-ht_iter_t *ht_iter_begin (hashtable_t *ht, map_key_t key) {
+ht_iter_t *ht_iter_begin (hashtable_t *ht, map_key_t key, void *ctx) {
     hti_t *hti;
     int ref_count;
     do {
         hti = ht->hti;
         while (hti->next != NULL) {
-            do { } while (hti_help_copy(hti, NULL) != true);
+            do { } while (hti_help_copy(hti, ctx) != true);
             hti = hti->next;
         }
         do {
@@ -749,7 +749,7 @@ size_t ht_size (hashtable_t *ht) {
     return sizes * sizeof(map_key_t) * 2;
 }
 
-map_val_t ht_iter_next (ht_iter_t *iter, map_key_t *key_ptr) {
+map_val_t ht_iter_next (ht_iter_t *iter, map_key_t *key_ptr, void *ctx) {
     volatile entry_t *ent;
     map_key_t key;
     map_val_t val;
@@ -766,12 +766,12 @@ map_val_t ht_iter_next (ht_iter_t *iter, map_key_t *key_ptr) {
     } while (key == DOES_NOT_EXIST || val == DOES_NOT_EXIST || val == TOMBSTONE);
 
     if (val == COPIED_VALUE) {
-        uint32_t hash = hash32(iter->hti->ht, key, NULL);
-        val = hti_get(iter->hti->next, (map_key_t)ent->key, hash);
+        uint32_t hash = hash32(iter->hti->ht, key, ctx);
+        val = hti_get(iter->hti->next, (map_key_t)ent->key, hash, ctx);
 
         // Go to the next entry if key is already deleted.
         if (val == DOES_NOT_EXIST)
-            return ht_iter_next(iter, key_ptr); // recursive tail-call
+            return ht_iter_next(iter, key_ptr, ctx); // recursive tail-call
     }
 
     if (key_ptr) {
