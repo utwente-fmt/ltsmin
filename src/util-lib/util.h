@@ -58,7 +58,7 @@ ci_begin (ci_list *list)
 static inline int *
 ci_end (ci_list *list)
 {
-    return &list->data[list->count - 1];
+    return &list->data[list->count];
 }
 /* end iterator */
 
@@ -126,6 +126,8 @@ list_invert (ci_list *list)
         swap (list->data[i], list->data[list->count - i - 1]);
     }
 }
+
+
 
 extern char *gnu_basename (char *path);
 
