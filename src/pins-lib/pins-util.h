@@ -7,7 +7,7 @@
 
 
 extern size_t       pins_get_state_label_count (model_t model);
-extern size_t       pins_get_state_edge_count (model_t model);
+extern size_t       pins_get_edge_label_count (model_t model);
 extern size_t       pins_get_state_variable_count (model_t model);
 extern size_t       pins_get_group_count (model_t model);
 
