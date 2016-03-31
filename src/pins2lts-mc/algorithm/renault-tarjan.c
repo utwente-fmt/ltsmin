@@ -111,7 +111,7 @@ renault_local_init (run_t *run, wctx_t *ctx)
     ctx->local->state_tarjan.acc_set  = 0;
     ctx->local->target_tarjan.acc_set = 0;
 
-    shared->ltl = GBgetAcceptingStateLabelIndex(ctx->model) != -1;
+    shared->ltl = pins_get_accepting_state_label_index(ctx->model) != -1;
 
     ctx->local->visited_states =
             fset_create (sizeof (ref_t), sizeof (raw_data_t), 10, dbs_size);
@@ -162,7 +162,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             if (GBTGBAIsAccepting(ctx->model, acc) ) {
                 ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
             }
-        } if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(successor)) ) {
+        } if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(successor)) ) {
             // TODO: this cycle report won't work correctly
             ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
         }
@@ -188,9 +188,9 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                 ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
             }
         } 
-        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)))
+        if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(ctx->state)))
             ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, ctx->state);
-        if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(successor)))
+        if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(successor)))
             ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
 
         state_info_deserialize (loc->target, *addr);
@@ -355,7 +355,7 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
             // betweem two SCCs (which cannot be part of a cycle)
             r_uf_add_acc (shared->uf, loc->target->ref, acc_set);
             acc_set = loc->target_tarjan.acc_set;
-        } else if (shared->ltl && GBbuchiIsAccepting(ctx->model, state_info_state(loc->target))) {
+        } else if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(loc->target))) {
             accepting = loc->target->ref;
         }
 
