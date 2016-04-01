@@ -10,13 +10,15 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
-#include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-check.h>
 #include <pins-lib/por/por-ample.h>
 #include <pins-lib/por/por-beam.h>
 #include <pins-lib/por/por-deletion.h>
 #include <pins-lib/por/por-internal.h>
 #include <pins-lib/por/por-leap.h>
+#include <pins-lib/por/pins2pins-por.h>
+#include <pins-lib/por/pins2pins-por-check.h>
 #include <util-lib/bitmultiset.h>
 #include <util-lib/dfs-stack.h>
 
@@ -57,7 +59,7 @@ typedef enum {
     POR_AMPLE1,
 } por_alg_t;
 
-static por_alg_t alg = -1;
+static por_alg_t    alg = -1;
 
 static si_map_entry por_algorithm[]={
     {"none",    POR_NONE},
@@ -69,6 +71,8 @@ static si_map_entry por_algorithm[]={
     {NULL, 0}
 };
 
+#define  POR_SHORT_OPT 'p'
+
 static void
 por_popt (poptContext con, enum poptCallbackReason reason,
           const struct poptOption *opt, const char *arg, void *data)
@@ -78,7 +82,7 @@ por_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_PRE: break;
     case POPT_CALLBACK_REASON_POST: break;
     case POPT_CALLBACK_REASON_OPTION:
-        if (opt->shortName == 'p') {
+        if (opt->shortName == POR_SHORT_OPT) {
             if (arg == NULL) arg = "";
             int num = linear_search (por_algorithm, arg);
             if (num < 0) {
@@ -87,7 +91,7 @@ por_popt (poptContext con, enum poptCallbackReason reason,
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
             if ((alg = num) != POR_NONE)
-                PINS_POR = PINS_POR_ON;
+                PINS_POR = PINS_CORRECTNESS_CHECK ? PINS_POR_CHECK : PINS_POR_ON;
             return;
         } else if (opt->shortName == -1) {
             if (arg == NULL) arg = "";
@@ -108,15 +112,15 @@ por_popt (poptContext con, enum poptCallbackReason reason,
 
 struct poptOption por_options[]={
     {NULL, 0, POPT_ARG_CALLBACK, (void *)por_popt, 0, NULL, NULL},
-    { "por", 'p', POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL,
+    { "por", POR_SHORT_OPT, POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL,
       &algorithm, 0, "enable partial order reduction", "<heur|del> (default: heur)" },
-    { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL , &weak , 0 , "Weak stubborn set theory" , NULL },
+    { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL , &weak , 0 , "Weak stubborn set theory" , "[valmari] (default: uses stronger left-commutativity)" },
     { "leap" , 0, POPT_ARG_VAL  | POPT_ARGFLAG_OPTIONAL , &leap , 1 , "Leaping POR (Cartesian product of several disjoint stubborn sets)" , NULL },
 
     /* HIDDEN OPTIONS FOR EXPERIMENTATION */
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, beam_options, 0, NULL, NULL},
     { "prefer-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PREFER_NDS , 1 , "prefer MC+NDS over NES" , NULL },
-    { "check" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PINS_POR , PINS_POR_CHECK , "verify partial order reduction peristent sets" , NULL },
+//    { "check" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PINS_POR , PINS_POR_CHECK , "verify partial order reduction peristent sets" , NULL },
     { "no-dna" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DNA , 1 , "without DNA" , NULL },
     { "no-commutes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_COMMUTES , 1 , "without commutes (for left-accordance)" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
@@ -273,6 +277,17 @@ all_guards (por_context *ctx, int i, matrix_t *m, int j)
  */
 model_t
 GBaddPOR (model_t model)
+{
+    switch (PINS_POR) {
+    case PINS_POR_NONE:     return model;
+    case PINS_POR_ON:       return PORwrapper(model);
+    case PINS_POR_CHECK:    return GBaddPORCheck(model);
+    default: HREassert (false, "Unknown POR mode: %d", PINS_POR);
+    }
+}
+
+model_t
+PORwrapper (model_t model)
 {
     if (pins_get_accepting_state_label_index(model) != -1) {
         Print1  (info, "POR layer: model may be a buchi automaton.");

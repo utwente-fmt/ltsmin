@@ -12,12 +12,32 @@
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/pins2pins-mucalc.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <ltsmin-lib/mucalc-grammar.h>
 #include <ltsmin-lib/mucalc-parse-env.h>
 #include <ltsmin-lib/mucalc-syntax.h>
 #include <ltsmin-lib/mucalc-lexer.h>
 #include <pins-lib/pg-types.h>
+
+static char *mucalc_file = NULL;
+
+static int mucalc_node_count = 0;
+
+struct poptOption mucalc_options[]={
+    { "mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
+          "<mucalc-file>.mcf|<mucalc formula>"},
+    POPT_TABLEEND
+};
+
+int GBhaveMucalc() {
+    return (mucalc_file) ? 1 : 0;
+}
+
+int GBgetMucalcNodeCount() {
+    return mucalc_node_count;
+}
 
 
 typedef struct mucalc_node {
@@ -922,8 +942,14 @@ static matrix_t sl_info;
  * \brief Initialises the mu-calculus PINS layer.
  */
 model_t
-GBaddMucalc (model_t model, const char *mucalc_file)
+GBaddMucalc (model_t model)
 {
+    /* add mu calculus */
+    if (!mucalc_file) return model;
+
+    if (PINS_LTL) Abort("The --mucalc option and --ltl options can not be combined.");
+    if (PINS_POR) Abort("The --mucalc option and --por options can not be combined.");
+
     Warning(info,"Initializing mu-calculus layer... formula: %s", mucalc_file);
     model_t _model = GBcreateBase();
     mucalc_context_t *ctx = RTmalloc(sizeof *ctx);
@@ -988,7 +1014,7 @@ GBaddMucalc (model_t model, const char *mucalc_file)
 
     // Compute transition groups
     ctx->groupinfo = mucalc_compute_groupinfo(env, parent_groups);
-    GBsetMucalcNodeCount(_model, ctx->groupinfo.node_count);
+    mucalc_node_count = ctx->groupinfo.node_count;
 
     mucalc_add_proposition_values(_model);
     mucalc_add_action_labels(_model);

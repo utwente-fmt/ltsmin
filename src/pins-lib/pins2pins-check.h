@@ -7,6 +7,8 @@
 
 extern struct poptOption check_options[];
 
+extern int PINS_CORRECTNESS_CHECK;
+
 /**
 \brief Add wrapper that checks dependency matrices.
 */

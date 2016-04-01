@@ -117,6 +117,8 @@ typedef struct proviso_s {
 
 extern void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy);
 
+extern model_t PORwrapper (model_t model);
+
 // number of necessary sets (halves if MC is absent, because no NDSs then)
 static inline int
 NS_SIZE (por_context* ctx)

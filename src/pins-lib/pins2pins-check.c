@@ -9,10 +9,10 @@
 #include <util-lib/is-balloc.h>
 #include <util-lib/util.h>
 
-static int MATRIX_CHECK = 0;
+int PINS_CORRECTNESS_CHECK = 0;
 
 struct poptOption check_options[]={
-    { "matrix-check", 0, POPT_ARG_VAL|POPT_ARGFLAG_DOC_HIDDEN, &MATRIX_CHECK, 1,
+    { "check", 0, POPT_ARG_VAL|POPT_ARGFLAG_DOC_HIDDEN, &PINS_CORRECTNESS_CHECK, 1,
       "Check correctness of DM (Read / Write and MustWrite)", NULL },
     POPT_TABLEEND
 };
@@ -374,7 +374,7 @@ model_t
 GBaddCheck (model_t model)
 {
     HREassert (model != NULL, "No model");
-    if (!MATRIX_CHECK) return model;
+    if (!PINS_CORRECTNESS_CHECK) return model;
 
     Print1 (info, "Matrix checking layer activated.");
 
