@@ -11,6 +11,7 @@
 #include <pins-lib/pins2pins-fork.h>
 #include <pins-lib/pins2pins-group.h>
 #include <pins-lib/pins2pins-guards.h>
+#include <pins-lib/pins2pins-check.h>
 #include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/pins2pins-mucalc.h>
 #include <pins-lib/pins2pins-mutex.h>
@@ -1203,6 +1204,7 @@ wrapModel(model_t model)
     model = GBaddMutex(model); // Only adds mutex if PINS_REQUIRE_MUTEX_WRAPPER = 1
 
     model = GBaddGuards (model);
+    model = GBaddCheck (model);
 
     /* add partial order reduction */
     if (PINS_POR == PINS_POR_ON) {
@@ -1366,6 +1368,7 @@ struct poptOption greybox_options[]={
     { "mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
           "<mucalc-file>.mcf|<mucalc formula>"},
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, guards_options, 0 , NULL, NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, check_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, group_options, 0 , "Regrouping options", NULL },
 	POPT_TABLEEND
