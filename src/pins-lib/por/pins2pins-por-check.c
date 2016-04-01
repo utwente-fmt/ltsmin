@@ -8,6 +8,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/por/pins2pins-por-check.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/por/por-internal.h>
 #include <util-lib/fast_set.h>
@@ -602,14 +603,15 @@ GBaddPORCheck (model_t model)
 {
     HREassert (PINS_LTL == PINS_LTL_NONE, "Use --por-check without LTL");
 
+    Print1 (info, "POR checking layer activated.");
+
     // init POR
-    model_t por_model = GBaddPOR (model);
+    model_t                 por_model = PORwrapper (model);
 
     // create extra check layer
-    model_t             check_model = GBcreateBase ();
-
-    por_context *por_ctx = GBgetContext (por_model);
-    dlk_check_context_t *check_ctx = create_check_ctx (por_ctx);
+    model_t                 check_model = GBcreateBase ();
+    por_context            *por_ctx = GBgetContext (por_model);
+    dlk_check_context_t    *check_ctx = create_check_ctx (por_ctx);
     GBsetContext (check_model, check_ctx);
 
     GBinitModelDefaults (&check_model, por_model);

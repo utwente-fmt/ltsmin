@@ -3927,7 +3927,7 @@ void init_spg(model_t model)
 
     num_vars = pins_chunk_count (model, var_type_no); // number of propositional variables
     if (GBhaveMucalc()) {
-        num_vars = GBgetMucalcNodeCount(model); // number of mu-calculus subformulae
+        num_vars = GBgetMucalcNodeCount(); // number of mu-calculus subformulae
     }
     Print(infoLong, "init_spg: var_type_no=%d, num_vars=%zu", var_type_no, num_vars);
     priority = RTmalloc(num_vars * sizeof(int)); // priority of variables

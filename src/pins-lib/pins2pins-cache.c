@@ -8,6 +8,13 @@
 #include <pins-lib/pins2pins-cache.h>
 #include <util-lib/dynamic-array.h>
 
+static int              cache = 0;
+
+struct poptOption cache_options[]={
+    { "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching (memoization) of PINS calls" , NULL },
+    POPT_TABLEEND
+};
+
 static const int EL_OFFSET = 1;
 
 typedef struct state_info {
@@ -129,6 +136,8 @@ cached_transition_in_group (model_t self, int* labels, int group)
 model_t
 GBaddCache (model_t model)
 {
+    if (cache == 0) return model;
+
     HREassert (model != NULL, "No model");
     matrix_t           *p_dm = GBgetDMInfo (model);
     int                 N = dm_nrows (p_dm);

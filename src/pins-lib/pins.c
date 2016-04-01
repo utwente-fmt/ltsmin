@@ -16,7 +16,6 @@
 #include <pins-lib/pins2pins-mucalc.h>
 #include <pins-lib/pins2pins-mutex.h>
 #include <pins-lib/por/pins2pins-por.h>
-#include <pins-lib/por/pins2pins-por-check.h>
 #include <util-lib/treedbs.h>
 
 /** \file pins.c */
@@ -61,8 +60,6 @@ struct grey_box_model {
 	void **map;
 	chunk2pretty_t chunk2pretty;
 	string_set_t default_filter;
-
-	int mucalc_node_count;
 
 	/** Index of static information matrices. */
 	string_index_t static_info_index;
@@ -496,7 +493,6 @@ model_t GBcreateBase(){
 	model->transition_in_group=transition_in_group_default;
 	model->map=NULL;
 	model->chunk_factory=NULL;
-	model->mucalc_node_count = 0;
 
 	model->static_info_index=SIcreate();
 	model->static_info_matrices=NULL;
@@ -655,8 +651,6 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         GBsetIsCoveredBy(model, default_src->covered_by);
     if (model->covered_by_short == NULL)
         GBsetIsCoveredByShort(model, default_src->covered_by_short);
-
-    if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
 
     model->exit = wrapped_exit_default;
 
@@ -1163,22 +1157,6 @@ static pins_loader_t    model_preloader[MAX_TYPES];
 static int              registered_pre=0;
 static int              matrix=0;
 static int              labels=0;
-static int              cache=0;
-pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
-
-static char *mucalc_file = NULL;
-
-int GBhaveMucalc() {
-    return (mucalc_file) ? 1 : 0;
-}
-
-int GBgetMucalcNodeCount(model_t model) {
-    return model->mucalc_node_count;
-}
-
-void GBsetMucalcNodeCount(model_t model, int node_count) {
-    model->mucalc_node_count = node_count;
-}
 
 void chunk_table_print(log_t log, model_t model) {
     lts_type_t t = GBgetLTStype(model);
@@ -1201,38 +1179,29 @@ void chunk_table_print(log_t log, model_t model) {
 static model_t
 wrapModel(model_t model)
 {
-    model = GBaddMutex(model); // Only adds mutex if PINS_REQUIRE_MUTEX_WRAPPER = 1
+    /* add mutex layer */
+    model = GBaddMutex (model);
 
+    /* add GBlong guard evaluation layer (Deprecated) */
     model = GBaddGuards (model);
+
+    /* add dependency checking layer */
     model = GBaddCheck (model);
 
     /* add partial order reduction */
-    if (PINS_POR == PINS_POR_ON) {
-        model = GBaddPOR(model);
-    } else if (PINS_POR == PINS_POR_CHECK) {
-        model = GBaddPORCheck(model);
-    }
+    model = GBaddPOR (model);
 
-    model = GBaddLTL(model); // Only adds LTL when a formula is provided
+    /* add LTL crossproduct layer */
+    model = GBaddLTL (model);
 
     /* add regrouping */
-    model = GBregroup(model);
+    model = GBregroup (model);
 
     /* add mu calculus */
-    if (mucalc_file) {
-        if (PINS_LTL) {
-            Abort("The --mucalc option and --ltl options can not be combined.");
-        }
-        if (PINS_POR) {
-            Abort("The --mucalc option and --por options can not be combined.");
-        }
-        model = GBaddMucalc(model, mucalc_file);
-    }
+    model = GBaddMucalc (model); // Only adds LTL when a mu formula is provided
 
     /* add cache */
-    if (cache) {
-        model = GBaddCache (model);
-    }
+    model = GBaddCache (model);
 
     /* if 'print matrix', print matrix and abort */
     if (matrix) {
@@ -1364,9 +1333,8 @@ GBsetAccSetEdgeLabelIndex (model_t model, int idx)
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
-    { "mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
-          "<mucalc-file>.mcf|<mucalc formula>"},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, mucalc_options, 0 , NULL, NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, cache_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, guards_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, check_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
