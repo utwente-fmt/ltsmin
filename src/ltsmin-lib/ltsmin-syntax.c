@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <ctype.h>
 
+#include <dm/bitvector.h>
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-grammar.h>
 #include <ltsmin-lib/ltsmin-parse-env.h> // required for ltsmin-lexer.h!
@@ -354,6 +355,7 @@ ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,
     hash[3] = arg1?arg1->hash:0;
     hash[4] = arg2?arg2->hash:0;
     E->hash = SuperFastHash((const char*)hash, sizeof(hash), 0x0739c2d6);
+    E->deps.data = NULL;
     return E;
 }
 
@@ -391,6 +393,9 @@ ltsmin_expr_t LTSminExprClone(ltsmin_expr_t expr)
     memcpy(e, expr, sizeof(struct ltsmin_expr_s));
     if (e->arg1) e->arg1 = LTSminExprClone(e->arg1);
     if (e->arg2) e->arg2 = LTSminExprClone(e->arg2);
+    
+    if (expr->deps.data != NULL) bitvector_copy(&e->deps, &expr->deps);
+    
     return e;
 }
 
@@ -399,6 +404,7 @@ void LTSminExprDestroy(ltsmin_expr_t expr)
 {
     if (expr->arg1) LTSminExprDestroy(expr->arg1);
     if (expr->arg2) LTSminExprDestroy(expr->arg2);
+    bitvector_free(&expr->deps);
     RTfree(expr);
 }
 

@@ -755,11 +755,13 @@ GBaddLTL (model_t model)
     default: Abort("Unknown LTL semantics.");
     }
 
+    bitvector_t formula_state_dep;
+    bitvector_create(&formula_state_dep, len);
+    
     // mark the parts the buchi automaton uses for reading
-    int formula_state_dep[len];
-    memset (&formula_state_dep, 0, sizeof(int[len]));
     for (int k=0; k < ba->predicate_count; k++) {
-        mark_predicate(model, ba->predicates[k], formula_state_dep, ba->env);
+        mark_predicate(model, ba->predicates[k], ba->env);
+        bitvector_union(&formula_state_dep, &ba->predicates[k]->deps);
     }
 
     // add one column to the matrix
@@ -785,7 +787,7 @@ GBaddLTL (model_t model)
 
         // add buchi variables as dependent (read)
         for(int j=0; j < len; j++) {
-            if (formula_state_dep[j]) {
+            if (bitvector_is_set(&formula_state_dep, j)) {
                 dm_set(p_new_dm, i, j+1);
                 dm_set(p_new_dm_r, i, j+1);
             }
@@ -801,7 +803,7 @@ GBaddLTL (model_t model)
 
             // add buchi variables as dependent (read)
             for (int j=0; j < len; j++) {
-                if (formula_state_dep[j]) {
+                if (bitvector_is_set(&formula_state_dep, j)) {
                     dm_set(p_new_dm, i, j+1);
                     dm_set(p_new_dm_r, i, j+1);
                 }
@@ -861,9 +863,11 @@ GBaddLTL (model_t model)
     // add buchi label dependencies
     dm_set(p_new_sl, ctx->sl_idx_accept, ctx->ltl_idx);
     for (int j=0; j < sl_len; ++j) {
-        if (formula_state_dep[j])
+        if (bitvector_is_set(&formula_state_dep, j))
             dm_set(p_new_sl, ctx->sl_idx_accept, j+1);
     }
+    
+    bitvector_clear(&formula_state_dep);
 
     GBsetStateLabelInfo(ltlmodel, p_new_sl);
 
