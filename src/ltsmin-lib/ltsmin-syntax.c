@@ -209,6 +209,9 @@ int LTSminBinaryOperator(ltsmin_parse_env_t env, int token, const char* name,int
         case 6: env->binary_info[res].pattern=TOKEN_BIN6; break;
         case 7: env->binary_info[res].pattern=TOKEN_BIN7; break;
         case 8: env->binary_info[res].pattern=TOKEN_BIN8; break;
+        case 9: env->binary_info[res].pattern=TOKEN_BIN9; break;
+        case 10: env->binary_info[res].pattern=TOKEN_BIN10; break;
+        case 11: env->binary_info[res].pattern=TOKEN_BIN11; break;
         default: Abort("priority %d is not supported",prio);
     }
     env->binary_info[res].prio=prio;

@@ -324,6 +324,9 @@ input ::= EXPR expr(E) . {
 
 %left CONSTANT .
 %right QUANTIFIER .
+%left BIN11 .
+%left BIN10 .
+%left BIN9 .
 %left PREFIX9  .
 %right POSTFIX9 .
 %left BIN8 .
@@ -393,6 +396,15 @@ expr(E) ::= expr(E1) BIN7(OP) expr(E2) . {
     E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
 }
 expr(E) ::= expr(E1) BIN8(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN9(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN10(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN11(OP) expr(E2) . {
     E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
 }
 
