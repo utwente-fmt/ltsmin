@@ -18,12 +18,8 @@ typedef struct bitvector {
  *  Create a new bitvector
  *   1) unused bitvector_t struct
  *   2) number of bits in the vector
- *
- *  return values:
- *   0: n-bit bitvector has been allocated
- *  -1: error
  */
-extern int          bitvector_create (bitvector_t *, size_t);
+extern void         bitvector_create (bitvector_t *, size_t);
 
 /**
  * bitvector_clear
@@ -51,12 +47,8 @@ extern void         bitvector_free (bitvector_t *);
  *  Copy a bitvector to another bitvector
  *   1) unused bitvector_t struct
  *   2) source bitvector
- *
- *  return value:
- *   0: new bitvector is created in the target, all bits are copied
- *  -1: error
  */
-extern int          bitvector_copy (bitvector_t *, const bitvector_t *);
+extern void         bitvector_copy (bitvector_t *, const bitvector_t *);
 
 /**
  * bitvector_size

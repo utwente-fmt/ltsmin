@@ -751,7 +751,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     Warning(info, "Petri net has %d places, %d transitions and %d arcs",
         NUM_PLACES, NUM_TRANSS, NUM_ARCS);
 
-    if (bitvector_create(&(context->safe_places), NUM_PLACES) != 0) Abort("Out of memory");
+    bitvector_create(&(context->safe_places), NUM_PLACES);
     bitvector_clear(&(context->safe_places));
 
     Warning(infoLong, "Analyzing safe places");

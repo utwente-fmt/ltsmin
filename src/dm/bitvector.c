@@ -4,6 +4,8 @@
 
 #include <dm/bitvector.h>
 
+#include "hre/user.h"
+
 static inline       size_t
 utrunc (size_t x, size_t m)
 {
@@ -20,18 +22,12 @@ bv_seg (size_t i) { return i >> WORD_SHIFT; }
 static inline size_t
 bv_ofs (size_t i) { return i & WORD_BITS_MASK; }
 
-int
+void
 bitvector_create (bitvector_t *bv, size_t n_bits)
 {
     bv->n_words = utrunc (n_bits, WORD_BITS);
-    bv->data = calloc (bv->n_words, sizeof (size_t));
-    if (bv->data == NULL) {
-        bv->n_bits = 0;
-        return -1;
-    } else {
-        bv->n_bits = n_bits;
-        return 0;
-    }
+    bv->data = RTmallocZero (bv->n_words * sizeof (size_t));
+    bv->n_bits = n_bits;
 }
 
 void
@@ -45,27 +41,23 @@ bitvector_free (bitvector_t *bv)
 {
     // free memory
     if (bv->data != NULL)
-        free (bv->data);
+        RTfree (bv->data);
     bv->n_bits = 0;
 }
 
-int
+void
 bitvector_copy (bitvector_t *bv_tgt, const bitvector_t *bv_src)
 {
     // check validity src
-    if (bv_src->data == NULL)
-        return -1;
+    HREassert(bv_src->data != NULL);
 
     // alloc memory for target
-    if (bitvector_create (bv_tgt, bv_src->n_bits) != 0) {
-        return -1;
-    } else {
-        // copy bitvector
-        size_t              size =
-            utrunc (bv_src->n_bits, WORD_BITS) * sizeof (size_t);
-        memcpy (bv_tgt->data, bv_src->data, size);
-        return 0;
-    }
+    bitvector_create (bv_tgt, bv_src->n_bits);
+    
+    // copy bitvector
+    size_t              size =
+        utrunc (bv_src->n_bits, WORD_BITS) * sizeof (size_t);
+    memcpy (bv_tgt->data, bv_src->data, size);    
 }
 
 size_t
