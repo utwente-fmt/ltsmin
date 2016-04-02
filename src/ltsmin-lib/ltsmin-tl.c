@@ -15,11 +15,21 @@ PRED_NAME(Pred pred)
     case PRED_TRUE:             return "true";
     case PRED_FALSE:            return "false";
     case PRED_NOT:              return "!";
+    case PRED_LT:               return "<";
+    case PRED_LEQ:              return "<=";
+    case PRED_GT:               return ">";
+    case PRED_GEQ:              return ">=";
     case PRED_OR:               return "||";
     case PRED_AND:              return "&&";
     case PRED_EQ:               return "==";
+    case PRED_NEQ:              return "!=";
     case PRED_EQUIV:            return "<->";
     case PRED_IMPLY:            return "->";
+    case PRED_MULT:             return "*";
+    case PRED_DIV:              return "/";
+    case PRED_REM:              return "%";
+    case PRED_ADD:              return "+";
+    case PRED_SUB:              return "-";
     default:        Abort ("Not a keyword/operator, token id: %d", pred);
     }
 }
@@ -126,15 +136,28 @@ pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     LTSminConstant      (env, PRED_FALSE,  PRED_NAME(PRED_FALSE));
     LTSminConstant      (env, PRED_TRUE,   PRED_NAME(PRED_TRUE));
+    
+    LTSminBinaryOperator(env, PRED_MULT,   PRED_NAME(PRED_MULT), 1);
+    LTSminBinaryOperator(env, PRED_DIV,    PRED_NAME(PRED_DIV), 1);
+    LTSminBinaryOperator(env, PRED_REM,    PRED_NAME(PRED_REM), 1);
+    LTSminBinaryOperator(env, PRED_ADD,    PRED_NAME(PRED_ADD), 2);
+    LTSminBinaryOperator(env, PRED_SUB,    PRED_NAME(PRED_SUB), 2);
 
-    LTSminBinaryOperator(env, PRED_EQ,     PRED_NAME(PRED_EQ), 1);
-    LTSminPrefixOperator(env, PRED_NOT,    PRED_NAME(PRED_NOT),  2);
+    LTSminBinaryOperator(env, PRED_LT,     PRED_NAME(PRED_LT), 3);
+    LTSminBinaryOperator(env, PRED_LEQ,    PRED_NAME(PRED_LEQ), 3);
+    LTSminBinaryOperator(env, PRED_GT,     PRED_NAME(PRED_GT), 3);
+    LTSminBinaryOperator(env, PRED_GEQ,    PRED_NAME(PRED_GEQ), 3);
+    
+    LTSminBinaryOperator(env, PRED_EQ,     PRED_NAME(PRED_EQ), 4);
+    LTSminBinaryOperator(env, PRED_NEQ,    PRED_NAME(PRED_NEQ), 4);
+    
+    LTSminPrefixOperator(env, PRED_NOT,    PRED_NAME(PRED_NOT), 5);
 
-    LTSminBinaryOperator(env, PRED_AND,    PRED_NAME(PRED_AND),  4);
-    LTSminBinaryOperator(env, PRED_OR,     PRED_NAME(PRED_OR),  5);
+    LTSminBinaryOperator(env, PRED_AND,    PRED_NAME(PRED_AND), 6);
+    LTSminBinaryOperator(env, PRED_OR,     PRED_NAME(PRED_OR), 7);
 
-    LTSminBinaryOperator(env, PRED_EQUIV,  PRED_NAME(PRED_EQUIV),6);
-    LTSminBinaryOperator(env, PRED_IMPLY,  PRED_NAME(PRED_IMPLY), 7);
+    LTSminBinaryOperator(env, PRED_EQUIV,  PRED_NAME(PRED_EQUIV), 8);
+    LTSminBinaryOperator(env, PRED_IMPLY,  PRED_NAME(PRED_IMPLY), 9);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
     ltsmin_expr_t expr=env->expr;
@@ -210,14 +233,17 @@ ltl_tree_walker(ltsmin_expr_t in)
 
 /* Parser Priorities:
  * HIGH
- *     binary priority 1          : ==, !=, etc
- *     prefix priority 2          : !
- *     prefix priority 3          : G,F,X
- *     binary priority 4          : &
- *     binary priority 5          : |
- *     binary priority 6          : <->
- *     binary priority 7          : <->
- *     binary priority 8          : U,R
+ *     binary priority 1          : *, /, %
+ *     binary priority 2          : +, -
+ *     binary priority 3          : <, <=, >, >=
+ *     binary priority 4          : ==, !=, etc
+ *     prefix priority 5          : !
+ *     prefix priority 6          : G,F,X
+ *     binary priority 7          : &
+ *     binary priority 8          : |
+ *     binary priority 9          : <->
+ *     binary priority 10         : ->
+ *     binary priority 11         : U,R
  * LOW
  */
 ltsmin_expr_t
@@ -229,23 +255,36 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     LTSminConstant      (env, LTL_FALSE,        LTL_NAME(LTL_FALSE));
     LTSminConstant      (env, LTL_TRUE,         LTL_NAME(LTL_TRUE));
+    
+    
+    LTSminBinaryOperator(env, LTL_MULT,         LTL_NAME(LTL_MULT), 1);
+    LTSminBinaryOperator(env, LTL_DIV,          LTL_NAME(LTL_DIV), 1);
+    LTSminBinaryOperator(env, LTL_REM,          LTL_NAME(LTL_REM), 1);
+    LTSminBinaryOperator(env, LTL_ADD,          LTL_NAME(LTL_ADD), 2);
+    LTSminBinaryOperator(env, LTL_SUB,          LTL_NAME(LTL_SUB), 2);
+    
+    LTSminBinaryOperator(env, LTL_LT,           LTL_NAME(LTL_LT), 3);
+    LTSminBinaryOperator(env, LTL_LEQ,          LTL_NAME(LTL_LEQ), 3);
+    LTSminBinaryOperator(env, LTL_GT,           LTL_NAME(LTL_GT), 3);
+    LTSminBinaryOperator(env, LTL_GEQ,          LTL_NAME(LTL_GEQ), 3);
 
-    LTSminBinaryOperator(env, LTL_EQ,           LTL_NAME(LTL_EQ), 1);
-    LTSminPrefixOperator(env, LTL_NOT,          LTL_NAME(LTL_NOT),  2);
+    LTSminBinaryOperator(env, LTL_EQ,           LTL_NAME(LTL_EQ), 4);
+    LTSminBinaryOperator(env, LTL_NEQ,          LTL_NAME(LTL_NEQ), 4);
+    LTSminPrefixOperator(env, LTL_NOT,          LTL_NAME(LTL_NOT), 5);
 
-    LTSminPrefixOperator(env, LTL_GLOBALLY,     LTL_NAME(LTL_GLOBALLY), 3);
-    LTSminPrefixOperator(env, LTL_FUTURE,       LTL_NAME(LTL_FUTURE), 3);
-    LTSminPrefixOperator(env, LTL_NEXT,         LTL_NAME(LTL_NEXT),  3);
+    LTSminPrefixOperator(env, LTL_GLOBALLY,     LTL_NAME(LTL_GLOBALLY), 6);
+    LTSminPrefixOperator(env, LTL_FUTURE,       LTL_NAME(LTL_FUTURE), 6);
+    LTSminPrefixOperator(env, LTL_NEXT,         LTL_NAME(LTL_NEXT), 6);
 
-    LTSminBinaryOperator(env, LTL_AND,          LTL_NAME(LTL_AND),  4);
-    LTSminBinaryOperator(env, LTL_OR,           LTL_NAME(LTL_OR),  5);
+    LTSminBinaryOperator(env, LTL_AND,          LTL_NAME(LTL_AND), 7);
+    LTSminBinaryOperator(env, LTL_OR,           LTL_NAME(LTL_OR), 8);
 
-    LTSminBinaryOperator(env, LTL_EQUIV,        LTL_NAME(LTL_EQUIV),6);
-    LTSminBinaryOperator(env, LTL_IMPLY,        LTL_NAME(LTL_IMPLY), 7);
+    LTSminBinaryOperator(env, LTL_EQUIV,        LTL_NAME(LTL_EQUIV), 9);
+    LTSminBinaryOperator(env, LTL_IMPLY,        LTL_NAME(LTL_IMPLY), 10);
 
-    LTSminBinaryOperator(env, LTL_UNTIL,        LTL_NAME(LTL_UNTIL),  8);
-    LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   LTL_NAME(LTL_WEAK_UNTIL),  8); // translated to U \/ []
-    LTSminBinaryOperator(env, LTL_RELEASE,      LTL_NAME(LTL_RELEASE),  8);
+    LTSminBinaryOperator(env, LTL_UNTIL,        LTL_NAME(LTL_UNTIL), 11);
+    LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   LTL_NAME(LTL_WEAK_UNTIL), 11); // translated to U \/ []
+    LTSminBinaryOperator(env, LTL_RELEASE,      LTL_NAME(LTL_RELEASE), 11);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
     env->expr = ltl_tree_walker (env->expr);
@@ -283,24 +322,37 @@ ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     LTSminConstant      (env, CTL_FALSE,        CTL_NAME(CTL_FALSE));
     LTSminConstant      (env, CTL_TRUE,         CTL_NAME(CTL_TRUE));
+    
+    
+    LTSminBinaryOperator(env, CTL_MULT,         CTL_NAME(CTL_MULT), 1);
+    LTSminBinaryOperator(env, CTL_DIV,          CTL_NAME(CTL_DIV), 1);
+    LTSminBinaryOperator(env, CTL_REM,          CTL_NAME(CTL_REM), 1);
+    LTSminBinaryOperator(env, CTL_ADD,          CTL_NAME(CTL_ADD), 2);
+    LTSminBinaryOperator(env, CTL_SUB,          CTL_NAME(CTL_SUB), 2);
+    
+    LTSminBinaryOperator(env, CTL_LT,           CTL_NAME(CTL_LT), 3);
+    LTSminBinaryOperator(env, CTL_LEQ,          CTL_NAME(CTL_LEQ), 3);
+    LTSminBinaryOperator(env, CTL_GT,           CTL_NAME(CTL_GT), 3);
+    LTSminBinaryOperator(env, CTL_GEQ,          CTL_NAME(CTL_GEQ), 3);
 
-    LTSminBinaryOperator(env, CTL_EQ,           CTL_NAME(CTL_EQ), 1);
-    LTSminPrefixOperator(env, CTL_NOT,          CTL_NAME(CTL_NOT),  2);
+    LTSminBinaryOperator(env, CTL_EQ,           CTL_NAME(CTL_EQ), 4);
+    LTSminBinaryOperator(env, CTL_NEQ,          CTL_NAME(CTL_NEQ), 4);
+    LTSminPrefixOperator(env, CTL_NOT,          CTL_NAME(CTL_NOT), 5);
 
-    LTSminPrefixOperator(env, CTL_EXIST,        CTL_NAME(CTL_EXIST),  3);
-    LTSminPrefixOperator(env, CTL_ALL,          CTL_NAME(CTL_ALL),  3);
+    LTSminPrefixOperator(env, CTL_EXIST,        CTL_NAME(CTL_EXIST), 6);
+    LTSminPrefixOperator(env, CTL_ALL,          CTL_NAME(CTL_ALL), 6);
 
-    LTSminPrefixOperator(env, CTL_GLOBALLY,     CTL_NAME(CTL_GLOBALLY), 3);
-    LTSminPrefixOperator(env, CTL_FUTURE,       CTL_NAME(CTL_FUTURE), 3);
-    LTSminPrefixOperator(env, CTL_NEXT,         CTL_NAME(CTL_NEXT),  3);
+    LTSminPrefixOperator(env, CTL_GLOBALLY,     CTL_NAME(CTL_GLOBALLY), 6);
+    LTSminPrefixOperator(env, CTL_FUTURE,       CTL_NAME(CTL_FUTURE), 6);
+    LTSminPrefixOperator(env, CTL_NEXT,         CTL_NAME(CTL_NEXT), 6);
 
-    LTSminBinaryOperator(env, CTL_AND,          CTL_NAME(CTL_AND),  4);
-    LTSminBinaryOperator(env, CTL_OR,           CTL_NAME(CTL_OR),  5);
+    LTSminBinaryOperator(env, CTL_AND,          CTL_NAME(CTL_AND), 7);
+    LTSminBinaryOperator(env, CTL_OR,           CTL_NAME(CTL_OR), 8);
 
-    LTSminBinaryOperator(env, CTL_EQUIV,        CTL_NAME(CTL_EQUIV),6);
-    LTSminBinaryOperator(env, CTL_IMPLY,        CTL_NAME(CTL_IMPLY), 7);
+    LTSminBinaryOperator(env, CTL_EQUIV,        CTL_NAME(CTL_EQUIV), 9);
+    LTSminBinaryOperator(env, CTL_IMPLY,        CTL_NAME(CTL_IMPLY), 10);
 
-    LTSminBinaryOperator(env, CTL_UNTIL,        CTL_NAME(CTL_UNTIL),  8);
+    LTSminBinaryOperator(env, CTL_UNTIL,        CTL_NAME(CTL_UNTIL), 11);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
     ltsmin_expr_t expr=env->expr;
@@ -365,12 +417,22 @@ ltsmin_expr_t ltl_to_ctl_star_1(ltsmin_expr_t in)
         case LTL_NUM:       res->token = CTL_NUM;       break;
         case LTL_CHUNK:     res->token = CTL_CHUNK;     break;
         case LTL_VAR:       res->token = CTL_VAR;       break;
+        case LTL_LT:        res->token = CTL_LT;        break;
+        case LTL_LEQ:       res->token = CTL_LEQ;       break;
+        case LTL_GT:        res->token = CTL_GT;        break;
+        case LTL_GEQ:       res->token = CTL_GEQ;       break;
         case LTL_EQ:        res->token = CTL_EQ;        break;
+        case LTL_NEQ:       res->token = CTL_NEQ;       break;
         case LTL_TRUE:      res->token = CTL_TRUE;      break;
         case LTL_FALSE:     res->token = CTL_FALSE;     break;
         case LTL_OR:        res->token = CTL_OR;        break;
         case LTL_AND:       res->token = CTL_AND;       break;
         case LTL_NOT:       res->token = CTL_NOT;       break;
+        case LTL_MULT:      res->token = CTL_MULT;      break;
+        case LTL_DIV:       res->token = CTL_DIV;       break;
+        case LTL_REM:       res->token = CTL_REM;       break;
+        case LTL_ADD:       res->token = CTL_ADD;       break;
+        case LTL_SUB:       res->token = CTL_SUB;       break;
         case LTL_NEXT:      res->token = CTL_NEXT;      break;
         case LTL_UNTIL:     res->token = CTL_UNTIL;     break;
         case LTL_IMPLY:     res->token = CTL_IMPLY;     break;
@@ -595,7 +657,12 @@ char *ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
                 sprintf(buf, "@C%d", ltl->num);
             break;
         case LTL_CHUNK: sprintf(buf, "@H%d", ltl->idx); break;
+        case LTL_LT: sprintf(buf, " < "); break;
+        case LTL_LEQ: sprintf(buf, " <= "); break;
+        case LTL_GT: sprintf(buf, " > "); break;
+        case LTL_GEQ: sprintf(buf, " >= "); break;
         case LTL_EQ: sprintf(buf, " == "); break;
+        case LTL_NEQ: sprintf(buf, " != "); break;
         case LTL_TRUE: sprintf(buf, "true"); break;
         case LTL_OR: sprintf(buf, " or "); break;
         case LTL_NOT: sprintf(buf, "!"); break;
@@ -607,6 +674,11 @@ char *ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
         case LTL_IMPLY: sprintf(buf, " -> "); break;
         case LTL_FUTURE: sprintf(buf, "F "); break;
         case LTL_GLOBALLY: sprintf(buf, "G "); break;
+        case LTL_MULT: sprintf(buf, " * "); break;
+        case LTL_DIV: sprintf(buf, " / "); break;
+        case LTL_REM: sprintf(buf, " %% "); break;
+        case LTL_ADD: sprintf(buf, " + "); break;
+        case LTL_SUB: sprintf(buf, " - "); break;
         default:
             Abort("unknown LTL token");
     }
@@ -653,7 +725,12 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
                 sprintf(buf, "@C%d", ctl->num);
             break;
         case CTL_CHUNK: sprintf(buf, "@H%d", ctl->idx); break;
+        case CTL_LT: sprintf(buf, " < "); break;
+        case CTL_LEQ: sprintf(buf, " <= "); break;
+        case CTL_GT: sprintf(buf, " > "); break;
+        case CTL_GEQ: sprintf(buf, " >= "); break;
         case CTL_EQ: sprintf(buf, " == "); break;
+        case CTL_NEQ: sprintf(buf, " != "); break;
         case CTL_TRUE: sprintf(buf, "true"); break;
         case CTL_OR: sprintf(buf, " or "); break;
         case CTL_NOT: sprintf(buf, "!"); break;
@@ -667,6 +744,11 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
         case CTL_GLOBALLY: sprintf(buf, "G "); break;
         case CTL_EXIST: sprintf(buf, "E "); break;
         case CTL_ALL: sprintf(buf, "A "); break;
+        case CTL_MULT: sprintf(buf, " * "); break;
+        case CTL_DIV: sprintf(buf, " / "); break;
+        case CTL_REM: sprintf(buf, " %% "); break;
+        case CTL_ADD: sprintf(buf, " + "); break;
+        case CTL_SUB: sprintf(buf, " - "); break;
         default:
             Abort("unknown CTL token");
     }
@@ -1544,7 +1626,12 @@ ltsmin_expr_t ctl_star_to_mu_1(ltsmin_expr_t in)
         case CTL_NUM:       res->token = MU_NUM;       break;
         case CTL_CHUNK:     res->token = MU_CHUNK;     break;
         case CTL_VAR:       res->token = MU_VAR;       break;
+        case CTL_LT:        res->token = MU_LT;        break;
+        case CTL_LEQ:       res->token = MU_LEQ;       break;
+        case CTL_GT:        res->token = MU_GT;        break;
+        case CTL_GEQ:       res->token = MU_GEQ;       break;
         case CTL_EQ:        res->token = MU_EQ;        break;
+        case CTL_NEQ:       res->token = MU_NEQ;       break;
         case CTL_TRUE:      res->token = MU_TRUE;      break;
         case CTL_FALSE:     res->token = MU_FALSE;     break;
         case CTL_OR:        res->token = MU_OR;        break;
@@ -1553,6 +1640,11 @@ ltsmin_expr_t ctl_star_to_mu_1(ltsmin_expr_t in)
         case CTL_NEXT:      res->token = MU_NEXT;      break;
         case CTL_ALL:       res->token = MU_ALL;       break;
         case CTL_EXIST:     res->token = MU_EXIST;     break;
+        case CTL_MULT:      res->token = MU_MULT;      break;
+        case CTL_DIV:       res->token = MU_DIV;       break;
+        case CTL_REM:       res->token = MU_REM;       break;
+        case CTL_ADD:       res->token = MU_ADD;       break;
+        case CTL_SUB:       res->token = MU_SUB;       break;
         default:
             // unhandled?
             Abort("unhandled case in ctl_star_to_mu_1");

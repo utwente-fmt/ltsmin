@@ -66,7 +66,12 @@ typedef enum {
     VAR,
 
     /* predicate language constructs, to avoid enum collisions */
+    S_LT,
+    S_LEQ,
+    S_GT,
+    S_GEQ,
     S_EQ,
+    S_NEQ,
     S_TRUE,
     S_FALSE,
     S_NOT,
@@ -74,6 +79,11 @@ typedef enum {
     S_AND,
     S_EQUIV,
     S_IMPLY,
+    S_MULT,
+    S_DIV,
+    S_REM,
+    S_ADD,
+    S_SUB,
 
     /* special symbols */
     MU_FIX,
