@@ -391,6 +391,28 @@ if test "x$with_scoop" == xyes; then
     [have_scoop="yes"]
 fi
 
+AX_BOOST_BASE([1.46],[have_boost="yes"],)
+AX_PATH_VIENNACL(1.5.1, no)
+if (test x$HAVE_VIENNACL = x1); then
+    have_viennacl="yes"
+else
+    AC_MSG_WARN([no acceptable ViennaCL installation found.])
+fi
+
+AM_PATH_XML2(,[have_xml2="yes"],[AC_MSG_WARN([No acceptable libxml2 installation found.])])
+
+AC_ARG_WITH([prob],[AS_HELP_STRING([--with-prob],[Compile ProB front-end])],[],[with_prob=yes])
+AS_IF([test x"$with_prob" = "xyes"],[AX_ZMQ([3.0.0])])
+AS_IF([test x"$HAVE_ZMQ" = "x1"],[AX_CZMQ(,[
+    acx_prob=yes
+    PROB_CPPFLAGS="$CZMQ_CPPFLAGS $ZMQ_CPPFLAGS"
+    PROB_LDFLAGS="$CZMQ_LDFLAGS $ZMQ_LDFLAGS"
+    PROB_LIBS="$CZMQ_LIBS $ZMQ_LIBS"
+    AC_SUBST(PROB_CPPFLAGS)
+    AC_SUBST(PROB_LDFLAGS)
+    AC_SUBST(PROB_LIBS)
+])])
+
 #AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
