@@ -219,10 +219,7 @@ dm_create(matrix_t* m, const int rows, const int cols)
     // calculate the number of bits needed per row, dword aligned
     size_t row_size = (cols % 32) ? cols - (cols % 32) + 32 : cols;
     m->bits_per_row = row_size;
-    if (bitvector_create(&(m->bits), rows * row_size)) {
-        Warning(info, "out of memory");
-        HREabort(LTSMIN_EXIT_FAILURE);
-    }
+    bitvector_create(&(m->bits), rows * row_size);
 
     // create row header
     dm_create_header(&(m->row_perm), rows);
@@ -505,12 +502,9 @@ dm_copy(const matrix_t* src, matrix_t* tgt)
     copy_header_(&(src->col_perm), &(tgt->col_perm));
 
     if (src->rows != 0 && src->cols != 0) {
-        if (bitvector_copy(&(tgt->bits), &(src->bits)) != 0) Abort("out of memory");
+        bitvector_copy(&(tgt->bits), &(src->bits));
     } else {
-        if (bitvector_create(&(tgt->bits), 0)) {
-            Warning(info, "out of memory");
-            HREabort(LTSMIN_EXIT_FAILURE);
-        }
+        bitvector_create(&(tgt->bits), 0);
     }
 }
 
