@@ -1,6 +1,7 @@
 #ifndef LTSMIN_SYNTAX_H
 #define LTSMIN_SYNTAX_H
 
+#include <dm/bitvector.h>
 #include <hre/user.h>
 #include <hre-io/stream.h>
 #include <util-lib/fast_hash.h>
@@ -108,6 +109,7 @@ struct ltsmin_expr_s {
     ltsmin_expr_t       arg1;
     ltsmin_expr_t       arg2;
     uint32_t            hash;
+    bitvector_t         deps;
 };
 
 extern void   LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env);

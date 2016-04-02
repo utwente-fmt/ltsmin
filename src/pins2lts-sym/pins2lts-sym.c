@@ -3616,11 +3616,10 @@ init_invariant_detection()
         inv_parse_env[i] = LTSminParseEnvCreate();
         inv_expr[i] = parse_file_env(inv_detect[i], pred_parse_file, model, inv_parse_env[i]);
         mark_visible(model, inv_expr[i], inv_parse_env[i]);
-        int deps[N];
-        memset(&deps, 0, sizeof(int[N]));
-        inv_proj[i].len = mark_predicate(model, inv_expr[i], deps, inv_parse_env[i]);
+        mark_predicate(model, inv_expr[i], inv_parse_env[i]);
+        inv_proj[i].len = bitvector_n_high(&inv_expr[i]->deps);
         inv_proj[i].proj = (int*) RTmalloc(inv_proj[i].len * sizeof(int));
-        for (int j = 0, k = 0; j < N; j++) if (deps[j]) inv_proj[i].proj[k++] = j;
+        bitvector_high_bits(&inv_expr[i]->deps, inv_proj[i].proj);
     }
 
     inv_state_labels = (int*) RTmalloc(sizeof(int[sLbls]));

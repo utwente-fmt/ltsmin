@@ -28,6 +28,7 @@ libltsmin_la_SOURCES += ltsmin-lexer.l
 libltsmin_la_SOURCES += ltsmin-standard.h
 
 libltsmin_la_LIBADD   = $(top_builddir)/ltl2ba/libltl2ba.la
+libltsmin_la_LIBADD  += ../dm/libdm.la
 libltsmin_la_LIBADD  += $(SPOT_LDFLAGS) $(SPOT_LIBS)
 
 libltsmin_la_LIBS     = $(SPOT_LIBS)

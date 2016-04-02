@@ -208,3 +208,17 @@ bitvector_invert(bitvector_t *bv)
     if (used_bits < WORD_BITS)
         bv->data[bv->n_words-1] &= mask;
 }
+
+size_t
+bitvector_n_high(bitvector_t *bv)
+{
+    HREassert(sizeof(size_t) == sizeof(unsigned long long));
+    
+    size_t n_high = 0;
+    
+    for (size_t i = 0; i < bv->n_words; i++) {
+        n_high += __builtin_popcountll((unsigned long long) bv->data[0]);
+    }
+    
+    return n_high;
+}

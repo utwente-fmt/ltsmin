@@ -201,4 +201,9 @@ extern int          bitvector_is_disjoint(const bitvector_t *, const bitvector_t
  */
 extern void         bitvector_invert(bitvector_t *);
 
+/**
+ * Returns the number of high bits
+ */
+extern size_t       bitvector_n_high(bitvector_t *);
+
 #endif                          // BITVECTOR_H

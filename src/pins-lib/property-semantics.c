@@ -120,18 +120,23 @@ parse_file(const char *file, parse_f parser, model_t model)
     return expr;
 }
 
-int
-mark_predicate (model_t m, ltsmin_expr_t e, int *dep, ltsmin_parse_env_t env)
+void
+mark_predicate (model_t m, ltsmin_expr_t e, ltsmin_parse_env_t env)
 {
-    int deps = 0;
-    if (!e) return deps;
+    if (!e) return;
+    
+    bitvector_create(&e->deps, pins_get_state_variable_count(m));
+    
     switch(e->node_type) {
     case BINARY_OP:
-        deps = mark_predicate(m,e->arg1,dep,env);
-        deps += mark_predicate(m,e->arg2,dep,env);
+        mark_predicate(m,e->arg1,env);
+        mark_predicate(m,e->arg2,env);
+        bitvector_copy(&e->deps, &e->arg1->deps);
+        bitvector_union(&e->deps, &e->arg2->deps);
         break;
     case UNARY_OP:
-        deps = mark_predicate(m,e->arg1,dep,env);
+        mark_predicate(m,e->arg1,env);
+        bitvector_copy(&e->deps, &e->arg1->deps);
         break;
     default:
         switch(e->token) {
@@ -141,26 +146,16 @@ mark_predicate (model_t m, ltsmin_expr_t e, int *dep, ltsmin_parse_env_t env)
         case PRED_VAR:
         case PRED_CHUNK:
             break;
-        case PRED_EQ:
-            deps = mark_predicate(m,e->arg1, dep,env);
-            deps += mark_predicate(m,e->arg2, dep,env);
-            break;
         case PRED_SVAR: {
             lts_type_t ltstype = GBgetLTStype(m);
             int N = lts_type_get_state_length (ltstype);
             if (e->idx < N) { // state variable
-                if (dep[e->idx] == 0) deps++;
-                dep[e->idx] = 1;
+                bitvector_set(&e->deps, e->idx);
             } else { // state label
                 HREassert (e->idx < N + lts_type_get_state_label_count(ltstype));
                 matrix_t *sl = GBgetStateLabelInfo (m);
                 HREassert (N == dm_ncols(sl));
-                for (int i = 0; i < N; i++) {
-                    if (dm_is_set(sl, e->idx - N, i)) {
-                        if (dep[i] == 0) deps++;
-                        dep[i] = 1;
-                    }
-                }
+                dm_bitvector_row(&e->deps, sl, e->idx - N);
             }
             break;
         }
@@ -170,7 +165,6 @@ mark_predicate (model_t m, ltsmin_expr_t e, int *dep, ltsmin_parse_env_t env)
         }
         break;
     }
-    return deps;
 }
 
 void
