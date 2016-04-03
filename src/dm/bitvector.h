@@ -206,4 +206,9 @@ extern void         bitvector_invert(bitvector_t *);
  */
 extern size_t       bitvector_n_high(bitvector_t *);
 
+/**
+ * Sets the bits that are high
+ */
+extern void         bitvector_high_bits(bitvector_t *, int *);
+
 #endif                          // BITVECTOR_H

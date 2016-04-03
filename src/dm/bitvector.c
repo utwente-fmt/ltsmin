@@ -217,8 +217,18 @@ bitvector_n_high(bitvector_t *bv)
     size_t n_high = 0;
     
     for (size_t i = 0; i < bv->n_words; i++) {
-        n_high += __builtin_popcountll((unsigned long long) bv->data[0]);
+        n_high += __builtin_popcountll((unsigned long long) bv->data[i]);
     }
     
     return n_high;
+}
+
+void
+bitvector_high_bits(bitvector_t *bv, int *bits)
+{
+    if (bv->n_bits > INT_MAX) Abort("bitvector too large");
+    
+    for (int i = 0, j = 0; i < (int) bv->n_bits; i++) {
+        if (bitvector_is_set(bv, i)) bits[j++] = i;
+    }
 }
