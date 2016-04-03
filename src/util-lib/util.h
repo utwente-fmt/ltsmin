@@ -147,5 +147,7 @@ INT_SIZE (size_t size)
     return (size + 3) / 4;
 }
 
+extern int long_mult_overflow(const long si_a, const long si_b);
+
 #endif // UTIL_LTSMIN_H
 
