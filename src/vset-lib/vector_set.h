@@ -414,8 +414,6 @@ extern void vset_visit_seq(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_s
 
 extern int vset_get_visit_op_num(vdom_t dom);
 
-extern void vset_blaat(vset_t set);
-
 //@}
 
 #endif
