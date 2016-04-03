@@ -1,6 +1,7 @@
 #include <hre/config.h>
 
 #include <ctype.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -109,4 +110,22 @@ void
 ci_sort (ci_list *list)
 {
     qsortr (list->data, list->count, sizeof(int), compint, NULL);
+}
+
+int long_mult_overflow(const long si_a, const long si_b) {
+    if (si_a > 0) { /* si_a is positive */
+        if (si_b > 0) { /* si_a and si_b are positive */
+            if (si_a > (LONG_MAX / si_b)) return 1;
+        } else { /* si_a positive, si_b nonpositive */
+            if (si_b < (LONG_MIN / si_a)) return 1;
+        } /* si_a positive, si_b nonpositive */
+    } else { /* si_a is nonpositive */
+        if (si_b > 0) { /* si_a is nonpositive, si_b is positive */
+            if (si_a < (LONG_MIN / si_b)) return 1;
+        } else { /* si_a and si_b are nonpositive */
+            if ((si_a != 0) && (si_b < (LONG_MAX / si_a))) return 1;
+        } /* End if si_a and si_b are nonpositive */
+    } /* End if si_a is nonpositive */
+    
+    return 0;
 }
