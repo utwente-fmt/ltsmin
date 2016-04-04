@@ -312,6 +312,7 @@ struct inv_check_s
     vset_t container;
     struct inv_check_s* left;
     struct inv_check_s* right;
+    void* work;
 };
 
 struct inv_check_s** inv_expr_info = NULL;
@@ -779,25 +780,69 @@ learn_labels_par(vset_t states)
     for (int i = 0; i < num_inv_sl_used; i++) SYNC(eval_label);
 }
 
+struct inv_rel_s {
+    vset_t tmp;
+    vset_t true_states;
+    vset_t false_states;
+    vset_t shortcut; // only used when not evaluating every binary operand in parallel.
+    int len;
+    int* deps;
+    int* vec;
+};
+
 static void
 inv_info_destroy(ltsmin_expr_t e, ltsmin_parse_env_t env, struct inv_check_s* c)
 {
     switch(e->token) {
-    case PRED_NOT:
-        inv_info_destroy(e->arg1, env, c->left);
-        break;
-    case PRED_AND:
-    case PRED_OR:
-        inv_info_destroy(e->arg1, env, c->left);
-        inv_info_destroy(e->arg2, env, c->right);
-        break;
-    case PRED_SVAR:
-        vset_destroy(c->left->container);
-        RTfree(c->left);
-        break;
+        case PRED_NOT:
+            inv_info_destroy(e->arg1, env, c->left);
+            break;
+        case PRED_AND:
+        case PRED_OR:
+            inv_info_destroy(e->arg1, env, c->left);
+            inv_info_destroy(e->arg2, env, c->right);
+            break;
+        case PRED_SVAR:
+            vset_destroy(c->left->container);
+            RTfree(c->left);
+            break;        
+        case PRED_EQ:
+        case PRED_NEQ:
+        case PRED_LT:
+        case PRED_LEQ:
+        case PRED_GT:
+        case PRED_GEQ: {
+            struct inv_rel_s* info = (struct inv_rel_s*) c->work;
+            vset_destroy(info->tmp);
+            vset_destroy(info->true_states);
+            vset_destroy(info->false_states);
+            if (!inv_bin_par) vset_destroy(info->shortcut);
+            RTfree(info->deps);
+            RTfree(info->vec);
+            RTfree(info);
+            break;
+        }
     }
     vset_destroy(c->container);
     RTfree(c);
+}
+
+struct rel_expr_info {
+    int* vec;
+    int len;
+    int* deps;
+    ltsmin_expr_t e;
+    ltsmin_parse_env_t env;
+};
+
+static void
+rel_expr_cb(vset_t set, void *context, int *e)
+{
+    struct rel_expr_info* ctx = (struct rel_expr_info*) context;
+    int vec[N];
+    memcpy(vec, ctx->vec, sizeof(int[N]));
+    for (int i = 0; i < ctx->len; i++) vec[ctx->deps[i]] = e[i];
+    if (eval_predicate(model, ctx->e, NULL, vec, N, ctx->env)) vset_add(set, e);
 }
 
 #define eval_predicate_set_par(e, env, c, s) CALL(eval_predicate_set_par, (e), (env), (c), (s))
@@ -843,6 +888,43 @@ VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, s
             vset_union(c->container, c->right->container);
             vset_clear(c->right->container);
         } break;
+        case PRED_EQ:
+        case PRED_NEQ:
+        case PRED_LT:
+        case PRED_LEQ:
+        case PRED_GT:
+        case PRED_GEQ: {
+            const struct inv_rel_s* info = (const struct inv_rel_s*) c->work;
+            
+            vset_project_minus(info->tmp, states, info->true_states);
+            vset_minus(info->tmp, info->false_states);
+            
+            struct rel_expr_info ctx;
+            ctx.vec = info->vec;
+
+            ctx.len = info->len;
+            ctx.deps = info->deps;
+
+            ctx.e = e;
+            ctx.env = env;
+            
+            // count when verbose
+            if (log_active(infoLong)) {
+                double elem_count;
+                vset_count(info->tmp, NULL, &elem_count);
+                if (elem_count >= 10000.0 * SPEC_REL_PERF) {                    
+                    const char* p = LTSminPrintExpr(e, env);
+                    Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
+                }
+            }
+
+            vset_update(info->true_states, info->tmp, rel_expr_cb, &ctx);
+            vset_minus(info->tmp, info->true_states);
+            vset_union(info->false_states, info->tmp);
+            vset_clear(info->tmp);
+            vset_join(c->container, c->container, info->true_states);
+            break;
+        }
         default:
             LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);
@@ -864,7 +946,7 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struc
         case PRED_SVAR: { // assume state label
             /* following join is necessary because vset does not yet support
              * set projection of a projected set. */
-            vset_join(c->left->container, c->container, states);
+            vset_join((vset_t) c->work, c->container, states);
             if (inv_par) {
                 volatile int* ptr = &label_locks[e->idx - N];
                 while (!cas(ptr, 0, 1)) {
@@ -872,9 +954,9 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struc
                     ptr = &label_locks[e->idx - N];
                 }
             }
-            eval_label(e->idx - N, c->left->container);
+            eval_label(e->idx - N, (vset_t) c->work);
             if (inv_par) label_locks[e->idx - N] = 0;
-            vset_clear(c->left->container);
+            vset_clear((vset_t) c->work);
             vset_join(c->container, c->container, label_true[e->idx - N]);            
         } break;
         case PRED_NOT: {
@@ -909,6 +991,47 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struc
             }
             vset_clear(c->left->container);
         } break;
+        case PRED_EQ:
+        case PRED_NEQ:
+        case PRED_LT:
+        case PRED_LEQ:
+        case PRED_GT:
+        case PRED_GEQ: {
+            const struct inv_rel_s* info = (const struct inv_rel_s*) c->work;
+            
+            // this join is necessary because we can not project an already projected vset.
+            vset_join(info->shortcut, states, c->container);
+            
+            vset_project_minus(info->tmp, info->shortcut, info->true_states);
+            vset_clear(info->shortcut);
+            vset_minus(info->tmp, info->false_states);
+            
+            struct rel_expr_info ctx;
+            ctx.vec = info->vec;
+
+            ctx.len = info->len;
+            ctx.deps = info->deps;
+
+            ctx.e = e;
+            ctx.env = env;
+            
+            // count when verbose
+            if (log_active(infoLong)) {
+                double elem_count;
+                vset_count(info->tmp, NULL, &elem_count);
+                if (elem_count >= 10000.0 * SPEC_REL_PERF) {                    
+                    const char* p = LTSminPrintExpr(e, env);
+                    Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
+                }
+            }
+
+            vset_update(info->true_states, info->tmp, rel_expr_cb, &ctx);
+            vset_minus(info->tmp, info->true_states);
+            vset_union(info->false_states, info->tmp);
+            vset_clear(info->tmp);
+            vset_join(c->container, c->container, info->true_states);            
+            break;
+        }
         default:
             LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);
@@ -3443,7 +3566,7 @@ static struct inv_check_s*
 inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
 {
     if (!e) return NULL;
-
+        
     struct inv_check_s* result = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
     result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
     switch(e->token) {
@@ -3459,11 +3582,31 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
     case PRED_FALSE:
         break;
     case PRED_SVAR:
-        if (e->idx >= N) {
-            result->left = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
-            result->left->container = vset_create(domain, -1, NULL);
+        if (e->idx >= N && !inv_bin_par) {
+            result->work = (void*) vset_create(domain, -1, NULL);
             break;
         }
+    case PRED_EQ:
+    case PRED_NEQ:
+    case PRED_LT:
+    case PRED_LEQ:
+    case PRED_GT:
+    case PRED_GEQ: {
+        result->work = RTmalloc(sizeof(struct inv_rel_s));
+        struct inv_rel_s* info = (struct inv_rel_s*) result->work;
+        
+        info->vec = RTmalloc(sizeof(int[N]));
+        GBgetInitialState(model, info->vec);
+        
+        info->len = bitvector_n_high(&e->deps);
+        info->deps = RTmalloc(sizeof(int[info->len]));
+        bitvector_high_bits(&e->deps, info->deps);
+        info->tmp = vset_create(domain, info->len, info->deps);
+        info->true_states = vset_create(domain, info->len, info->deps);
+        info->false_states = vset_create(domain, info->len, info->deps);
+        if (!inv_bin_par) info->shortcut = vset_create(domain, -1, NULL);
+        break;
+    }
     default:
         LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
         HREabort (LTSMIN_EXIT_FAILURE);
@@ -3613,7 +3756,7 @@ init_invariant_detection()
     inv_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * num_inv);
     for (int i = 0; i < num_inv; i++) {
         inv_parse_env[i] = LTSminParseEnvCreate();
-        inv_expr[i] = parse_file_env(inv_detect[i], pred_parse_file, model, inv_parse_env[i]);
+        inv_expr[i] = parse_file_env(inv_detect[i], pred_parse_file, model, inv_parse_env[i]);        
         mark_visible(model, inv_expr[i], inv_parse_env[i]);
         mark_predicate(model, inv_expr[i], inv_parse_env[i]);
         inv_proj[i].len = bitvector_n_high(&inv_expr[i]->deps);
