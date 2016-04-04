@@ -42,6 +42,7 @@
 
 #define LTSMIN_TYPE_BOOL                "bool"
 #define LTSMIN_TYPE_GUARD               "guard"
+#define LTSMIN_TYPE_NUMERIC             "numeric"
 
 
 /**
