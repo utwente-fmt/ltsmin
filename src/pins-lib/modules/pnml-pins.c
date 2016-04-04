@@ -61,7 +61,7 @@ typedef enum { ARC_IN, ARC_OUT, ARC_LAST } arc_dir_t;
 typedef struct arc {
     int transition;
     int place;
-    uint32_t num;
+    int num;
     arc_dir_t type;
 } arc_t;
 
@@ -91,7 +91,7 @@ typedef struct pnml_context {
     int num_in_arcs;
 } pnml_context_t;
 
-static uint32_t max_token_count = 0;
+static int max_token_count = 0;
 
 static void
 pnml_exit(model_t model)
@@ -106,16 +106,16 @@ get_successor_long(void* model, int t, int* in, void
 {
     pnml_context_t* context = GBgetContext(model);
 
-    uint32_t out[NUM_PLACES];
+    int out[NUM_PLACES];
     memcpy(out, in, sizeof(int[NUM_PLACES]));
 
     int overflown = 0;
-    uint32_t max = 0;
+    int max = 0;
     for (arc_t* arc = context->arcs + context->transitions[t].start; arc->transition == t; arc++) {
         switch(arc->type) {
             case ARC_IN: {
                 // check precondition
-                if (out[arc->place] - arc->num > out[arc->place]) return 0; // underflow (token count < 0)
+                if (out[arc->place] - arc->num < 0) return 0; // underflow (token count < 0)
 
                 // remove tokens
                 out[arc->place] -= arc->num;
@@ -126,7 +126,7 @@ get_successor_long(void* model, int t, int* in, void
                 if (!bitvector_is_set(&(context->safe_places), arc->place)) {
 
                     // detect overflow and report later (only if transition is enabled)
-                    overflown |= out[arc->place] > UINT32_MAX - arc->num;
+                    overflown |= out[arc->place] > INT_MAX - arc->num;
 
                     // add tokens
                     out[arc->place] += arc->num;
@@ -142,14 +142,14 @@ get_successor_long(void* model, int t, int* in, void
 
     if (overflown) Abort("max token count exceeded");
 
-    volatile uint32_t* ptr;
+    volatile int* ptr;
     do {
         ptr = &max_token_count;
         if (max <= *ptr) break;
     } while (!cas(ptr, *ptr, max));
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
-    callback(arg, &transition_info, (int*) out, NULL);
+    callback(arg, &transition_info, out, NULL);
 
     return 1;
 }
@@ -164,17 +164,17 @@ get_successor_short(void* model, int t, int* in, void
 
     const int num_writes = dm_ones_in_row(GBgetDMInfoMustWrite(model), t);
 
-    uint32_t out[num_writes];
+    int out[num_writes];
     memcpy(out, in, sizeof(int[num_writes]));
-    uint32_t* place = out;
+    int* place = out;
 
     int overflown = 0;
-    uint32_t max = 0;
+    int max = 0;
     for (arc_t* arc = context->arcs + context->transitions[t].start; arc->transition == t; arc++) {
         switch(arc->type) {
             case ARC_IN: {
                 // check precondition
-                if (*place - arc->num > *place) return 0; // underflow (token count < 0)
+                if (*place - arc->num < 0) return 0; // underflow (token count < 0)
 
                 // remove tokens
                 *place -= arc->num;
@@ -184,7 +184,7 @@ get_successor_short(void* model, int t, int* in, void
                 // establish postcondition
 
                 // detect overflow and report later (only if transition is enabled)
-                overflown |= *place > UINT32_MAX - arc->num;
+                overflown |= *place > INT_MAX - arc->num;
 
                 // add tokens
                 *place += arc->num;
@@ -200,14 +200,14 @@ get_successor_short(void* model, int t, int* in, void
 
     if (overflown) Abort("max token count exceeded");
 
-    volatile uint32_t* ptr;
+    volatile int* ptr;
     do {
         ptr = &max_token_count;
         if (max <= *ptr) break;
     } while (!cas(ptr, *ptr, max));
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
-    callback(arg, &transition_info, (int*) out, NULL);
+    callback(arg, &transition_info, out, NULL);
 
     return 1;
 }
@@ -218,17 +218,17 @@ get_update_long(void* model, int t, int* in, void
 {
     pnml_context_t* context = GBgetContext(model);
 
-    uint32_t out[NUM_PLACES];
+    int out[NUM_PLACES];
     memcpy(out, in, sizeof(int[NUM_PLACES]));
 
     int overflown = 0;
-    uint32_t max = 0;
+    int max = 0;
     for (arc_t* arc = context->arcs + context->transitions[t].start; arc->transition == t; arc++) {
         switch(arc->type) {
             case ARC_IN: {
                 /* If there is an underflow then this transition is disabled,
                  * while it should not be, since this is the update function. */
-                HREassert(out[arc->place] - arc->num <= out[arc->place], "transition should not have been disabled");
+                HREassert(out[arc->place] - arc->num >= 0, "transition should not have been disabled");
 
                 // remove tokens
                 out[arc->place] -= arc->num;
@@ -239,7 +239,7 @@ get_update_long(void* model, int t, int* in, void
                 if (!bitvector_is_set(&(context->safe_places), arc->place)) {
 
                     // detect overflow and report later (only if transition is enabled)
-                    overflown |= out[arc->place] > UINT32_MAX - arc->num;
+                    overflown |= out[arc->place] > INT_MAX - arc->num;
 
                     // add tokens
                     out[arc->place] += arc->num;
@@ -255,14 +255,14 @@ get_update_long(void* model, int t, int* in, void
 
     if (overflown) Abort("max token count exceeded");
 
-    volatile uint32_t* ptr;
+    volatile int* ptr;
     do {
         ptr = &max_token_count;
         if (max <= *ptr) break;
     } while (!cas(ptr, *ptr, max));
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
-    callback(arg, &transition_info, (int*) out, NULL);
+    callback(arg, &transition_info, out, NULL);
 
     return 1;
 }
@@ -277,12 +277,12 @@ get_update_short(void* model, int t, int* in, void
 
     const int num_writes = dm_ones_in_row(GBgetDMInfoMustWrite(model), t);
 
-    uint32_t out[num_writes];
+    int out[num_writes];
     memcpy(out, in, sizeof(int[num_writes]));
-    uint32_t* place = out;
+    int* place = out;
 
     int overflown = 0;
-    uint32_t max = 0;
+    int max = 0;
     for (arc_t* arc = context->arcs + context->transitions[t].start; arc->transition == t; arc++) {
         switch(arc->type) {
             case ARC_IN: {
@@ -290,7 +290,7 @@ get_update_short(void* model, int t, int* in, void
 
                 /* If there is an underflow then this transition is disabled,
                  * while it should not be, since this is the update function. */
-                HREassert(*place - arc->num <= *place, "transition should not have been disabled");
+                HREassert(*place - arc->num >= 0, "transition should not have been disabled");
 
                 // remove tokens
                 *place -= arc->num;
@@ -300,7 +300,7 @@ get_update_short(void* model, int t, int* in, void
                 // establish postcondition
 
                 // detect overflow and report later (only if transition is enabled)
-                overflown |= *place > UINT32_MAX - arc->num;
+                overflown |= *place > INT_MAX - arc->num;
 
                 // add tokens
                 *place += arc->num;
@@ -316,14 +316,14 @@ get_update_short(void* model, int t, int* in, void
 
     if (overflown) Abort("max token count exceeded");
 
-    volatile uint32_t* ptr;
+    volatile int* ptr;
     do {
         ptr = &max_token_count;
         if (max <= *ptr) break;
     } while (!cas(ptr, *ptr, max));
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
-    callback(arg, &transition_info, (int*) out, NULL);
+    callback(arg, &transition_info, out, NULL);
 
     return 1;
 }
@@ -333,14 +333,14 @@ get_label_long(model_t model, int label, int* src) {
     pnml_context_t* context = GBgetContext(model);
     HREassert(label < context->num_guards, "unknown state label");
     const arc_t* arc = context->guards[label];
-    return ((uint32_t) src[arc->place]) >= arc->num;
+    return src[arc->place] >= arc->num;
 }
 
 static int
 get_label_short(model_t model, int label, int* src) {
     pnml_context_t* context = GBgetContext(model);
     HREassert(label < context->num_guards, "unknown state label");
-    return ((uint32_t) src[0]) >= context->guards[label]->num;
+    return src[0] >= context->guards[label]->num;
 }
 
 static void
@@ -349,7 +349,7 @@ get_labels(model_t model, sl_group_enum_t group, int* src, int* label) {
     if (group == GB_SL_GUARDS || group == GB_SL_ALL) {
         for (int i = 0; i < context->num_guards; i++) {
             const arc_t* arc = context->guards[i];
-            label[i] = ((uint32_t) src[arc->place]) >= arc->num;
+            label[i] = src[arc->place] >= arc->num;
         }
     }
 }
@@ -405,7 +405,7 @@ parse_toolspecific(xmlNode* a_node, pnml_context_t* context)
 }
 
 static void
-parse_net(xmlNode* a_node, model_t model, uint32_t* init_state[])
+parse_net(xmlNode* a_node, model_t model, int* init_state[])
 {
     pnml_context_t* context = GBgetContext(model);
     for (xmlNode* node = a_node; node; node = node->next) {
@@ -426,13 +426,13 @@ parse_net(xmlNode* a_node, model_t model, uint32_t* init_state[])
                 } else if (xmlStrcmp(node->parent->name, (const xmlChar*) "initialMarking") == 0) {
                     int num;
                     if ((num = SIlookup(context->pnml_places, (char*) id)) == SI_INDEX_FAILED) Abort("missing place");
-                    const uint32_t val = (uint32_t) atol((char*) xmlNodeGetContent(node));
+                    const int val = atoi((char*) xmlNodeGetContent(node));
                     (*init_state)[num] = val;
                     if (val > max_token_count) max_token_count = val;
                 } else if (xmlStrcmp(node->parent->name, (const xmlChar*) "inscription") == 0) {
                     int num;
                     if ((num = SIlookup(context->pnml_arcs, (char*) id)) == SI_INDEX_FAILED) Abort("missing arc");
-                    context->arcs[num].num = (uint32_t) atol((char*) xmlNodeGetContent(node));
+                    context->arcs[num].num = atoi((char*) xmlNodeGetContent(node));
                 }
             } else if (xmlStrcmp(node->name, (const xmlChar*) "arc") == 0) {
                 int num;
@@ -770,7 +770,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     ltstype = lts_type_create();
 
     // adding types
-    int int_type = lts_type_add_type(ltstype, "int", NULL);
+    int int_type = lts_type_add_type(ltstype, LTSMIN_TYPE_NUMERIC, NULL);
     int act_type = lts_type_add_type(ltstype, "action", NULL);
 
     lts_type_set_format(ltstype, int_type, LTStypeDirect);
@@ -785,6 +785,10 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     lts_type_set_edge_label_typeno(ltstype, 0, act_type);
 
     const int guard_type = lts_type_add_type(ltstype, LTSMIN_TYPE_GUARD, NULL);
+    lts_type_set_format(ltstype, guard_type, LTStypeEnum);
+    
+    const int bool_type = lts_type_add_type(ltstype, LTSMIN_TYPE_BOOL, NULL);
+    lts_type_set_format(ltstype, bool_type, LTStypeEnum);
 
     for (int i = 0; i < NUM_PLACES; ++i) {
         lts_type_set_state_typeno(ltstype, i, int_type);
@@ -794,9 +798,13 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     GBsetLTStype(model, ltstype); // must set ltstype before setting initial state
                                   // creates tables for types!
 
-    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE ), 1);
-    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
+    pins_chunk_put_at(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
+    pins_chunk_put_at(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE), 1);
+    pins_chunk_put_at(model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
+    
+    // add bool type for LTSmin language expressions
+    pins_chunk_put_at(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
+    pins_chunk_put_at(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);    
 
     dm_create(dm_info, NUM_TRANSS, NUM_PLACES);
     dm_create(dm_read_info, NUM_TRANSS, NUM_PLACES);
@@ -817,10 +825,10 @@ PNMLloadGreyboxModel(model_t model, const char* name)
 
     Warning(infoLong, "Analyzing Petri net behavior");
     node = xmlDocGetRootElement(doc);
-    uint32_t* init_state = RTmallocZero(sizeof(uint32_t[NUM_PLACES]));
+    int* init_state = RTmallocZero(sizeof(int[NUM_PLACES]));
     parse_net(node, model, &init_state);
     Warning(info, "Petri net %s analyzed", name);
-    GBsetInitialState(model, (int*) init_state);
+    GBsetInitialState(model, init_state);
     RTfree(init_state);
 
     xmlFreeDoc(doc);
