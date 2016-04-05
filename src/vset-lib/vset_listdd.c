@@ -83,6 +83,9 @@ static struct op_rec *op_cache=NULL;
 #define OP_CCOUNT1 12
 #define OP_CCOUNT2 13
 #define OP_VISIT 14
+#define MAX_OP 14
+
+static int next_cache_op = MAX_OP;
 
 struct vector_domain {
     struct vector_domain_shared shared;
@@ -1676,6 +1679,8 @@ dom_visit_clear_cache(vdom_t dom, const int cache_op)
     for (uint32_t i = 0 ; i < cache_size; i++) {
         if ((op_cache[i].op & 0xffff) == op) op_cache[i].op=OP_UNUSED;
     }
+
+    next_cache_op = MAX_OP;
 }
 
 static void
@@ -1773,6 +1778,21 @@ set_visit_mdd(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* co
     if (set->proj != NULL) mdd_visit_proj(set->mdd, cbs, ctx_size, context, op, set->p_id);
     else mdd_visit(set->mdd, cbs, ctx_size, context, op);
 }
+
+static int
+dom_next_cache_op(vdom_t dom)
+{
+    (void) dom;
+    
+    next_cache_op++;
+
+    if (next_cache_op > (int) 0xff) {
+        Abort("No more free user cache operations");
+    }
+
+    return next_cache_op;
+}
+
 vdom_t vdom_create_list_native(int n){
     Warning(info,"Creating a native ListDD domain.");
     vdom_t dom=(vdom_t)RTmalloc(sizeof(struct vector_domain));
@@ -1845,5 +1865,6 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.rel_dot=rel_dot_mdd;
     dom->shared.set_visit_seq=set_visit_mdd;
     dom->shared.dom_visit_clear_cache=dom_visit_clear_cache;
+    dom->shared.dom_next_cache_op=dom_next_cache_op;
     return dom;
 }

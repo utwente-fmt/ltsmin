@@ -412,8 +412,6 @@ extern void vset_visit_par(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_s
 
 extern void vset_visit_seq(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
 
-extern int vset_get_visit_op_num(vdom_t dom);
-
 //@}
 
 #endif

@@ -272,7 +272,6 @@ void vdom_init_shared(vdom_t dom,int n)
     dom->shared.set_next_union=default_set_next_union;
     dom->shared.set_visit_par=default_set_visit_par;
     dom->shared.names = RTmalloc(n * sizeof(char*));
-    dom->shared.dom_visit_op_num = 0;
     for (int i = 0; i < n; i++) dom->shared.names[i] = NULL;
 }
 
@@ -525,7 +524,7 @@ void vset_count_precise(vset_t set,long nodes,bn_int_t *elements){
     cbs.vset_visit_post = count_precise_post;
     cbs.vset_visit_cache_success = count_cache_success;
 
-    const int cache_op = vdom_visit_op_next(set->dom);
+    const int cache_op = vdom_next_cache_op(set->dom);
     vset_visit_seq(set, &cbs, sizeof(count_info_t), &context, cache_op);
 
     for (long i = cache_size; i > num_free; i--) bn_clear(&glob.bignums[i - 1]);
@@ -747,13 +746,17 @@ vset_visit_seq(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* c
     set->dom->shared.set_visit_seq(set, cbs, ctx_size, context, cache_op);
 }
 
-int vdom_visit_op_next(vdom_t dom) {
-    return dom->shared.dom_visit_op_num++;
+int vdom_next_cache_op(vdom_t dom) {
+
+    if (dom->shared.dom_next_cache_op == NULL) {
+        Abort("Vector set implementation does not support user cache operations");
+    }
+
+    return dom->shared.dom_next_cache_op(dom);
 }
 
 void vdom_visit_clear_cache(vdom_t dom, const int cache_op) {
     if (dom->shared.dom_visit_clear_cache != NULL) {
         dom->shared.dom_visit_clear_cache(dom, cache_op);
-        dom->shared.dom_visit_op_num = 0;
     }
 }
