@@ -15,6 +15,7 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins2pins-group.h>
+#include <pins-lib/pins2pins-guards.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/util.h>
 
@@ -1064,9 +1065,8 @@ GBregroup (model_t model)
         dm_copy (original_may_write, mayw);
         dm_copy (original_must_write, mustw);
 
-        int gid = GBgetMatrixID (model, LTSMIN_MATRIX_ACTIONS_READS);
-        bool has_guards = gid == -1 || GBgetGuardsInfo(model) == NULL;
-        if (has_guards) {
+        if (GBhasGuardsInfo(model)) {
+            const int gid = GBgetMatrixID (model, LTSMIN_MATRIX_ACTIONS_READS);
             dm_copy (GBgetMatrix(model, gid), r);
         } else {
             dm_copy (GBgetDMInfoRead(model), r);
@@ -1117,7 +1117,7 @@ GBregroup (model_t model)
 
         if (regroup_spec != NULL) {
             Print1 (info, "Regroup specification: %s", regroup_spec);
-            if (has_guards) {
+            if (GBhasGuardsInfo(model)) {
                 apply_regroup_spec (&inf, regroup_spec, GBgetGuardsInfo(model), ",");
             } else {
                 apply_regroup_spec (&inf, regroup_spec, NULL, ",");
@@ -1236,7 +1236,7 @@ GBregroup (model_t model)
         GBsetDMInfoMustWrite(group, mustw);
 
         // here we either transform the read matrix or the actions read matrix
-        if (has_guards) { // we have transformed the actions read matrix
+        if (GBhasGuardsInfo(model)) { // we have transformed the actions read matrix
 
             // set the new actions read matrix
             GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, r, PINS_MAY_SET,

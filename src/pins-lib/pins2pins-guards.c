@@ -19,7 +19,6 @@ typedef struct guard_ctx_s {
     int                *guard_status;
 } guard_ctx_t;
 
-
 int
 guards_all (model_t model, int *src, TransitionCB cb, void *context)
 {
@@ -50,23 +49,31 @@ GBaddGuards (model_t model)
 {
     HREassert (model != NULL, "No model");
     /* if --pins-guards is set, then check implementation */
-    if (!PINS_USE_GUARDS) return model;
+    if (!PINS_USE_GUARDS) {
+        if (!GBhasGuardsInfo (model)) return model;
+        else {
+            model_t         unguarded = GBcreateBase ();
+            GBinitModelDefaults (&unguarded, model);
+            GBsetGuardsInfo (unguarded, NULL);
+            return unguarded;
+        }
+    } else {
+        /* check if the implementation actually supports and exports guards */
+        sl_group_t *guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+        if (guards == NULL || guards->count == 0) {
+            Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+        }
 
-    /* check if the implementation actually supports and exports guards */
-    sl_group_t *guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-    if (guards == NULL || guards->count == 0) {
-        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
+        model_t             guarded = GBcreateBase ();
+
+        guard_ctx_t        *ctx = RTmalloc (sizeof(guard_ctx_t));
+        ctx->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
+
+        GBsetContext (guarded, ctx);
+        GBinitModelDefaults (&guarded, model);
+        GBsetNextStateAll (guarded, guards_all);
+
+        return guarded;        
     }
-
-    model_t             guarded = GBcreateBase ();
-
-    guard_ctx_t        *ctx = RTmalloc (sizeof(guard_ctx_t));
-    ctx->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
-
-    GBsetContext (guarded, ctx);
-    GBsetNextStateAll (guarded, guards_all);
-    GBinitModelDefaults (&guarded, model);
-
-    return guarded;
 }
 
