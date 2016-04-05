@@ -840,7 +840,7 @@ set_visit_seq(vset_t set, vset_visit_callbacks_t* cbs, size_t user_ctx_size, voi
 }
 
 static void
-dom_visit_clear_cache(vdom_t dom, const int cache_op)
+dom_clear_cache(vdom_t dom, const int cache_op)
 {
     (void) cache_op; (void) dom;
     cache_clear();
@@ -897,7 +897,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_join=set_join;
     dom->shared.set_visit_par=set_visit_par;
     dom->shared.set_visit_seq=set_visit_seq;
-    dom->shared.dom_visit_clear_cache=dom_visit_clear_cache;
+    dom->shared.dom_clear_cache=dom_clear_cache;
     dom->shared.dom_next_cache_op=dom_next_cache_op;
     //dom->shared.set_least_fixpoint=set_least_fixpoint;
 	//void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
