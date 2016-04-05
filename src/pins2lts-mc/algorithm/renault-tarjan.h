@@ -44,6 +44,6 @@
 #ifndef RENAULT_TARJAN_SCC_H
 #define RENAULT_TARJAN_SCC_H
 
-#include <pins2lts-mc/algorithm/algorithm.h>
+#include <pins2lts-mc/algorithm/ltl.h>
 
 #endif // RENAULT_TARJAN_SCC_H

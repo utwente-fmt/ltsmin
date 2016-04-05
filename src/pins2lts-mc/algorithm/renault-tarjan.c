@@ -373,10 +373,12 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
     if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
         acc_set = r_uf_get_acc (shared->uf, root);
         if (GBTGBAIsAccepting(ctx->model, acc_set) ) {
-            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, root);
+            state_info_set (loc->target, root, LM_NULL_LATTICE);
+            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, loc->target);
         }
     } else if (accepting != DUMMY_IDX) {
-        ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, accepting);
+        state_info_set (loc->target, accepting, LM_NULL_LATTICE);
+        ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, loc->target);
     }
 
     // move the root of the SCC (since it is not on tarjan_stack)

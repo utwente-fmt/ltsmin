@@ -128,8 +128,9 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
   // create bitset for the acceptance set
   uint32_t acceptance_set = 0;
   if (isTGBA) {
+    HREassert (aut->num_sets() <= 32, "No more than 32 TGBA accepting sets supported.")
     for (int i=0; i<aut->num_sets(); i++)
-      acceptance_set |= (1 << i);
+      acceptance_set |= (1ULL << i);
   }
   else 
     HREassert(aut->num_sets() == 1, "Multiple acceptance sets for BA");

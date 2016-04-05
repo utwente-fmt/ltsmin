@@ -339,7 +339,7 @@ successor (wctx_t *ctx)
             } else if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(loc->root))) {
                 accepting = loc->root->ref;
             }
-            Debug ("Uniting: %zu and %zu", loc->root->ref, ctx->target->ref);
+            Debug ("Uniting: %zu and %zu", loc->root->ref, loc->target->ref);
 
             uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
 
