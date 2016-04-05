@@ -35,7 +35,6 @@ struct vector_domain_shared {
 	void (*set_minus)(vset_t dst,vset_t src);
 	void (*set_zip)(vset_t dst,vset_t src);
 	void (*set_count)(vset_t set,long *nodes,double *elements);
-	void (*set_count_precise)(vset_t set,long nodes,bn_int_t *elements);
 	void (*set_ccount)(vset_t set,long *nodes,long double *elements);
 	void (*dom_clear_cache)(vdom_t dom, const int cache_op);
 	void (*set_visit_seq)(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);

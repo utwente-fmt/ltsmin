@@ -539,7 +539,7 @@ void vset_count_precise(vset_t set,long nodes,bn_int_t *elements){
 }
 
 int vdom_supports_precise_counting(vdom_t dom) {
-	return dom->shared.set_count_precise != NULL;
+    return dom->shared.set_visit_seq != NULL;
 }
 
 void vset_ccount(vset_t set,long *nodes,long double *elements) {
