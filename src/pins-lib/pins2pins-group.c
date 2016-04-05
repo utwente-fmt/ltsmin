@@ -16,6 +16,7 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins2pins-group.h>
 #include <pins-lib/pins2pins-guards.h>
+#include <pins-lib/pins-util.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/util.h>
 
@@ -219,21 +220,36 @@ group_state_labels_all(model_t self, int *state, int *labels)
     return GBgetStateLabelsAll(parent, oldstate, labels);
 }
 
+/* map groups and delete duplicates, because groups may be subsumed */
 static int
-group_transition_in_group (model_t self, int* labels, int group)
+group_groups_of_edge (model_t self, int edgeno, int index, int** groups)
 {
-    group_context_t  ctx    = (group_context_t)GBgetContext (self);
-    model_t          parent = GBgetParent (self);
-    int              begin  = ctx->transbegin[group];
-    int              end    = ctx->transbegin[group + 1];
+    group_context_t ctx = (group_context_t) GBgetContext(self);
 
-    for (int i = begin; i < end; i++) {
-        int g = ctx->transmap[i];
-        if (GBtransitionInGroup(parent, labels, g))
-            return 1;
+    int* groups_parent = NULL;
+    const int n = GBgroupsOfEdge(GBgetParent(self), edgeno, index, &groups_parent);
+    
+    if (n == 0) return 0;    
+
+    *groups = RTmalloc(sizeof(int) * pins_get_group_count(self));
+    
+    int c = 0;
+    for (int i = 0; i < n; i++) {
+        for (int k = 0; k < c; k++) {
+            if (*groups[k] == groups_parent[i]) goto duplicate;
+        }
+        (*groups)[c++] = ctx->transmap[groups_parent[i]];
+        
+        duplicate:;
+    }
+    
+    if (c > 0) RTrealloc(*groups, sizeof(int) * c);
+    else {
+        RTfree(*groups);
+        *groups = NULL;
     }
 
-    return 0;
+    return c;
 }
 
 static int
@@ -1299,7 +1315,7 @@ GBregroup (model_t model)
         GBsetStateLabelShort (group, group_state_labels_short);
         GBsetStateLabelLong (group, group_state_labels_long);
         GBsetStateLabelsAll (group, group_state_labels_all);
-        GBsetTransitionInGroup (group, group_transition_in_group);
+        GBsetGroupsOfEdge (group, group_groups_of_edge);
         GBsetPrettyPrint (group, group_chunk_pretty_print);
 
         GBinitModelDefaults (&group, model);

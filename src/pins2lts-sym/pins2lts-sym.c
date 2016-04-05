@@ -3425,20 +3425,17 @@ establish_group_order(int *group_order, int *initial_count)
 
     bitvector_create(&found_groups, nGrps);
 
-    int label_count = lts_type_get_state_label_count(ltstype);
-    int labels[label_count];
-    for (int i = 0; i < label_count; i++) {
-        labels[i] = act_label == i ? act_index : -1;
-    }
-
-    for (int i = 0; i < nGrps; i++){
-        if (GBtransitionInGroup(model, labels, i)) {
-            Warning(info, "Found \"%s\" potentially in group %d", act_detect,i);
-            group_order[group_total] = i;
+    int* groups = NULL;
+    const int n = GBgroupsOfEdge(model, act_label, act_index, &groups);
+    if (n > 0) {
+        for (int i = 0; i < n; i++) {
+            Warning(info, "Found \"%s\" potentially in group %d", act_detect, groups[i]);
+            group_order[group_total] = groups[i];
             group_total++;
-            bitvector_set(&found_groups, i);
+            bitvector_set(&found_groups, groups[i]);
         }
-    }
+        RTfree(groups);
+    } else Abort("No group will ever produce action \"%s\"", act_detect);
 
     *initial_count = group_total;
 

@@ -55,7 +55,7 @@ enum FORK_CALL {
     LABELS_LONG,
     LABELS_GROUP,
     LABELS_ALL,
-    TRANSITION_IN_GROUP,
+    GROUPS_OF_EDGE,
     COVERED_BY,
     COVERED_BY_SHORT,
 };
@@ -288,6 +288,19 @@ child_process(struct thread_info *ti)
             GBgetStateLabelsAll(parent_model, src, labels);
             // signal the result of the label evaluation
             for (int i=0; i<n_labels; i++) DSwriteS32(os, labels[i]);
+            stream_flush(os);
+        } else if (next == GROUPS_OF_EDGE) {
+            int edgeno = DSreadS32(is);
+            int index = DSreadS32(is);
+            int* groups = NULL;
+            const int n = GBgroupsOfEdge(parent_model, edgeno, index, &groups);
+            DSwriteS32(os, n);
+            if (n > 0) {
+                for (int i = 0; i < n; i++) {
+                    DSwriteS32(os, groups[i]);
+                }
+                RTfree(groups);
+            }
             stream_flush(os);
         } else if (next == EXIT) {
             break;
@@ -540,21 +553,28 @@ forked_state_labels_group(model_t model, sl_group_enum_t group, int *state, int 
 }
 
 static int
-forked_transition_in_group(model_t model, int *labels, int group)
+forked_groups_of_edge(model_t model, int edgeno, int index, int** groups)
 {
     struct fork_context *fc = (struct fork_context*)GBgetContext(model);
     struct thread_info *ti = get_or_fork(fc, model);
     stream_t is = ti->parent_socket_is;
     stream_t os = ti->parent_socket_os;
 
-    // send command, labels and group
-    DSwriteS32(os, TRANSITION_IN_GROUP);
-    for (int i=0; i<fc->n_state_labels; i++) DSwriteS32(os, labels[i]);
-    DSwriteS32(os, group);
+    // send command, edgeno and index
+    DSwriteS32(os, GROUPS_OF_EDGE);
+    DSwriteS32(os, edgeno);
+    DSwriteS32(os, index);
     stream_flush(os);
 
-    // read result
-    return DSreadS32(is);
+    const int n = DSreadS32(is);
+    if (n == 0) return 0;
+
+    *groups = (int*) RTmalloc(sizeof(int) * n);
+
+    // read group numbers
+    for (int i = 0; i < n; i++) (*groups)[i] = DSreadS32(is);
+
+    return n;
 }
 
 
@@ -610,7 +630,7 @@ GBaddFork(model_t parent_model)
     GBsetStateLabelLong(forked_model, forked_state_labels_long);
     GBsetStateLabelsGroup(forked_model, forked_state_labels_group);
     GBsetStateLabelsAll(forked_model, forked_state_labels_all);
-    GBsetTransitionInGroup(forked_model, forked_transition_in_group);
+    GBsetGroupsOfEdge(forked_model, forked_groups_of_edge);
     // GBsetIsCoveredBy
     // GBsetIsCoveredByShort
 

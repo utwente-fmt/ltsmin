@@ -254,29 +254,31 @@ public:
         }
     }
 
-    int transition_in_group (label_vector const& labels, int group)
+    int groups_of_edge (int edgeno, int index, int** groups)
     {
-        for (size_t i = 0; i < edge_label_count(); ++i) {
-            int mt = edge_label_type(i);
-            int pt = lts_type_get_edge_label_typeno (GBgetLTStype (model_), i);
-            int id = find_mcrl2_index (mt, pt, labels[i], readable_edge_labels);
+        int mt = edge_label_type(edgeno);
+        int pt = lts_type_get_edge_label_typeno (GBgetLTStype (model_), edgeno);
+        int id = find_mcrl2_index (mt, pt, index, readable_edge_labels);
 
-            std::string c;
+        std::string c;
 
-            if (!readable_edge_labels)
-                c = data_type(mt).serialize(id);
-            else
-                c = data_type(mt).print(id);
+        if (!readable_edge_labels)
+            c = data_type(mt).serialize(id);
+        else
+            c = data_type(mt).print(id);
 
-            std::set<std::string> s = summand_action_names(group);
+        std::vector<int> g;
+        *groups = &g[0]; (void) groups;
+
+        for (size_t i = 0; i < group_count(); i++) {
+            std::set<std::string> s = summand_action_names(i);
 
             for (std::set<std::string>::iterator j = s.begin(); j != s.end(); ++j) {
-                if (c.find(*j) == std::string::npos)
-                    return 0;
+                if (c.find(*j) == std::string::npos) g.push_back(static_cast<int>(i));
             }
         }
 
-        return 1;
+        return static_cast<int>(g.size());
     }
 
 private:
@@ -413,10 +415,10 @@ MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
 }
 
 static int
-MCRL2transitionInGroup (model_t m, int* labels, int group)
+MCRL2groupsOfEdge (model_t m, int edge_no, int index, int **groups)
 {
     ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
-    return pins->transition_in_group(labels, group);
+    return pins->groups_of_edge(edge_no, index, groups);
 }
 
 static int
@@ -622,7 +624,7 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     GBsetDMInfoMustWrite (m, p_dm_write_info);
     GBsetNextStateLong (m, MCRL2getTransitionsLong);
     GBsetNextStateAll (m, MCRL2getTransitionsAll);
-    GBsetTransitionInGroup(m, MCRL2transitionInGroup);
+    GBsetGroupsOfEdge(m, MCRL2groupsOfEdge);
     GBsetPrettyPrint(m, MCRL2prettyPrint);
 
     atexit(MCRL2exit);
