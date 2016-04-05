@@ -354,6 +354,24 @@ get_labels(model_t model, sl_group_enum_t group, int* src, int* label) {
     }
 }
 
+static int
+groups_of_edge(model_t model, int edgeno, int index, int** groups)
+{
+    pnml_context_t* context = GBgetContext(model);
+
+    const chunk c = pins_chunk_get(model, lts_type_get_edge_label_typeno(GBgetLTStype(model), edgeno), index);
+
+    const int group = SIlookup(context->pnml_transs, c.data);
+
+    if (group == SI_INDEX_FAILED) return 0;
+
+    *groups = (int*) RTmalloc(sizeof(int));
+
+    (*groups)[0] = group;
+
+    return 1;
+}
+
 static void
 find_ids(xmlNode* a_node, pnml_context_t* context)
 {
@@ -888,6 +906,8 @@ PNMLloadGreyboxModel(model_t model, const char* name)
         GBsetNextStateShortR2W(model, (next_method_grey_t) get_successor_short);
         GBsetActionsShortR2W(model, (next_method_grey_t) get_update_short);
     } else Warning(infoLong, "Since this net has 1-safe places, short next-state functions are not used");
+
+    GBsetGroupsOfEdge(model, groups_of_edge);
 
     GBsetExit(model, pnml_exit);
 
