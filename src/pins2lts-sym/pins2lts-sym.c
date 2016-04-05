@@ -26,7 +26,7 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-guards.h>
-#include <pins-lib/pins2pins-mutex.h>
+#include <pins-lib/pins2pins-fork.h>
 #include <pins-lib/pins2pins-mucalc.h>
 #include <pins-lib/property-semantics.h>
 #include <pins-lib/por/pins2pins-por.h>
@@ -3511,7 +3511,12 @@ init_model(char *file)
 
     HREbarrier(HREglobal());
 
-    PINS_REQUIRE_MUTEX_WRAPPER = 0;
+#if !SPEC_MT_SAFE
+#if defined(PROB)
+    if (lace_n_workers != 1) Abort("Use ProB with --lace-workers=1");
+#endif
+    PINS_REQUIRE_FORK_WRAPPER = 1;
+#endif
     GBloadFile(model, file, &model);
 
     HREbarrier(HREglobal());

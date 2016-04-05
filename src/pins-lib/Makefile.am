@@ -78,7 +78,6 @@ libpins_la_SOURCES += pins-impl.h
 libpins_la_SOURCES += pins2pins-cache.c pins2pins-cache.h
 libpins_la_SOURCES += pins2pins-check.c pins2pins-check.h
 libpins_la_SOURCES += pins2pins-fork.c pins2pins-fork.h
-libpins_la_SOURCES += pins2pins-mutex.c pins2pins-mutex.h
 libpins_la_SOURCES += pins2pins-group.c pins2pins-group.h
 libpins_la_SOURCES += pins2pins-guards.c pins2pins-guards.h
 libpins_la_SOURCES += pg-types.c pg-types.h

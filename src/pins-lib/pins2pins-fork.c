@@ -9,6 +9,7 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins2pins-fork.h>
 
+int PINS_REQUIRE_FORK_WRAPPER = 0;
 
 /**
  * Wraps a PINS interface in a separate process, communicating over UNIX socket
@@ -585,6 +586,8 @@ model_t
 GBaddFork(model_t parent_model)
 {
     HREassert(parent_model != NULL, "No model");
+
+    if (!PINS_REQUIRE_FORK_WRAPPER) return parent_model;
 
     /* create new model */
     model_t forked_model = GBcreateBase();
