@@ -27,6 +27,20 @@ extern void mark_predicate(model_t m, ltsmin_expr_t e, ltsmin_parse_env_t env);
 /* mark all groups that WRITE to a variable influencing the expression */
 extern void mark_visible(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env);
 
+struct evar_info {
+    int idx; // edge label to look for
+    int num; // edge value to look for
+    int exists; // whether an transition with such an edge exists
+};
+
+static void
+evar_cb(void *context, transition_info_t *ti, int *dst, int *cpy)
+{
+    (void) dst; (void) cpy;
+    struct evar_info* ctx = (struct evar_info*) context;
+    ctx->exists = ctx->exists || ti->labels[ctx->idx] == ctx->num;
+}
+
 /**
  * evaluate predicate on state
  * NUM values may be looked up in the chunk tables (for chunk types), hence the
@@ -49,6 +63,22 @@ eval_predicate(model_t model, ltsmin_expr_t e, transition_info_t *ti, int *state
             } else { // state label
                 return GBgetStateLabelLong(model, e->idx - N, state);
             }
+        case PRED_EVAR: {
+            // test whether the state has at least one transition (existential) with a specific edge
+            int* groups = NULL;
+            const int n = GBgroupsOfEdge(model, e->idx, e->num, &groups);
+            struct evar_info ctx;
+            ctx.idx = e->idx;
+            ctx.num = e->num;
+            ctx.exists = 0;
+            if (n > 0) {
+                for (int i = 0; i < n && ctx.exists == 0; i++) {
+                    GBgetTransitionsLong(model, groups[i], state, evar_cb, &ctx);
+                }
+                RTfree(groups);
+                return ctx.exists ? e->num : -1;
+            } else return -1;
+        }
         case PRED_CHUNK:
         case PRED_VAR:
             if (-1 == e->num) {

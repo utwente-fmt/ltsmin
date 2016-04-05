@@ -14,7 +14,7 @@
 /**
  * Enums need their values to be present in the tables, hence the strict lookup.
  */
-static void
+static int
 lookup_type_value (ltsmin_expr_t e, int type, const chunk c,
                    model_t m, bool strict)
 {
@@ -25,19 +25,22 @@ lookup_type_value (ltsmin_expr_t e, int type, const chunk c,
         Warning (info, "Value for identifier '%s' cannot be found in table for enum type '%s'.",
                  c.data, lts_type_get_type(GBgetLTStype(m),type));
     e->lts_type = type;
+
+    return e->num;
 }
 
-static void
+static int
 ltsmin_expr_lookup_value(ltsmin_expr_t top, ltsmin_expr_t e, int typeno,
                          ltsmin_parse_env_t env, model_t model)
 {
+    int v = -1;
     switch(e->node_type) {
     case VAR:
     case CHUNK:
     case INT:
         break;
     default:
-        return;
+        return v;
     }
     chunk c;
     data_format_t format = lts_type_get_format(GBgetLTStype(model), typeno);
@@ -50,11 +53,12 @@ ltsmin_expr_lookup_value(ltsmin_expr_t top, ltsmin_expr_t e, int typeno,
     case LTStypeEnum:
     case LTStypeChunk:
         c.data = SIgetC(env->values, e->idx, (int*) &c.len);
-        lookup_type_value (e, typeno, c, model, format==LTStypeEnum);
+        v = lookup_type_value (e, typeno, c, model, format==LTStypeEnum);
         Debug ("Bound '%s' to %d in table for type '%s'", c.data,
                e->num, lts_type_get_state_type(GBgetLTStype(model),typeno));
         break;
     }
+    return v;
 }
 
 static inline int
@@ -119,11 +123,11 @@ ltsmin_expr_type_check(ltsmin_expr_t e,ltsmin_parse_env_t env,model_t model)
                      * In the third case we have unbound chunks.
                      * In the fourth case we must check if the types are the same. */
                     if (left >= 0 && right < 0) {
-                        ltsmin_expr_lookup_value (e, e->arg2, left, env, model);
-                        return left;
+                        const int v = ltsmin_expr_lookup_value (e, e->arg2, left, env, model);
+                        e->arg1->num = v;
                     } else if (right >= 0 && left < 0) {
-                        ltsmin_expr_lookup_value (e, e->arg1, right, env, model);
-                        return right;
+                        const int v = ltsmin_expr_lookup_value (e, e->arg1, right, env, model);
+                        e->arg2->num = v;
                     } else if (left == -1 && right == -1) {
                         // this is something like "chunk1" == "chunk2"
                         const char* ex = LTSminPrintExpr(e, env);
@@ -198,6 +202,9 @@ ltsmin_expr_type_check(ltsmin_expr_t e,ltsmin_parse_env_t env,model_t model)
                     return lts_type_get_state_typeno (ltstype, e->idx);
                 else
                     return lts_type_get_state_label_typeno (ltstype, e->idx - N);
+            }
+            case PRED_EVAR: {
+                return lts_type_get_edge_label_typeno(GBgetLTStype(model), e->idx);
             }
             case PRED_NUM: {
                 return type_check_get_type(GBgetLTStype(model), LTSMIN_TYPE_NUMERIC, e, env);
@@ -281,6 +288,18 @@ mark_predicate (model_t m, ltsmin_expr_t e, ltsmin_parse_env_t env)
             }
             break;
         }
+        case PRED_EVAR: {
+            int* groups = NULL;
+            int n = GBgroupsOfEdge(m, e->idx, e->num, &groups);
+            if (n > 0) {
+                const matrix_t* r = GBgetDMInfoRead(m);
+                for (int i = 0; i < n; i++) {
+                    dm_bitvector_row(&e->deps, r, groups[i]);
+                }
+                RTfree(groups);
+            }
+            break;
+        }
         default:
             LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);
@@ -324,6 +343,10 @@ mark_visible(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env)
                 pins_add_state_label_visible (model, e->idx - N);
             }
           } break;
+        case PRED_EVAR: {
+            pins_add_edge_label_visible(model, e->idx, e->num);
+            break;
+        }
         default:
             LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);

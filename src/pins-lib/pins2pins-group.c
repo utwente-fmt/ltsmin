@@ -231,14 +231,14 @@ group_groups_of_edge (model_t self, int edgeno, int index, int** groups)
     
     if (n == 0) return 0;    
 
-    *groups = RTmalloc(sizeof(int) * pins_get_group_count(self));
+    *groups = RTmalloc(sizeof(int) * n);
     
     int c = 0;
     for (int i = 0; i < n; i++) {
         for (int k = 0; k < c; k++) {
             if (*groups[k] == groups_parent[i]) goto duplicate;
         }
-        (*groups)[c++] = ctx->transmap[groups_parent[i]];
+        (*groups)[c++] = ctx->groupmap[groups_parent[i]];
         
         duplicate:;
     }
