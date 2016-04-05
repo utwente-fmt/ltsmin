@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
@@ -800,9 +801,7 @@ static void
 set_visit_prepare(vset_t set, vset_visit_callbacks_t* cbs, size_t user_ctx_size, void* user_ctx,
     int cache_op, lddmc_visit_info_t* context, lddmc_visit_callbacks_t* lddmc_cbs)
 {
-    if (cache_op > 0xff) Abort("cache op too large");
-
-    context->global->op = ((uint64_t) cache_op) << 56;
+    context->global->op = ((uint64_t) cache_op) << 40;
     context->global->cbs = cbs;
     context->global->user_ctx_size = user_ctx_size;
 
@@ -847,6 +846,16 @@ dom_visit_clear_cache(vdom_t dom, const int cache_op)
     cache_clear();
 }
 
+static int
+dom_next_cache_op(vdom_t dom)
+{
+    (void) dom;
+    const uint64_t op = cache_next_opid();
+    if (op >> 40 > INT_MAX) Abort("Too many user cache operations");
+
+    return (int) op;
+}
+
 static void
 set_function_pointers(vdom_t dom)
 {
@@ -889,6 +898,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_visit_par=set_visit_par;
     dom->shared.set_visit_seq=set_visit_seq;
     dom->shared.dom_visit_clear_cache=dom_visit_clear_cache;
+    dom->shared.dom_next_cache_op=dom_next_cache_op;
     //dom->shared.set_least_fixpoint=set_least_fixpoint;
 	//void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
 
