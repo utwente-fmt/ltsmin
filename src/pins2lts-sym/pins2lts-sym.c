@@ -26,7 +26,6 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-guards.h>
-#include <pins-lib/pins2pins-mutex.h>
 #include <pins-lib/pins2pins-mucalc.h>
 #include <pins-lib/property-semantics.h>
 #include <pins-lib/por/pins2pins-por.h>
@@ -3388,8 +3387,6 @@ init_model(char *file)
     GBsetChunkMap (model, HREgreyboxTableFactory());
 
     HREbarrier(HREglobal());
-
-    PINS_REQUIRE_MUTEX_WRAPPER = 1;
     GBloadFile(model, file, &model);
 
     HREbarrier(HREglobal());
@@ -4386,6 +4383,16 @@ main (int argc, char *argv[])
     poptContext optCon = poptGetContext(NULL, argc, (const char**)argv, lace_options, 0);
     while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
     poptFreeContext(optCon);
+
+#if !SPEC_MT_SAFE
+    if (lace_n_workers != 1) lace_n_workers = 1;
+    Warning(info, "Falling back to 1 LACE worker, since front-end is not thread-safe.");
+#endif
+    
+#if defined(PROB)
+    if (lace_n_workers != 1) lace_n_workers = 1;
+    Warning(info, "Falling back to 1 LACE worker, since the ProB front-end is not yet compatible with HRE.");
+#endif
 
     struct args_t args = (struct args_t){argc, argv};
     lace_init(lace_n_workers, lace_dqsize);

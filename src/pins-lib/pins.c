@@ -14,7 +14,7 @@
 #include <pins-lib/pins2pins-check.h>
 #include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/pins2pins-mucalc.h>
-#include <pins-lib/pins2pins-mutex.h>
+#include <pins-lib/pins2pins-fork.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <util-lib/treedbs.h>
 
@@ -1175,8 +1175,8 @@ void chunk_table_print(log_t log, model_t model) {
 static model_t
 wrapModel(model_t model)
 {
-    /* add mutex layer */
-    model = GBaddMutex (model);
+    /* add fork layer */
+    model = GBaddFork (model);
 
     /* add GBlong guard evaluation layer (Deprecated) */
     model = GBaddGuards (model);
