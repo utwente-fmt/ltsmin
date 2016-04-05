@@ -81,6 +81,10 @@
  **/
 #define LTSMIN_EDGE_TYPE_STATEMENT      "statement"
 
+/** SPOT's TGBA uses accepting sets on edges **/
+#define LTSMIN_EDGE_TYPE_ACCEPTING_SET  "acc_set"
+#define LTSMIN_EDGE_LABEL_ACCEPTING_SET "acc_set"
+
 /**
 @brief The name and type of the hyper edge group.
 

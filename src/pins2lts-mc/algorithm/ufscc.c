@@ -4,17 +4,17 @@
 
 #include <hre/config.h>
 
+#include <ltsmin-lib/ltsmin-standard.h>
+#include <mc-lib/unionfind.h>
+#include <pins-lib/pins-util.h>
+#include <pins-lib/pins.h>
+#include <pins2lts-mc/algorithm/ltl.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/util.h>
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-info.h>
 #include <pins2lts-mc/parallel/worker.h>
-#include <ltsmin-lib/ltsmin-standard.h>
-#include <mc-lib/unionfind.h>
-#include <pins-lib/pins-util.h>
-#include <pins-lib/pins.h>
 #include <util-lib/fast_set.h>
-#include <pins2lts-mc/algorithm/ltl.h>
 
 #if HAVE_PROFILER
 #include <gperftools/profiler.h>
@@ -149,8 +149,7 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     // TGBA acceptance
     if (ti->labels != NULL && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-        int el_index = GBgetAccSetEdgeLabelIndex (ctx->model);
-        acc_set = ti->labels[el_index];
+        acc_set = ti->labels[pins_get_accepting_set_edge_label_index(ctx->model)];
     }
 
     ctx->counters->trans++;
@@ -160,7 +159,7 @@ ufscc_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         loc->cnt.selfloop ++;
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
             uint32_t acc = uf_add_acc (shared->uf, successor->ref + 1, acc_set);
-            if (GBTGBAIsAccepting(ctx->model, acc) ) {
+            if (GBgetAcceptingSet() == acc) {
                 report_lasso (ctx, ctx->state->ref);
             }
         } else if (shared->ltl) { // BA
@@ -307,7 +306,7 @@ successor (wctx_t *ctx)
             // add transition acceptance set
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
                 uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref + 1, loc->state_acc);
-                if (GBTGBAIsAccepting(ctx->model, acc) ) {
+                if (GBgetAcceptingSet() == acc) {
                     report_lasso (ctx, ctx->state->ref);
                 }
             }
@@ -349,7 +348,7 @@ successor (wctx_t *ctx)
         // after uniting SCC, report lasso
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
             acc_set = uf_get_acc (shared->uf, ctx->state->ref + 1);
-            if (GBTGBAIsAccepting(ctx->model, acc_set) ) {
+            if (GBgetAcceptingSet() == acc_set) {
                 report_lasso (ctx, ctx->state->ref);
             }
         } else if (accepting != DUMMY_IDX) {

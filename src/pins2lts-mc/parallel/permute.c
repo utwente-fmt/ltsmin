@@ -12,6 +12,7 @@
 #include <time.h>
 
 #include <hre/unix.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/reach.h>
 #include <pins2lts-mc/parallel/global.h>

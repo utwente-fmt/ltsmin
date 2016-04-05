@@ -4,10 +4,12 @@
 
 #include <hre/config.h>
 
+#include <mc-lib/renault-unionfind.h>
+#include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins2lts-mc/algorithm/renault-tarjan.h>
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-info.h>
-#include <mc-lib/renault-unionfind.h>
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/fast_set.h>
 
@@ -111,7 +113,8 @@ renault_local_init (run_t *run, wctx_t *ctx)
     ctx->local->state_tarjan.acc_set  = 0;
     ctx->local->target_tarjan.acc_set = 0;
 
-    shared->ltl = pins_get_accepting_state_label_index(ctx->model) != -1;
+    shared->ltl = pins_get_accepting_state_label_index(ctx->model) != -1 ||
+                  pins_get_accepting_set_edge_label_index(ctx->model) - 1;
 
     ctx->local->visited_states =
             fset_create (sizeof (ref_t), sizeof (raw_data_t), 10, dbs_size);
@@ -149,8 +152,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     // TGBA acceptance
     if (ti->labels != NULL && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-        int el_index = GBgetAccSetEdgeLabelIndex (ctx->model);
-        acc_set = ti->labels[el_index];
+        acc_set = ti->labels[pins_get_accepting_set_edge_label_index(ctx->model)];
     }
 
     ctx->counters->trans++;
@@ -159,7 +161,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (ctx->state->ref == successor->ref) {
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
             uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, acc_set);
-            if (GBTGBAIsAccepting(ctx->model, acc) ) {
+            if (GBgetAcceptingSet() == acc) {
                 ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
             }
         } if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(successor)) ) {
@@ -185,7 +187,7 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         // TODO: this cycle report won't work correctly
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
             uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, acc_set);
-            if (GBTGBAIsAccepting(ctx->model, acc) ) {
+            if (GBgetAcceptingSet() == acc) {
                 ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
             }
         } 
@@ -372,7 +374,7 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
 
     if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
         acc_set = r_uf_get_acc (shared->uf, root);
-        if (GBTGBAIsAccepting(ctx->model, acc_set) ) {
+        if (GBgetAcceptingSet() == acc_set) {
             state_info_set (loc->target, root, LM_NULL_LATTICE);
             ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, loc->target);
         }
