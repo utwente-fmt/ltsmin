@@ -435,11 +435,11 @@ parse_net(xmlNode* a_node, model_t model, int* init_state[])
                     else if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "transition") == 0) {
                         int num;
                         if ((num = SIlookup(context->pnml_transs, (char*) id)) == SI_INDEX_FAILED) Abort("missing transition");
-                        pins_chunk_put_at (model, lts_type_find_type(GBgetLTStype(model), "action"), chunk_str((char*) xmlNodeGetContent(node)), num);
+                        pins_chunk_put_at (model, lts_type_find_type(GBgetLTStype(model), "action"), chunk_str((char*) id), num);
                     } else if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "place") == 0) {
                         int num;
                         if ((num = SIlookup(context->pnml_places, (char*) id)) == SI_INDEX_FAILED) Abort("missing place");
-                        lts_type_set_state_name(GBgetLTStype(model), num, (char*) xmlNodeGetContent(node));
+                        lts_type_set_state_name(GBgetLTStype(model), num, (char*) id);
                     }
                 } else if (xmlStrcmp(node->parent->name, (const xmlChar*) "initialMarking") == 0) {
                     int num;
