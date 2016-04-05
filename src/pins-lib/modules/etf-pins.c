@@ -80,43 +80,42 @@ static int etf_state_short(model_t self,int label,int *state){
     return ctx->label_data[label][SIlookupC(ctx->label_key_idx[label],(char*)state,len<<2)];
 }
 
-
 static int
-etf_transition_in_group(model_t self, int *labels, int group)
+etf_groups_of_edge(model_t model, int edge_no, int index, int** groups)
 {
-    gb_context_t ctx  = (gb_context_t)GBgetContext(self);
-    matrix_table_t mt = ctx->trans_table[group];
-    int K = MTgetCount(mt);
+    gb_context_t ctx  = (gb_context_t)GBgetContext(model);
+    int n_groups = dm_nrows(GBgetDMInfo(model));
 
-    for(int i = 0; i < K; i++){
-        uint32_t row[3];
-        MTgetRow(mt, i, row);
-        switch(ctx->edge_labels){
-        case 0: {
-            return 1;
-        }
-        case 1: {
-            if(labels[0]==(int)row[2])
-                return 1;
-            else
-                break;
-        }
-        default: {
-            int* tl = (int*)SIgetC(ctx->label_idx,(int)row[2],NULL);
-            int i = 0;
-            int correct = 1;
-            while(correct && i < ctx->edge_labels) {
-                correct = (tl[i] == labels[i]);
-                i++;
+    int count = 0;
+    *groups = (int*) RTmalloc(sizeof(int) * n_groups);
+
+    for (int i = 0; i < n_groups; i++) {
+        matrix_table_t mt = ctx->trans_table[i];
+        int K = MTgetCount(mt);
+        for(int j = 0; j < K; i++){
+            uint32_t row[3];
+            MTgetRow(mt, j, row);
+            switch(ctx->edge_labels){
+                case 0: {
+                    // JM: I think it should be so that if there are no edge labels,
+                    // then no group can produce the edge
+                    // and this method should return 0
+                    // the caller can then produce a nice error message
+                    // groups[count++] = i;
+                    break;
+                } case 1: {
+                    if (index == (int) row[2]) *groups[count++] = i;
+                    break;
+                } default: {
+                    int* tl = (int*) SIgetC(ctx->label_idx, (int) row[2], NULL);
+                    if (tl[edge_no] == index) (*groups)[count++] = i;
+                    break;
+                }
             }
-            if(correct)
-                return 1;
-            else
-                break;
-        }
         }
     }
-    return 0;
+    RTrealloc(*groups, sizeof(int) * count);
+    return count;
 }
 
 void
@@ -269,7 +268,7 @@ ETFloadGreyboxModel(model_t model, const char *name)
     }
     GBsetStateLabelInfo(model, p_sl_info);
     GBsetStateLabelShort(model,etf_state_short);
-    GBsetTransitionInGroup(model,etf_transition_in_group);
+    GBsetGroupsOfEdge(model,etf_groups_of_edge);
 
     int type_count=lts_type_get_type_count(ltstype);
     for(int i=0;i<type_count;i++){

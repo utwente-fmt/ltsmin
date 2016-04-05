@@ -128,9 +128,9 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
 }
 
 static int
-cached_transition_in_group (model_t self, int* labels, int group)
+cached_groups_of_edge (model_t self, int edgeno, int index, int** groups)
 {
-  return GBtransitionInGroup (GBgetParent(self), labels, group);
+    return GBgroupsOfEdge(GBgetParent(self), edgeno, index, groups);
 }
 
 model_t
@@ -165,7 +165,7 @@ GBaddCache (model_t model)
     GBsetContext (cached, ctx);
     
     GBsetNextStateShort (cached, cached_short);
-    GBsetTransitionInGroup (cached, cached_transition_in_group);
+    GBsetGroupsOfEdge (cached, cached_groups_of_edge);
 
     GBinitModelDefaults (&cached, model);
 

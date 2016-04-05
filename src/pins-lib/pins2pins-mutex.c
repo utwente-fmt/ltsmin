@@ -176,13 +176,13 @@ mutex_state_labels_group(model_t model, sl_group_enum_t group, int *state, int *
 }
 
 static int
-mutex_transition_in_group(model_t model, int *labels, int group)
+mutex_groups_of_edge(model_t model, int edgeno, int index, int** groups)
 {
     struct mutex_context *mc = (struct mutex_context*)GBgetContext(model);
     pthread_mutex_lock(&mc->mutex);
     mc->count++;
 
-    int res = GBtransitionInGroup(GBgetParent(model), labels, group);
+    int res = GBgroupsOfEdge(GBgetParent(model), edgeno, index, groups);
 
     pthread_mutex_unlock(&mc->mutex);
     return res;
@@ -225,7 +225,7 @@ GBaddMutex(model_t parent_model)
     GBsetStateLabelLong(mutex_model, mutex_state_labels_long);
     GBsetStateLabelsGroup(mutex_model, mutex_state_labels_group);
     GBsetStateLabelsAll(mutex_model, mutex_state_labels_all);
-    GBsetTransitionInGroup(mutex_model, mutex_transition_in_group);
+    GBsetGroupsOfEdge(mutex_model, mutex_groups_of_edge);
     // covered_by type needs "model" parameter!!!
     // GBsetIsCoveredBy(mutex_model, mutex_is_covered_by);
     // GBsetIsCoveredByShort(mutex_model, mutex_is_covered_by_short);

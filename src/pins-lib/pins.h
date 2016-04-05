@@ -414,12 +414,12 @@ extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void
 \brief Get the state labels and all transitions in one call.
 */
 
-extern int GBtransitionInGroup(model_t model, int* labels, int group);
+extern int GBgroupsOfEdge(model_t model, int edgeno, int index, int** groups);
 /**<
-\brief Return if a transition labelled with labels potentially occurs in group
+\brief Computes group numbers that may produce an edge
 
-The number of labels in the labels parameter should be equal to the number of
-labels with with each transition is labelled.
+Returns the number of groups that may produce an edge with a specific number (edgeno) and value (index).
+Sets groups to the exact groups that may produce the edge. Groups must be freed by the caller with free().
 */
 
 /**
@@ -796,13 +796,13 @@ extern void GBsetStateLabelLong(model_t model,get_label_method_t method);
 */
 extern void GBsetStateLabelShort(model_t model,get_label_method_t method);
 
-/// Type of transition group retrieval method
-typedef int (*transition_in_group_t)(model_t self,int *labels,int group);
+/// Type of groups of edge method
+typedef int (*groups_of_edge_t)(model_t model,int edgeno,int index,int** groups);
 
 /**
-\brief Set the method for transition group retrieval
+\brief Set the method for groups of edge method.
 */
-extern void GBsetTransitionInGroup(model_t model,transition_in_group_t method);
+extern void GBsetGroupsOfEdge(model_t model,groups_of_edge_t method);
 
 
 /**
