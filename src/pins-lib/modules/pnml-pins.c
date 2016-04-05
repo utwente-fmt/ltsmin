@@ -445,12 +445,27 @@ parse_net(xmlNode* a_node, model_t model, int* init_state[])
                     int num;
                     if ((num = SIlookup(context->pnml_places, (char*) id)) == SI_INDEX_FAILED) Abort("missing place");
                     const int val = atoi((char*) xmlNodeGetContent(node));
+                    
+                    // test if the value fits in an int
+                    char buf[strlen((char*) xmlNodeGetContent(node)) + 1];
+                    sprintf(buf, "%d", val);
+                    if (strcmp(buf, (char*) xmlNodeGetContent(node)) != 0) {
+                        Abort("Make sure the initial marking \"%s\" fits in a signed 32-bit integer", xmlNodeGetContent(node));
+                    }
+                        
                     (*init_state)[num] = val;
                     if (val > max_token_count) max_token_count = val;
                 } else if (xmlStrcmp(node->parent->name, (const xmlChar*) "inscription") == 0) {
                     int num;
                     if ((num = SIlookup(context->pnml_arcs, (char*) id)) == SI_INDEX_FAILED) Abort("missing arc");
                     context->arcs[num].num = atoi((char*) xmlNodeGetContent(node));
+                    
+                    // test if the value fits in an int
+                    char buf[strlen((char*) xmlNodeGetContent(node)) + 1];
+                    sprintf(buf, "%d", context->arcs[num].num);
+                    if (strcmp(buf, (char*) xmlNodeGetContent(node)) != 0) {
+                        Abort("Make sure the inscription \"%s\" fits in a signed 32-bit integer", xmlNodeGetContent(node));
+                    }
                 }
             } else if (xmlStrcmp(node->name, (const xmlChar*) "arc") == 0) {
                 int num;
