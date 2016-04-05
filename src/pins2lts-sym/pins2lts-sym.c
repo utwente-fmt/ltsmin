@@ -59,7 +59,6 @@ static char* transitions_save_filename = NULL;
 static char* transitions_load_filename = NULL;
 static int save_reachable = 0; // save reachable states too in --save-transitions
 
-static int   use_guards = 0;
 static char* trc_output = NULL;
 static char* trc_type   = "gcf";
 static int   dlk_detect = 0;
@@ -255,7 +254,6 @@ static  struct poptOption options[] = {
     { invariant_long , 'i' , POPT_ARG_STRING , NULL , 0, "detect invariant violations (can be given multiple times)", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },
-    { "guards" , 'g' , POPT_ARG_VAL , &use_guards , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
     { "type", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &trc_type, 0, "trace type to write", "<aut|gcd|gcf|dir|fsm|bcg>" },
     { "save-transitions", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write transition relations to", "<outputfile>" },
     { "save-reachable", 0, POPT_ARG_NONE, &save_reachable, 0, "when saving transitions, also save reachable states", 0 },
@@ -411,7 +409,7 @@ VOID_TASK_2(vset_minus_par, vset_t, dst, vset_t, src) { vset_minus(dst, src); }
 static inline void
 reduce(int group, vset_t set)
 {
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         guard_t* guards = GBgetGuard(model, group);
         for (int g = 0; g < guards->count && !vset_is_empty(set); g++) {
             vset_join(set, set, label_true[guards->guard[g]]);
@@ -740,7 +738,7 @@ VOID_TASK_2(eval_label, int, label, vset_t, set)
 
 static inline void
 learn_guards(vset_t states, long *guard_count) {
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         for (int g = 0; g < nGuards; g++) {
             if (guard_count != NULL) (*guard_count)++;
             LACE_ME;
@@ -753,13 +751,13 @@ static inline void
 learn_guards_par(vset_t states, long *guard_count)
 {
     LACE_ME;
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         for (int g = 0; g < nGuards; g++) {
             if (guard_count != NULL) (*guard_count)++;
             SPAWN(eval_label, g, states);
         }
     }
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         for (int g = 0; g < nGuards; g++) SYNC(eval_label);
     }
 }
@@ -1050,7 +1048,7 @@ inv_cleanup()
         }
     }
 
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         for (int i = 0; i < nGuards; i++) {
             pins_add_state_label_visible(model, i);
         }
@@ -1349,7 +1347,7 @@ static inline void
 learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_maybe, vset_t false_states, vset_t maybe_states, vset_t tmp) {
 
     LACE_ME;
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         guard_t* guards = GBgetGuard(model, t);
         for (int g = 0; g < guards->count && !vset_is_empty(true_states); g++) {
             if (guard_count != NULL) (*guard_count)++;
@@ -1423,7 +1421,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     vset_t tmp = NULL;
     vset_t false_states = NULL;
     vset_t maybe_states = NULL;
-    if (!no_soundness_check && use_guards) {
+    if (!no_soundness_check && GBhasGuardsInfo(model)) {
         for(int i=0;i<nGuards;i++) {
             guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
         }
@@ -1450,7 +1448,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     for(int i=0;i<nGrps;i++) {
         vset_destroy(new_reduced[i]);
     }
-    if(!no_soundness_check && use_guards) {
+    if(!no_soundness_check && GBhasGuardsInfo(model)) {
         for(int i=0;i<nGuards;i++) {
             vset_destroy(guard_maybe[i]);
         }
@@ -1560,7 +1558,7 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
             fclose(fp);
         }
 
-        for (int g = 0; g < nGuards && use_guards; g++) {
+        for (int g = 0; g < nGuards && GBhasGuardsInfo(model); g++) {
             file = "%s/guard_false-l%d-g%d.dot";
             char fgfbuf[snprintf(NULL, 0, file, dot_dir, level, g)];
             sprintf(fgfbuf, file, dot_dir, level, g);
@@ -1777,7 +1775,7 @@ reach_prepare(size_t left, size_t right)
         result->index = left;
         result->left = NULL;
         result->right = NULL;
-        if (use_guards) result->red = reach_red_prepare(0, GBgetGuard(model, left)->count, left);
+        if (GBhasGuardsInfo(model)) result->red = reach_red_prepare(0, GBgetGuard(model, left)->count, left);
         else result->red = NULL;
     } else {
         result->index = -1;
@@ -2068,7 +2066,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 root->class = c;
                 reach_bfs_next(root, reach_groups, maybe);
                 reach_stop(root);
-                if (!no_soundness_check && use_guards) {
+                if (!no_soundness_check && GBhasGuardsInfo(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -2098,7 +2096,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // call next function
             reach_bfs_next(root, reach_groups, maybe);
             reach_stop(root);
-            if (!no_soundness_check && use_guards) {
+            if (!no_soundness_check && GBhasGuardsInfo(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -2184,7 +2182,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 root->class = c;
                 reach_bfs_next(root, reach_groups, maybe);
                 reach_stop(root);
-                if (!no_soundness_check && use_guards) {
+                if (!no_soundness_check && GBhasGuardsInfo(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -2216,7 +2214,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // call next function
             reach_bfs_next(root, reach_groups, maybe);
             reach_stop(root);
-            if (!no_soundness_check && use_guards) {
+            if (!no_soundness_check && GBhasGuardsInfo(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -2504,7 +2502,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 root->class = c;
                 CALL(reach_par_next, root, reach_groups, maybe);
                 reach_stop(root);
-                if (!no_soundness_check && use_guards) {
+                if (!no_soundness_check && GBhasGuardsInfo(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -2535,7 +2533,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // call next function
             CALL(reach_par_next, root, reach_groups, maybe);
             reach_stop(root);
-            if (!no_soundness_check && use_guards) {
+            if (!no_soundness_check && GBhasGuardsInfo(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -2620,7 +2618,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 root->class = c;
                 CALL(reach_par_next, root, reach_groups, maybe);
                 reach_stop(root);
-                if (!no_soundness_check && use_guards) {
+                if (!no_soundness_check && GBhasGuardsInfo(model)) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
@@ -2649,7 +2647,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // call next function
             CALL(reach_par_next, root, reach_groups, maybe);
             reach_stop(root);
-            if (!no_soundness_check && use_guards) {
+            if (!no_soundness_check && GBhasGuardsInfo(model)) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
@@ -2706,7 +2704,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t tmp = NULL;
     vset_t false_states = NULL;
     vset_t maybe_states = NULL;
-    if (!no_soundness_check && use_guards) {
+    if (!no_soundness_check && GBhasGuardsInfo(model)) {
         for(int i=0;i<nGuards;i++) {
             guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
         }
@@ -2767,7 +2765,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
     }
-    if(!no_soundness_check && use_guards) {
+    if(!no_soundness_check && GBhasGuardsInfo(model)) {
         for(int i=0;i<nGuards;i++) {
             vset_destroy(guard_maybe[i]);
         }
@@ -2794,7 +2792,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t tmp = NULL;
     vset_t false_states = NULL;
     vset_t maybe_states = NULL;
-    if (!no_soundness_check && use_guards) {
+    if (!no_soundness_check && GBhasGuardsInfo(model)) {
         for(int i=0;i<nGuards;i++) {
             guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
         }
@@ -2845,7 +2843,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
     }
-    if(!no_soundness_check && use_guards) {
+    if(!no_soundness_check && GBhasGuardsInfo(model)) {
         for(int i=0;i<nGuards;i++) {
             vset_destroy(guard_maybe[i]);
         }
@@ -2873,7 +2871,7 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
     (void) reach_proc;
     (void) guard_count;
 
-    if (use_guards)
+    if (GBhasGuardsInfo(model))
         Abort("guard-splitting not supported with saturation=sat-fix");
 
     int level = 0;
@@ -3083,7 +3081,7 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     (void) next_count;
     (void) guard_count;
 
-    if (use_guards)
+    if (GBhasGuardsInfo(model))
         Abort("guard-splitting not supported with saturation=sat");
 
     if (act_detect != NULL && trc_output != NULL)
@@ -3375,7 +3373,7 @@ unguided(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
     bitvector_invert(&reach_groups);
     sat_proc(reach_proc, visited, &reach_groups, &eg_count, &next_count, &guard_count);
     bitvector_free(&reach_groups);
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         Warning(info, "Exploration took %ld group checks, %ld next state calls and %ld guard evaluation calls",
                 eg_count, next_count, guard_count);
     } else {
@@ -3513,12 +3511,12 @@ init_model(char *file)
 
     HREbarrier(HREglobal());
 
-    PINS_REQUIRE_MUTEX_WRAPPER = 1;
+    PINS_REQUIRE_MUTEX_WRAPPER = 0;
     GBloadFile(model, file, &model);
 
     HREbarrier(HREglobal());
 
-    if (HREme(HREglobal())==0 && !use_guards && no_soundness_check) {
+    if (HREme(HREglobal())==0 && !GBhasGuardsInfo(model) && no_soundness_check) {
         Abort("Option --no-soundness-check is incompatible with --pins-guards=false");
     }
 
@@ -3638,29 +3636,29 @@ init_domain(vset_implementation_t impl) {
     matrix_t* read_matrix;
     matrix_t* write_matrix;
 
-    if (!vdom_separates_rw(domain) && !use_guards) {
+    if (!vdom_separates_rw(domain) && !GBhasGuardsInfo(model)) {
         read_matrix = GBgetDMInfo(model);
         write_matrix = GBgetDMInfo(model);
         Warning(info, "Using GBgetTransitionsShort as next-state function");
         transitions_short = GBgetTransitionsShort;
-    } else if (!vdom_separates_rw(domain) && use_guards) {
+    } else if (!vdom_separates_rw(domain) && GBhasGuardsInfo(model)) {
         read_matrix = GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
         write_matrix = GBgetDMInfo(model);
         Warning(info, "Using GBgetActionsShort as next-state function");
         transitions_short = GBgetActionsShort;
-    } else if (vdom_separates_rw(domain) && !use_guards) {
+    } else if (vdom_separates_rw(domain) && !GBhasGuardsInfo(model)) {
         read_matrix = GBgetDMInfoRead(model);
         write_matrix = GBgetDMInfoMayWrite(model);
         Warning(info, "Using GBgetTransitionsShortR2W as next-state function");
         transitions_short = GBgetTransitionsShortR2W;
-    } else { // vdom_separates_rw(domain) && use_guards
+    } else { // vdom_separates_rw(domain) && GBhasGuardsInfo(model)
         read_matrix = GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
         write_matrix = GBgetDMInfoMayWrite(model);
         Warning(info, "Using GBgetActionsShortR2W as next-state function");
         transitions_short = GBgetActionsShortR2W;
     }
 
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         if (no_soundness_check) {
             Warning(info, "Guard-splitting: not checking soundness of the specification, this may result in an incorrect state space!");
         } else {
@@ -4274,7 +4272,7 @@ VOID_TASK_1(actual_main, void*, arg)
 
     if (inv_detect != NULL) init_invariant_detection();
 
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         for (int i = 0; i < nGuards; i++) {
             pins_add_state_label_visible(model, i);
         }
@@ -4439,7 +4437,7 @@ VOID_TASK_1(actual_main, void*, arg)
     Print(info, "group_next: %ld nodes total", total_node_count);
     Print(info, "group_explored: %ld nodes, %.*g short vectors total", explored_total_node_count, DBL_DIG, explored_total_vector_count);
 
-    if (use_guards) {
+    if (GBhasGuardsInfo(model)) {
         long total_false = 0;
         long total_true = 0;
         explored_total_vector_count = 0;
