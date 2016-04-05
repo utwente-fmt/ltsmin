@@ -192,27 +192,6 @@ typedef struct guard {
 //@{
 
 /**
-
-/**
-\brief The type of the Buchi automaton
-
-PINS_BUCHI_TYPE_BA refers to the (state-based) Buchi Automaton obtained
-from ltl2ba.
-PINS_BUCHI_TYPE_TGBA refers to the Transition Based Generalized Buchi
-Automaton obtained from Spot (via ltl2spot).
-PINS_BUCHI_TYPE_SPOTBA refers to the (state-based) Buchi Automaton
-obtained from Spot (via ltl2spot).
-*/
-typedef enum {
-    PINS_BUCHI_TYPE_BA,
-    PINS_BUCHI_TYPE_TGBA,
-    PINS_BUCHI_TYPE_SPOTBA,
-} pins_buchi_type_t;
-
-/**
- * \brief buchi type for the LTL automaton
- */
-extern pins_buchi_type_t PINS_BUCHI_TYPE;
  * \brief Factory method for loading models.
  *
  * Given a model that has been initialized with data synchronization functions,
@@ -433,26 +412,6 @@ extern void GBsetStateLabelGroupInfo(model_t model, sl_group_enum_t group, sl_gr
 extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void*context);
 /**<
 \brief Get the state labels and all transitions in one call.
-*/
-
-extern void GBsetTGBAAcceptance(model_t model, int acc_set);
-/**<
-\brief Sets the TGBA acceptance condition
-*/
-
-extern int GBTGBAIsAccepting(model_t model, int acc_set);
-/**<
-\brief Return if the given acceptance set is equal to the ltsmin_buchi acceptance_set
-*/
-
-extern int GBgetAccSetEdgeLabelIndex(model_t model);
-/**<
-\brief Get index of acceptance set edge label
-*/
-
-extern int GBsetAccSetEdgeLabelIndex(model_t model, int index);
-/**<
-\brief Set index of acceptance set edge label
 */
 
 extern int GBtransitionInGroup(model_t model, int* labels, int group);

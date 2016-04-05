@@ -28,10 +28,12 @@
 #include <util-lib/util.h>
 
 
+uint32_t                HOA_ACCEPTING_SET = 0;
 static char            *ltl_file = NULL;
 static const char      *ltl_semantics_name = "none";
 static const char      *buchi_type = "ba";
 pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
+pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
 
 static si_map_entry db_ltl_semantics[]={
     {"none",    PINS_LTL_NONE},
@@ -47,6 +49,12 @@ static si_map_entry db_buchi_type[]={
     {"spotba",  PINS_BUCHI_TYPE_SPOTBA},
     {NULL, 0}
 };
+
+uint32_t
+GBgetAcceptingSet ()
+{
+    return HOA_ACCEPTING_SET;
+}
 
 static void
 ltl_popt (poptContext con, enum poptCallbackReason reason,
@@ -682,20 +690,18 @@ GBaddLTL (model_t model)
 
     if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
         /* Edge labels */
-        int acc_set_type = lts_type_add_type (ltstype_new, "acc_set", NULL);
+        int acc_set_type = lts_type_add_type (ltstype_new, LTSMIN_EDGE_TYPE_ACCEPTING_SET, NULL);
 
-        lts_type_set_edge_label_count (ltstype_new, 1);
-        lts_type_set_edge_label_name (ltstype_new, 0, "acc_set");
-        lts_type_set_edge_label_type (ltstype_new, 0, "acc_set");
-        lts_type_set_edge_label_typeno (ltstype_new, 0, acc_set_type);
+        int edge_labels = lts_type_get_edge_label_count (ltstype);
 
-        // set the edge label index
-        int el_index = lts_type_find_edge_label (ltstype_new, "acc_set");
-        GBsetAccSetEdgeLabelIndex(ltlmodel, el_index);
+        lts_type_set_edge_label_count (ltstype_new, edge_labels + 1);
+        lts_type_set_edge_label_name (ltstype_new, edge_labels, LTSMIN_EDGE_LABEL_ACCEPTING_SET);
+        lts_type_set_edge_label_type (ltstype_new, edge_labels, LTSMIN_EDGE_TYPE_ACCEPTING_SET);
+        lts_type_set_edge_label_typeno (ltstype_new, edge_labels, acc_set_type);
 
-        // set the TGBA acceptance set
-        GBsetTGBAAcceptance (ltlmodel, ba->acceptance_set);
-        ctx->el_idx_accept_set = 0;
+        HOA_ACCEPTING_SET = ba->acceptance_set;
+
+        ctx->el_idx_accept_set = edge_labels;
     }
 
     ctx->labels = RTmalloc (sizeof(int[lts_type_get_edge_label_count (ltstype_new)]));

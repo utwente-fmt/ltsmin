@@ -25,6 +25,11 @@ extern void         pins_add_state_variable_visible (model_t model, int index);
 extern void         pins_add_state_label_visible (model_t model, int index);
 
 /**
+ * Gets the index for the LTSMIN_EDGE_LABEL_ACCEPTING_SET (see ltsmin-standard.h)
+ */
+extern int pins_get_accepting_set_edge_label_index (model_t model);
+
+/**
  * Gets the index for the LTSMIN_STATE_LABEL_ACCEPTING (see ltsmin-standard.h)
  */
 extern int pins_get_accepting_state_label_index (model_t model);

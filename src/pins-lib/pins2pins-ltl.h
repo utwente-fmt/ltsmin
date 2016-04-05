@@ -1,6 +1,9 @@
 #ifndef PINS2PINS_LTL
 #define PINS2PINS_LTL
 
+#include <pins-lib/pins.h>
+
+
 /**
 \brief The behaviour of the ltl buchi product
 
@@ -27,9 +30,32 @@ typedef enum {
 extern pins_ltl_type_t PINS_LTL;
 
 /**
+\brief The type of the Buchi automaton
+
+PINS_BUCHI_TYPE_BA refers to the (state-based) Buchi Automaton obtained
+from ltl2ba.
+PINS_BUCHI_TYPE_TGBA refers to the Transition Based Generalized Buchi
+Automaton obtained from Spot (via ltl2spot).
+PINS_BUCHI_TYPE_SPOTBA refers to the (state-based) Buchi Automaton
+obtained from Spot (via ltl2spot).
+*/
+typedef enum {
+    PINS_BUCHI_TYPE_BA,
+    PINS_BUCHI_TYPE_TGBA,
+    PINS_BUCHI_TYPE_SPOTBA,
+} pins_buchi_type_t;
+
+/**
+ * \brief buchi type for the LTL automaton
+ */
+extern pins_buchi_type_t PINS_BUCHI_TYPE;
+
+/**
 \brief Add LTL layer on top all other pins layers
 */
 extern model_t GBaddLTL(model_t model);
+
+extern uint32_t GBgetAcceptingSet ();
 
 extern struct poptOption ltl_options[];
 
