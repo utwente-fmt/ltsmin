@@ -37,7 +37,7 @@ struct vector_domain_shared {
 	void (*set_count)(vset_t set,long *nodes,double *elements);
 	void (*set_count_precise)(vset_t set,long nodes,bn_int_t *elements);
 	void (*set_ccount)(vset_t set,long *nodes,long double *elements);
-	void (*dom_visit_clear_cache)(vdom_t dom, const int cache_op);
+	void (*dom_clear_cache)(vdom_t dom, const int cache_op);
 	void (*set_visit_seq)(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
 	void (*set_visit_par)(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
 	void (*rel_count)(vrel_t rel,long *nodes,double *elements);
@@ -85,7 +85,7 @@ extern void vdom_init_shared(vdom_t dom,int n);
 
 extern int vdom_next_cache_op(vdom_t dom);
 
-extern void vdom_visit_clear_cache(vdom_t dom, const int cache_op);
+extern void vdom_clear_cache(vdom_t dom, const int cache_op);
 
 #endif
 

@@ -535,7 +535,7 @@ void vset_count_precise(vset_t set,long nodes,bn_int_t *elements){
     bn_init_copy(elements, &context.bignum);
     bn_clear(&context.bignum);
 
-    vdom_visit_clear_cache(set->dom, cache_op);
+    vdom_clear_cache(set->dom, cache_op);
 }
 
 int vdom_supports_precise_counting(vdom_t dom) {
@@ -755,8 +755,8 @@ int vdom_next_cache_op(vdom_t dom) {
     return dom->shared.dom_next_cache_op(dom);
 }
 
-void vdom_visit_clear_cache(vdom_t dom, const int cache_op) {
-    if (dom->shared.dom_visit_clear_cache != NULL) {
-        dom->shared.dom_visit_clear_cache(dom, cache_op);
+void vdom_clear_cache(vdom_t dom, const int cache_op) {
+    if (dom->shared.dom_clear_cache != NULL) {
+        dom->shared.dom_clear_cache(dom, cache_op);
     }
 }

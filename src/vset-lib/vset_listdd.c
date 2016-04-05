@@ -1671,7 +1671,7 @@ set_ccount_mdd(vset_t set, long *nodes, long double *elements)
 }
 
 static void
-dom_visit_clear_cache(vdom_t dom, const int cache_op)
+dom_clear_cache(vdom_t dom, const int cache_op)
 {
     (void) dom;
     const uint32_t op = (uint32_t) OP_VISIT | (cache_op << 8);
@@ -1864,7 +1864,7 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_dot=set_dot_mdd;
     dom->shared.rel_dot=rel_dot_mdd;
     dom->shared.set_visit_seq=set_visit_mdd;
-    dom->shared.dom_visit_clear_cache=dom_visit_clear_cache;
+    dom->shared.dom_clear_cache=dom_clear_cache;
     dom->shared.dom_next_cache_op=dom_next_cache_op;
     return dom;
 }
