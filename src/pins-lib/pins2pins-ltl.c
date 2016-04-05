@@ -100,6 +100,7 @@ typedef struct ltl_context {
     int             ltl_idx;
     int             sl_idx_accept;
     int             sl_idx_nonaccept;
+    int             el_idx_accept_set;
     int             len;
     int             old_len;
     int             groups;
@@ -107,6 +108,7 @@ typedef struct ltl_context {
     int             edge_labels;
     ltsmin_buchi_t *ba;
     bool            is_weak;
+    int            *labels;
 } ltl_context_t;
 
 typedef struct cb_context {
@@ -181,7 +183,7 @@ eval (cb_context *infoctx, transition_info_t *ti, int *state)
 /*
  * TYPE LTSMIN
  */
-void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
+void ltl_ltsmin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
     cb_context *infoctx = (cb_context*)context;
     ltl_context_t *ctx = infoctx->ctx;
     // copy dst, append ltl never claim in lockstep
@@ -194,6 +196,8 @@ void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
         eval (infoctx, ti, infoctx->src + 1); /* ltsmin: src instead of dst */
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
+    transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
+    memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((pred_evals & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -203,14 +207,12 @@ void ltl_ltsmin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
 
             // allocate the edge labels and write the TGBA acceptance set
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-                int n_labels = lts_type_get_edge_label_count (infoctx->model);
-                ti->labels = RTmalloc (sizeof(int*[n_labels]));
-                int el_index = GBgetAccSetEdgeLabelIndex (infoctx->model);
-                ti->labels[el_index] = ctx->ba->states[i]->transitions[j].acc_set;
+                ti2.labels[ctx->el_idx_accept_set] =
+                                ctx->ba->states[i]->transitions[j].acc_set;
             }
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
+            infoctx->cb(infoctx->user_context, &ti2, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -250,7 +252,7 @@ ltl_ltsmin_all (model_t self, int *src, TransitionCB cb,
 /*
  * TYPE SPIN
  */
-void ltl_spin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
+void ltl_spin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
     cb_context *infoctx = (cb_context*)context;
     ltl_context_t *ctx = infoctx->ctx;
     // copy dst, append ltl never claim in lockstep
@@ -259,6 +261,8 @@ void ltl_spin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
     int pred_evals = infoctx->predicate_evals;
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
+    transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
+    memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((pred_evals & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -268,14 +272,12 @@ void ltl_spin_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
 
             // allocate the edge labels and write the TGBA acceptance set
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-                int n_labels = lts_type_get_edge_label_count (infoctx->model);
-                ti->labels = RTmalloc (sizeof(int*[n_labels]));
-                int el_index = GBgetAccSetEdgeLabelIndex (infoctx->model);
-                ti->labels[el_index] = ctx->ba->states[i]->transitions[j].acc_set;
+                ti2.labels[ctx->el_idx_accept_set] =
+                                ctx->ba->states[i]->transitions[j].acc_set;
             }
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
+            infoctx->cb (infoctx->user_context, &ti2, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -314,8 +316,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
         memcpy (dst_buchi + 1, src + 1, ctx->old_len * sizeof(int) );
         int i = src[ctx->ltl_idx];
         HREassert (i < ctx->ba->state_count);
-        int labels[ctx->edge_labels];
-        memset (labels, 0, sizeof(int) * ctx->edge_labels);
+        memset (ctx->labels, 0, sizeof(int) * ctx->edge_labels);
         for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
             if ((new_ctx.predicate_evals & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
                 (new_ctx.predicate_evals & ctx->ba->states[i]->transitions[j].neg[0]) == 0) {
@@ -328,12 +329,12 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
 
                 // set the edge label for the TGBA acceptance set
                 if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-                    int el_index = GBgetAccSetEdgeLabelIndex (self);
-                    labels[el_index] = ctx->ba->states[i]->transitions[j].acc_set;
+                    ctx->labels[ctx->el_idx_accept_set] =
+                                    ctx->ba->states[i]->transitions[j].acc_set;
                 }
 
-                transition_info_t ti = GB_TI(labels, group);
-                
+                transition_info_t ti = GB_TI(ctx->labels, group);
+
                 cb(user_context, &ti, dst_buchi,NULL);
                 ++new_ctx.ntbtrans;
             }
@@ -345,8 +346,8 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
 /*
  * TYPE TEXTBOOK
  */
-void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
-    cb_context *infoctx = (cb_context*)context;
+void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
+    cb_context *infoctx = (cb_context*)c;
     ltl_context_t *ctx = infoctx->ctx;
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
@@ -355,6 +356,8 @@ void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
     int i = infoctx->src[ctx->ltl_idx];
     if (i == -1) { i=0; } /* textbook: extra initial state */
     HREassert (i < ctx->ba->state_count );
+    transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
+    memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((dst_pred & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -364,14 +367,12 @@ void ltl_textbook_cb (void*context,transition_info_t*ti,int*dst,int*cpy) {
 
             // allocate the edge labels and write the TGBA acceptance set
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-                int n_labels = lts_type_get_edge_label_count (infoctx->model);
-                ti->labels = RTmalloc (sizeof(int*[n_labels]));
-                int el_index = GBgetAccSetEdgeLabelIndex (infoctx->model);
-                ti->labels[el_index] = ctx->ba->states[i]->transitions[j].acc_set;
+                ti2.labels[ctx->el_idx_accept_set] =
+                                ctx->ba->states[i]->transitions[j].acc_set;
             }
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
+            infoctx->cb(infoctx->user_context, &ti2, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -401,9 +402,9 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
     if (src[ctx->ltl_idx] == -1) {
         int labels[ctx->edge_labels];
-        memset (labels, 0, sizeof(int) * ctx->edge_labels);
-        transition_info_t ti = GB_TI(labels, -1);
-        ltl_textbook_cb(&new_ctx, &ti, src + 1,NULL);
+        memset (labels, 0, sizeof(int[ctx->edge_labels]));
+        transition_info_t ti = GB_TI(labels, ctx->groups);
+        ltl_textbook_cb(&new_ctx, &ti, src + 1, NULL);
         return new_ctx.ntbtrans;
     } else {
         GBgetTransitionsAll(ctx->parent, src + 1, ltl_textbook_cb, &new_ctx);
@@ -604,7 +605,7 @@ GBaddLTL (model_t model)
 
     if (PINS_LTL == PINS_LTL_NONE) PINS_LTL = PINS_LTL_SPIN;
 
-    ltsmin_buchi_t* ba = init_ltsmin_buchi(model, ltl_file);
+    ltsmin_buchi_t *ba = init_ltsmin_buchi(model, ltl_file);
 
     model_t         ltlmodel = GBcreateBase();
     ltl_context_t *ctx = RTmalloc(sizeof *ctx);
@@ -694,7 +695,10 @@ GBaddLTL (model_t model)
 
         // set the TGBA acceptance set
         GBsetTGBAAcceptance (ltlmodel, ba->acceptance_set);
+        ctx->el_idx_accept_set = 0;
     }
+
+    ctx->labels = RTmalloc (sizeof(int[lts_type_get_edge_label_count (ltstype_new)]));
 
     // This messes up the trace, the chunk maps now is one index short! Fixed below
     GBcopyChunkMaps(ltlmodel, model);
@@ -719,7 +723,20 @@ GBaddLTL (model_t model)
     matrix_t       *p_dm_w = GBgetDMInfoMayWrite (model);
 
     int             groups = dm_nrows( GBgetDMInfo(model) );
-    int             new_ngroups = (PINS_LTL_SPIN != PINS_LTL ? groups : groups + ba->trans_count);
+    int             new_ngroups;
+
+    switch (PINS_LTL) {
+    case PINS_LTL_LTSMIN:
+        new_ngroups = groups;
+        break;
+    case PINS_LTL_SPIN:
+        new_ngroups = groups + ba->trans_count;
+        break;
+    case PINS_LTL_TEXTBOOK:
+        new_ngroups = groups + 1;
+        break;
+    default: Abort("Unknown LTL semantics.");
+    }
 
     // mark the parts the buchi automaton uses for reading
     int formula_state_dep[len];
@@ -758,22 +775,25 @@ GBaddLTL (model_t model)
         }
     }
 
-    // fill groups added by SPIN LTL deadlock behavior with guards dependencies
-    if (PINS_LTL_SPIN == PINS_LTL) {
-        for(int i = groups; i < new_ngroups; i++) {
+    if (PINS_LTL == PINS_LTL_SPIN || PINS_LTL == PINS_LTL_TEXTBOOK) {
+        for (int i = groups; i < new_ngroups; i++) {
             // add buchi as dependent
             dm_set(p_new_dm, i, ctx->ltl_idx);
             dm_set(p_new_dm_r, i, ctx->ltl_idx);
             dm_set(p_new_dm_w, i, ctx->ltl_idx);
 
             // add buchi variables as dependent (read)
-            for(int j=0; j < len; j++) {
+            for (int j=0; j < len; j++) {
                 if (formula_state_dep[j]) {
                     dm_set(p_new_dm, i, j+1);
                     dm_set(p_new_dm_r, i, j+1);
                 }
             }
         }
+    }
+
+    // fill groups added by SPIN LTL deadlock behavior with guards dependencies
+    if (PINS_LTL == PINS_LTL_SPIN) {
         // because these transitions depend on a deadlock, they depend on all others
         sl_group_t *guards = GBgetStateLabelGroupInfo(model, GB_SL_GUARDS);
         int deps[len]; // collects union of all dependencies
