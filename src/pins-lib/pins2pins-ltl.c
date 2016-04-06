@@ -205,7 +205,8 @@ void ltl_ltsmin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
     transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
-    memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
+        memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((pred_evals & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -270,7 +271,8 @@ void ltl_spin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
     transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
-    memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
+        memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((pred_evals & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -365,7 +367,8 @@ void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
     if (i == -1) { i=0; } /* textbook: extra initial state */
     HREassert (i < ctx->ba->state_count );
     transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
-    memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
+        memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((dst_pred & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
