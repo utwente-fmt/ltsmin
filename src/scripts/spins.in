@@ -36,11 +36,11 @@ for option in ${1+"$@"}; do
     fi
 done
 
-if [ -z "$promela_file" ]; then
-    echo "usage: spins [options] promela_file" ;
-    echo "options will be passed to GCC"
-    exit 1
-fi
+#if [ -z "$promela_file" ]; then
+#    echo "usage: spins [options] promela_file" ;
+#    echo "options will be passed to GCC"
+#    exit 1
+#fi
 
 promela_name=`basename $promela_file`
 output_file="${promela_name}.spins.c"
