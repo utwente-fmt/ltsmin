@@ -77,7 +77,7 @@ int
 pins_get_accepting_set_edge_label_index (model_t model)
 {
     lts_type_t          ltstype = GBgetLTStype (model);
-    return lts_type_find_state_label (ltstype, LTSMIN_EDGE_LABEL_ACCEPTING_SET);
+    return lts_type_find_edge_label (ltstype, LTSMIN_EDGE_LABEL_ACCEPTING_SET);
 }
 
 int
