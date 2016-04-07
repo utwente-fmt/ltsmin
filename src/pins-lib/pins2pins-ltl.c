@@ -114,6 +114,7 @@ typedef struct ltl_context {
     int             groups;
     int             old_groups;
     int             edge_labels;
+    int             edge_labels_old;
     ltsmin_buchi_t *ba;
     bool            is_weak;
     int            *labels;
@@ -204,9 +205,11 @@ void ltl_ltsmin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
         eval (infoctx, ti, infoctx->src + 1); /* ltsmin: src instead of dst */
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
-    transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
-        memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+        HREassert (ctx->edge_labels_old == ctx->el_idx_accept_set);
+        memcpy (ctx->labels, ti->labels, sizeof(int[ctx->edge_labels_old]));
+        ti->labels = ctx->labels; // inline because por_proviso is passed up
+    }
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((pred_evals & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -216,12 +219,12 @@ void ltl_ltsmin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 
             // allocate the edge labels and write the TGBA acceptance set
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-                ti2.labels[ctx->el_idx_accept_set] =
+                ti->labels[ctx->el_idx_accept_set] =
                                 ctx->ba->states[i]->transitions[j].acc_set;
             }
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, &ti2, dst_buchi,cpy);
+            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -270,9 +273,11 @@ void ltl_spin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
     int pred_evals = infoctx->predicate_evals;
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
-    transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
-        memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+        HREassert (ctx->edge_labels_old == ctx->el_idx_accept_set);
+        memcpy (ctx->labels, ti->labels, sizeof(int[ctx->edge_labels_old]));
+        ti->labels = ctx->labels; // inline because por_proviso is passed up
+    }
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((pred_evals & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -282,12 +287,12 @@ void ltl_spin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 
             // allocate the edge labels and write the TGBA acceptance set
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-                ti2.labels[ctx->el_idx_accept_set] =
+                ti->labels[ctx->el_idx_accept_set] =
                                 ctx->ba->states[i]->transitions[j].acc_set;
             }
 
             // callback, emit new state, move allowed
-            infoctx->cb (infoctx->user_context, &ti2, dst_buchi,cpy);
+            infoctx->cb (infoctx->user_context, ti, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -344,6 +349,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
                 }
 
                 transition_info_t ti = GB_TI(ctx->labels, group);
+                ti.por_proviso = 1; // state fully explored
 
                 cb(user_context, &ti, dst_buchi,NULL);
                 ++new_ctx.ntbtrans;
@@ -366,9 +372,11 @@ void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
     int i = infoctx->src[ctx->ltl_idx];
     if (i == -1) { i=0; } /* textbook: extra initial state */
     HREassert (i < ctx->ba->state_count );
-    transition_info_t ti2 = GB_TI(ctx->labels, ti->group);
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)
-        memcpy (ti2.labels, ti->labels, sizeof(int[ctx->el_idx_accept_set]));
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+        HREassert (ctx->edge_labels_old == ctx->el_idx_accept_set);
+        memcpy (ctx->labels, ti->labels, sizeof(int[ctx->edge_labels_old]));
+        ti->labels = ctx->labels; // inline because por_proviso is passed up
+    }
     for(int j=0; j < ctx->ba->states[i]->transition_count; j++) {
         // check predicates
         if ((dst_pred & ctx->ba->states[i]->transitions[j].pos[0]) == ctx->ba->states[i]->transitions[j].pos[0] &&
@@ -378,12 +386,12 @@ void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
 
             // allocate the edge labels and write the TGBA acceptance set
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-                ti2.labels[ctx->el_idx_accept_set] =
+                ti->labels[ctx->el_idx_accept_set] =
                                 ctx->ba->states[i]->transitions[j].acc_set;
             }
 
             // callback, emit new state, move allowed
-            infoctx->cb(infoctx->user_context, &ti2, dst_buchi,cpy);
+            infoctx->cb(infoctx->user_context, ti, dst_buchi,cpy);
             ++infoctx->ntbtrans;
         }
     }
@@ -912,6 +920,7 @@ GBaddLTL (model_t model)
     ctx->len = new_len;
     ctx->old_groups = groups;
     ctx->groups = new_ngroups;
+    ctx->edge_labels_old = lts_type_get_edge_label_count(ltstype);
     ctx->edge_labels = lts_type_get_edge_label_count(ltstype_new);
     return ltlmodel;
 }
