@@ -182,6 +182,12 @@ extern void dm_apply_xor(matrix_t* tgt, const matrix_t* src);
  */
 extern int dm_is_empty(const matrix_t* m);
 
+
+/**
+ * Applies the product bv * m = tgt;
+ */
+extern void dm_prod_bm(bitvector_t* tgt, const bitvector_t* bv, const matrix_t* m);
+
 /**
  * dm_bitvector_row/col
  *  Copy a row/column of the matrix to a bitvector
