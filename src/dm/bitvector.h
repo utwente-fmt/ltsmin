@@ -211,4 +211,26 @@ extern size_t       bitvector_n_high(bitvector_t *);
  */
 extern void         bitvector_high_bits(bitvector_t *, int *);
 
+/**
+ * Test whether two bitvectors are equal.
+ *
+ *  result:
+ *   true: all bits are equal
+ *   false: not all bits are equal or the bitvectors are not of the same size
+ */
+extern int          bitvector_equal(const bitvector_t *bv1, const bitvector_t *bv2);
+
+/**
+ * bitvector_xor
+ *  xor two bitvectors
+ *   1) the target bitvector
+ *      the bitvector should be created with bitvector_create or bitvector_copy
+ *      and should be of the same size as the source bitvector
+ *   2) the source bitvector
+ *
+ *  result:
+ *   the target bitvector has only those bits set that were not set in both
+ */
+extern void         bitvector_xor(bitvector_t *, const bitvector_t *);
+
 #endif                          // BITVECTOR_H

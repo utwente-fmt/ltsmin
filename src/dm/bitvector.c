@@ -232,3 +232,26 @@ bitvector_high_bits(bitvector_t *bv, int *bits)
         if (bitvector_is_set(bv, i)) bits[j++] = i;
     }
 }
+
+int
+bitvector_equal(const bitvector_t *bv1, const bitvector_t *bv2)
+{
+    if (bv1->n_bits != bv2->n_bits) return 0;
+    
+    for(size_t i=0; i < bv1->n_words; ++i) {
+        if (bv1->data[i] != bv2->data[i]) return 0;
+    }
+    return 1;
+}
+
+void
+bitvector_xor(bitvector_t *bv, const bitvector_t *bv2)
+{
+    if (bv->n_bits != bv2->n_bits) return;
+
+    // calculate number of words in the bitvector, xor wordwise
+    for(size_t i=0; i < bv->n_words; ++i) {
+        bv->data[i] ^= bv2->data[i];
+    }
+}
+
