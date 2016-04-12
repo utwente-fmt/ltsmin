@@ -119,7 +119,7 @@ tl_lex(void)
             Debug ("LTL Lexer: passing token '%s' to LTL2BA", yytext);
             return PREDICATE;
         default:
-            Abort("unhandled LTL_TOKEN: %d\n", e->token);
+            Abort("unhandled LTL_TOKEN: %s\n", LTL_NAME(e->token));
             break;
     }
     tl_yyerror("expected something...");
