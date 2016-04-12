@@ -415,7 +415,7 @@ MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
 }
 
 static int
-MCRL2groupsOfEdge (model_t m, int edge_no, int index, int* groups)
+MCRL2groupsOfEdge (model_t m, int edge_no, int index, int **groups)
 {
     ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
     return pins->groups_of_edge(edge_no, index, groups);
