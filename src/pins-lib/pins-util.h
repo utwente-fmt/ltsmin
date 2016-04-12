@@ -11,8 +11,15 @@ extern size_t       pins_get_edge_label_count (model_t model);
 extern size_t       pins_get_state_variable_count (model_t model);
 extern size_t       pins_get_group_count (model_t model);
 
-extern void         pins_add_edge_label_visible (model_t model, int act_label,
-                                                  int act_index);
+/**
+\brief Adds visibility info for groups that can produce and edge with a specific label.
+*/
+extern void         pins_add_edge_label_visible (model_t model, int edge, int label);
+
+/**
+\brief Adds visibility info for group to the PorGroupVisibility array.
+*/
+extern void         pins_add_group_visible (model_t model, int group);
 
 /**
 \brief Adds visibility info for a state variable to the PorGroupVisibility array.

@@ -846,9 +846,7 @@ void
 combine_rows(matrix_t *matrix_new, matrix_t *matrix_old, int new_rows,
                  int *transbegin, int *transmap)
 {
-    bitvector_t row_new, row_old;
-
-    bitvector_create(&row_old, dm_ncols(matrix_old));
+    bitvector_t row_new;
 
     for (int i = 0; i < new_rows; i++) {
         int begin = transbegin[i];
@@ -857,8 +855,7 @@ combine_rows(matrix_t *matrix_new, matrix_t *matrix_old, int new_rows,
         bitvector_create(&row_new, dm_ncols(matrix_old));
 
         for (int j = begin; j < end; j++) {
-            dm_bitvector_row(&row_old, matrix_old, transmap[j]);
-            bitvector_union(&row_new, &row_old);
+            dm_row_union(&row_new, matrix_old, transmap[j]);
         }
 
         for (int k = 0; k < dm_ncols(matrix_old); k++) {
@@ -870,8 +867,6 @@ combine_rows(matrix_t *matrix_new, matrix_t *matrix_old, int new_rows,
 
         bitvector_free(&row_new);
     }
-
-    bitvector_free(&row_old);
 }
 
 static int

@@ -27,8 +27,8 @@
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-guards.h>
 #include <pins-lib/pins2pins-mucalc.h>
-#include <pins-lib/property-semantics.h>
 #include <pins-lib/por/pins2pins-por.h>
+#include <pins-lib/property-semantics.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
@@ -302,20 +302,10 @@ static model_t model;
 static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
-static vset_t *label_false; // 0
-static vset_t *label_true;  // 1
+static vset_t *label_false = NULL; // 0
+static vset_t *label_true = NULL;  // 1
 static vset_t *label_tmp;
 static rt_timer_t reach_timer;
-
-struct inv_check_s
-{
-    vset_t container;
-    struct inv_check_s* left;
-    struct inv_check_s* right;
-    void* work;
-};
-
-struct inv_check_s** inv_expr_info = NULL;
 
 static int* label_locks = NULL;
 
@@ -325,8 +315,7 @@ static proj_info* inv_proj = NULL;
 static vset_t* inv_set = NULL;
 static int* inv_violated = NULL;
 static int num_inv_violated = 0;
-static int num_inv_sl_used = 0;
-static int* inv_state_labels = NULL;
+static bitvector_t state_label_used;
 
 typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
                              bitvector_t *reach_groups,
@@ -764,9 +753,9 @@ learn_guards_par(vset_t states, long *guard_count)
 static inline void
 learn_labels(vset_t states)
 {
-    for (int i = 0; i < num_inv_sl_used; i++) {
+    for (int i = 0; i < sLbls; i++) {
         LACE_ME;
-        eval_label(inv_state_labels[i], states);
+        if (bitvector_is_set(&state_label_used, i)) eval_label(i, states);
     }
 }
 
@@ -774,57 +763,62 @@ static inline void
 learn_labels_par(vset_t states)
 {
     LACE_ME;
-    for (int i = 0; i < num_inv_sl_used; i++) {
-        SPAWN(eval_label, inv_state_labels[i], states);
+    for (int i = 0; i < sLbls; i++) {
+        if (bitvector_is_set(&state_label_used, i)) SPAWN(eval_label, i, states);
     }
-    for (int i = 0; i < num_inv_sl_used; i++) SYNC(eval_label);
+    for (int i = 0; i < sLbls; i++) {
+        if (bitvector_is_set(&state_label_used, i)) SYNC(eval_label);
+    }
 }
 
-struct inv_rel_s {
-    vset_t tmp;
-    vset_t true_states;
-    vset_t false_states;
-    vset_t shortcut; // only used when not evaluating every binary operand in parallel.
-    int len;
-    int* deps;
-    int* vec;
+struct inv_info_s {
+    vset_t container;
+    void* work;
 };
 
 static void
-inv_info_destroy(ltsmin_expr_t e, ltsmin_parse_env_t env, struct inv_check_s* c)
+inv_info_destroy(void* context)
 {
-    switch(e->token) {
-        case PRED_NOT:
-            inv_info_destroy(e->arg1, env, c->left);
-            break;
-        case PRED_AND:
-        case PRED_OR:
-            inv_info_destroy(e->arg1, env, c->left);
-            inv_info_destroy(e->arg2, env, c->right);
-            break;
-        case PRED_SVAR:
-            vset_destroy(c->left->container);
-            RTfree(c->left);
-            break;        
-        case PRED_EQ:
-        case PRED_NEQ:
-        case PRED_LT:
-        case PRED_LEQ:
-        case PRED_GT:
-        case PRED_GEQ: {
-            struct inv_rel_s* info = (struct inv_rel_s*) c->work;
-            vset_destroy(info->tmp);
-            vset_destroy(info->true_states);
-            vset_destroy(info->false_states);
-            if (!inv_bin_par) vset_destroy(info->shortcut);
-            RTfree(info->deps);
-            RTfree(info->vec);
-            RTfree(info);
-            break;
-        }
-    }
-    vset_destroy(c->container);
-    RTfree(c);
+    struct inv_info_s* info = (struct inv_info_s*) context;
+    vset_destroy(info->container);
+    RTfree(info);
+}
+
+struct inv_rel_s {
+    vset_t tmp; // some workspace for learning
+    vset_t true_states; // all short states that satisfy the expression
+    vset_t false_states; // all short states that do not satisfy the expression
+    vset_t shortcut; // only used when not evaluating every binary operand in parallel.
+    int* vec; // space for long vector
+    int len; // length of short vector
+    int* deps; // dependencies for short vector
+};
+
+static void
+inv_rel_destroy(void* context)
+{
+    struct inv_info_s* info = (struct inv_info_s*) context;    
+    struct inv_rel_s* rel = (struct inv_rel_s*) info->work;
+    
+    vset_destroy(rel->tmp);
+    vset_destroy(rel->true_states);
+    vset_destroy(rel->false_states);
+    if (!inv_bin_par) vset_destroy(rel->shortcut);
+    inv_info_destroy(info);
+}
+
+struct inv_svar_s {
+    vset_t tmp;
+};
+
+static void
+inv_svar_destroy(void* context)
+{
+    struct inv_info_s* info = (struct inv_info_s*) context;
+    struct inv_svar_s* svar = (struct inv_svar_s*) info->work;
+    
+    if (svar->tmp != NULL) vset_destroy(svar->tmp);
+    inv_info_destroy(info);
 }
 
 struct rel_expr_info {
@@ -842,12 +836,18 @@ rel_expr_cb(vset_t set, void *context, int *e)
     int vec[N];
     memcpy(vec, ctx->vec, sizeof(int[N]));
     for (int i = 0; i < ctx->len; i++) vec[ctx->deps[i]] = e[i];
-    if (eval_predicate(model, ctx->e, NULL, vec, N, ctx->env)) vset_add(set, e);
+    if (eval_predicate(model, ctx->e, vec, ctx->env)) vset_add(set, e);
 }
 
-#define eval_predicate_set_par(e, env, c, s) CALL(eval_predicate_set_par, (e), (env), (c), (s))
-VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, struct inv_check_s*, c, vset_t, states)
+#define eval_predicate_set_par(e, env, s) CALL(eval_predicate_set_par, (e), (env), (s))
+VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, vset_t, states)
 {
+    struct inv_info_s* c = (struct inv_info_s*) e->context;
+    struct inv_info_s* left, *right;
+    left = right = NULL;
+    if (e->node_type == UNARY_OP || e->node_type == BINARY_OP) left = (struct inv_info_s*) e->arg1->context;
+    if (e->node_type == BINARY_OP) right = (struct inv_info_s*) e->arg2->context;
+    
     switch (e->token) {
         case PRED_TRUE: {
             // do nothing (c->container already contains everything)
@@ -859,34 +859,34 @@ VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, s
             vset_join(c->container, c->container, label_true[e->idx - N]);            
             break;
         case PRED_NOT: {
-            vset_copy(c->left->container, c->container);
-            eval_predicate_set_par(e->arg1, env, c->left, states);
-            vset_minus(c->container, c->left->container);
-            vset_clear(c->left->container);            
+            vset_copy(left->container, c->container);
+            eval_predicate_set_par(e->arg1, env, states);
+            vset_minus(c->container, left->container);
+            vset_clear(left->container);            
         } break;
         case PRED_AND: {
-            vset_copy(c->left->container, c->container);
-            SPAWN(eval_predicate_set_par, e->arg1, env, c->left, states);
-            vset_copy(c->right->container, c->container);
+            vset_copy(left->container, c->container);
+            SPAWN(eval_predicate_set_par, e->arg1, env, states);
+            vset_copy(right->container, c->container);
             vset_clear(c->container);
-            eval_predicate_set_par(e->arg2, env, c->right, states);
+            eval_predicate_set_par(e->arg2, env, states);
             SYNC(eval_predicate_set_par);
-            vset_copy(c->container, c->left->container);
-            vset_clear(c->left->container);
-            vset_intersect(c->container, c->right->container);
-            vset_clear(c->right->container);
+            vset_copy(c->container, left->container);
+            vset_clear(left->container);
+            vset_intersect(c->container, right->container);
+            vset_clear(right->container);
         } break;
         case PRED_OR: {
-            vset_copy(c->left->container, c->container);
-            SPAWN(eval_predicate_set_par, e->arg1, env, c->left, states);
-            vset_copy(c->right->container, c->container);
+            vset_copy(left->container, c->container);
+            SPAWN(eval_predicate_set_par, e->arg1, env, states);
+            vset_copy(right->container, c->container);
             vset_clear(c->container);
-            eval_predicate_set_par(e->arg2, env, c->right, states);
+            eval_predicate_set_par(e->arg2, env, states);
             SYNC(eval_predicate_set_par);
-            vset_copy(c->container, c->left->container);
-            vset_clear(c->left->container);
-            vset_union(c->container, c->right->container);
-            vset_clear(c->right->container);
+            vset_copy(c->container, left->container);
+            vset_clear(left->container);
+            vset_union(c->container, right->container);
+            vset_clear(right->container);
         } break;
         case PRED_EQ:
         case PRED_NEQ:
@@ -894,16 +894,16 @@ VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, s
         case PRED_LEQ:
         case PRED_GT:
         case PRED_GEQ: {
-            const struct inv_rel_s* info = (const struct inv_rel_s*) c->work;
+            struct inv_rel_s* rel = (struct inv_rel_s*) c->work;
             
-            vset_project_minus(info->tmp, states, info->true_states);
-            vset_minus(info->tmp, info->false_states);
+            vset_project_minus(rel->tmp, states, rel->true_states);
+            vset_minus(rel->tmp, rel->false_states);
             
             struct rel_expr_info ctx;
-            ctx.vec = info->vec;
+            ctx.vec = rel->vec;
 
-            ctx.len = info->len;
-            ctx.deps = info->deps;
+            ctx.len = rel->len;
+            ctx.deps = rel->deps;
 
             ctx.e = e;
             ctx.env = env;
@@ -911,18 +911,18 @@ VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, s
             // count when verbose
             if (log_active(infoLong)) {
                 double elem_count;
-                vset_count(info->tmp, NULL, &elem_count);
+                vset_count(rel->tmp, NULL, &elem_count);
                 if (elem_count >= 10000.0 * SPEC_REL_PERF) {                    
                     const char* p = LTSminPrintExpr(e, env);
                     Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
                 }
             }
 
-            vset_update(info->true_states, info->tmp, rel_expr_cb, &ctx);
-            vset_minus(info->tmp, info->true_states);
-            vset_union(info->false_states, info->tmp);
-            vset_clear(info->tmp);
-            vset_join(c->container, c->container, info->true_states);
+            vset_update(rel->true_states, rel->tmp, rel_expr_cb, &ctx);
+            vset_minus(rel->tmp, rel->true_states);
+            vset_union(rel->false_states, rel->tmp);
+            vset_clear(rel->tmp);
+            vset_join(c->container, c->container, rel->true_states);
             break;
         }
         default:
@@ -932,8 +932,14 @@ VOID_TASK_4(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, s
 }
 
 static void
-eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struct inv_check_s* c)
+eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
 {
+    struct inv_info_s* c = (struct inv_info_s*) e->context;
+    struct inv_info_s* left, *right;
+    left = right = NULL;
+    if (e->node_type == UNARY_OP || e->node_type == BINARY_OP) left = (struct inv_info_s*) e->arg1->context;
+    if (e->node_type == BINARY_OP) right = (struct inv_info_s*) e->arg2->context;
+    
     LACE_ME;
 
     switch (e->token) {
@@ -946,7 +952,9 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struc
         case PRED_SVAR: { // assume state label
             /* following join is necessary because vset does not yet support
              * set projection of a projected set. */
-            vset_join((vset_t) c->work, c->container, states);
+            struct inv_svar_s* svar = (struct inv_svar_s*) c->work;
+
+            vset_join(svar->tmp, c->container, states);
             if (inv_par) {
                 volatile int* ptr = &label_locks[e->idx - N];
                 while (!cas(ptr, 0, 1)) {
@@ -954,42 +962,42 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struc
                     ptr = &label_locks[e->idx - N];
                 }
             }
-            eval_label(e->idx - N, (vset_t) c->work);
+            eval_label(e->idx - N, svar->tmp);
             if (inv_par) label_locks[e->idx - N] = 0;
-            vset_clear((vset_t) c->work);
+            vset_clear(svar->tmp);
             vset_join(c->container, c->container, label_true[e->idx - N]);            
         } break;
         case PRED_NOT: {
-            vset_copy(c->left->container, c->container);
-            eval_predicate_set(e->arg1, env, states, c->left);
-            vset_minus(c->container, c->left->container);
-            vset_clear(c->left->container);
+            vset_copy(left->container, c->container);
+            eval_predicate_set(e->arg1, env, states);
+            vset_minus(c->container, left->container);
+            vset_clear(left->container);
         } break;
         case PRED_AND: {
-            vset_copy(c->left->container, c->container);
+            vset_copy(left->container, c->container);
             vset_clear(c->container);
-            eval_predicate_set(e->arg1, env, states, c->left);
-            if (!vset_is_empty(c->left->container)) {
-                vset_copy(c->right->container, c->left->container); // epic win for state labels
-                eval_predicate_set(e->arg2, env, states, c->right);
-                vset_copy(c->container, c->right->container);
-                vset_intersect(c->container, c->left->container);
-                vset_clear(c->right->container);
-                vset_clear(c->left->container);
+            eval_predicate_set(e->arg1, env, states);
+            if (!vset_is_empty(left->container)) {
+                vset_copy(right->container, left->container); // epic win for state labels
+                eval_predicate_set(e->arg2, env, states);
+                vset_copy(c->container, right->container);
+                vset_intersect(c->container, left->container);
+                vset_clear(right->container);
+                vset_clear(left->container);
             }
         } break;
         case PRED_OR: {
-            vset_copy(c->left->container, c->container);
-            eval_predicate_set(e->arg1, env, states, c->left);
-            if (!vset_equal(c->left->container, c->container)) {
-                vset_copy(c->right->container, c->container);
-                vset_minus(c->right->container, c->left->container); // epic win for state labels
-                eval_predicate_set(e->arg2, env, states, c->right);
-                vset_copy(c->container, c->left->container);
-                vset_union(c->container, c->right->container);
-                vset_clear(c->right->container);
+            vset_copy(left->container, c->container);
+            eval_predicate_set(e->arg1, env, states);
+            if (!vset_equal(left->container, c->container)) {
+                vset_copy(right->container, c->container);
+                vset_minus(right->container, left->container); // epic win for state labels
+                eval_predicate_set(e->arg2, env, states);
+                vset_copy(c->container, left->container);
+                vset_union(c->container, right->container);
+                vset_clear(right->container);
             }
-            vset_clear(c->left->container);
+            vset_clear(left->container);
         } break;
         case PRED_EQ:
         case PRED_NEQ:
@@ -997,20 +1005,20 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struc
         case PRED_LEQ:
         case PRED_GT:
         case PRED_GEQ: {
-            const struct inv_rel_s* info = (const struct inv_rel_s*) c->work;
-            
+            struct inv_rel_s* rel = (struct inv_rel_s*) c->work;
+
             // this join is necessary because we can not project an already projected vset.
-            vset_join(info->shortcut, states, c->container);
+            vset_join(rel->shortcut, states, c->container);
             
-            vset_project_minus(info->tmp, info->shortcut, info->true_states);
-            vset_clear(info->shortcut);
-            vset_minus(info->tmp, info->false_states);
+            vset_project_minus(rel->tmp, rel->shortcut, rel->true_states);
+            vset_clear(rel->shortcut);
+            vset_minus(rel->tmp, rel->false_states);
             
             struct rel_expr_info ctx;
-            ctx.vec = info->vec;
+            ctx.vec = rel->vec;
 
-            ctx.len = info->len;
-            ctx.deps = info->deps;
+            ctx.len = rel->len;
+            ctx.deps = rel->deps;
 
             ctx.e = e;
             ctx.env = env;
@@ -1018,18 +1026,18 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struc
             // count when verbose
             if (log_active(infoLong)) {
                 double elem_count;
-                vset_count(info->tmp, NULL, &elem_count);
+                vset_count(rel->tmp, NULL, &elem_count);
                 if (elem_count >= 10000.0 * SPEC_REL_PERF) {                    
                     const char* p = LTSminPrintExpr(e, env);
                     Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
                 }
             }
 
-            vset_update(info->true_states, info->tmp, rel_expr_cb, &ctx);
-            vset_minus(info->tmp, info->true_states);
-            vset_union(info->false_states, info->tmp);
-            vset_clear(info->tmp);
-            vset_join(c->container, c->container, info->true_states);            
+            vset_update(rel->true_states, rel->tmp, rel_expr_cb, &ctx);
+            vset_minus(rel->tmp, rel->true_states);
+            vset_union(rel->false_states, rel->tmp);
+            vset_clear(rel->tmp);
+            vset_join(c->container, c->container, rel->true_states);
             break;
         }
         default:
@@ -1040,36 +1048,38 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states, struc
 
 static inline void
 inv_cleanup()
-{
+{    
+    bitvector_clear(&state_label_used);
+
+    int n_violated = 0;
     for (int i = 0; i < num_inv; i++) {
         if (!inv_violated[i]) {
-            mark_visible(model, inv_expr[i], inv_parse_env[i]);
-        }
+            bitvector_union(&state_label_used, &inv_expr[i]->annotation->state_label_deps);
+        } else n_violated++;
     }
+    
+    if (n_violated == num_inv) RTfree(inv_detect);
 
     if (GBhasGuardsInfo(model)) {
         for (int i = 0; i < nGuards; i++) {
-            pins_add_state_label_visible(model, i);
+            bitvector_set(&state_label_used, i);
         }
     }
-
-    num_inv_sl_used = 0;
-    for (int i = 0; i < sLbls; i++) {
-        if (!GBgetPorStateLabelVisibility(model)[i]) {
-            if (label_true[i] != NULL) {
-                vset_destroy(label_false[i]);
-                vset_destroy(label_true[i]);
-                vset_destroy(label_tmp[i]);
-                label_false[i] = NULL;
-                label_true[i] = NULL;
-                label_tmp[i] = NULL;
+    
+    if (label_true != NULL) {
+        for (int i = 0; i < sLbls; i++) {
+            if (!bitvector_is_set(&state_label_used, i)) {
+                if (label_true[i] != NULL) {
+                    vset_destroy(label_false[i]);
+                    vset_destroy(label_true[i]);
+                    vset_destroy(label_tmp[i]);
+                    label_false[i] = NULL;
+                    label_true[i] = NULL;
+                    label_tmp[i] = NULL;
+                }
             }
-        } else {
-            inv_state_labels[num_inv_sl_used++] = i;
         }
     }
-    memset(GBgetPorStateLabelVisibility(model), 0, sizeof(int[sLbls]));
-    memset(GBgetPorGroupVisibility(model), 0, sizeof(int[nGrps]));
 }
 
 static inline void
@@ -1081,11 +1091,11 @@ check_inv(vset_t states, const int level)
             if (!inv_violated[i]) {
                 vset_project(inv_set[i], states);
                 if (!vset_is_empty(inv_set[i])) {
-                    vset_copy(inv_expr_info[i]->container, inv_set[i]);
-                    eval_predicate_set(inv_expr[i], inv_parse_env[i], states, inv_expr_info[i]);
-                    if (!vset_equal(inv_set[i], inv_expr_info[i]->container)) {
-                        inv_info_destroy(inv_expr[i], inv_parse_env[i], inv_expr_info[i]);
-                        LTSminExprDestroy(inv_expr[i]);
+                    vset_t container = ((struct inv_info_s*) inv_expr[i]->context)->container;
+                    vset_copy(container, inv_set[i]);
+                    eval_predicate_set(inv_expr[i], inv_parse_env[i], states);
+                    if (!vset_equal(inv_set[i], container)) {
+                        LTSminExprDestroy(inv_expr[i], 1);
                         LTSminParseEnvDestroy(inv_parse_env[i]);
                         vset_destroy(inv_set[i]);
                         Warning(info, " ");
@@ -1107,7 +1117,7 @@ check_inv(vset_t states, const int level)
                         }
                     } else {
                         vset_clear(inv_set[i]);
-                        vset_clear(inv_expr_info[i]->container);
+                        vset_clear(container);
                     }
                 }
             }
@@ -1122,23 +1132,24 @@ TASK_3(int, check_inv_par_go, vset_t, states, int, i, int, level)
     if (!inv_violated[i]) {
         vset_project(inv_set[i], states);
         if (!vset_is_empty(inv_set[i])) {
-            vset_copy(inv_expr_info[i]->container, inv_set[i]);
-            if (inv_bin_par) eval_predicate_set_par(inv_expr[i], inv_parse_env[i], inv_expr_info[i], states);
-            else eval_predicate_set(inv_expr[i], inv_parse_env[i], states, inv_expr_info[i]);
+            vset_t container = ((struct inv_info_s*) inv_expr[i]->context)->container;
+            vset_copy(container, inv_set[i]);
+            if (inv_bin_par) eval_predicate_set_par(inv_expr[i], inv_parse_env[i], states);
+            else eval_predicate_set(inv_expr[i], inv_parse_env[i], states);
 
-            if (!vset_equal(inv_set[i], inv_expr_info[i]->container)) {
-                inv_info_destroy(inv_expr[i], inv_parse_env[i], inv_expr_info[i]);
-                LTSminExprDestroy(inv_expr[i]);
+            if (!vset_equal(inv_set[i], container)) {
+                LTSminExprDestroy(inv_expr[i], 1);
                 LTSminParseEnvDestroy(inv_parse_env[i]);
                 vset_destroy(inv_set[i]);
                 Warning(info, " ");
                 Warning(info, "Invariant violation (%s) found at depth %d!", inv_detect[i], level);
                 Warning(info, " ");
+                RTfree(inv_detect[i]);
                 inv_violated[i] = 1;
                 res = 1;
                 add_fetch(&num_inv_violated, 1);
             } else {
-                vset_clear(inv_expr_info[i]->container);
+                vset_clear(container);
                 vset_clear(inv_set[i]);
             }
         }
@@ -2960,12 +2971,7 @@ initialize_levels(bitvector_t *groups, int *empty_groups, int *back,
     }
 
     for (int i = 0; i < nGrps; i++) {
-        bitvector_t row;
-
-        bitvector_create(&row, N);
-        dm_bitvector_row(&row, GBgetDMInfo(model), i);
-        bitvector_union(&level_matrix[level[i]], &row);
-        bitvector_free(&row);
+        dm_row_union(&level_matrix[level[i]], GBgetDMInfo(model), i);
     }
 
     for (int k = 0; k < max_sat_levels; k++) {
@@ -3396,11 +3402,13 @@ find_overlapping_group(bitvector_t *found_groups, int *group)
 
     for (int i = 0; i < nGrps; i++) {
         if (!bitvector_is_set(found_groups, i)) continue;
-        dm_bitvector_row(&row_found, GBgetDMInfoRead(model), i);
+        bitvector_clear(&row_found);
+        dm_row_union(&row_found, GBgetDMInfoRead(model), i);
 
         for(int j = 0; j < nGrps; j++) {
             if (bitvector_is_set(found_groups, j)) continue;
-            dm_bitvector_row(&row_new, GBgetDMInfoMayWrite(model), j);
+            bitvector_clear(&row_new);
+            dm_row_union(&row_new, GBgetDMInfoMayWrite(model), j);
             bitvector_intersect(&row_new, &row_found);
 
             if (!bitvector_is_empty(&row_new)) {
@@ -3559,56 +3567,79 @@ init_model(char *file)
     HREbarrier(HREglobal());
 }
 
-static struct inv_check_s*
+static void
 inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
 {
-    if (!e) return NULL;
-        
-    struct inv_check_s* result = (struct inv_check_s*) RTmalloc(sizeof(struct inv_check_s));
-    result->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
+    struct inv_info_s* c;
     switch(e->token) {
     case PRED_NOT:
-        result->left = inv_info_prepare(e->arg1, env, i);
+        inv_info_prepare(e->arg1, env, i);
+        c = RTmalloc(sizeof(struct inv_info_s));
+        e->destroy_context = inv_info_destroy;
         break;
     case PRED_AND:
     case PRED_OR:
-        result->left = inv_info_prepare(e->arg1, env, i);
-        result->right = inv_info_prepare(e->arg2, env, i);
+        inv_info_prepare(e->arg1, env, i);
+        inv_info_prepare(e->arg2, env, i);
+        c = RTmalloc(sizeof(struct inv_info_s));
+        e->destroy_context = inv_info_destroy;
         break;
     case PRED_TRUE:
     case PRED_FALSE:
+        c = RTmalloc(sizeof(struct inv_info_s));
+        e->destroy_context = inv_info_destroy;
         break;
-    case PRED_SVAR:
+    case PRED_SVAR: {
         if (e->idx >= N && !inv_bin_par) {
-            result->work = (void*) vset_create(domain, -1, NULL);
-            break;
+            c = RTmalloc(sizeof(struct inv_info_s) + sizeof(struct inv_svar_s));
+            e->destroy_context = inv_svar_destroy;
+            struct inv_svar_s* svar = (struct inv_svar_s*) c + sizeof(struct inv_info_s);
+            
+            c->work = svar;
+            svar->tmp = vset_create(domain, -1, NULL);
+        } else {
+            c = RTmalloc(sizeof(struct inv_info_s));
+            e->destroy_context = inv_info_destroy;
         }
+        break;
+    }
     case PRED_EQ:
     case PRED_NEQ:
     case PRED_LT:
     case PRED_LEQ:
     case PRED_GT:
     case PRED_GEQ: {
-        result->work = RTmalloc(sizeof(struct inv_rel_s));
-        struct inv_rel_s* info = (struct inv_rel_s*) result->work;
+        set_pins_semantics(model, e, env, &e->annotation->state_deps);
         
-        info->vec = RTmalloc(sizeof(int[N]));
-        GBgetInitialState(model, info->vec);
+        const int len = bitvector_n_high(&e->annotation->state_deps);
+
+        c = RTmalloc(sizeof(struct inv_info_s)
+                + sizeof(struct inv_rel_s)
+                + sizeof(int[N])
+                + sizeof(int[len]));
+
+        struct inv_rel_s* rel = c->work = (struct inv_rel_s*) (c + 1);
+        rel->vec = (int*) (rel + 1);
+        rel->deps = (int*) (rel->vec + N);
+
+        e->destroy_context = inv_rel_destroy;
         
-        info->len = bitvector_n_high(&e->deps);
-        info->deps = RTmalloc(sizeof(int[info->len]));
-        bitvector_high_bits(&e->deps, info->deps);
-        info->tmp = vset_create(domain, info->len, info->deps);
-        info->true_states = vset_create(domain, info->len, info->deps);
-        info->false_states = vset_create(domain, info->len, info->deps);
-        if (!inv_bin_par) info->shortcut = vset_create(domain, -1, NULL);
+        GBgetInitialState(model, rel->vec);
+        
+        rel->len = len;
+        bitvector_high_bits(&e->annotation->state_deps, rel->deps);
+        rel->tmp = vset_create(domain, rel->len, rel->deps);
+        rel->true_states = vset_create(domain, rel->len, rel->deps);
+        rel->false_states = vset_create(domain, rel->len, rel->deps);
+        if (!inv_bin_par) rel->shortcut = vset_create(domain, -1, NULL);
         break;
     }
     default:
         LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
         HREabort (LTSMIN_EXIT_FAILURE);
     }
-    return result;
+    e->context = c;
+    c->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
 }
 
 static void
@@ -3702,7 +3733,7 @@ init_domain(vset_implementation_t impl) {
 
         /* Indeed, we skip unused state labels, but allocate memory for pointers
          * (to vset_t's). Is this bad? Maybe a hashmap is worse. */
-        if (GBgetPorStateLabelVisibility(model)[i]) {
+        if (bitvector_is_set(&state_label_used, i)) {
             l_projs[i].len     = dm_ones_in_row(GBgetStateLabelInfo(model), i);
             l_projs[i].proj    = (int*) RTmalloc(l_projs[i].len * sizeof(int));
 
@@ -3722,13 +3753,10 @@ init_domain(vset_implementation_t impl) {
         }
     }
 
-    memset(GBgetPorStateLabelVisibility(model), 0, sizeof(int[sLbls]));
-
     inv_set = (vset_t*) RTmalloc(sizeof(vset_t) * num_inv);
-    inv_expr_info = (struct inv_check_s**) RTmalloc(sizeof(struct inv_check_s*) * num_inv);
     for (int i = 0; i < num_inv; i++) {
         inv_set[i] = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
-        inv_expr_info[i] = inv_info_prepare(inv_expr[i], inv_parse_env[i], i);
+        inv_info_prepare(inv_expr[i], inv_parse_env[i], i);
     }
 }
 
@@ -3753,20 +3781,15 @@ init_invariant_detection()
     inv_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * num_inv);
     for (int i = 0; i < num_inv; i++) {
         inv_parse_env[i] = LTSminParseEnvCreate();
-        inv_expr[i] = parse_file_env(inv_detect[i], pred_parse_file, model, inv_parse_env[i]);        
-        mark_visible(model, inv_expr[i], inv_parse_env[i]);
-        mark_predicate(model, inv_expr[i], inv_parse_env[i]);
-        inv_proj[i].len = bitvector_n_high(&inv_expr[i]->deps);
+        inv_expr[i] = pred_parse_file(inv_detect[i], inv_parse_env[i], ltstype);
+        LTSminLogExpr(infoLong, "Loaded and optimized invariant: ", inv_expr[i], inv_parse_env[i]);
+        set_pins_semantics(model, inv_expr[i], inv_parse_env[i], &inv_expr[i]->annotation->state_deps);
+        inv_proj[i].len = bitvector_n_high(&inv_expr[i]->annotation->state_deps);
         inv_proj[i].proj = (int*) RTmalloc(inv_proj[i].len * sizeof(int));
-        bitvector_high_bits(&inv_expr[i]->deps, inv_proj[i].proj);
+        bitvector_high_bits(&inv_expr[i]->annotation->state_deps, inv_proj[i].proj);
     }
 
-    inv_state_labels = (int*) RTmalloc(sizeof(int[sLbls]));
-    for (int i = 0, num_inv_sl_used = 0; i < sLbls; i++) {
-        if (GBgetPorStateLabelVisibility(model)[i]) {
-            inv_state_labels[num_inv_sl_used++] = i;
-        }
-    }
+    inv_cleanup();
 
     if (inv_par) label_locks = (int*) RTmallocZero(sizeof(int[sLbls]));
 }
@@ -3951,16 +3974,16 @@ init_mu_calculus()
 
         for (int i = 0; i < num_mu; i++) {
             mu_parse_env[i] = LTSminParseEnvCreate();
-            mu_exprs[i] = parse_file_env(mu_formulas[i], mu_parse_file, model, mu_parse_env[i]);
-            mark_visible(model, mu_exprs[i], mu_parse_env[i]);
+            mu_exprs[i] = mu_parse_file(mu_formulas[i], mu_parse_env[i], ltstype);
+            set_pins_semantics(model, mu_exprs[i], mu_parse_env[i], &mu_exprs[i]->annotation->state_deps);
         }
 
         for (int i = 0; i < num_ctl; i++) {
             mu_parse_env[num_mu + i] = LTSminParseEnvCreate();
-            ltsmin_expr_t ctl = parse_file_env(ctl_formulas[i], ctl_parse_file, model, mu_parse_env[num_mu + i]);
-            mark_visible(model, ctl, mu_parse_env[num_mu + i]);
+            ltsmin_expr_t ctl = ctl_parse_file(ctl_formulas[i], mu_parse_env[num_mu + i], ltstype);
             Warning(infoLong, "converting %s to mu-calculus", ctl_formulas[i]);
             mu_exprs[num_mu + i] = ctl_star_to_mu(ctl);
+            set_pins_semantics(model, mu_exprs[num_mu + i], mu_parse_env[num_mu + i], &mu_exprs[i]->annotation->state_deps);
         }
 
         num_mu = num_mu + num_ctl;
@@ -4258,22 +4281,8 @@ VOID_TASK_1(actual_main, void*, arg)
     if (act_label != -1) action_typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
     if (act_detect != NULL) init_action_detection();
 
-    /* initialize invariant detection */
-    int* group_vis = RTmalloc(sizeof(int[nGrps]));
-    memset(group_vis, 0, sizeof(int[nGrps]));
-    GBsetPorGroupVisibility(model, group_vis);
-
-    int* label_vis = RTmalloc(sizeof(int[sLbls]));
-    memset(label_vis, 0, sizeof(int[sLbls]));
-    GBsetPorStateLabelVisibility(model, label_vis);
-
+    bitvector_create(&state_label_used, sLbls);
     if (inv_detect != NULL) init_invariant_detection();
-
-    if (GBhasGuardsInfo(model)) {
-        for (int i = 0; i < nGuards; i++) {
-            pins_add_state_label_visible(model, i);
-        }
-    }
 
     /* turn on Lace again (for Sylvan) */
     if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {

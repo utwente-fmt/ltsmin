@@ -314,7 +314,7 @@ that can be reused for other languages (e.g. CTL, CTL* and LTL)
 %type expr { ltsmin_expr_t }
 %destructor expr {
     (void)env;
-     LTSminExprDestroy($$);
+     LTSminExprDestroy($$, 1);
 }
 
 input ::= EXPR expr(E) . {

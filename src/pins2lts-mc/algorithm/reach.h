@@ -140,7 +140,7 @@ invariant_detect (wctx_t *ctx)
 
     state_data_t        state = state_info_state (ctx->state);
     if (EXPECT_TRUE(
-            eval_predicate(ctx->model, loc->inv_expr, NULL, state, N, loc->env)))
+            eval_predicate(ctx->model, loc->inv_expr, state, loc->env)))
         return;
 
     global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;

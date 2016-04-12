@@ -6,9 +6,10 @@
 \brief Internal datastructures for ast/lex/lemon.
  */
 
-#include <util-lib/dynamic-array.h>
+#include <hre/stringindex.h>
 #include <ltsmin-lib/etf-util.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
+#include <util-lib/dynamic-array.h>
 
 struct op_info{
     int pattern;

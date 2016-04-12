@@ -3,13 +3,12 @@
 #include <stdio.h>
 #include <ctype.h>
 
-#include <dm/bitvector.h>
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-grammar.h>
 #include <ltsmin-lib/ltsmin-parse-env.h> // required for ltsmin-lexer.h!
 #include <ltsmin-lib/ltsmin-lexer.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
-#include <util-lib/chunk_support.h>
 
 void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t stream){
     yyscan_t scanner;
@@ -111,6 +110,10 @@ const char* LTSminConstantName(ltsmin_parse_env_t env,int idx){
     return SIget(env->constant_ops,idx);
 }
 
+int LTSminConstantIdx(ltsmin_parse_env_t env, const char* name){
+    return SIlookup(env->constant_ops, name);
+}
+
 int LTSminConstantToken(ltsmin_parse_env_t env, int idx)
 {
     ensure_access(env->constant_man,idx);
@@ -173,6 +176,10 @@ const char* LTSminUnaryName(ltsmin_parse_env_t env,int idx){
     return SIget(env->unary_ops,idx);
 }
 
+int LTSminUnaryIdx(ltsmin_parse_env_t env, const char* name){
+    return SIlookup(env->unary_ops, name);
+}
+
 int LTSminUnaryToken(ltsmin_parse_env_t env, int idx)
 {
     ensure_access(env->unary_man,idx);
@@ -219,9 +226,15 @@ int LTSminBinaryOperator(ltsmin_parse_env_t env, int token, const char* name,int
     env->binary_info[res].token=token;
     return res;
 }
+
 const char* LTSminBinaryName(ltsmin_parse_env_t env,int idx){
     return SIget(env->binary_ops,idx);
 }
+
+int LTSminBinaryIdx(ltsmin_parse_env_t env, const char* name){
+    return SIlookup(env->binary_ops, name);
+}
+
 
 int LTSminBinaryToken(ltsmin_parse_env_t env, int idx)
 {
@@ -235,10 +248,7 @@ LTSminSPrintExpr(char *buf, ltsmin_expr_t expr, ltsmin_parse_env_t env)
     char *begin = buf;
     switch(expr->node_type){
         case VAR:
-            if (expr->num == -1)
-                buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
-            else
-                buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
+            buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
             break;
         case SVAR:
             buf += sprintf(buf, "%s",LTSminStateVarName(env, expr->idx));
@@ -346,16 +356,28 @@ ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,
 {
     uint32_t hash[5];
     ltsmin_expr_t E = RT_NEW(struct ltsmin_expr_s);
-    E->num = -1;
     hash[0] = E->node_type = node_type;
     hash[1] = E->token = token;
     hash[2] = E->idx = idx;
     E->arg1 = arg1;
     E->arg2 = arg2;
+    if (E->arg1 != NULL) E->arg1->parent = E;
+    if (E->arg2 != NULL) E->arg2->parent = E;
     hash[3] = arg1?arg1->hash:0;
     hash[4] = arg2?arg2->hash:0;
     E->hash = SuperFastHash((const char*)hash, sizeof(hash), 0x0739c2d6);
-    E->deps.data = NULL;
+    if (arg1 != NULL) {
+        E->create_annotation = arg1->create_annotation;
+        E->copy_annotation = arg1->copy_annotation;
+        E->destroy_annotation = arg1->destroy_annotation;
+    } else {
+        E->create_annotation = NULL;
+        E->copy_annotation = NULL;
+        E->destroy_annotation = NULL;
+    }
+    if (E->create_annotation != NULL) E->annotation = E->create_annotation();
+    E->context = NULL;
+    E->destroy_context = NULL;
     return E;
 }
 
@@ -393,19 +415,42 @@ ltsmin_expr_t LTSminExprClone(ltsmin_expr_t expr)
     memcpy(e, expr, sizeof(struct ltsmin_expr_s));
     if (e->arg1) e->arg1 = LTSminExprClone(e->arg1);
     if (e->arg2) e->arg2 = LTSminExprClone(e->arg2);
-    
-    if (expr->deps.data != NULL) bitvector_copy(&e->deps, &expr->deps);
+
+    if (e->arg1 != NULL) e->arg1->parent = e;
+    if (e->arg2 != NULL) e->arg2->parent = e;
+
+    if (e->create_annotation != NULL) {
+        e->annotation = e->create_annotation();
+        if (e->copy_annotation != NULL) {
+            e->copy_annotation(expr->annotation, e->annotation);
+        }
+    } else e->annotation = NULL;
     
     return e;
 }
 
 /* assume none of the nodes used in the expression is shared! */
-void LTSminExprDestroy(ltsmin_expr_t expr)
+void LTSminExprDestroy(ltsmin_expr_t expr, int recursive)
 {
-    if (expr->arg1) LTSminExprDestroy(expr->arg1);
-    if (expr->arg2) LTSminExprDestroy(expr->arg2);
-    bitvector_free(&expr->deps);
+    if (recursive && expr->arg1) LTSminExprDestroy(expr->arg1, recursive);
+    if (recursive && expr->arg2) LTSminExprDestroy(expr->arg2, recursive);
+    if (expr->destroy_annotation != NULL) {
+        expr->destroy_annotation(expr->annotation);
+        expr->annotation = NULL;
+    }
+    if (expr->destroy_context != NULL) {
+        expr->destroy_context(expr->context);
+        expr->context = NULL;
+    }
     RTfree(expr);
+}
+
+ltsmin_expr_t LTSminExprSibling(ltsmin_expr_t e)
+{
+//    HREassert(e->parent != NULL);
+            
+    if (e->parent->arg1 == e) return e->parent->arg2;
+    return e->parent->arg1;
 }
 
 static char*keyword[]={"begin","end","state","edge","init","trans","sort","map",NULL};

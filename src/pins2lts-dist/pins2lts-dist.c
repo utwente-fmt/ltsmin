@@ -140,7 +140,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 static inline void
 invariant_detect (struct dist_thread_context *ctx, int *state)
 {
-    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, size, ctx->env) ) return;
+    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, state, ctx->env) ) return;
     ctx->violations++;
     if (trc_output!=NULL){
         uint32_t ofs=TreeFold(ctx->dbs,(int32_t*)(state));
@@ -731,7 +731,7 @@ int main(int argc, char*argv[]){
     if (inv_detect) {
         if (PINS_POR) Abort ("Distributed tool implements no cycle provisos.");
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
-        inv_expr = parse_file_env (inv_detect, pred_parse_file, model, env);
+        inv_expr = pred_parse_file (inv_detect, env, ltstype);
         ctx.env = env;
     }
     HREbarrier(HREglobal());

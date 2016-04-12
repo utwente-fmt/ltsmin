@@ -1259,7 +1259,7 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
 static void
 gsea_invariant_check(gsea_state_t *state, void *arg)
 {
-    if ( eval_predicate(opt.model, opt.inv_expr, NULL, state->state, global.N, opt.env) ) return; // invariant holds
+    if ( eval_predicate(opt.model, opt.inv_expr, state->state, opt.env) ) return; // invariant holds
 
     global.violations++;
     do_trace(NULL, arg, "Invariant violation", opt.inv_detect); // state still on stack
@@ -1514,15 +1514,15 @@ gsea_setup(const char *output)
         opt.act_index = pins_chunk_put (opt.model, typeno, c);
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
         if (PINS_POR) {
-            pins_add_edge_label_visible (opt.model, opt.act_label, opt.act_index);
+            pins_add_edge_label_visible(opt.model, opt.act_label, opt.act_index);
             set_cycle_proviso ();
         }
     }
     if (opt.inv_detect) {
         opt.env = LTSminParseEnvCreate();
-        opt.inv_expr = parse_file_env (opt.inv_detect, pred_parse_file, opt.model, opt.env);
+        opt.inv_expr = pred_parse_file (opt.inv_detect, opt.env, GBgetLTStype(opt.model));
         if (PINS_POR) {
-            mark_visible (opt.model, opt.inv_expr, opt.env);
+            set_pins_semantics(opt.model, opt.inv_expr, opt.env, NULL);
             set_cycle_proviso ();
         }
     }
