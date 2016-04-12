@@ -108,7 +108,17 @@ tl_lex(void)
             Token(IMPLIES);
         case LTL_EQ:
         case LTL_SVAR:
-        case LTL_VAR: {
+        case LTL_VAR:
+        case LTL_NEQ:
+        case LTL_LT:
+        case LTL_LEQ:
+        case LTL_GT:
+        case LTL_GEQ:
+        case LTL_MULT:
+        case LTL_DIV:
+        case LTL_REM:
+        case LTL_ADD:
+        case LTL_SUB: {
             ltsmin_expr_print_ltl(e, yytext);
             /*ltsmin_expr_t ne = */ltsmin_expr_lookup(e, yytext, &le_list);
 
