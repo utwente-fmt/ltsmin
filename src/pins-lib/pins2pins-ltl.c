@@ -181,7 +181,7 @@ eval (cb_context *infoctx, int *state)
     ltl_context_t *ctx = infoctx->ctx;
     int pred_evals = 0; // assume < 32 predicates..
     for(int i=0; i < ctx->ba->predicate_count; i++) {
-        if (eval_predicate(infoctx->model, ctx->ba->predicates[i], state, ctx->ba->env))
+        if (eval_predicate(GBgetParent(infoctx->model), ctx->ba->predicates[i], state, ctx->ba->env))
             pred_evals |= (1 << i);
     }
     return pred_evals;
