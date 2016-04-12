@@ -345,6 +345,7 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
         }
     }
     int guard_is_new, guard_type = lts_type_add_type (ltstype, LTSMIN_TYPE_GUARD, &guard_is_new);
+    lts_type_set_format (ltstype, guard_type, LTStypeEnum);
 
     lts_type_set_state_length(ltstype, state_length);
 
