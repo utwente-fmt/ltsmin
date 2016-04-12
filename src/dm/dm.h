@@ -186,19 +186,19 @@ extern int dm_is_empty(const matrix_t* m);
 /**
  * Applies the product bv * m = tgt;
  */
-extern void dm_prod_bm(bitvector_t* tgt, const bitvector_t* bv, const matrix_t* m);
+extern void dm_prod(bitvector_t* tgt, const bitvector_t* bv, const matrix_t* m);
 
 /**
- * dm_bitvector_row/col
- *  Copy a row/column of the matrix to a bitvector
+ * dm_row/col_union
+ *  Union of a row/column of the matrix to a bitvector
  *  (with the current permutation applied)
  *  1) bitvector of the size (rows/cols) of the matrix;
  *     it should be initialized by bitvector_create or bitvector_copy
  *  2) the matrix
  *  3) the row/column of the matrix
  */
-extern void dm_bitvector_row(bitvector_t* bv, const matrix_t* m, int row);
-extern void dm_bitvector_col(bitvector_t* bv, const matrix_t* m, int col);
+extern void dm_row_union(bitvector_t* bv, const matrix_t* m, int row);
+extern void dm_col_union(bitvector_t* bv, const matrix_t* m, int col);
 
 extern void dm_row_spans(const matrix_t* const m, int* const spans);
 

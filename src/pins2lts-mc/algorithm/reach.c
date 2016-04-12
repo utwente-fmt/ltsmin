@@ -491,13 +491,12 @@ reach_local_setup   (run_t *run, wctx_t *ctx)
     ctx->local->inv_expr = NULL;
     if (inv_detect) { // local parsing
         ctx->local->env = LTSminParseEnvCreate();
-        ctx->local->inv_expr = parse_file_env (inv_detect, pred_parse_file,
-                                               ctx->model, ctx->local->env);
+        ctx->local->inv_expr = pred_parse_file (inv_detect, ctx->local->env, GBgetLTStype(ctx->model));
     }
 
     if (PINS_POR) {
         if (ctx->local->inv_expr) {
-            mark_visible (ctx->model, ctx->local->inv_expr, ctx->local->env);
+            set_pins_semantics (ctx->model, ctx->local->inv_expr, ctx->local->env, NULL);
         }
         if (act_detect) {
             pins_add_edge_label_visible (ctx->model, act_label, act_index);

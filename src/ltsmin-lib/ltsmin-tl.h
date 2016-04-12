@@ -3,11 +3,17 @@
 
 /* Definitions for a simple predicate language & temporal logics */
 
+#include <dm/bitvector.h>
 #include <ltsmin-lib/lts-type.h>
 #include <ltsmin-lib/ltsmin-grammar.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 
-typedef ltsmin_expr_t (*parse_f)(const char *,ltsmin_parse_env_t,lts_type_t);
+struct lts_annotation_s {
+    bitvector_t         state_deps;
+    bitvector_t         state_label_deps;
+    matrix_t            edge_label_deps;
+    int                 chunk_type;
+};
 
 /* Predicate language */
 typedef enum {

@@ -1,11 +1,16 @@
 #include <hre/config.h>
 
 
+#include <limits.h>
 #include <stdlib.h>
 
 #include <dm/dm.h>
 #include <hre/user.h>
+#include <hre/stringindex.h>
+#include <ltsmin-lib/ltsmin-parse-env.h>
 #include <ltsmin-lib/ltsmin-standard.h>
+#include <ltsmin-lib/ltsmin-syntax.h>
+#include <ltsmin-lib/ltsmin-tl.h>
 #include <pins-lib/pins-util.h>
 
 
@@ -38,6 +43,15 @@ pins_get_group_count (model_t model)
 }
 
 void
+pins_add_group_visible (model_t model, int group)
+{
+    int *visibles = GBgetPorGroupVisibility (model);
+    HREassert (visibles != NULL, "pins_add_edge_label_visible: No (lower) PINS layer uses POR visibility.");
+    
+    visibles[group] = 1;
+}
+
+void
 pins_add_edge_label_visible (model_t model, int edge, int label)
 {
     int *visibles = GBgetPorGroupVisibility (model);
@@ -52,8 +66,8 @@ pins_add_edge_label_visible (model_t model, int edge, int label)
         RTfree(groups_of_edge);
     } else {
         chunk c = pins_chunk_get(model, lts_type_get_edge_label_typeno(GBgetLTStype(model), edge), label);
-        char s[c.len];
-        chunk2string(c, c.len, s);
+        char s[c.len * 2 + 6];
+        chunk2string(c, sizeof(s), s);
         Abort("There is no group that can produce edge \"%s\"", s);
 
     }

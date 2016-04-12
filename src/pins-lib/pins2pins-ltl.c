@@ -10,7 +10,6 @@
 #include <dm/dm.h>
 #include <hre/unix.h>
 #include <hre/user.h>
-#include <ltsmin-lib/ltsmin-tl.h>
 #include <ltsmin-lib/ltl2ba-lex.h>
 
 #ifdef HAVE_SPOT
@@ -177,13 +176,12 @@ ltl_sl_all(model_t model, int *state, int *labels)
 }
 
 static inline int
-eval (cb_context *infoctx, transition_info_t *ti, int *state)
+eval (cb_context *infoctx, int *state)
 {
     ltl_context_t *ctx = infoctx->ctx;
     int pred_evals = 0; // assume < 32 predicates..
     for(int i=0; i < ctx->ba->predicate_count; i++) {
-        if (eval_predicate(infoctx->model, ctx->ba->predicates[i], ti, state,
-                           ctx->old_len, ctx->ba->env))
+        if (eval_predicate(infoctx->model, ctx->ba->predicates[i], state, ctx->ba->env))
             pred_evals |= (1 << i);
     }
     return pred_evals;
@@ -202,7 +200,7 @@ void ltl_ltsmin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
     // evaluate predicates
     int pred_evals = infoctx->predicate_evals;
     if (pred_evals == -1) // long calls cannot do before-hand evaluation
-        eval (infoctx, ti, infoctx->src + 1); /* ltsmin: src instead of dst */
+        eval (infoctx, infoctx->src + 1); /* ltsmin: src instead of dst */
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
     if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
@@ -256,7 +254,7 @@ ltl_ltsmin_all (model_t self, int *src, TransitionCB cb,
     ltl_context_t *ctx = GBgetContext(self);
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
     // evaluate predicates (on source, so before hand!)
-    new_ctx.predicate_evals = eval (&new_ctx, NULL, src + 1); /* No EVARS! */
+    new_ctx.predicate_evals = eval (&new_ctx, src + 1); /* No EVARS! */
     GBgetTransitionsAll(ctx->parent, src + 1, ltl_ltsmin_cb, &new_ctx);
     return new_ctx.ntbtrans;
 }
@@ -324,7 +322,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
 
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
     // evaluate predicates (on source, so before hand!)
-    new_ctx.predicate_evals = eval (&new_ctx, NULL, src + 1); /* No EVARS! */
+    new_ctx.predicate_evals = eval (&new_ctx, src + 1); /* No EVARS! */
     GBgetTransitionsAll(ctx->parent, src + 1, ltl_spin_cb, &new_ctx);
     if (0 == new_ctx.ntbtrans) { // deadlock, let buchi continue
         int dst_buchi[ctx->len];
@@ -368,7 +366,7 @@ void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
     memcpy (dst_buchi + 1, dst, ctx->old_len * sizeof(int) );
-    int dst_pred = eval (infoctx, ti, dst);
+    int dst_pred = eval (infoctx, dst);
     int i = infoctx->src[ctx->ltl_idx];
     if (i == -1) { i=0; } /* textbook: extra initial state */
     HREassert (i < ctx->ba->state_count );
@@ -512,7 +510,8 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
     if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
         Warning(info, "LTL layer: formula: %s", ltl_file);
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
-        ltsmin_expr_t ltl = parse_file_env (ltl_file, ltl_parse_file, model, env);
+        ltsmin_expr_t ltl = ltl_parse_file (ltl_file, env, GBgetLTStype(model));
+
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
 
         ltsmin_buchi_t *ba;
@@ -760,8 +759,7 @@ GBaddLTL (model_t model)
     
     // mark the parts the buchi automaton uses for reading
     for (int k=0; k < ba->predicate_count; k++) {
-        mark_predicate(model, ba->predicates[k], ba->env);
-        bitvector_union(&formula_state_dep, &ba->predicates[k]->deps);
+        set_pins_semantics(model, ba->predicates[k], ba->env, &formula_state_dep);
     }
 
     // add one column to the matrix
@@ -877,14 +875,6 @@ GBaddLTL (model_t model)
     GBsetStateLabelsAll (ltlmodel, ltl_sl_all);
 
     lts_type_validate(ltstype_new);
-
-    // mark visible groups in POR layer: all groups that write to a variable
-    // that influences the buchi's predicates.
-    if (PINS_POR) {
-        for (int k=0; k < ba->predicate_count; k++) {
-            mark_visible (model, ba->predicates[k], ba->env);
-        }
-    }
 
     switch (PINS_LTL) {
     case PINS_LTL_LTSMIN:

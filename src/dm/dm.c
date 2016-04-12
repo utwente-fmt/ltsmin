@@ -1504,34 +1504,26 @@ dm_expand_vector(matrix_t* m, int row, int* s0, int* src, int* tgt)
 }
 
 void
-dm_bitvector_row(bitvector_t* bv, const matrix_t* m, int row)
+dm_row_union(bitvector_t* bv, const matrix_t* m, int row)
 {
     // check size
-    if (bitvector_size(bv) != (size_t) dm_ncols(m)) HREabort(LTSMIN_EXIT_FAILURE);
+    HREassert(bitvector_size(bv) == dm_ncols(m));
 
     // copy row
     for (int i = 0; i < dm_ncols(m); i++) {
-        if (dm_is_set(m, row, i)) {
-            bitvector_set(bv, i);
-        } else {
-            bitvector_unset(bv, i);
-        }
+        if (dm_is_set(m, row, i)) bitvector_set(bv, i);
     }
 }
 
 void
-dm_bitvector_col(bitvector_t* bv, const matrix_t* m, int col)
+dm_col_union(bitvector_t* bv, const matrix_t* m, int col)
 {
     // check size
-    if (bitvector_size(bv) != (size_t) dm_nrows(m)) HREabort(LTSMIN_EXIT_FAILURE);
+    HREassert(bitvector_size(bv) == dm_ncols(m));
 
     // copy row
     for (int i = 0; i < dm_nrows(m); i++) {
-        if (dm_is_set(m, i, col)) {
-            bitvector_set(bv, i);
-        } else {
-            bitvector_unset(bv, i);
-        }
+        if (dm_is_set(m, i, col)) bitvector_set(bv, i);
     }
 }
 
@@ -1608,40 +1600,40 @@ dm_cols_to_idx_table(const matrix_t* m)
 void
 dm_apply_or(matrix_t* a, const matrix_t* b)
 {
-    HREassert(dm_nrows(a) == dm_rows(b) && dm_ncols(a) == dm_ncols(b))
+    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b))
 
-    bitvector_union(a->bits, b->bits);
+    bitvector_union(&a->bits, &b->bits);
 }
 
 int
 dm_equals(const matrix_t* a, const matrix_t* b)
 {
-    HREassert(dm_nrows(a) == dm_rows(b) && dm_ncols(a) == dm_ncols(b))
+    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b))
 
-    return bitvector_equal(a->bits, b->bits);
+    return bitvector_equal(&a->bits, &b->bits);
 }
 
 void
 dm_apply_xor(matrix_t* a, const matrix_t* b)
 {
-    HREassert(dm_nrows(a) == dm_rows(b) && dm_ncols(a) == dm_ncols(b))
+    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b))
 
-    return bitvector_xor(a->bits, b->bits);
+    return bitvector_xor(&a->bits, &b->bits);
 }
 
 int
 dm_is_empty(const matrix_t* m)
 {
-    return bitvector_is_empty(m->bits);
+    return bitvector_is_empty(&m->bits);
 }
 
 void
-dm_prod_bm(bitvector_t* tgt, const bitvector_t* bv, const matrix_t* m)
+dm_prod(bitvector_t* tgt, const bitvector_t* bv, const matrix_t* m)
 {
-    HREassert(bitvector_size(tgt) == dm_ncols(m) && bitvector_size(bv) == dm_nrows(m));
+    HREassert(bitvector_size(tgt) == (size_t) dm_ncols(m) && bitvector_size(bv) == (size_t) dm_nrows(m));
 
     for (size_t i = 0; i < bitvector_size(bv); i++) {
-        dm_bitvector_row(tgt, m, i);
+        dm_row_union(tgt, m, i);
     }
 }
 
