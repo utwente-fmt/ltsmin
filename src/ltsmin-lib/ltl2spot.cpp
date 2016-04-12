@@ -33,7 +33,7 @@ extern "C" {
 
 static ltsmin_expr_list_t *le_list = NULL;
 static ltsmin_lin_expr_t *le;
-static int le_at;
+static char ltl_formula[4096*32];
 
 // linearizes the ltl expression to an array of tokens
 // then iterates over this array and creates a string for the formula
@@ -50,9 +50,8 @@ ltl_to_store(ltsmin_expr_t e)
   linearize_ltsmin_expr(e, &le);
 
   // create buffer to store the LTL formula in
-  char buff[4096*32];
-  memset(buff, 0, sizeof(buff));
-  char* at = buff;
+  memset(ltl_formula, 0, sizeof(ltl_formula));
+  char* at = ltl_formula;
   *at = '\0';
 
   for(int i=0; i < le->count; i++) {
@@ -97,7 +96,7 @@ ltl_to_store(ltsmin_expr_t e)
         break;
     }
   }
-  return buff;
+  return ltl_formula;
 }
 
 }
@@ -109,7 +108,7 @@ static int
 get_predicate_index(std::vector<std::string> pred_vec, std::string predicate) 
 {
   // iterate over the vector until the predicate matches
-  for (int i=0; i<pred_vec.size(); i++) {
+  for (uint i=0; i<pred_vec.size(); i++) {
     if (predicate.compare(pred_vec[i]) == 0)
       return i;
   }
@@ -139,7 +138,7 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
   uint32_t acceptance_set = 0;
   if (isTGBA) {
     HREassert (aut->num_sets() <= 32, "No more than 32 TGBA accepting sets supported.")
-    for (int i=0; i<aut->num_sets(); i++)
+    for (uint i=0; i<aut->num_sets(); i++)
       acceptance_set |= (1ULL << i);
   }
   else 
@@ -174,7 +173,7 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
     for (auto& t: aut->out(s)) {
       std::string cond = spot::bdd_format_formula(dict, t.cond);
       // count the number of '|' occurrences in the predicates
-      for (int c_i=0; c_i<cond.length(); c_i++) {
+      for (uint c_i=0; c_i<cond.length(); c_i++) {
         if (cond.at(c_i) == '|') {
           transition_count ++;
         }
@@ -215,7 +214,7 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
         std::string cond = spot::bdd_format_formula(dict, t.cond);
         int pred_start = -1;
         bool is_neg = false;
-        for (int c_i=0; c_i<cond.length(); c_i++) {
+        for (uint c_i=0; c_i<cond.length(); c_i++) {
           switch (cond.at(c_i)) {
             case '\"': {
               if (pred_start != -1) {
@@ -273,13 +272,11 @@ ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba)
   // create and run a system command that produces the HOA
   std::string ltl = std::string(buff);
 
-  //std::cerr << "LTL Formula: " << ltl << std::endl;
-
   // use Spot to parse the LTL and create an automata
-  spot::parse_error_list pel;
-  spot::formula f = spot::parse_infix_psl(ltl, pel);
-  int parse_errors = spot::format_parse_errors(std::cerr, ltl, pel);
-  HREassert(!parse_errors, "Parse errors found in LTL formula. LTL = %s", buff);
+  spot::parsed_formula f = spot::parse_infix_psl(ltl);
+  bool parse_errors = f.format_errors(std::cerr);
+  HREassert(!parse_errors, "Parse errors found in conversion of LTL to Spot formula. LTL = %s", buff);
+
   spot::translator trans;
   isTGBA = to_tgba;
   if (isTGBA)
@@ -287,9 +284,9 @@ ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba)
   else
     trans.set_type(spot::postprocessor::BA);
   trans.set_pref(spot::postprocessor::Deterministic);
-  spot_automaton = trans.run(f);
 
-  //spot::print_hoa(std::cout, spot_automaton); // print the HOA
+  // create the automaton
+  spot_automaton = trans.run(f.f);
 }
 
 
