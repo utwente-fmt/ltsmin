@@ -50,10 +50,21 @@ void
 linearize_ltsmin_expr(ltsmin_expr_t e, ltsmin_lin_expr_t **le)
 {
     // quick fix
-    if (e->token == LTL_EQ) {
-        // add expr
-        add_lin_expr(e, le);
-        return;
+    switch (e->token) {
+        case LTL_EQ:
+        case LTL_NEQ:
+        case LTL_LT:
+        case LTL_LEQ:
+        case LTL_GT:
+        case LTL_GEQ:
+        case LTL_MULT:
+        case LTL_DIV:
+        case LTL_REM:
+        case LTL_ADD:
+        case LTL_SUB: {
+            add_lin_expr(e, le);
+            return;
+        }
     }
 
     // add left part of binary op first

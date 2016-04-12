@@ -74,7 +74,17 @@ ltl_to_store(ltsmin_expr_t e)
       case LTL_IMPLY:     at += sprintf(at, " -> "); break;
       case LTL_EQ:
       case LTL_SVAR:
-      case LTL_VAR: {
+      case LTL_VAR:
+      case LTL_NEQ:
+      case LTL_LT:
+      case LTL_LEQ:
+      case LTL_GT:
+      case LTL_GEQ:
+      case LTL_MULT:
+      case LTL_DIV:
+      case LTL_REM:
+      case LTL_ADD:
+      case LTL_SUB: {
         char buffer[2048];
         memset(buffer, 0, sizeof(buffer));
         ltsmin_expr_print_ltl(le->lin_expr[i], buffer); 
