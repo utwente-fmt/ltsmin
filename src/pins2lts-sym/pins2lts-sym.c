@@ -3782,7 +3782,10 @@ init_invariant_detection()
     for (int i = 0; i < num_inv; i++) {
         inv_parse_env[i] = LTSminParseEnvCreate();
         inv_expr[i] = pred_parse_file(inv_detect[i], inv_parse_env[i], ltstype);
-        LTSminLogExpr(infoLong, "Loaded and optimized invariant: ", inv_expr[i], inv_parse_env[i]);
+        const char s[] = "Loaded and optimized invariant #%d:";
+        char buf[snprintf(NULL, 0, s, i + 1) + 1];
+        sprintf(buf, s, i + 1);
+        LTSminLogExpr(infoLong, buf, inv_expr[i], inv_parse_env[i]);
         set_pins_semantics(model, inv_expr[i], inv_parse_env[i], &inv_expr[i]->annotation->state_deps);
         inv_proj[i].len = bitvector_n_high(&inv_expr[i]->annotation->state_deps);
         inv_proj[i].proj = (int*) RTmalloc(inv_proj[i].len * sizeof(int));
