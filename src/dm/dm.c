@@ -1507,7 +1507,7 @@ void
 dm_row_union(bitvector_t* bv, const matrix_t* m, int row)
 {
     // check size
-    HREassert(bitvector_size(bv) == dm_ncols(m));
+    HREassert(bitvector_size(bv) == (size_t) dm_ncols(m));
 
     // copy row
     for (int i = 0; i < dm_ncols(m); i++) {
@@ -1519,7 +1519,7 @@ void
 dm_col_union(bitvector_t* bv, const matrix_t* m, int col)
 {
     // check size
-    HREassert(bitvector_size(bv) == dm_ncols(m));
+    HREassert(bitvector_size(bv) == (size_t) dm_ncols(m));
 
     // copy row
     for (int i = 0; i < dm_nrows(m); i++) {
