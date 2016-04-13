@@ -1795,3 +1795,22 @@ dm_FORCE(matrix_t* m)
     } while (iterations > 0 && old_span > new_span);
     Warning(infoLong, "FORCE took %d iterations", dm_ncols(m) - iterations);
 }
+
+int
+dm_equal_header(const matrix_header_t* const a, const matrix_header_t* const b)
+{
+    if (a->size != b->size) return 0;
+
+    for (int i = 0; i < a->size; i++) {
+        const header_entry_t* ae = &a->data[i];
+        const header_entry_t* be = &b->data[i];
+        
+        if (ae->at != be->at ||
+            ae->becomes != be->becomes ||
+            ae->group != be->group) {
+            return 0;
+        }
+    }
+
+    return 1;
+}

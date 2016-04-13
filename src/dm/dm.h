@@ -182,7 +182,6 @@ extern void dm_apply_xor(matrix_t* tgt, const matrix_t* src);
  */
 extern int dm_is_empty(const matrix_t* m);
 
-
 /**
  * Applies the product bv * m = tgt;
  */
@@ -204,6 +203,11 @@ extern void dm_row_spans(const matrix_t* const m, int* const spans);
 
 extern double dm_event_span(const matrix_t* const m, int* const spans);
 extern double dm_weighted_event_span(const matrix_t* const m, int* const spans);
+
+/**
+ * Returns whether header a and header b are equal.
+ */
+extern int dm_equal_header(const matrix_header_t* const a, const matrix_header_t* const b);
 
 #ifdef __cplusplus
 }
