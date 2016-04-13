@@ -465,53 +465,56 @@ print_ltsmin_buchi_helper (const ltsmin_buchi_t *ba, ltsmin_parse_env_t env,
 void
 print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 {
-    int is_hoa = ba->acceptance_set;
-    if (is_hoa) { // HOA acceptance
-        char *buf = NULL;
-        for (int p=0; p<32; p++) {
-            if ( ba->acceptance_set & (1 << p) ) {
-                // print two times, first to obtain the size (+ nullbyte)
-                size_t n = snprintf(NULL, 0, " %d", p) + 1;
-                buf = RTmalloc (sizeof (char) * n);
-                // and the second time for the actual print
-                snprintf(buf, n, " %d", p);
-            }
-        }
-        Warning(info, "Acceptance set: {%s }", buf);
-        RTfree(buf);
-    }
     Warning(info, "buchi has %d states", ba->state_count);
-    for(int i=0; i < ba->state_count; i++) {
-        if (is_hoa) {
-            if (!ba->states[i]->accept) {
-                Warning(info, " state %d:", i);
-            } else {
-                char *buf = NULL;
-                for (int p=0; p<32; p++) {
-                    if ( ba->states[i]->accept & (1 << p) ) {
-                        // print two times, first to obtain the size (+ nullbyte)
-                        size_t n = snprintf(NULL, 0, " %d", p) + 1;
-                        buf = RTmalloc (sizeof (char) * n);
-                        // and the second time for the actual print
-                        snprintf(buf, n, " %d", p);
-                    }
+
+    if (log_active(infoLong)) {
+        int is_hoa = ba->acceptance_set;
+        if (is_hoa) { // HOA acceptance
+            char *buf = NULL;
+            for (int p=0; p<32; p++) {
+                if ( ba->acceptance_set & (1 << p) ) {
+                    // print two times, first to obtain the size (+ nullbyte)
+                    size_t n = snprintf(NULL, 0, " %d", p) + 1;
+                    buf = RTmalloc (sizeof (char) * n);
+                    // and the second time for the actual print
+                    snprintf(buf, n, " %d", p);
                 }
-                Warning(info, " state %d: {%s }", i, buf);
+            }
+            Warning(infoLong, "Acceptance set: {%s }", buf);
+            RTfree(buf);
+        }
+        for(int i=0; i < ba->state_count; i++) {
+            if (is_hoa) {
+                if (!ba->states[i]->accept) {
+                    Warning(infoLong, " state %d:", i);
+                } else {
+                    char *buf = NULL;
+                    for (int p=0; p<32; p++) {
+                        if ( ba->states[i]->accept & (1 << p) ) {
+                            // print two times, first to obtain the size (+ nullbyte)
+                            size_t n = snprintf(NULL, 0, " %d", p) + 1;
+                            buf = RTmalloc (sizeof (char) * n);
+                            // and the second time for the actual print
+                            snprintf(buf, n, " %d", p);
+                        }
+                    }
+                    Warning(infoLong, " state %d: {%s }", i, buf);
+                    RTfree(buf);
+                }
+            }
+            else {
+                Warning(infoLong, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
+            }
+            for(int j=0; j < ba->states[i]->transition_count; j++) {
+                // print two times, first to obtain the size (+ nullbyte)
+                size_t n = print_ltsmin_buchi_helper (ba, env, is_hoa, i, j, NULL, 0) + 1;
+                char *buf = RTmalloc (sizeof (char) * n);
+                // and the second time for the actual print
+                print_ltsmin_buchi_helper (ba, env, is_hoa, i, j, buf, n);
+
+                Warning(infoLong, "  -> %d, | %s", ba->states[i]->transitions[j].to_state, buf);
                 RTfree(buf);
             }
-        }
-        else {
-            Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
-        }
-        for(int j=0; j < ba->states[i]->transition_count; j++) {
-            // print two times, first to obtain the size (+ nullbyte)
-            size_t n = print_ltsmin_buchi_helper (ba, env, is_hoa, i, j, NULL, 0) + 1;
-            char *buf = RTmalloc (sizeof (char) * n);
-            // and the second time for the actual print
-            print_ltsmin_buchi_helper (ba, env, is_hoa, i, j, buf, n);
-
-            Warning(info, "  -> %d, | %s", ba->states[i]->transitions[j].to_state, buf);
-            RTfree(buf);
         }
     }
 }
