@@ -1600,7 +1600,9 @@ dm_cols_to_idx_table(const matrix_t* m)
 void
 dm_apply_or(matrix_t* a, const matrix_t* b)
 {
-    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b))
+    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b));
+    HREassert(dm_equal_header(&a->row_perm, &b->row_perm) && dm_equal_header(&a->col_perm, &b->col_perm),
+            "fast or only possible on matrices with the same permutation");
 
     bitvector_union(&a->bits, &b->bits);
 }
@@ -1608,7 +1610,9 @@ dm_apply_or(matrix_t* a, const matrix_t* b)
 int
 dm_equals(const matrix_t* a, const matrix_t* b)
 {
-    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b))
+    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b));
+    HREassert(dm_equal_header(&a->row_perm, &b->row_perm) && dm_equal_header(&a->col_perm, &b->col_perm),
+            "fast equals only possible on matrices with the same permutation");
 
     return bitvector_equal(&a->bits, &b->bits);
 }
@@ -1616,7 +1620,9 @@ dm_equals(const matrix_t* a, const matrix_t* b)
 void
 dm_apply_xor(matrix_t* a, const matrix_t* b)
 {
-    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b))
+    HREassert(dm_nrows(a) == dm_nrows(b) && dm_ncols(a) == dm_ncols(b));
+    HREassert(dm_equal_header(&a->row_perm, &b->row_perm) && dm_equal_header(&a->col_perm, &b->col_perm),
+            "fast xor only possible on matrices with the same permutation");
 
     return bitvector_xor(&a->bits, &b->bits);
 }
