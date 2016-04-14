@@ -59,6 +59,67 @@ char    yytext[2048];
 #define LTL_LPAR ((void*)0x01)
 #define LTL_RPAR ((void*)0x02)
 
+// print function for ltl2ba (not to be used elsewhere)
+static char *
+ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
+{
+    // no equation
+    HREassert (ltl, "Empty LTL expression");
+
+    // left eq
+    switch(ltl->node_type) {
+        case BINARY_OP:
+            *buf++='(';
+            buf = ltsmin_expr_print_ltl(ltl->arg1, buf);
+        default:;
+    }
+    // middle
+    switch(ltl->token) {
+        case LTL_SVAR: sprintf(buf, "@S%d", ltl->idx); break;
+        case LTL_EVAR: sprintf(buf, "@E%d", ltl->idx); break;
+        case LTL_NUM: sprintf(buf, "%d", ltl->idx); break;
+        case LTL_CHUNK: sprintf(buf, "@H%d", ltl->idx); break;
+        case LTL_LT: sprintf(buf, " < "); break;
+        case LTL_LEQ: sprintf(buf, " <= "); break;
+        case LTL_GT: sprintf(buf, " > "); break;
+        case LTL_GEQ: sprintf(buf, " >= "); break;
+        case LTL_EQ: sprintf(buf, " == "); break;
+        case LTL_NEQ: sprintf(buf, " != "); break;
+        case LTL_TRUE: sprintf(buf, "true"); break;
+        case LTL_OR: sprintf(buf, " or "); break;
+        case LTL_NOT: sprintf(buf, "!"); break;
+        case LTL_NEXT: sprintf(buf, "X "); break;
+        case LTL_UNTIL: sprintf(buf, " U "); break;
+        case LTL_FALSE: sprintf(buf, "false"); break;
+        case LTL_AND: sprintf(buf, " and "); break;
+        case LTL_EQUIV: sprintf(buf, " <-> "); break;
+        case LTL_IMPLY: sprintf(buf, " -> "); break;
+        case LTL_FUTURE: sprintf(buf, "F "); break;
+        case LTL_GLOBALLY: sprintf(buf, "G "); break;
+        case LTL_MULT: sprintf(buf, " * "); break;
+        case LTL_DIV: sprintf(buf, " / "); break;
+        case LTL_REM: sprintf(buf, " %% "); break;
+        case LTL_ADD: sprintf(buf, " + "); break;
+        case LTL_SUB: sprintf(buf, " - "); break;
+        default:
+            Abort("unknown LTL token");
+    }
+    buf += strlen(buf);
+    // right eq
+    switch(ltl->node_type) {
+        case UNARY_OP:
+            buf = ltsmin_expr_print_ltl(ltl->arg1, buf);
+            break;
+        case BINARY_OP:
+            buf = ltsmin_expr_print_ltl(ltl->arg2, buf);
+            *buf++=')';
+            break;
+        default:;
+    }
+    *buf='\0';
+    return buf;
+}
+
 static int
 tl_lex(void)
 {
