@@ -518,7 +518,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
 #ifdef HAVE_SPOT
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
             PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
-            ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA);
+            ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env);
             ba = ltsmin_hoa_buchi();
         } else {
 #endif

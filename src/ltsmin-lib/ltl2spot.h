@@ -10,7 +10,7 @@ extern "C" {
 
 #include <ltsmin-lib/ltsmin-buchi.h>
 
-void ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba);
+void ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba, ltsmin_parse_env_t env);
 ltsmin_buchi_t *ltsmin_hoa_buchi();
 
 #ifdef __cplusplus
