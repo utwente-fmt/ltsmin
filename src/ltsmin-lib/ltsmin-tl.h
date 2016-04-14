@@ -170,7 +170,6 @@ extern ltsmin_expr_t ctl_to_ctl_star(ltsmin_expr_t);
 extern ltsmin_expr_t ctl_normalize(ltsmin_expr_t);
 extern ltsmin_expr_t ctl_star_to_pnf(ltsmin_expr_t);
 extern ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t);
-extern char* ltsmin_expr_print_ltl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_ctl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_mu(ltsmin_expr_t, char*);
 
