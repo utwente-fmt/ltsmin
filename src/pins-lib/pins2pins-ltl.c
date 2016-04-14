@@ -429,20 +429,56 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
     }
 }
 
+
+static size_t
+print_ltsmin_buchi_helper (const ltsmin_buchi_t *ba, ltsmin_parse_env_t env,
+                           int is_hoa, int i, int j, char *buf, size_t max_buf)
+{
+    size_t n = 0;
+    for(int k=0; k < ba->predicate_count; k++) {
+        if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
+            if (n!=0) n += snprintf(buf + (buf?n:0), max_buf, " && ");
+            char *expr = LTSminPrintExpr(ba->predicates[k], env);
+            n += snprintf(buf + (buf?n:0), max_buf, "%s",expr);
+        }
+        if (ba->states[i]->transitions[j].neg[k/32] & (1<<(k%32))) {
+            if (n!=0) n += snprintf(buf + (buf?n:0), max_buf, " && ");
+            char *expr = LTSminPrintExpr(ba->predicates[k], env);
+            n += snprintf(buf + (buf?n:0), max_buf, "!%s",expr);
+        }
+    }
+
+    if (n == 0) n += snprintf(buf + (buf?n:0), max_buf, "true");
+    
+    if (is_hoa && ba->states[i]->transitions[j].acc_set) { // HOA acceptance
+        n += snprintf(buf + (buf?n:0), max_buf, " {");
+        for (int p=0; p<32; p++) {
+            if ( ba->states[i]->transitions[j].acc_set & (1 << p) )
+                n += snprintf(buf + (buf?n:0), max_buf, " %d",p);
+        }
+        n += snprintf(buf + (buf?n:0), max_buf, " }");
+    }
+
+    return n;
+}
+
 void
 print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 {
     int is_hoa = ba->acceptance_set;
     if (is_hoa) { // HOA acceptance
-        char buf[4096];
-        memset(buf, 0, sizeof(buf));
-        char* at = buf;
-        *at = '\0';
+        char *buf = NULL;
         for (int p=0; p<32; p++) {
-            if ( ba->acceptance_set & (1 << p) )
-                at +=  sprintf(at, " %d",p);
+            if ( ba->acceptance_set & (1 << p) ) {
+                // print two times, first to obtain the size (+ nullbyte)
+                size_t n = snprintf(NULL, 0, " %d", p) + 1;
+                buf = RTmalloc (sizeof (char) * n);
+                // and the second time for the actual print
+                snprintf(buf, n, " %d", p);
+            }
         }
         Warning(info, "Acceptance set: {%s }", buf);
+        RTfree(buf);
     }
     Warning(info, "buchi has %d states", ba->state_count);
     for(int i=0; i < ba->state_count; i++) {
@@ -450,51 +486,32 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
             if (!ba->states[i]->accept) {
                 Warning(info, " state %d:", i);
             } else {
-                char buf[4096];
-                memset(buf, 0, sizeof(buf));
-                char* at = buf;
-                *at = '\0';
+                char *buf = NULL;
                 for (int p=0; p<32; p++) {
-                    if ( ba->states[i]->accept & (1 << p) )
-                        at +=  sprintf(at, " %d",p);
+                    if ( ba->states[i]->accept & (1 << p) ) {
+                        // print two times, first to obtain the size (+ nullbyte)
+                        size_t n = snprintf(NULL, 0, " %d", p) + 1;
+                        buf = RTmalloc (sizeof (char) * n);
+                        // and the second time for the actual print
+                        snprintf(buf, n, " %d", p);
+                    }
                 }
                 Warning(info, " state %d: {%s }", i, buf);
+                RTfree(buf);
             }
         }
         else {
             Warning(info, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
         }
         for(int j=0; j < ba->states[i]->transition_count; j++) {
-            char buf[4096*32];
-            memset(buf, 0, sizeof(buf));
-            char* at = buf;
-            *at = '\0';
-            for(int k=0; k < ba->predicate_count; k++) {
-                if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
-                    if (at != buf)
-                        at += sprintf(at, " && ");
-                    char *expr =  LTSminPrintExpr(ba->predicates[k], env);
-                    at += sprintf(at, "%s",expr);
-                }
-                if (ba->states[i]->transitions[j].neg[k/32] & (1<<(k%32))) {
-                    if (at != buf)
-                        at += sprintf(at, " && ");
-                    *at++ = '!';
-                    char *expr = LTSminPrintExpr(ba->predicates[k], env);
-                    at += sprintf(at, "%s",expr);
-                }
-            }
-            if (at == buf) sprintf(at, "true");
-            
-            if (is_hoa && ba->states[i]->transitions[j].acc_set) { // HOA acceptance
-                at += sprintf(at, " {");
-                for (int p=0; p<32; p++) {
-                    if ( ba->states[i]->transitions[j].acc_set & (1 << p) )
-                        at +=  sprintf(at, " %d",p);
-                }
-                at +=  sprintf(at, " }");
-            }
+            // print two times, first to obtain the size (+ nullbyte)
+            size_t n = print_ltsmin_buchi_helper (ba, env, is_hoa, i, j, NULL, 0) + 1;
+            char *buf = RTmalloc (sizeof (char) * n);
+            // and the second time for the actual print
+            print_ltsmin_buchi_helper (ba, env, is_hoa, i, j, buf, n);
+
             Warning(info, "  -> %d, | %s", ba->states[i]->transitions[j].to_state, buf);
+            RTfree(buf);
         }
     }
 }
