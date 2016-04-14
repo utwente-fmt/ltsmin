@@ -98,12 +98,10 @@ ltl_to_store (ltsmin_expr_t e, ltsmin_parse_env_t env)
   le->count = 0;
   linearize_ltsmin_expr(e, &le);
 
-  // create buffer to store the LTL formula in
-  char *buffer         = NULL;
-  // compute the string length of the LTL formula
-  int n = ltl_to_store_helper(buffer, le, env, 0);
+  // compute the string length of the LTL formula (+ nullbyte)
+  int n = ltl_to_store_helper(NULL, le, env, 0) + 1;
   // allocate the buffer
-  buffer = (char*) RTmalloc ( sizeof(char) * n );
+  char *buffer = (char*) RTmalloc ( sizeof(char) * n );
   // write the LTL formula
   ltl_to_store_helper(buffer, le, env, n);
 

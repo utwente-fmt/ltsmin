@@ -338,8 +338,8 @@ LTSminSPrintExpr(char *buf, size_t max_buf, ltsmin_expr_t expr, ltsmin_parse_env
 char *
 LTSminPrintExpr(ltsmin_expr_t expr, ltsmin_parse_env_t env)
 {
-    // get the length of the to-be-printed expression
-    size_t len = LTSminSPrintExpr(NULL, 0, expr, env);
+    // get the length of the to-be-printed expression (+ nullbyte)
+    size_t len = LTSminSPrintExpr(NULL, 0, expr, env) + 1;
     // allocate the buffer
     char *buffer = (char*) RTmalloc ( sizeof(char) * len );
     // write the LTL expression
@@ -351,8 +351,8 @@ LTSminPrintExpr(ltsmin_expr_t expr, ltsmin_parse_env_t env)
 void
 LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env)
 {
-    // get the length of the to-be-printed expression
-    size_t len = LTSminSPrintExpr(NULL, 0, expr, env);
+    // get the length of the to-be-printed expression (+ nullbyte)
+    size_t len = LTSminSPrintExpr(NULL, 0, expr, env) + 1;
     // allocate the buffer
     char *buffer = (char*) RTmalloc ( sizeof(char) * len );
     // write the LTL expression
