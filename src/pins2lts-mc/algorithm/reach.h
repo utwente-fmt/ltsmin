@@ -120,7 +120,8 @@ deadlock_detect (wctx_t *ctx, size_t count)
     if (pins_state_is_valid_end(ctx->model, state)) return;
     if ( !loc->inv_expr ) loc->counters.violations++;
 
-    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
+    if (dlk_detect)
+        global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
     if (dlk_detect && (!no_exit || trc_output) && run_stop(ctx->run)) {
         Warning (info, " ");
         Warning (info, "Deadlock found in state at depth %zu!",
