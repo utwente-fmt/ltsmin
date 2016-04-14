@@ -1,6 +1,7 @@
 
 
 // C++ libraries
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -33,44 +34,29 @@ extern "C" {
 
 static ltsmin_expr_list_t *le_list = NULL;
 static ltsmin_lin_expr_t *le;
-static char ltl_formula[4096*32];
 
-// linearizes the ltl expression to an array of tokens
-// then iterates over this array and creates a string for the formula
-// all found predicates are stored in a lookup list
-static char *
-ltl_to_store(ltsmin_expr_t e)
+static int
+ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, int max_buffer)
 {
-  const int le_size = 64;
-  // linearized expression
-  le = (ltsmin_lin_expr_t*) RTmalloc(sizeof(ltsmin_lin_expr_t) + le_size * sizeof(ltsmin_expr_t));
-  le->size = le_size;
-  le->count = 0;
-
-  linearize_ltsmin_expr(e, &le);
-
-  // create buffer to store the LTL formula in
-  memset(ltl_formula, 0, sizeof(ltl_formula));
-  char* at = ltl_formula;
-  *at = '\0';
-
-  for(int i=0; i < le->count; i++) {
-    if (le->lin_expr[i] == LTL_LPAR) { at += sprintf(at, "("); continue; }
-    if (le->lin_expr[i] == LTL_RPAR) { at += sprintf(at, ")"); continue; }
+  // walk over the linearized expression
+  int n = 0;
+  for (int i=0; i < le->count; i++) {
+    if (le->lin_expr[i] == LTL_LPAR) { n += snprintf(at + (at?n:0), max_buffer, "("); continue; }
+    if (le->lin_expr[i] == LTL_RPAR) { n += snprintf(at + (at?n:0), max_buffer, ")"); continue; }
 
     switch(le->lin_expr[i]->token) {
-      case LTL_TRUE:      at += sprintf(at, "true"); break;
-      case LTL_FALSE:     at += sprintf(at, "false"); break;
-      case LTL_AND:       at += sprintf(at, " && "); break;
-      case LTL_OR:        at += sprintf(at, " || "); break;
-      case LTL_NOT:       at += sprintf(at, " ! "); break;
-      case LTL_FUTURE:    at += sprintf(at, " <> "); break;
-      case LTL_GLOBALLY:  at += sprintf(at, " [] "); break;
-      case LTL_UNTIL:     at += sprintf(at, " U "); break;
-      case LTL_RELEASE:   at += sprintf(at, " R "); break;
-      case LTL_NEXT:      at += sprintf(at, " X "); break;
-      case LTL_EQUIV:     at += sprintf(at, " <-> "); break;
-      case LTL_IMPLY:     at += sprintf(at, " -> "); break;
+      case LTL_TRUE:      n += snprintf(at + (at?n:0), max_buffer, "true"); break;
+      case LTL_FALSE:     n += snprintf(at + (at?n:0), max_buffer, "false"); break;
+      case LTL_AND:       n += snprintf(at + (at?n:0), max_buffer, " && "); break;
+      case LTL_OR:        n += snprintf(at + (at?n:0), max_buffer, " || "); break;
+      case LTL_NOT:       n += snprintf(at + (at?n:0), max_buffer, " ! "); break;
+      case LTL_FUTURE:    n += snprintf(at + (at?n:0), max_buffer, " <> "); break;
+      case LTL_GLOBALLY:  n += snprintf(at + (at?n:0), max_buffer, " [] "); break;
+      case LTL_UNTIL:     n += snprintf(at + (at?n:0), max_buffer, " U "); break;
+      case LTL_RELEASE:   n += snprintf(at + (at?n:0), max_buffer, " R "); break;
+      case LTL_NEXT:      n += snprintf(at + (at?n:0), max_buffer, " X "); break;
+      case LTL_EQUIV:     n += snprintf(at + (at?n:0), max_buffer, " <-> "); break;
+      case LTL_IMPLY:     n += snprintf(at + (at?n:0), max_buffer, " -> "); break;
       case LTL_EQ:
       case LTL_SVAR:
       case LTL_VAR:
@@ -84,11 +70,11 @@ ltl_to_store(ltsmin_expr_t e)
       case LTL_REM:
       case LTL_ADD:
       case LTL_SUB: {
-        char buffer[2048];
-        memset(buffer, 0, sizeof(buffer));
-        ltsmin_expr_print_ltl(le->lin_expr[i], buffer); 
-        ltsmin_expr_lookup(le->lin_expr[i], buffer, &le_list);
-        at += sprintf(at, "\"%s\"", buffer);  
+        char *buffer = LTSminPrintExpr(le->lin_expr[i], env);
+        // store the predicate (only once)
+        if (at) ltsmin_expr_lookup(le->lin_expr[i], buffer, &le_list);
+        // add temporary '#' to mark predicates for Spot
+        n += snprintf(at + (at?n:0), max_buffer, "#%s#", buffer);
         break;
       }
       default:
@@ -96,7 +82,32 @@ ltl_to_store(ltsmin_expr_t e)
         break;
     }
   }
-  return ltl_formula;
+  return n;
+}
+
+// linearizes the ltl expression to an array of tokens
+// then iterates over this array and creates a string for the formula
+// all found predicates are stored in a lookup list
+static char *
+ltl_to_store (ltsmin_expr_t e, ltsmin_parse_env_t env)
+{
+  // linearize expression
+  const int le_size = 64;
+  le = (ltsmin_lin_expr_t*) RTmalloc(sizeof(ltsmin_lin_expr_t) + le_size * sizeof(ltsmin_expr_t));
+  le->size = le_size;
+  le->count = 0;
+  linearize_ltsmin_expr(e, &le);
+
+  // create buffer to store the LTL formula in
+  char *buffer         = NULL;
+  // compute the string length of the LTL formula
+  int n = ltl_to_store_helper(buffer, le, env, 0);
+  // allocate the buffer
+  buffer = (char*) RTmalloc ( sizeof(char) * n );
+  // write the LTL formula
+  ltl_to_store_helper(buffer, le, env, n);
+
+  return buffer;
 }
 
 }
@@ -157,8 +168,11 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
   ba->predicates = (ltsmin_expr_t*) RTmalloc(ba->predicate_count * sizeof(ltsmin_expr_t));
   std::vector<std::string> pred_vec;
   for (spot::formula ap: aut->ap()) {
-    pred_vec.push_back(ap.ap_name());
-    ltsmin_expr_t e = ltsmin_expr_lookup(NULL, (char*) ap.ap_name().c_str(), &le_list);
+    std::string ap_name = ap.ap_name();
+    // Change the single quotation back to a double quote
+    replace( ap_name.begin(), ap_name.end(), '\'', '\"');
+    pred_vec.push_back(ap_name);
+    ltsmin_expr_t e = ltsmin_expr_lookup(NULL, (char*) ap_name.c_str(), &le_list);
     HREassert(e, "Empty LTL expression");
     ba->predicates[i++] = e;
   }
@@ -220,6 +234,8 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
               if (pred_start != -1) {
                 // finished predicate
                 std::string predicate = cond.substr(pred_start+1, c_i-pred_start-1);
+                // Change the single quotation back to a double quote
+                replace( predicate.begin(), predicate.end(), '\'', '\"');
                 int pred_index = get_predicate_index(pred_vec, predicate);
                 HREassert(pred_index >= 0, "Predicate not found");
                 if (is_neg)
@@ -264,13 +280,15 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut)
 
 
 void 
-ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba) 
+ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba, ltsmin_parse_env_t env) 
 {
   // construct the LTL formula and store the predicates
-  char *buff = ltl_to_store(e);
-  
-  // create and run a system command that produces the HOA
+  char *buff = ltl_to_store(e, env);
   std::string ltl = std::string(buff);
+
+  // modify #(a1 == "S")#  to  "(a1 == 'S')"
+  replace( ltl.begin(), ltl.end(), '"', '\'');
+  replace( ltl.begin(), ltl.end(), '#', '\"');
 
   // use Spot to parse the LTL and create an automata
   spot::parsed_formula f = spot::parse_infix_psl(ltl);
@@ -287,6 +305,9 @@ ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba)
 
   // create the automaton
   spot_automaton = trans.run(f.f);
+
+  // free
+  RTfree(buff);
 }
 
 
