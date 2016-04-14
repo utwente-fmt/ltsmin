@@ -473,13 +473,15 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
                 if (ba->states[i]->transitions[j].pos[k/32] & (1<<(k%32))) {
                     if (at != buf)
                         at += sprintf(at, " && ");
-                    at += LTSminSPrintExpr(at, ba->predicates[k], env);
+                    char *expr =  LTSminPrintExpr(ba->predicates[k], env);
+                    at += sprintf(at, "%s",expr);
                 }
                 if (ba->states[i]->transitions[j].neg[k/32] & (1<<(k%32))) {
                     if (at != buf)
                         at += sprintf(at, " && ");
                     *at++ = '!';
-                    at += LTSminSPrintExpr(at, ba->predicates[k], env);
+                    char *expr = LTSminPrintExpr(ba->predicates[k], env);
+                    at += sprintf(at, "%s",expr);
                 }
             }
             if (at == buf) sprintf(at, "true");
