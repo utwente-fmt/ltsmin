@@ -243,112 +243,122 @@ int LTSminBinaryToken(ltsmin_parse_env_t env, int idx)
 }
 
 size_t
-LTSminSPrintExpr(char *buf, ltsmin_expr_t expr, ltsmin_parse_env_t env)
+LTSminSPrintExpr(char *buf, size_t max_buf, ltsmin_expr_t expr, ltsmin_parse_env_t env)
 {
-    char *begin = buf;
+    size_t n = 0;
     switch(expr->node_type){
         case VAR:
-            buf += sprintf(buf, "%s",SIget(env->idents,expr->idx));
+            n += snprintf (buf + (buf?n:0), max_buf, "%s",SIget(env->idents,expr->idx));
             break;
         case SVAR:
-            buf += sprintf(buf, "%s",LTSminStateVarName(env, expr->idx));
+            n += snprintf (buf + (buf?n:0), max_buf, "%s",LTSminStateVarName(env, expr->idx));
             break;
         case EVAR:
-            buf += sprintf(buf, "%s",LTSminEdgeVarName(env, expr->idx));
+            n += snprintf (buf + (buf?n:0), max_buf, "%s",LTSminEdgeVarName(env, expr->idx));
             break;
         case INT:
-            buf += sprintf(buf, "%d",expr->idx);
+            n += snprintf (buf + (buf?n:0), max_buf, "%d",expr->idx);
             break;
         case CHUNK: {
             chunk c;
             c.data=SIgetC(env->values,expr->idx,(int*)&c.len);
             char print[c.len*2+6];
             chunk2string(c,sizeof print,print);
-            buf += sprintf(buf,"%s",print);
+            n += snprintf        (buf + (buf?n:0), max_buf,"%s",print);
             break;
         }
         case CONSTANT: {
-            buf += sprintf(buf, " %s ",LTSminConstantName(env, expr->idx));
+            n += snprintf        (buf + (buf?n:0), max_buf, " %s ",LTSminConstantName(env, expr->idx));
             break;
         }
         case BINARY_OP: {
-            buf += sprintf(buf, "(");
-            buf += LTSminSPrintExpr(buf, expr->arg1, env);
-            buf += sprintf(buf, " %s ",LTSminBinaryName(env, expr->idx));
-            buf += LTSminSPrintExpr(buf, expr->arg2, env);
-            buf += sprintf(buf, ")");
+            n += snprintf        (buf + (buf?n:0), max_buf, "(");
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, " %s ",LTSminBinaryName(env, expr->idx));
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg2, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ")");
             break;
         }
         case UNARY_OP:
             if (LTSminUnaryIsPrefix(env, expr->idx)) {
-                buf += sprintf(buf, "(%s ", LTSminUnaryName(env, expr->idx));
-                buf += LTSminSPrintExpr(buf, expr->arg1, env);
-                buf += sprintf(buf, ")");
+                n += snprintf        (buf + (buf?n:0), max_buf, "(%s ", LTSminUnaryName(env, expr->idx));
+                n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+                n += snprintf        (buf + (buf?n:0), max_buf, ")");
             } else {
-                buf += sprintf(buf, "(");
-                buf += LTSminSPrintExpr(buf, expr->arg1, env);
-                buf += sprintf(buf, "%s )", LTSminUnaryName(env, expr->idx));
+                n += snprintf        (buf + (buf?n:0), max_buf, "(");
+                n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+                n += snprintf        (buf + (buf?n:0), max_buf, "%s )", LTSminUnaryName(env, expr->idx));
             }
             break;
         case MU_FIX:
-            buf += sprintf(buf, "(%s %s.",SIget(env->keywords,TOKEN_MU_SYM), SIget(env->idents,expr->idx));
-            buf += LTSminSPrintExpr(buf, expr->arg1, env);
-            buf += sprintf(buf, ")");
+            n += snprintf        (buf + (buf?n:0), max_buf, "(%s %s.",SIget(env->keywords,TOKEN_MU_SYM), SIget(env->idents,expr->idx));
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ")");
             break;
         case NU_FIX:
-            buf += sprintf(buf, "(%s %s.",SIget(env->keywords,TOKEN_NU_SYM), SIget(env->idents,expr->idx));
-            buf += LTSminSPrintExpr(buf, expr->arg1, env);
-            buf += sprintf(buf, ")");
+            n += snprintf        (buf + (buf?n:0), max_buf, "(%s %s.",SIget(env->keywords,TOKEN_NU_SYM), SIget(env->idents,expr->idx));
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ")");
             break;
         case EXISTS_STEP:
-            buf += sprintf(buf, "(%s ", SIget(env->keywords,TOKEN_EXISTS_SYM));
-            buf += LTSminSPrintExpr(buf, expr->arg1, env);
-            buf += sprintf(buf, ".");
-            buf += LTSminSPrintExpr(buf, expr->arg2, env);
-            buf += sprintf(buf, ")");
+            n += snprintf        (buf + (buf?n:0), max_buf, "(%s ", SIget(env->keywords,TOKEN_EXISTS_SYM));
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ".");
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg2, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ")");
             break;
         case FORALL_STEP:
-            buf += sprintf(buf, "(%s ", SIget(env->keywords,TOKEN_ALL_SYM));
-            buf += LTSminSPrintExpr(buf, expr->arg1, env);
-            buf += sprintf(buf, ".");
-            buf += LTSminSPrintExpr(buf, expr->arg2, env);
-            buf += sprintf(buf, ")");
+            n += snprintf        (buf + (buf?n:0), max_buf, "(%s ", SIget(env->keywords,TOKEN_ALL_SYM));
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ".");
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg2, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ")");
             break;
         case EDGE_EXIST:
-            buf += sprintf(buf, "(%s%s%s",
+            n += snprintf        (buf + (buf?n:0), max_buf, "(%s%s%s",
                 SIget(env->keywords,TOKEN_EDGE_EXIST_LEFT),
                 SIget(env->edge_vars,expr->idx),
                 SIget(env->keywords,TOKEN_EDGE_EXIST_RIGHT));
-            buf += LTSminSPrintExpr(buf, expr->arg1, env);
-            buf += sprintf(buf, ")");
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ")");
             break;
         case EDGE_ALL:
-            buf += sprintf(buf, "(%s%s%s",
+            n += snprintf        (buf + (buf?n:0), max_buf, "(%s%s%s",
                 SIget(env->keywords,TOKEN_EDGE_ALL_LEFT),
                 SIget(env->edge_vars,expr->idx),
                 SIget(env->keywords,TOKEN_EDGE_ALL_RIGHT));
-            buf += LTSminSPrintExpr(buf, expr->arg1, env);
-            buf += sprintf(buf, ")");
+            n += LTSminSPrintExpr(buf + (buf?n:0), max_buf, expr->arg1, env);
+            n += snprintf        (buf + (buf?n:0), max_buf, ")");
             break;
         default: Abort("Unknown expression node");
     }
-    return buf - begin;
+    return n;
 }
 
 char *
 LTSminPrintExpr(ltsmin_expr_t expr, ltsmin_parse_env_t env)
 {
-    size_t len = LTSminSPrintExpr(env->buffer, expr, env);
-    HREassert (len < ENV_BUFFER_SIZE, "Buffer overflow in print expression");
-    return env->buffer;
+    // get the length of the to-be-printed expression
+    size_t len = LTSminSPrintExpr(NULL, 0, expr, env);
+    // allocate the buffer
+    char *buffer = (char*) RTmalloc ( sizeof(char) * len );
+    // write the LTL expression
+    LTSminSPrintExpr(buffer, len, expr, env);
+
+    return buffer;
 }
 
 void
 LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env)
 {
-    size_t len = LTSminSPrintExpr(env->buffer, expr, env);
-    HREassert (len < ENV_BUFFER_SIZE, "Buffer overflow in print expression");
-    Warning(log, "%s%s", msg, env->buffer);
+    // get the length of the to-be-printed expression
+    size_t len = LTSminSPrintExpr(NULL, 0, expr, env);
+    // allocate the buffer
+    char *buffer = (char*) RTmalloc ( sizeof(char) * len );
+    // write the LTL expression
+    LTSminSPrintExpr(buffer, len, expr, env);
+
+    Warning(log, "%s%s", msg, buffer);
 }
 
 ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,

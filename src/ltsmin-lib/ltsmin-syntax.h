@@ -119,7 +119,7 @@ struct ltsmin_expr_s {
 };
 
 extern void   LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env);
-extern size_t LTSminSPrintExpr(char *buf,ltsmin_expr_t expr,ltsmin_parse_env_t env);
+extern size_t LTSminSPrintExpr(char *buf, size_t max_buf,ltsmin_expr_t expr,ltsmin_parse_env_t env);
 extern char  *LTSminPrintExpr(ltsmin_expr_t expr,ltsmin_parse_env_t env);
 
 ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx, ltsmin_expr_t arg1, ltsmin_expr_t arg2);
