@@ -205,6 +205,8 @@ main (int argc, char *argv[])
 
     run_alg (ctx);
 
+    int                 exit_code = global->exit_status;
+
     reduce_and_print (ctx);
 
     deinit_all (ctx);
@@ -212,5 +214,5 @@ main (int argc, char *argv[])
     GBExit (model);
 
     HREbarrier (HREglobal());
-    HREexit (global->exit_status);
+    HREexit (exit_code);
 }
