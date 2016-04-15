@@ -2125,7 +2125,7 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_minus(next_level, visited);
         }
 
-        check_invariants(next_level, level);
+        if (sat_strategy == NO_SAT) check_invariants(next_level, level);
 
         // set current_level to next_level
         vset_copy(current_level, next_level);
@@ -2241,7 +2241,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_union(visited, root->container);
         }
 
-        check_invariants(visited, level);
+        if (sat_strategy == NO_SAT) check_invariants(visited, level);
 
         if (dlk_detect) {
             deadlock_check(root->deadlocks, reach_groups);
@@ -2559,7 +2559,7 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_union(visited, root->container);
         }
 
-        check_invariants(visited, level);
+        if (sat_strategy == NO_SAT) check_invariants(visited, level);
 
         if (dlk_detect) {
             deadlock_check(root->deadlocks, reach_groups);
@@ -2675,7 +2675,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_minus(next_level, visited);
         }
 
-        check_invariants(next_level, level);
+        if (sat_strategy == NO_SAT) check_invariants(next_level, level);
 
         // set current_level to next_level
         vset_copy(current_level, next_level);
@@ -2760,7 +2760,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             }
         }
 
-        check_invariants(new_states, -1);
+        if (sat_strategy == NO_SAT) check_invariants(new_states, -1);
 
         // no deadlocks in old new_states
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
@@ -2840,7 +2840,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             vset_clear(temp);
         }
 
-        check_invariants(visited, -1);
+        if (sat_strategy == NO_SAT) check_invariants(visited, -1);
 
         // no deadlocks in old_vis
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
@@ -3028,6 +3028,7 @@ reach_sat_like(reach_proc_t reach_proc, vset_t visited,
         Warning(infoLong, "Saturating level: %d", k);
         vset_copy(old_vis, visited);
         reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count,guard_count);
+        check_invariants(visited, -1);
         if (save_sat_levels) vset_copy(prev_vis[k], visited);
         if (vset_equal(old_vis, visited))
             k++;
@@ -3068,6 +3069,7 @@ reach_sat_loop(reach_proc_t reach_proc, vset_t visited,
             if (empty_groups[k]) continue;
             Warning(infoLong, "Saturating level: %d", k);
             reach_proc(visited, prev_vis[k], &groups[k], eg_count, next_count,guard_count);
+            check_invariants(visited, -1);
             if (save_sat_levels) vset_copy(prev_vis[k], visited);
         }
     }
