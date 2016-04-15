@@ -420,7 +420,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
     if (src[ctx->ltl_idx] == -1) {
         int labels[ctx->edge_labels];
         memset (labels, 0, sizeof(int[ctx->edge_labels]));
-        transition_info_t ti = GB_TI(labels, ctx->groups);
+        transition_info_t ti = GB_TI(labels, ctx->old_groups);
         ltl_textbook_cb(&new_ctx, &ti, src + 1, NULL);
         return new_ctx.ntbtrans;
     } else {
