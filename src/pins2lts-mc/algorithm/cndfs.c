@@ -150,12 +150,16 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
     wctx_t             *ctx = (wctx_t *) arg;
     alg_local_t        *loc = ctx->local;
     cndfs_alg_local_t  *cloc = (cndfs_alg_local_t *) ctx->local;
+    int                 onstack;
 
     /* Find cycle back to the seed */
     HREassert (cloc->accepting_depth > 0);
     size_t             *level;
-    int onstack = fset_find (cloc->fset, NULL, &successor->ref, (void**)&level, false);
-    HREassert (onstack != FSET_FULL);
+    onstack = ctx->state->ref == loc->seed->ref;
+    if (!onstack) {
+        onstack = fset_find (cloc->fset, NULL, &successor->ref, (void**)&level, false);
+        HREassert (onstack != FSET_FULL);
+    }
 
     if ( onstack && *level < cloc->accepting_depth )
         ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
@@ -372,7 +376,7 @@ endfs_red (wctx_t *ctx)
             state_info_deserialize (ctx->state, state_data);
 
             // seed is only state on both cyan and pink stack
-            on_stack = ctx->state->ref != loc->seed->ref;
+            on_stack = ctx->state->ref == loc->seed->ref;
             if (!on_stack) {
                 on_stack = fset_find (cloc->fset, NULL, &ctx->state->ref, (void**)&level, false);
                 HREassert (on_stack != FSET_FULL);
@@ -501,15 +505,15 @@ endfs_blue (run_t *run, wctx_t *ctx)
         }
     }
 
-    if (!run_is_stopped(ctx->run))
-        HREassert (fset_count(cloc->fset) == 0);
+    HREassert (run_is_stopped(ctx->run) || fset_count(cloc->fset) == 0);
 
     // if the recursive strategy uses global bits (global pruning)
     // then do simple load balancing (only for the top-level strategy)
     if ( Strat_ENDFS == loc->strat &&
          run == run->shared->top_level &&
-         (Strat_LTLG & sm->rec->local->strat) )
+         (Strat_LTLG & sm->rec->local->strat) ) {
         endfs_lb (ctx);
+    }
 }
 
 void
