@@ -120,7 +120,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     if (!is_progress && seen && ecd_has_state(loc->cyan, successor)) {
         global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
-        if (run_stop(ctx->run)) {
+        if (run_stop(ctx->run) && trc_output) {
             construct_np_lasso (ctx, successor);
         }
     }
