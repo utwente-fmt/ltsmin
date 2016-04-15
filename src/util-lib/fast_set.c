@@ -147,7 +147,7 @@ resize (fset_t *dbs, fset_resize_t mode)
 static inline mem_hash_t
 rehash (mem_hash_t h, mem_hash_t v)
 {
-    return h + (primes[v & 1023] << FSET_MIN_SIZE);
+    return h + (odd_primes[v & 1023] << FSET_MIN_SIZE);
 }
 
 static int
