@@ -150,7 +150,7 @@ rehash (mem_hash_t h, mem_hash_t v)
     return h + (primes[v & 1023] << FSET_MIN_SIZE);
 }
 
-static bool
+static int
 fset_locate (fset_t *dbs, mem_hash_t *mem, void *key, size_t *ref, size_t *tomb)
 {
     size_t              k = dbs->key_length;
@@ -171,10 +171,10 @@ fset_locate (fset_t *dbs, mem_hash_t *mem, void *key, size_t *ref, size_t *tomb)
                 if (*tomb == NONE)
                     *tomb = *ref; // first found tombstone
             } else if (*memoized(dbs,*ref) == EMPTY) {
-                return false;
+                return 0;
             } else if ( *mem == *memoized(dbs,*ref) &&
                         memcmp (key, bucket(dbs,dbs->data,*ref), k) == 0 ) {
-                return true;
+                return 1;
             }
             *ref = (*ref+1 == line_end ? line_begin : *ref+1); // next in line
         }
@@ -220,8 +220,9 @@ internal_delete (fset_t *dbs, mem_hash_t *m, void *key, void **data)
     size_t              k = dbs->key_length;
     size_t              tomb = NONE;
     mem_hash_t          mem = m == NULL ? EMPTY : *m;
-    bool found = fset_locate (dbs, &mem, key, &ref, &tomb);
-    if (!found)
+    int found = fset_locate (dbs, &mem, key, &ref, &tomb);
+    HREassert (found != FSET_FULL);
+    if (found == 0)
         return false;
     wipe_chain (dbs, ref);
 
@@ -265,7 +266,7 @@ fset_find (fset_t *dbs, mem_hash_t *m, void *key, void **data,
     size_t              tomb = NONE;
     size_t              k = dbs->key_length;
     mem_hash_t          mem = m == NULL ? EMPTY : *m;
-    bool                found = fset_locate (dbs, &mem, key, &ref, &tomb);
+    int                 found = fset_locate (dbs, &mem, key, &ref, &tomb);
 
     if (insert_absert && !found) {
         // insert:
