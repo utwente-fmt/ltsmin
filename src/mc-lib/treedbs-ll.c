@@ -209,7 +209,7 @@ static inline uint64_t
 prime_rehash (uint64_t h, uint64_t v)
 {
     uint64_t            n = (h + 1) & (~CL_MASK);
-    uint64_t            p = primes[v & PRIME_MASK];
+    uint64_t            p = odd_primes[v & PRIME_MASK];
     return (h & CL_MASK) + (p << (CACHE_LINE-3)) + n;
 }
 

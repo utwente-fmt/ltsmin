@@ -173,7 +173,7 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *ha
         hash_memo = ((hash_rehash >> 48) ^ hash_memo);
     mem_hash_t          lost = hash_memo & (WRITE_BIT | dbs->sat_mask);
     hash_memo = (hash_memo + (lost << (dbs->sat_bits+1))) & ~dbs->sat_mask;
-    uint32_t            prime = primes[hash_rehash & PRIME_MASK];
+    uint32_t            prime = odd_primes[hash_rehash & PRIME_MASK];
     //avoid collision of memoized hash with reserved values EMPTY and WRITE_BIT
     while (EMPTY == hash_memo || WRITE_BIT == hash_memo)
         hash_memo = (hash_memo + (prime << (dbs->sat_bits+1))) & ~dbs->sat_mask;
