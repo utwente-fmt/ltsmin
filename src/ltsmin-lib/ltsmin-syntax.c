@@ -359,6 +359,8 @@ LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env)
     LTSminSPrintExpr(buffer, len, expr, env);
 
     Warning(log, "%s%s", msg, buffer);
+
+    RTfree(buffer);
 }
 
 ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,

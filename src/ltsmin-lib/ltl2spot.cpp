@@ -75,6 +75,7 @@ ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, in
         if (at) ltsmin_expr_lookup(le->lin_expr[i], buffer, &le_list);
         // add temporary '#' to mark predicates for Spot
         n += snprintf(at + (at?n:0), max_buffer, "#%s#", buffer);
+        RTfree(buffer);
         break;
       }
       default:
