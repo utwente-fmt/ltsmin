@@ -3833,7 +3833,7 @@ mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_
         /* Currently MU_EQ works only in the context of an SVAR/INTEGER pair */
         if (mu_expr->arg1->token != MU_SVAR)
             Abort("Expecting == with state variable on the left side!\n");
-        if (mu_expr->arg1->token != MU_NUM)
+        if (mu_expr->arg2->token != MU_NUM)
             Abort("Expecting == with int on the right side!\n");
         result = get_svar_eq_int_set(mu_expr->arg1->idx, mu_expr->arg2->idx, visited);
     } break;
