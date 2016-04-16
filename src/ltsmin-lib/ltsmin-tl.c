@@ -1387,25 +1387,163 @@ ltsmin_expr_t ctl_normalize(ltsmin_expr_t in)
     return in;
 }
 
-ltsmin_expr_t ctlmu(ltsmin_expr_t in,int num)
-{ // TODO provide direct recursive translation
+MU ctl2mu_token(CTL token) { // precondition: token is not a path operator (A,E) or temporal operator (F,G,X,U,...)
+      switch (token) {
+        case CTL_SVAR:      return MU_SVAR;
+        case CTL_EVAR:      return MU_EVAR;
+        case CTL_NUM:       return MU_NUM;
+        case CTL_CHUNK:     return MU_CHUNK;
+        case CTL_VAR:       return MU_VAR;
+        case CTL_TRUE:      return MU_TRUE;
+        case CTL_FALSE:     return MU_FALSE;
+        case CTL_OR:        return MU_OR;
+        case CTL_AND:       return MU_AND;
+        case CTL_NOT:       return MU_NOT;
+        case CTL_NEXT:      return MU_NEXT;
+        case CTL_ALL:       return MU_ALL;   // TODO: remove these two? potentially dangerous
+        case CTL_EXIST:     return MU_EXIST;
+        case CTL_LT:        return MU_LT;  // TODO: eliminate atomic predicates and expressions?
+        case CTL_LEQ:       return MU_LEQ;
+        case CTL_GT:        return MU_GT;
+        case CTL_GEQ:       return MU_GEQ;
+        case CTL_EQ:        return MU_EQ;
+        case CTL_NEQ:       return MU_NEQ;
+        case CTL_MULT:      return MU_MULT;
+        case CTL_DIV:       return MU_DIV;
+        case CTL_REM:       return MU_REM;
+        case CTL_ADD:       return MU_ADD;
+        case CTL_SUB:       return MU_SUB;
+        default:
+	  Abort("ctl_to_mu cannot handle path or temporal operator: %s",CTL_NAME(token));
+    }
+}
+
+// LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), l, 0);
+// LTSminExpr(BINARY_OP, PRED_LT, LTSminBinaryIdx(env, PRED_NAME(PRED_LT)), e->arg1->arg1, e->arg1->arg2);
+// LTSminExpr(CONSTANT, CTL_TRUE, LTSminConstantIdx(env, CTL_NAME(CTL_TRUE)), 0, 0);
+
+ltsmin_expr_t ctlmu(ltsmin_expr_t in, int free)
+{   // free is the next free variable to use in mu/nu expressions
+    //    return ctl_star_to_mu(in);
+
+    // TODO provide direct recursive translation
     /* Source: formalising the translation of CTL into L_mu (Hasan Amjad)
      * T is the translation from CTL to mu
      * T(p \in AP) = p
      * T(!f) = !T(f)
-     * T(f & g) = T(g) & T(g)
+     * T(f & g) = T(f) & T(g)
      * T(EX f) = <.> T(f)
      * T(EG f) = nu Q. f & <.> Q
      * T(E[f U g]) = mu Q. g | (f & <.> Q)
      */
 
-  return ctl_star_to_mu(in);
+    ltsmin_expr_t res = RT_NEW(struct ltsmin_expr_s);
+    memcpy(res, in, sizeof(struct ltsmin_expr_s));
+    
+    switch (in->token) { // don't touch atomic predicates
+    case PRED_TRUE: case PRED_FALSE: case SVAR: case EVAR: 
+    case PRED_LT: case PRED_LEQ: case PRED_GT: case PRED_GEQ: case PRED_EQ: case PRED_NEQ:
+    case PRED_MULT: case PRED_DIV: case PRED_REM: case PRED_ADD: case PRED_SUB:
+    case INT: case CHUNK: case VAR:
+	return res;
+      // TODO: should we make a copy of the arguments as well?
+    default:;
+    }
+    
+    switch (in->node_type) {
+    case BINARY_OP: {            
+	
+	switch (in->token) {
+	case CTL_OR: case CTL_AND: case CTL_EQUIV: case CTL_IMPLY: { // traverse children
+	    res->token = ctl2mu_token(in->token);
+	    res->arg1 = ctlmu(in->arg1,free);
+	    res->arg2 = ctlmu(in->arg2,free);
+	    LTSminExprRehash(res);
+	    return res;
+	}
+	case CTL_UNTIL: {
+	    Abort("CTL (sub)formula should not start with U");
+	}
+	}
+    }
+	
+    case UNARY_OP: {
+	switch (in->token) {
+	case CTL_NOT: { // traverse child
+	    res->token = ctl2mu_token(in->token);
+	    res->arg1 = ctlmu(in->arg1,free);
+	    LTSminExprRehash(res);
+	    return res;
+	}
+	case CTL_EXIST: case CTL_ALL : {
+	    switch (in->arg1->token) {
+	    case CTL_UNTIL: { // translate A/E p U q  into  MU Z. q \/ (p /\ A/E X Z)
+		ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0,0);
+		ltsmin_expr_t X = LTSminExpr(UNARY_OP,MU_NEXT,0,Z,0); // TODO: do something smart with index?
+		res->arg1 = X;
+		res->token = ctl2mu_token(in->token); // A or E
+		LTSminExprRehash(res);
+		ltsmin_expr_t P = ctlmu(in->arg1->arg1,free+1);
+		ltsmin_expr_t A = LTSminExpr(BINARY_OP,MU_AND,0,P,res); // TODO: do something smart with index?
+		ltsmin_expr_t Q = ctlmu(in->arg1->arg2,free+1);
+		ltsmin_expr_t O = LTSminExpr(BINARY_OP,MU_OR,0,Q,A); // TODO: do something smart with index?
+		ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_MU,MU_MU,free,O,0);
+		return result;
+	    }
+	    case CTL_FUTURE: { // translate A/E F p into MU Z. p \/ A/E X Z
+		ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0,0);
+		ltsmin_expr_t X = LTSminExpr(UNARY_OP,MU_NEXT,0,Z,0); // TODO: do something smart with index?
+		res->arg1 = X;
+		res->token = ctl2mu_token(in->token);
+		LTSminExprRehash(res);
+		ltsmin_expr_t P = ctlmu(in->arg1->arg1,free+1);
+		ltsmin_expr_t O = LTSminExpr(BINARY_OP,MU_OR,0,P,res); // TODO: do something smart with index?
+		ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_MU,MU_MU,free,O,0);
+		return result;
+	    }
+	    case CTL_GLOBALLY: { // translate A/E G p into NU Z. p /\ A/E X Z
+		ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0,0);
+		ltsmin_expr_t X = LTSminExpr(UNARY_OP,MU_NEXT,0,Z,0); // TODO: do something smart with index?
+		res->arg1 = X;
+		res->token = ctl2mu_token(in->token);
+		LTSminExprRehash(res);
+		ltsmin_expr_t P = ctlmu(in->arg1->arg1,free+1);
+		ltsmin_expr_t A = LTSminExpr(BINARY_OP,MU_AND,0,P,res); // TODO: do something smart with index?
+		ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_NU,MU_NU,free,A,0);
+		return result;
+	    }
+	    case CTL_NEXT: { // translate A/E X to A/E X
+		ltsmin_expr_t resX = RT_NEW(struct ltsmin_expr_s);
+		memcpy(resX, in->arg1, sizeof(struct ltsmin_expr_s));
+		res->token = ctl2mu_token(in->token);
+		resX->token = MU_NEXT;
+		resX->arg1 = ctlmu(in->arg1->arg1,free);
+		res->arg1 = resX;
+		LTSminExprRehash(res->arg1);
+		LTSminExprRehash(res);
+		return res;
+	    }
+	    default:
+		Abort("ctl_to_mu: subformula of A/E should start with U,F,G,X");
+	    }
+	}
+	case CTL_FUTURE: case CTL_GLOBALLY: case CTL_NEXT: {
+	    Abort("ctl_to_mu: (sub)formula should not start with F, G, X");
+	}      
+	}
+    }
+
+    default:
+	Abort("ctl_to_mu: operator not recognized");
+    }
 }
 
-
 ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in)
-{
-  return ctlmu(in,0);
+{ ltsmin_expr_t mu = ctlmu(in,0);
+  char buf[8192];
+  ltsmin_expr_print_mu(mu,buf);
+  Warning(info,"Mu-calculus: %s",buf);
+  return mu;
 }
 
 ltsmin_expr_t ltl_to_mu(ltsmin_expr_t in)
@@ -2380,6 +2518,7 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
     switch(mu->token) {
         case MU_SVAR: sprintf(buf, "@S%d", mu->idx); break;
         case MU_EVAR: sprintf(buf, "@E%d", mu->idx); break;
+        case VAR: sprintf(buf, "@V%d", mu->idx); break;
         case MU_NUM: sprintf(buf, "%d", mu->idx); break;
         case MU_CHUNK: sprintf(buf, "@H%d", mu->idx); break;
         case MU_EQ: sprintf(buf, " == "); break;
@@ -2435,35 +2574,7 @@ ltsmin_expr_t ctl_star_to_mu_1(ltsmin_expr_t in)
 {
     ltsmin_expr_t res = RT_NEW(struct ltsmin_expr_s);
     memcpy(res, in, sizeof(struct ltsmin_expr_s));
-    switch (in->token) {
-        case CTL_SVAR:      res->token = MU_SVAR;      break;
-        case CTL_EVAR:      res->token = MU_EVAR;      break;
-        case CTL_NUM:       res->token = MU_NUM;       break;
-        case CTL_CHUNK:     res->token = MU_CHUNK;     break;
-        case CTL_VAR:       res->token = MU_VAR;       break;
-        case CTL_LT:        res->token = MU_LT;        break;
-        case CTL_LEQ:       res->token = MU_LEQ;       break;
-        case CTL_GT:        res->token = MU_GT;        break;
-        case CTL_GEQ:       res->token = MU_GEQ;       break;
-        case CTL_EQ:        res->token = MU_EQ;        break;
-        case CTL_NEQ:       res->token = MU_NEQ;       break;
-        case CTL_TRUE:      res->token = MU_TRUE;      break;
-        case CTL_FALSE:     res->token = MU_FALSE;     break;
-        case CTL_OR:        res->token = MU_OR;        break;
-        case CTL_AND:       res->token = MU_AND;       break;
-        case CTL_NOT:       res->token = MU_NOT;       break;
-        case CTL_NEXT:      res->token = MU_NEXT;      break;
-        case CTL_ALL:       res->token = MU_ALL;       break;
-        case CTL_EXIST:     res->token = MU_EXIST;     break;
-        case CTL_MULT:      res->token = MU_MULT;      break;
-        case CTL_DIV:       res->token = MU_DIV;       break;
-        case CTL_REM:       res->token = MU_REM;       break;
-        case CTL_ADD:       res->token = MU_ADD;       break;
-        case CTL_SUB:       res->token = MU_SUB;       break;
-        default:
-            // unhandled?
-            Abort("unhandled case in ctl_star_to_mu_1");
-    }
+    res->token = ctl2mu_token(in->token);
     // handle sub-expressions
     switch (in->node_type) {
         case UNARY_OP:
