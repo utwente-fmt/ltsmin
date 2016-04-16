@@ -1387,9 +1387,9 @@ ltsmin_expr_t ctl_normalize(ltsmin_expr_t in)
     return in;
 }
 
-ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in)
-{
-    /* Source: formalising the translation of CTL into L_mu
+ltsmin_expr_t ctlmu(ltsmin_expr_t in,int num)
+{ // TODO provide direct recursive translation
+    /* Source: formalising the translation of CTL into L_mu (Hasan Amjad)
      * T is the translation from CTL to mu
      * T(p \in AP) = p
      * T(!f) = !T(f)
@@ -1398,7 +1398,19 @@ ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in)
      * T(EG f) = nu Q. f & <.> Q
      * T(E[f U g]) = mu Q. g | (f & <.> Q)
      */
-     return in;
+
+  return ctl_star_to_mu(in);
+}
+
+
+ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in)
+{
+  return ctlmu(in,0);
+}
+
+ltsmin_expr_t ltl_to_mu(ltsmin_expr_t in)
+{ // TODO use BA or TGBA from SPOT
+  return ctl_star_to_mu(in);
 }
 
 int tableaux_node_eq(tableaux_node_t *n1, tableaux_node_t *n2)
