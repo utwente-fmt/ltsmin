@@ -467,7 +467,10 @@ pred_tree_walk(ltsmin_expr_t e, ltsmin_parse_env_t env, lts_type_t lts_type)
                         type_check_require_format(lts_type, right, formats, 2, e->arg1, env, "enum, chunk");
                         e->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);;
                         break;
-                    } else break;
+                    } else {
+		        e->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
+			break;
+		    }
                 }
                 default: {
                     LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
