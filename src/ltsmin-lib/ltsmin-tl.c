@@ -1241,7 +1241,140 @@ ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
     return expr;
 }
 
+static ltsmin_expr_t
+mu_tree_walk(ltsmin_expr_t e, ltsmin_parse_env_t env, lts_type_t lts_type)
+{
+    init_decoration(e, env, lts_type);
+    
+    switch (e->node_type) {
+    case BINARY_OP: {
+	switch (e->token) {
+	case MU_OR: case MU_AND: {
+	    pre_decorate(e,e->arg1);
+	    pre_decorate(e,e->arg2);
+	    ltsmin_expr_t l = mu_tree_walk(e->arg1, env, lts_type);
+	    ltsmin_expr_t r = mu_tree_walk(e->arg2, env, lts_type);
+	    if (l != e->arg1 || r != e->arg2) {
+		e->arg1 = l;
+		e->arg2 = r;
+		LTSminExprRehash(e);
+	    }
 
+	    switch (e->token) {
+	    case MU_AND: {
+		if (l->token == MU_FALSE) { // false /\ a is false
+		    LTSminExprDestroy(r, 1);
+		    LTSminExprDestroy(e, 0);
+		    return l;
+		}
+		if (r->token == MU_FALSE) { // a /\ false is false
+		    LTSminExprDestroy(l, 1);
+		    LTSminExprDestroy(e, 0);
+		    return r;
+		}
+		if (l->token == MU_TRUE) { // true /\ a is a
+		    LTSminExprDestroy(l, 1);
+		    LTSminExprDestroy(e, 0);
+		    return r;
+		}
+		if (r->token == MU_TRUE) { // a /\ true is a
+		    LTSminExprDestroy(r, 1);
+		    LTSminExprDestroy(e, 0);
+		    return l;
+		}
+		break;
+	    }
+	    case MU_OR: {
+		if (l->token == MU_TRUE) { // true \/ a is true
+		    LTSminExprDestroy(r, 1);
+		    LTSminExprDestroy(e, 0);
+		    return l;
+		}
+		if (r->token == MU_TRUE) { // a \/ true is true
+		    LTSminExprDestroy(l, 1);
+		    LTSminExprDestroy(e, 0);
+		    return r;
+		}
+		if (l->token == MU_FALSE) { // false \/ a is a
+		    LTSminExprDestroy(l, 1);
+		    LTSminExprDestroy(e, 0);
+		    return r;
+		}
+		if (r->token == MU_FALSE) { // a \/ false is a
+		    LTSminExprDestroy(r, 1);
+		    LTSminExprDestroy(e, 0);
+		    return l;
+		}
+		break;
+	    }
+	    }
+
+	    if (LTSminExprEq(l, r)) {
+		switch (e->token) {
+		case MU_OR: case MU_AND: { // a {\/, /\} a is a
+		    LTSminExprDestroy(e, 0);
+		    LTSminExprDestroy(r, 1);
+		    return l;
+		}
+		}
+	    }
+	    decorate(e, e->arg1);
+	    decorate(e, e->arg2);
+
+	    const int left = e->arg1->annotation->chunk_type;
+	    const int right = e->arg2->annotation->chunk_type;
+
+	    type_check_require_type(lts_type, left, LTSMIN_TYPE_BOOL, e->arg1, env);
+	    type_check_require_type(lts_type, right, LTSMIN_TYPE_BOOL, e->arg2, env);
+
+	    const data_format_t format[1] = { LTStypeEnum };
+	    type_check_require_format(lts_type, left, format, 1, e->arg1, env, "enum");
+	    type_check_require_format(lts_type, right, format, 1, e->arg2, env, "enum");
+
+	    e->annotation->chunk_type = left;
+
+	    return e;
+	}
+	default: {
+	    return pred_tree_walk(e, env, lts_type);
+	}
+	}
+    }
+    case UNARY_OP: {
+	switch (e->token) {
+	case MU_NOT: case MU_NEXT: case MU_EXIST: case MU_ALL: {
+
+	    pre_decorate(e, e->arg1);
+                    
+	    ltsmin_expr_t c = mu_tree_walk(e->arg1, env, lts_type);
+
+	    if (c != e->arg1) {
+		e->arg1 = c;
+		LTSminExprRehash(e);
+	    }
+
+	    decorate(e, e->arg1);
+
+	    const int type = e->arg1->annotation->chunk_type;
+
+	    const data_format_t format[1] = { LTStypeEnum };
+	    type_check_require_format(lts_type, type, format, 1, e->arg1, env, "enum");
+                    
+	    e->annotation->chunk_type = type;
+	    return e;
+	}
+	default: {
+	    return pred_tree_walk(e, env, lts_type);
+	}
+	}
+    }
+    default: {
+	return pred_tree_walk(e, env, lts_type);
+    }
+    }
+}
+
+    
 /*
  * From: Modal mu-calculi, Julian Bradfield and Colin Stirling
  * For the concrete syntax, we shall assume that modal operators have higher
@@ -1280,8 +1413,16 @@ mu_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
     LTSminPrefixOperator(env, MU_ALL, "A",4);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
-    ltsmin_expr_t expr=env->expr;
 
+    env->expr->create_annotation = create_annotation;
+    env->expr->destroy_annotation = destroy_annotation;
+    env->expr->copy_annotation = copy_annotation;
+
+    ltsmin_expr_t expr = mu_tree_walk(env->expr, env, ltstype);
+    if (expr != env->expr) LTSminExprRehash(expr);
+
+    type_check_require_type(ltstype, expr->annotation->chunk_type, LTSMIN_TYPE_BOOL, expr, env);
+    
     env->expr=NULL;
     return expr;
 }
