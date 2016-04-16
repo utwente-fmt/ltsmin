@@ -46,10 +46,15 @@
 hre_context_t ctx;
 
 static ltsmin_expr_t* mu_exprs = NULL;
+static char** ctl_star_formulas = NULL;
 static char** ctl_formulas = NULL;
+static char** ltl_formulas = NULL;
+static int num_ctl_star = 0;
 static int num_ctl = 0;
+static int num_ltl = 0;
 static char** mu_formulas  = NULL;
 static int num_mu = 0;
+static int num_total = 0;
 static int mu_par = 0;
 static ltsmin_parse_env_t* mu_parse_env = NULL;
 
@@ -157,6 +162,8 @@ static si_map_entry GUIDED[] = {
 
 static const char invariant_long[]="invariant";
 static const char ctl_star_long[]="ctl-star";
+static const char ctl_long[]="ctl";
+static const char ltl_long[]="ltl";
 static const char mu_long[]="mu";
 #define IF_LONG(long) if(((opt->longName)&&!strcmp(opt->longName,long)))
 
@@ -217,10 +224,22 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
             memcpy(inv_detect[num_inv - 1], arg, strlen(arg) + 1);
         }
         IF_LONG(ctl_star_long) {
+            num_ctl_star++;
+            ctl_star_formulas = (char**) RTrealloc(ctl_star_formulas, sizeof(char*) * num_ctl_star);
+            ctl_star_formulas[num_ctl_star - 1] = (char*) RTmalloc(strlen(arg) + 1);
+            memcpy(ctl_star_formulas[num_ctl_star - 1], arg, strlen(arg) + 1);
+        }
+        IF_LONG(ctl_long) {
             num_ctl++;
             ctl_formulas = (char**) RTrealloc(ctl_formulas, sizeof(char*) * num_ctl);
             ctl_formulas[num_ctl - 1] = (char*) RTmalloc(strlen(arg) + 1);
             memcpy(ctl_formulas[num_ctl - 1], arg, strlen(arg) + 1);
+        }
+        IF_LONG(ltl_long) {
+            num_ltl++;
+            ltl_formulas = (char**) RTrealloc(ltl_formulas, sizeof(char*) * num_ltl);
+            ltl_formulas[num_ltl - 1] = (char*) RTmalloc(strlen(arg) + 1);
+            memcpy(ltl_formulas[num_ltl - 1], arg, strlen(arg) + 1);
         }
         IF_LONG(mu_long) {
             num_mu++;
@@ -258,8 +277,10 @@ static  struct poptOption options[] = {
     { "save-transitions", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write transition relations to", "<outputfile>" },
     { "save-reachable", 0, POPT_ARG_NONE, &save_reachable, 0, "when saving transitions, also save reachable states", 0 },
     { "load-transitions", 0 , POPT_ARG_STRING, &transitions_load_filename, 0, "file to read transition relations from", "<inputfile>" },
-    { mu_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a mu formula  (can be given multiple times)" , "<mu-file>.mu" },
-    { ctl_star_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a ctl* formula  (can be given multiple times)" , "<ctl-file>.ctl" },
+    { mu_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a MU-calculus formula  (can be given multiple times)" , "<mu-file>.mu" },
+    { ctl_star_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL* formula  (can be given multiple times)" , "<ctl-star-file>.ctl" },
+    { ctl_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL formula  (can be given multiple times)" , "<ctl-file>.ctl" },
+    { ltl_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with an LTL formula  (can be given multiple times)" , "<ltl-file>.ltl" },
     { "dot", 0, POPT_ARG_STRING, &dot_dir, 0, "directory to write dot representation of vector sets to", NULL },
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
@@ -3975,33 +3996,54 @@ static vset_t** mu_vars = NULL;
 
 static void
 init_mu_calculus()
-{
-    if (num_mu + num_ctl > 0) {
-        mu_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * num_mu + num_ctl);
-        mu_exprs = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * num_mu + num_ctl);
-
+{   int total = num_mu + num_ctl_star + num_ctl + num_ltl;
+    if (total > 0) {
+        mu_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * total);
+	mu_exprs = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * total);
+	total = 0;
         for (int i = 0; i < num_mu; i++) {
             mu_parse_env[i] = LTSminParseEnvCreate();
+            Warning(info, "parsing MU-calculus formula");
             mu_exprs[i] = mu_parse_file(mu_formulas[i], mu_parse_env[i], ltstype);
-            set_pins_semantics(model, mu_exprs[i], mu_parse_env[i], &mu_exprs[i]->annotation->state_deps);
+	    set_pins_semantics(model, mu_exprs[i], mu_parse_env[i], &(mu_exprs[i])->annotation->state_deps);
         }
-
+	total += num_mu;
+        for (int i = 0; i < num_ctl_star; i++) {
+            mu_parse_env[total + i] = LTSminParseEnvCreate();
+            Warning(info, "parsing CTL* formula");
+            ltsmin_expr_t ctl_star = ctl_parse_file(ctl_star_formulas[i], mu_parse_env[total + i], ltstype);
+            Warning(info, "converting CTL* %s to mu-calculus", ctl_star_formulas[i]);
+            mu_exprs[total + i] = ctl_star_to_mu(ctl_star);
+	    set_pins_semantics(model, mu_exprs[total + i], mu_parse_env[total + i], &mu_exprs[total + i]->annotation->state_deps);
+        }
+	total += num_ctl_star;
         for (int i = 0; i < num_ctl; i++) {
-            mu_parse_env[num_mu + i] = LTSminParseEnvCreate();
-            ltsmin_expr_t ctl = ctl_parse_file(ctl_formulas[i], mu_parse_env[num_mu + i], ltstype);
-            Warning(infoLong, "converting %s to mu-calculus", ctl_formulas[i]);
-            mu_exprs[num_mu + i] = ctl_star_to_mu(ctl);
-            set_pins_semantics(model, mu_exprs[num_mu + i], mu_parse_env[num_mu + i], &mu_exprs[i]->annotation->state_deps);
+            mu_parse_env[total + i] = LTSminParseEnvCreate();
+            Warning(info, "parsing CTL formula");
+            ltsmin_expr_t ctl = ctl_parse_file(ctl_formulas[i], mu_parse_env[total + i], ltstype);
+            Warning(info, "converting CTL %s to mu-calculus", ctl_formulas[i]);
+            mu_exprs[total + i] = ctl_to_mu(ctl);
+	    set_pins_semantics(model, mu_exprs[total + i], mu_parse_env[total + i], &mu_exprs[total + i]->annotation->state_deps);
         }
+	total += num_ctl;
+        for (int i = 0; i < num_ltl; i++) {
+            mu_parse_env[total + i] = LTSminParseEnvCreate();
+            Warning(info, "parsing LTL formula");
+            ltsmin_expr_t ltl = ctl_parse_file(ltl_formulas[i], mu_parse_env[total + i], ltstype);
+            Warning(info, "converting LTL %s to mu-calculus", ltl_formulas[i]);
+            mu_exprs[total + i] = ltl_to_mu(ltl);
+	    set_pins_semantics(model, mu_exprs[total + i], mu_parse_env[total + i], &mu_exprs[total + i]->annotation->state_deps);
+        }
+	total += num_ltl;
 
-        num_mu = num_mu + num_ctl;
+	num_total = total;
 
-        mu_var_mans = (array_manager_t*) RTmalloc(sizeof(array_manager_t) * num_mu);
-        mu_vars = (vset_t**) RTmalloc(sizeof(vset_t*) * num_mu);
+        mu_var_mans = (array_manager_t*) RTmalloc(sizeof(array_manager_t) * num_total);
+        mu_vars = (vset_t**) RTmalloc(sizeof(vset_t*) * num_total);
 
         vset_t tmp = vset_create(domain, -1, NULL);
 
-        for (int i = 0; i < num_mu; i++) {
+        for (int i = 0; i < num_total; i++) {
             // run a small test to check correctness of mu formula
             // setup var manager
             mu_var_mans[i] = create_manager(65535);
@@ -4143,9 +4185,21 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
     vset_t x = mu_compute(mu_exprs[i], visited, mu_vars[i], mu_var_mans[i]);
     if (x) {
         double e_count;
-
         vset_count(x, NULL, &e_count);
-        Warning(info, "Formula %s holds for %.*g states,", (i >= (num_mu - num_ctl)) ? ctl_formulas[i - (num_mu - num_ctl)] : mu_formulas[i], DBL_DIG, e_count);
+	char* formula;
+	// recall: mu-formulas, ctl-star formulas, ctl-formulas, ltl-formulas
+	if (i < num_mu)
+	  formula = mu_formulas[i];
+	else if (i < num_mu + num_ctl_star)
+	  formula = ctl_star_formulas[i - num_mu];
+	else if (i < num_mu + num_ctl_star + num_ctl)
+	  formula = ctl_formulas[i - num_mu - num_ctl_star];
+	else if (i < num_mu + num_ctl_star + num_ltl)
+	  formula = ltl_formulas[i - num_mu - num_ctl_star - num_ctl];
+	else
+	  Warning(error, "Number of formulas doesn't match (%d+%d+%d+%d)", num_mu, num_ctl_star, num_ctl, num_ltl);
+
+        Warning(info, "Formula %s holds for %.*g states,", formula, DBL_DIG, e_count);
         Warning(info, "the initial state is %sin the set", vset_member(x, init) ? "" : "not ");
         vset_destroy(x);
     }
@@ -4154,10 +4208,10 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 static void
 check_mu(vset_t visited, int* init)
 {
-    if (num_mu > 0) {
+    if (num_total > 0) {
         Print(infoLong, "Starting mu-calculus model checking.");
         learn_labels(visited);
-        for (int i = 0; i < num_mu; i++) {
+        for (int i = 0; i < num_total; i++) {
             LACE_ME;
             check_mu_go(visited, i, init);
         }
@@ -4168,14 +4222,14 @@ static void
 check_mu_par(vset_t visited, int* init)
 {
     LACE_ME;
-    if (num_mu > 0) {
+    if (num_total > 0) {
         Print(infoLong, "Starting parallel mu-calculus model checking.");
         learn_labels_par(visited);
-        for (int i = 0; i < num_mu; i++) {
+        for (int i = 0; i < num_total; i++) {
             SPAWN(check_mu_go, visited, i, init);
         }
 
-        for (int i = 0; i < num_mu; i++) SYNC(check_mu_go);
+        for (int i = 0; i < num_total; i++) SYNC(check_mu_go);
     }
 }
 
