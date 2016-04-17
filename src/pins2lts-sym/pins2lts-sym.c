@@ -4183,22 +4183,23 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 #define check_mu_go(v, i, s) CALL(check_mu_go, (v), (i), (s))
 VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 {
-    vset_t x = mu_compute(mu_exprs[i], visited, mu_vars[i], mu_var_mans[i]);
-    if (x) {
+    vset_t x = mu_compute(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
+    if (x != NULL) {
         double e_count;
         vset_count(x, NULL, &e_count);
 	char* formula = NULL;
 	// recall: mu-formulas, ctl-star formulas, ctl-formulas, ltl-formulas
-	if (i < num_mu)
-	  formula = mu_formulas[i];
-	else if (i < num_mu + num_ctl_star)
-	  formula = ctl_star_formulas[i - num_mu];
-	else if (i < num_mu + num_ctl_star + num_ctl)
-	  formula = ctl_formulas[i - num_mu - num_ctl_star];
-	else if (i < num_mu + num_ctl_star + num_ltl)
-	  formula = ltl_formulas[i - num_mu - num_ctl_star - num_ctl];
-	else
-	  Warning(error, "Number of formulas doesn't match (%d+%d+%d+%d)", num_mu, num_ctl_star, num_ctl, num_ltl);
+	if (i < num_mu) {
+            formula = mu_formulas[i];
+	} else if (i < num_mu + num_ctl_star) {
+            formula = ctl_star_formulas[i - num_mu];
+	} else if (i < num_mu + num_ctl_star + num_ctl) {
+	    formula = ctl_formulas[i - num_mu - num_ctl_star];
+	} else if (i < num_mu + num_ctl_star + num_ltl) {
+            formula = ltl_formulas[i - num_mu - num_ctl_star - num_ctl];
+	} else {
+            Warning(error, "Number of formulas doesn't match (%d+%d+%d+%d)", num_mu, num_ctl_star, num_ctl, num_ltl);
+        }
 
         Warning(info, "Formula %s holds for %.*g states,", formula, DBL_DIG, e_count);
         Warning(info, "the initial state is %sin the set", vset_member(x, init) ? "" : "not ");
