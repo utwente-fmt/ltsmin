@@ -1559,10 +1559,6 @@ MU ctl2mu_token(CTL token) { // precondition: token is not a path operator (A,E)
     }
 }
 
-// LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), l, 0);
-// LTSminExpr(BINARY_OP, PRED_LT, LTSminBinaryIdx(env, PRED_NAME(PRED_LT)), e->arg1->arg1, e->arg1->arg2);
-// LTSminExpr(CONSTANT, CTL_TRUE, LTSminConstantIdx(env, CTL_NAME(CTL_TRUE)), 0, 0);
-
 ltsmin_expr_t ctlmu(ltsmin_expr_t in, int free)
 {   // free is the next free variable to use in mu/nu expressions
     //    return ctl_star_to_mu(in);
@@ -1582,100 +1578,99 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, int free)
     memcpy(res, in, sizeof(struct ltsmin_expr_s));
     
     switch (in->token) { // don't touch atomic predicates
-    case PRED_TRUE: case PRED_FALSE: case SVAR: case EVAR: 
-    case PRED_LT: case PRED_LEQ: case PRED_GT: case PRED_GEQ: case PRED_EQ: case PRED_NEQ:
-    case PRED_MULT: case PRED_DIV: case PRED_REM: case PRED_ADD: case PRED_SUB:
-    case INT: case CHUNK: case VAR:
-	return res;
-      // TODO: should we make a copy of the arguments as well?
-    default:;
+        case PRED_TRUE: case PRED_FALSE: case SVAR: case EVAR:
+        case PRED_LT: case PRED_LEQ: case PRED_GT: case PRED_GEQ: case PRED_EQ: case PRED_NEQ:
+        case PRED_MULT: case PRED_DIV: case PRED_REM: case PRED_ADD: case PRED_SUB:
+        case INT: case CHUNK: case VAR:
+            return res;
+          // TODO: should we make a copy of the arguments as well?
+        default:;
     }
     
     switch (in->node_type) {
-    case BINARY_OP: {            
+        case BINARY_OP: {
+            switch (in->token) {
+                case CTL_OR: case CTL_AND: case CTL_EQUIV: case CTL_IMPLY: { // traverse children
+                    res->token = ctl2mu_token(in->token);
+                    res->arg1 = ctlmu(in->arg1,free);
+                    res->arg2 = ctlmu(in->arg2,free);
+                    LTSminExprRehash(res);
+                    return res;
+                }
+                case CTL_UNTIL: {
+                    Abort("CTL (sub)formula should not start with U");
+                }
+            }
+        }
 	
-	switch (in->token) {
-	case CTL_OR: case CTL_AND: case CTL_EQUIV: case CTL_IMPLY: { // traverse children
-	    res->token = ctl2mu_token(in->token);
-	    res->arg1 = ctlmu(in->arg1,free);
-	    res->arg2 = ctlmu(in->arg2,free);
-	    LTSminExprRehash(res);
-	    return res;
-	}
-	case CTL_UNTIL: {
-	    Abort("CTL (sub)formula should not start with U");
-	}
-	}
-    }
-	
-    case UNARY_OP: {
-	switch (in->token) {
-	case CTL_NOT: { // traverse child
-	    res->token = ctl2mu_token(in->token);
-	    res->arg1 = ctlmu(in->arg1,free);
-	    LTSminExprRehash(res);
-	    return res;
-	}
-	case CTL_EXIST: case CTL_ALL : {
-	    switch (in->arg1->token) {
-	    case CTL_UNTIL: { // translate A/E p U q  into  MU Z. q \/ (p /\ A/E X Z)
-		ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0,0);
-		ltsmin_expr_t X = LTSminExpr(UNARY_OP,MU_NEXT,0,Z,0); // TODO: do something smart with index?
-		res->arg1 = X;
-		res->token = ctl2mu_token(in->token); // A or E
-		LTSminExprRehash(res);
-		ltsmin_expr_t P = ctlmu(in->arg1->arg1,free+1);
-		ltsmin_expr_t A = LTSminExpr(BINARY_OP,MU_AND,0,P,res); // TODO: do something smart with index?
-		ltsmin_expr_t Q = ctlmu(in->arg1->arg2,free+1);
-		ltsmin_expr_t O = LTSminExpr(BINARY_OP,MU_OR,0,Q,A); // TODO: do something smart with index?
-		ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_MU,MU_MU,free,O,0);
-		return result;
-	    }
-	    case CTL_FUTURE: { // translate A/E F p into MU Z. p \/ A/E X Z
-		ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0,0);
-		ltsmin_expr_t X = LTSminExpr(UNARY_OP,MU_NEXT,0,Z,0); // TODO: do something smart with index?
-		res->arg1 = X;
-		res->token = ctl2mu_token(in->token);
-		LTSminExprRehash(res);
-		ltsmin_expr_t P = ctlmu(in->arg1->arg1,free+1);
-		ltsmin_expr_t O = LTSminExpr(BINARY_OP,MU_OR,0,P,res); // TODO: do something smart with index?
-		ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_MU,MU_MU,free,O,0);
-		return result;
-	    }
-	    case CTL_GLOBALLY: { // translate A/E G p into NU Z. p /\ A/E X Z
-		ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0,0);
-		ltsmin_expr_t X = LTSminExpr(UNARY_OP,MU_NEXT,0,Z,0); // TODO: do something smart with index?
-		res->arg1 = X;
-		res->token = ctl2mu_token(in->token);
-		LTSminExprRehash(res);
-		ltsmin_expr_t P = ctlmu(in->arg1->arg1,free+1);
-		ltsmin_expr_t A = LTSminExpr(BINARY_OP,MU_AND,0,P,res); // TODO: do something smart with index?
-		ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_NU,MU_NU,free,A,0);
-		return result;
-	    }
-	    case CTL_NEXT: { // translate A/E X to A/E X
-		ltsmin_expr_t resX = RT_NEW(struct ltsmin_expr_s);
-		memcpy(resX, in->arg1, sizeof(struct ltsmin_expr_s));
-		res->token = ctl2mu_token(in->token);
-		resX->token = MU_NEXT;
-		resX->arg1 = ctlmu(in->arg1->arg1,free);
-		res->arg1 = resX;
-		LTSminExprRehash(res->arg1);
-		LTSminExprRehash(res);
-		return res;
-	    }
-	    default:
-		Abort("ctl_to_mu: subformula of A/E should start with U,F,G,X");
-	    }
-	}
-	case CTL_FUTURE: case CTL_GLOBALLY: case CTL_NEXT: {
-	    Abort("ctl_to_mu: (sub)formula should not start with F, G, X");
-	}      
-	}
-    }
-
-    default:
-	Abort("ctl_to_mu: operator not recognized");
+        case UNARY_OP: {
+            switch (in->token) {
+                case CTL_NOT: { // traverse child
+                    res->token = ctl2mu_token(in->token);
+                    res->arg1 = ctlmu(in->arg1, free);
+                    LTSminExprRehash(res);
+                    return res;
+                }
+                case CTL_EXIST: case CTL_ALL: {
+                    switch (in->arg1->token) {
+                    case CTL_UNTIL: { // translate A/E p U q  into  MU Z. q \/ (p /\ A/E X Z)
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, 0, Z, 0); // TODO: do something smart with index?
+                        res->arg1 = X;
+                        res->token = ctl2mu_token(in->token); // A or E
+                        LTSminExprRehash(res);
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, free + 1);
+                        ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, 0, P, res); // TODO: do something smart with index?
+                        ltsmin_expr_t Q = ctlmu(in->arg1->arg2, free + 1);
+                        ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, 0, Q, A); // TODO: do something smart with index?
+                        ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_MU, MU_MU, free, O, 0);
+                        return result;
+                    }
+                    case CTL_FUTURE: { // translate A/E F p into MU Z. p \/ A/E X Z
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, 0, Z, 0); // TODO: do something smart with index?
+                        res->arg1 = X;
+                        res->token = ctl2mu_token(in->token);
+                        LTSminExprRehash(res);
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, free + 1);
+                        ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, 0, P, res); // TODO: do something smart with index?
+                        ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_MU, MU_MU, free, O, 0);
+                        return result;
+                    }
+                    case CTL_GLOBALLY: { // translate A/E G p into NU Z. p /\ A/E X Z
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, 0, Z, 0); // TODO: do something smart with index?
+                        res->arg1 = X;
+                        res->token = ctl2mu_token(in->token);
+                        LTSminExprRehash(res);
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, free + 1);
+                        ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, 0, P, res); // TODO: do something smart with index?
+                        ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_NU, MU_NU, free, A, 0);
+                        return result;
+                    }
+                    case CTL_NEXT: { // translate A/E X to A/E X
+                        ltsmin_expr_t resX = RT_NEW(struct ltsmin_expr_s);
+                        memcpy(resX, in->arg1, sizeof(struct ltsmin_expr_s));
+                        res->token = ctl2mu_token(in->token);
+                        resX->token = MU_NEXT;
+                        resX->arg1 = ctlmu(in->arg1->arg1, free);
+                        res->arg1 = resX;
+                        LTSminExprRehash(res->arg1);
+                        LTSminExprRehash(res);
+                        return res;
+                    }
+                    default:
+                        Abort("ctl_to_mu: subformula of A/E should start with U,F,G,X");
+                    }
+                }
+                case CTL_FUTURE: case CTL_GLOBALLY: case CTL_NEXT: {
+                    Abort("ctl_to_mu: (sub)formula should not start with F, G, X");
+                }
+            }
+        }
+        default: {
+            Abort("ctl_to_mu: operator not recognized");
+        }
     }
 }
 
