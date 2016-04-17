@@ -4022,7 +4022,7 @@ init_mu_calculus()
             Warning(info, "parsing CTL formula");
             ltsmin_expr_t ctl = ctl_parse_file(ctl_formulas[i], mu_parse_env[total + i], ltstype);
             Warning(info, "converting CTL %s to mu-calculus", ctl_formulas[i]);
-            mu_exprs[total + i] = ctl_to_mu(ctl);
+            mu_exprs[total + i] = ctl_to_mu(ctl, mu_parse_env[total + i]);
 	    set_pins_semantics(model, mu_exprs[total + i], mu_parse_env[total + i], &mu_exprs[total + i]->annotation->state_deps);
         }
 	total += num_ctl;

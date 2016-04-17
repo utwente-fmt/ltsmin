@@ -69,9 +69,6 @@ const char *
 MU_NAME(MU mu)
 {
     switch (mu) {
-    case MU_AND:                return "&";
-    case MU_OR:                 return "|";
-
     case MU_EDGE_EXIST:         Abort ("Unimplemented: MU_EDGE_EXIST");
     case MU_EDGE_ALL:           Abort ("Unimplemented: MU_EDGE_ALL");
     case MU_EDGE_EXIST_LEFT:    return "<";
@@ -1391,26 +1388,37 @@ mu_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     fill_env (env, ltstype);
 
-    LTSminConstant      (env, MU_FALSE,        "false");
-    LTSminConstant      (env, MU_TRUE,         "true");
+    LTSminConstant(env, MU_FALSE, MU_NAME(MU_FALSE));
+    LTSminConstant(env, MU_TRUE, MU_NAME(MU_TRUE));
 
-    LTSminKeyword(env, MU_MU, "mu");
-    LTSminKeyword(env, MU_NU, "nu");
-    LTSminKeyword(env, MU_EDGE_EXIST_LEFT,  "<");
-    LTSminKeyword(env, MU_EDGE_EXIST_RIGHT, ">");
-    LTSminKeyword(env, MU_EDGE_ALL_LEFT,  "[");
-    LTSminKeyword(env, MU_EDGE_ALL_RIGHT, "]");
+    LTSminKeyword(env, MU_MU, MU_NAME(MU_MU));
+    LTSminKeyword(env, MU_NU, MU_NAME(MU_NU));
+    LTSminKeyword(env, MU_EDGE_EXIST_LEFT, MU_NAME(MU_EDGE_EXIST_LEFT));
+    LTSminKeyword(env, MU_EDGE_EXIST_RIGHT, MU_NAME(MU_EDGE_EXIST_RIGHT));
+    LTSminKeyword(env, MU_EDGE_ALL_LEFT, MU_NAME(MU_EDGE_ALL_LEFT));
+    LTSminKeyword(env, MU_EDGE_ALL_RIGHT, MU_NAME(MU_EDGE_ALL_RIGHT));
 
-    LTSminBinaryOperator(env, MU_AND, "&",2);
-    LTSminBinaryOperator(env, MU_AND, "/\\",2);
-    LTSminBinaryOperator(env, MU_OR, "\\/",3);
-    LTSminBinaryOperator(env, MU_OR, "|",3);
-    LTSminBinaryOperator(env, MU_EQ, "==",1);
-    LTSminPrefixOperator(env, MU_NOT, "!",1);
+    LTSminBinaryOperator(env, MU_MULT, MU_NAME(MU_MULT), 1);
+    LTSminBinaryOperator(env, MU_DIV, MU_NAME(MU_DIV), 1);
+    LTSminBinaryOperator(env, MU_REM, MU_NAME(MU_REM), 1);
+    LTSminBinaryOperator(env, MU_ADD, MU_NAME(MU_ADD), 2);
+    LTSminBinaryOperator(env, MU_SUB, MU_NAME(MU_SUB), 2);
 
-    LTSminPrefixOperator(env, MU_NEXT, "X",4);
-    LTSminPrefixOperator(env, MU_EXIST, "E",4);
-    LTSminPrefixOperator(env, MU_ALL, "A",4);
+    LTSminBinaryOperator(env, MU_LT,  MU_NAME(MU_LT), 3);
+    LTSminBinaryOperator(env, MU_LEQ, MU_NAME(MU_LEQ), 3);
+    LTSminBinaryOperator(env, MU_GT,  MU_NAME(MU_GT), 3);
+    LTSminBinaryOperator(env, MU_GEQ, MU_NAME(MU_GEQ), 3);
+
+    LTSminBinaryOperator(env, MU_EQ,  MU_NAME(MU_EQ), 4);
+    LTSminBinaryOperator(env, MU_NEQ, MU_NAME(MU_NEQ), 4);
+    LTSminPrefixOperator(env, MU_NOT, MU_NAME(MU_NOT), 5);
+
+    LTSminBinaryOperator(env, MU_AND, MU_NAME(MU_AND), 6);
+    LTSminBinaryOperator(env, MU_OR, MU_NAME(MU_OR), 7);
+
+    LTSminPrefixOperator(env, MU_NEXT, MU_NAME(MU_NEXT), 8);
+    LTSminPrefixOperator(env, MU_EXIST, MU_NAME(MU_EXIST), 8);
+    LTSminPrefixOperator(env, MU_ALL, MU_NAME(MU_ALL), 8);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
@@ -1559,7 +1567,7 @@ MU ctl2mu_token(CTL token) { // precondition: token is not a path operator (A,E)
     }
 }
 
-ltsmin_expr_t ctlmu(ltsmin_expr_t in, int free)
+ltsmin_expr_t ctlmu(ltsmin_expr_t in, ltsmin_parse_env_t env, int free)
 {   // free is the next free variable to use in mu/nu expressions
     //    return ctl_star_to_mu(in);
 
@@ -1592,8 +1600,8 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, int free)
             switch (in->token) {
                 case CTL_OR: case CTL_AND: case CTL_EQUIV: case CTL_IMPLY: { // traverse children
                     res->token = ctl2mu_token(in->token);
-                    res->arg1 = ctlmu(in->arg1,free);
-                    res->arg2 = ctlmu(in->arg2,free);
+                    res->arg1 = ctlmu(in->arg1, env, free);
+                    res->arg2 = ctlmu(in->arg2, env, free);
                     LTSminExprRehash(res);
                     return res;
                 }
@@ -1607,45 +1615,45 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, int free)
             switch (in->token) {
                 case CTL_NOT: { // traverse child
                     res->token = ctl2mu_token(in->token);
-                    res->arg1 = ctlmu(in->arg1, free);
+                    res->arg1 = ctlmu(in->arg1, env, free);
                     LTSminExprRehash(res);
                     return res;
                 }
                 case CTL_EXIST: case CTL_ALL: {
                     switch (in->arg1->token) {
                     case CTL_UNTIL: { // translate A/E p U q  into  MU Z. q \/ (p /\ A/E X Z)
-                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
-                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, 0, Z, 0); // TODO: do something smart with index?
+                        ltsmin_expr_t Z = LTSminExpr(MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
                         res->arg1 = X;
                         res->token = ctl2mu_token(in->token); // A or E
                         LTSminExprRehash(res);
-                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, free + 1);
-                        ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, 0, P, res); // TODO: do something smart with index?
-                        ltsmin_expr_t Q = ctlmu(in->arg1->arg2, free + 1);
-                        ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, 0, Q, A); // TODO: do something smart with index?
-                        ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_MU, MU_MU, free, O, 0);
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
+                        ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), P, res);
+                        ltsmin_expr_t Q = ctlmu(in->arg1->arg2, env, free + 1);
+                        ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, LTSminBinaryIdx(env, MU_NAME(MU_OR)), Q, A);
+                        ltsmin_expr_t result = LTSminExpr(MU_FIX, MU_MU, free, O, 0);
                         return result;
                     }
                     case CTL_FUTURE: { // translate A/E F p into MU Z. p \/ A/E X Z
-                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
-                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, 0, Z, 0); // TODO: do something smart with index?
+                        ltsmin_expr_t Z = LTSminExpr(MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
                         res->arg1 = X;
                         res->token = ctl2mu_token(in->token);
                         LTSminExprRehash(res);
-                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, free + 1);
-                        ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, 0, P, res); // TODO: do something smart with index?
-                        ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_MU, MU_MU, free, O, 0);
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
+                        ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, LTSminBinaryIdx(env, MU_NAME(MU_OR)), P, res);
+                        ltsmin_expr_t result = LTSminExpr(MU_FIX, MU_MU, free, O, 0);
                         return result;
                     }
                     case CTL_GLOBALLY: { // translate A/E G p into NU Z. p /\ A/E X Z
-                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
-                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, 0, Z, 0); // TODO: do something smart with index?
+                        ltsmin_expr_t Z = LTSminExpr(MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
                         res->arg1 = X;
                         res->token = ctl2mu_token(in->token);
                         LTSminExprRehash(res);
-                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, free + 1);
-                        ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, 0, P, res); // TODO: do something smart with index?
-                        ltsmin_expr_t result = LTSminExpr((ltsmin_expr_case)MU_NU, MU_NU, free, A, 0);
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
+                        ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), P, res);
+                        ltsmin_expr_t result = LTSminExpr(NU_FIX, MU_NU, free, A, 0);
                         return result;
                     }
                     case CTL_NEXT: { // translate A/E X to A/E X
@@ -1653,7 +1661,7 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, int free)
                         memcpy(resX, in->arg1, sizeof(struct ltsmin_expr_s));
                         res->token = ctl2mu_token(in->token);
                         resX->token = MU_NEXT;
-                        resX->arg1 = ctlmu(in->arg1->arg1, free);
+                        resX->arg1 = ctlmu(in->arg1->arg1, env, free);
                         res->arg1 = resX;
                         LTSminExprRehash(res->arg1);
                         LTSminExprRehash(res);
@@ -1674,12 +1682,9 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, int free)
     }
 }
 
-ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in)
-{ ltsmin_expr_t mu = ctlmu(in,0);
-  char buf[8192];
-  ltsmin_expr_print_mu(mu,buf);
-  Warning(info,"Mu-calculus: %s",buf);
-  return mu;
+ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in, ltsmin_parse_env_t env)
+{
+    return ctlmu(in, env, 0);
 }
 
 ltsmin_expr_t ltl_to_mu(ltsmin_expr_t in)
