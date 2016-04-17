@@ -17,16 +17,16 @@ struct poptOption cache_options[]={
 
 static const int EL_OFFSET = 1;
 
-typedef struct state_info {
+typedef struct state_data {
     int                 first;
     int                 edges;
-} state_info_t;
+} state_data_t;
 
 static void
 init_state_info (void *arg, void *old_array, int old_size, void *new_array,
                  int new_size)
 {
-    state_info_t       *array = (state_info_t *) new_array;
+    state_data_t       *array = (state_data_t *) new_array;
     while (old_size < new_size) {
         array[old_size].first = -1;
         old_size++;
@@ -53,7 +53,7 @@ typedef struct group_cache {
 
     size_t              total_edges;
     array_manager_t     begin_man;
-    state_info_t       *begin;
+    state_data_t       *begin;
     array_manager_t     dest_man;
     int                *dest;
 } group_cache_t;
@@ -70,7 +70,7 @@ edge_info_sz (group_cache_t *cache)
 
 typedef struct cache_cb_s {
     group_cache_t      *cache;
-    state_info_t       *src;
+    state_data_t       *src;
 } cache_cb_t;
 
 static void
@@ -78,7 +78,7 @@ add_cache_entry (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     cache_cb_t         *cbctx = (cache_cb_t *)context;
     group_cache_t      *ctx = cbctx->cache;
-    state_info_t       *src = cbctx->src;
+    state_data_t       *src = cbctx->src;
     int                 dst_index = SIputC (ctx->idx, (char *)dst, ctx->size);
     
     int                 offset = src->first + src->edges * edge_info_sz(ctx);
@@ -103,7 +103,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
     int                 src_idx = SIputC (cache->idx, (char *)src, cache->size);
 
     ensure_access (cache->begin_man, src_idx);
-    state_info_t       *state = &cache->begin[src_idx];
+    state_data_t       *state = &cache->begin[src_idx];
     if (state->first == -1) {
         int                 trans;
         cache_cb_t          cbctx = { cache, state };
@@ -151,7 +151,7 @@ GBaddCache (model_t model)
         cache[i].begin_man = create_manager (256);
         cache[i].begin = NULL;
         add_array (cache[i].begin_man, (void*)&(cache[i].begin),
-                   sizeof(state_info_t), init_state_info, NULL);
+                   sizeof(state_data_t), init_state_info, NULL);
         cache[i].dest_man = create_manager (256);
         cache[i].Nedge_labels = lts_type_get_edge_label_count (GBgetLTStype(model));
         cache[i].dest = NULL;

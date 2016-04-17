@@ -1,5 +1,10 @@
 #include <hre/config.h>
 
+/**
+ * TODO: Remove GBgetVarPerm and GBgetColPerm from PINS
+ *       Can we totally remove them? The language module can anyway reorder itself
+ */
+
 #include <ctype.h>
 #include <float.h>
 #include <limits.h>
@@ -28,6 +33,8 @@
 #include <dm/dm_viennacl.h>
 #endif
 
+#define                 USE_GUARDS_OPTION "pins-guard-eval"
+
 static const char      *regroup_spec = NULL;
 static int              cw_max_cols = -1;
 static int              cw_max_rows = -1;
@@ -35,9 +42,10 @@ static const char      *col_ins = NULL;
 static int mh_timeout = -1;
 static char            *row_perm = NULL;
 static char            *col_perm = NULL;
-static int             graph_metrics = 0;
-static int             group_exit = 0;
-static int             group_time = 0;
+static int              graph_metrics = 0;
+static int              group_exit = 0;
+static int              group_time = 0;
+int                     PINS_USE_GUARDS = 0;
 
 struct poptOption group_options[] = {
     { "regroup" , 'r' , POPT_ARG_STRING, &regroup_spec , 0 ,
@@ -65,6 +73,8 @@ struct poptOption group_options[] = {
 #endif
     { "regroup-exit", 0, POPT_ARG_NONE, &group_exit, 0, "exit after regrouping is done", NULL },
     { "regroup-time", 0, POPT_ARG_NONE, &group_time, 0, "print the timing information of each transformation", NULL },
+    { USE_GUARDS_OPTION, 'g', POPT_ARG_VAL|POPT_ARGFLAG_DOC_HIDDEN, &PINS_USE_GUARDS, 1,
+      "use guards in reordering layer" , NULL},
     POPT_TABLEEND
 };
 
@@ -1052,292 +1062,295 @@ str2vec(const int max_size, const char *perm, int *vec)
 model_t
 GBregroup (model_t model)
 {
-    if (
-        regroup_spec != NULL ||
-        col_ins != NULL ||
-        row_perm != NULL || col_perm != NULL ||
-        GBgetVarPerm(model) != NULL || GBgetGroupPerm(model) != NULL) {
+    if (!GBhasGuardsInfo(model)) {
+        if (PINS_USE_GUARDS)
+            Warning (info, "Ignoring option " USE_GUARDS_OPTION " for lack of guards!");
+        PINS_USE_GUARDS = 0;
+    }
 
-        Print1(info, "Initializing regrouping layer");
-
-        rt_timer_t t = RTcreateTimer();
-        RTstartTimer(t);
-
-        // note: context information is available via matrix, doesn't need to
-        // be stored again
-        matrix_t           *r       = RTmalloc (sizeof (matrix_t));
-        matrix_t           *mayw    = RTmalloc (sizeof (matrix_t));
-        matrix_t           *mustw   = RTmalloc (sizeof (matrix_t));
-        matrix_t           *m       = GBgetDMInfo (model);
-
-        matrix_t           *original_may_write = GBgetDMInfoMayWrite (model);
-        matrix_t           *original_must_write = GBgetDMInfoMustWrite (model);
-
-        dm_copy (original_may_write, mayw);
-        dm_copy (original_must_write, mustw);
-
-        if (GBhasGuardsInfo(model)) {
-            const int gid = GBgetMatrixID (model, LTSMIN_MATRIX_ACTIONS_READS);
-            dm_copy (GBgetMatrix(model, gid), r);
-        } else {
-            dm_copy (GBgetDMInfoRead(model), r);
-        }
-
-        rw_info_t inf;
-        memset(&inf, 0, sizeof(rw_info_t));
-
-        if (col_ins != NULL) {
-            Print1(info, "Column insert: %s", col_ins);
-            inf.pairs = parse_pair_spec(&(inf.num_pairs), col_ins, dm_ncols(r));
-            if (inf.num_pairs > 0) {
-                // sort by src; makes it easer to split and merge matrices later
-                inf.sorted_pairs = (pair_t*) RTmalloc(sizeof(pair_t[inf.num_pairs]));
-                memcpy(inf.sorted_pairs, inf.pairs, sizeof(pair_t[inf.num_pairs]));
-                qsort(inf.sorted_pairs, inf.num_pairs, sizeof(pair_t), compare_pair);
-            } else Abort("option --col-ins requires at least one pair");
-        }
-        inf.old_r = r;
-        inf.old_mayw = mayw;
-        inf.old_mustw = mustw;
-
-        split_matrices(&inf);
-
-        if (GBgetGroupPerm(model) != NULL) {
-            Warning(info, "Got group permutation from language front-end; permuting rows");
-            apply_permutation(&inf, GBgetGroupPerm(model), NULL);
-        }
-
-        if (GBgetVarPerm(model) != NULL) {
-            Warning(info, "Got state vector permutation from language front-end; permuting columns");
-            apply_permutation(&inf, NULL, GBgetVarPerm(model));
-        }
-
-        if (row_perm != NULL) {
-            Warning(info, "Permuting rows according to given vector");
-            int perm[dm_nrows(inf.r)];
-            str2vec(dm_nrows(inf.r), row_perm, perm);
-            apply_permutation(&inf, perm, NULL);
-        }
-
-        if (col_perm != NULL) {
-            Warning(info, "Permuting columns according to given vector");
-            int perm[dm_ncols(inf.r)];
-            str2vec(dm_ncols(inf.r), col_perm, perm);
-            apply_permutation(&inf, NULL, perm);
-        }
-
-        if (regroup_spec != NULL) {
-            Print1 (info, "Regroup specification: %s", regroup_spec);
-            if (GBhasGuardsInfo(model)) {
-                apply_regroup_spec (&inf, regroup_spec, GBgetGuardsInfo(model), ",");
-            } else {
-                apply_regroup_spec (&inf, regroup_spec, NULL, ",");
-            }
-        }
-
-        // post processing regroup specification
-        if (inf.combined != NULL) {
-            dm_free(inf.combined);
-            RTfree(inf.combined);
-        }
-
-        // undo column grouping
-        dm_ungroup_cols(inf.r);
-        dm_ungroup_cols(inf.mayw);
-        dm_ungroup_cols(inf.mustw);
-
-        merge_matrices(&inf);
-
-        if (col_ins != NULL) {
-            RTfree(inf.pairs);
-            RTfree(inf.sorted_pairs);
-        }
-
-        r = inf.old_r;
-        mayw = inf.old_mayw;
-        mustw = inf.old_mustw;
-        // create new model
-        model_t             group = GBcreateBase ();
-        GBcopyChunkMaps (group, model);
-
-        struct group_context *ctx = RTmalloc (sizeof *ctx);
-
-        GBsetContext (group, ctx);
-
-        GBsetNextStateLong (group, group_long);
-        GBsetActionsLong(group, actions_long);
-        GBsetNextStateAll (group, group_all);
-
-        // fill statemapping: assumption this is a bijection
-        {
-            int                 Nparts = dm_ncols (r);
-            if (Nparts != lts_type_get_state_length (GBgetLTStype (model)))
-                Fatal (1, error,
-                       "state mapping in file doesn't match the specification");
-            ctx->len = Nparts;
-            ctx->statemap = RTmalloc (Nparts * sizeof (int));
-            for (int i = 0; i < Nparts; i++) {
-                int                 s = r->col_perm.data[i].becomes;
-                ctx->statemap[i] = s;
-            }
-        }
-
-        // fill transition mapping: assumption: this is a surjection
-        {
-            int                 oldNgroups = dm_nrows (m);
-            int                 newNgroups = dm_nrows (r);
-            Print1  (info, "Regrouping: %d->%d groups", oldNgroups,
-                     newNgroups);
-            ctx->transbegin = RTmalloc ((1 + newNgroups) * sizeof (int));
-            ctx->transmap = RTmalloc (oldNgroups * sizeof (int));
-            // maps old group to new group
-            ctx->groupmap = RTmalloc (oldNgroups * sizeof (int));
-
-            // stores which states slots have to be copied
-            ctx->group_cpy = RTmalloc (oldNgroups * sizeof(int*));
-
-            for (int i = 0; i < oldNgroups; i++)
-                ctx->group_cpy[i] = RTmalloc (dm_ncols(mayw) * sizeof(int));
-
-            int                 p = 0;
-            for (int i = 0; i < newNgroups; i++) {
-                int                 first = r->row_perm.data[i].becomes;
-                int                 all_in_group = first;
-                ctx->transbegin[i] = p;
-                int                 n = 0;
-                do {
-
-                    // for each old transition group set for each slot whether the value
-                    // needs to be copied. The value needs to be copied if the new dependency
-                    // is a may-write (W) and the old dependency is a copy (-).
-                    for (int j = 0; j < dm_ncols(mayw); j++) {
-                        if (    dm_is_set(mayw, i, j) &&
-                                !dm_is_set(mustw, i, j) &&
-                                !dm_is_set(original_may_write, all_in_group, ctx->statemap[j])) {
-                            ctx->group_cpy[all_in_group][j] = 1;
-                        } else {
-                            ctx->group_cpy[all_in_group][j] = 0;
-                        }
-                    }
-
-                    ctx->groupmap[all_in_group] = i;
-                    ctx->transmap[p + n] = all_in_group;
-                    n++;
-                    all_in_group = r->row_perm.data[all_in_group].group;
-                } while (all_in_group != first);
-                p = p + n;
-            }
-            ctx->transbegin[newNgroups] = p;
-
-        }
-
-        lts_type_t ltstype=GBgetLTStype (model);
-        if (log_active(debug)){
-            lts_type_printf(debug,ltstype);
-        }
-        Warning(debug,"permuting ltstype");
-        ltstype=lts_type_permute(ltstype,ctx->statemap);
-        if (log_active(debug)){
-            lts_type_printf(debug,ltstype);
-        }
-        GBsetLTStype (group, ltstype);
-
-        // set new dependency matrices
-        GBsetDMInfoMayWrite (group, mayw);
-        GBsetDMInfoMustWrite(group, mustw);
-
-        // here we either transform the read matrix or the actions read matrix
-        if (GBhasGuardsInfo(model)) { // we have transformed the actions read matrix
-
-            // set the new actions read matrix
-            GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, r, PINS_MAY_SET,
-                        PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
-
-            // transform the read matrix and set it
-            matrix_t *read = RTmalloc (sizeof (matrix_t));
-            dm_create(read, dm_nrows (r), dm_ncols (r));
-            combine_rows(read, GBgetDMInfoRead (model), dm_nrows (r), ctx->transbegin,
-                             ctx->transmap);
-            dm_copy_col_info(r, read);
-            GBsetDMInfoRead(group, read);
-        } else { // we have transformed the read matrix
-
-            // transform the actions read matrix and set it
-            matrix_t *read = RTmalloc (sizeof (matrix_t));
-            dm_create(read, dm_nrows (r), dm_ncols (r));
-            combine_rows(read, GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), dm_nrows (r), ctx->transbegin,
-                             ctx->transmap);
-            dm_copy_col_info(r, read);
-            GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, read, PINS_MAY_SET,
-                        PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
-            // set the new read matrix
-            GBsetDMInfoRead(group, r);
-        }
-
-
-        // create a new combined dependency matrix
-        matrix_t *new_dm = RTmalloc (sizeof (matrix_t));
-        dm_copy (GBgetDMInfoRead(group), new_dm);
-        dm_apply_or(new_dm, mayw);
-        GBsetDMInfo (group, new_dm);
-
-        // copy state label matrix and apply the same permutation
-        matrix_t           *s = RTmalloc (sizeof (matrix_t));
-
-        if (GBgetStateLabelInfo(model) != NULL) {
-            dm_copy (GBgetStateLabelInfo (model), s);
-
-            dm_copy_col_info(r, s);
-
-            GBsetStateLabelInfo(group, s);
-        }
-
-        // set the guards per transition group
-        if (GBhasGuardsInfo(model)) {
-            guard_t** guards_info = RTmalloc(sizeof(guard_t*) * dm_nrows(r));
-            for (int i = 0; i < dm_nrows(r); i++) {
-                int oldGroup = r->row_perm.data[i].becomes;
-                guard_t* guards = RTmalloc(sizeof(guard_t) + sizeof(int[GBgetGuard(model, oldGroup)->count]));
-                guards->count = GBgetGuard(model, oldGroup)->count;
-                for (int g = 0; g < guards->count; g++) {
-                    guards->guard[g] = GBgetGuard(model, oldGroup)->guard[g];
-                }
-                guards_info[i] = guards;
-            }
-            GBsetGuardsInfo(group, guards_info);
-        }
-
-        GBsetStateLabelShort (group, group_state_labels_short);
-        GBsetStateLabelLong (group, group_state_labels_long);
-        GBsetStateLabelsAll (group, group_state_labels_all);
-        GBsetGroupsOfEdge (group, group_groups_of_edge);
-        GBsetPrettyPrint (group, group_chunk_pretty_print);
-
-        GBinitModelDefaults (&group, model);
-
-        // permute initial state
-        {
-            int                 len = ctx->len;
-            int                 s0[len], news0[len];
-            GBgetInitialState (model, s0);
-            for (int i = 0; i < len; i++)
-                news0[i] = s0[ctx->statemap[i]];
-            GBsetInitialState (group, news0);
-        }
-
-        RTstopTimer(t);
-        RTprintTimer(infoShort, t, "Regrouping took");
-        RTdeleteTimer(t);
-
-        if (group_exit) {
-            GBExit(model);
-            HREabort(LTSMIN_EXIT_SUCCESS);
-        }
-
-        // who is responsible for freeing matrix_t dm_info in group?
-        // probably needed until program termination
-        return group;
-    } else {
+    if (regroup_spec == NULL && col_ins == NULL &&
+             row_perm == NULL && col_perm == NULL &&
+             GBgetVarPerm(model) == NULL && GBgetGroupPerm(model) == NULL) {
         return model;
     }
+
+    Print1(info, "Initializing regrouping layer");
+
+    rt_timer_t t = RTcreateTimer();
+    RTstartTimer(t);
+
+    // note: context information is available via matrix, doesn't need to
+    // be stored again
+    matrix_t           *r       = RTmalloc (sizeof (matrix_t));
+    matrix_t           *mayw    = RTmalloc (sizeof (matrix_t));
+    matrix_t           *mustw   = RTmalloc (sizeof (matrix_t));
+    matrix_t           *m       = GBgetDMInfo (model);
+
+    matrix_t           *original_may_write = GBgetDMInfoMayWrite (model);
+    matrix_t           *original_must_write = GBgetDMInfoMustWrite (model);
+
+    dm_copy (original_may_write, mayw);
+    dm_copy (original_must_write, mustw);
+
+    if (PINS_USE_GUARDS) {
+        const int gid = GBgetMatrixID (model, LTSMIN_MATRIX_ACTIONS_READS);
+        dm_copy (GBgetMatrix(model, gid), r);
+    } else {
+        dm_copy (GBgetDMInfoRead(model), r);
+    }
+
+    rw_info_t inf;
+    memset(&inf, 0, sizeof(rw_info_t));
+
+    if (col_ins != NULL) {
+        Print1(info, "Column insert: %s", col_ins);
+        inf.pairs = parse_pair_spec(&(inf.num_pairs), col_ins, dm_ncols(r));
+        if (inf.num_pairs > 0) {
+            // sort by src; makes it easer to split and merge matrices later
+            inf.sorted_pairs = (pair_t*) RTmalloc(sizeof(pair_t[inf.num_pairs]));
+            memcpy(inf.sorted_pairs, inf.pairs, sizeof(pair_t[inf.num_pairs]));
+            qsort(inf.sorted_pairs, inf.num_pairs, sizeof(pair_t), compare_pair);
+        } else Abort("option --col-ins requires at least one pair");
+    }
+    inf.old_r = r;
+    inf.old_mayw = mayw;
+    inf.old_mustw = mustw;
+
+    split_matrices(&inf);
+
+    if (GBgetGroupPerm(model) != NULL) {
+        Warning(info, "Got group permutation from language front-end; permuting rows");
+        apply_permutation(&inf, GBgetGroupPerm(model), NULL);
+    }
+
+    if (GBgetVarPerm(model) != NULL) {
+        Warning(info, "Got state vector permutation from language front-end; permuting columns");
+        apply_permutation(&inf, NULL, GBgetVarPerm(model));
+    }
+
+    if (row_perm != NULL) {
+        Warning(info, "Permuting rows according to given vector");
+        int perm[dm_nrows(inf.r)];
+        str2vec(dm_nrows(inf.r), row_perm, perm);
+        apply_permutation(&inf, perm, NULL);
+    }
+
+    if (col_perm != NULL) {
+        Warning(info, "Permuting columns according to given vector");
+        int perm[dm_ncols(inf.r)];
+        str2vec(dm_ncols(inf.r), col_perm, perm);
+        apply_permutation(&inf, NULL, perm);
+    }
+
+    if (regroup_spec != NULL) {
+        Print1 (info, "Regroup specification: %s", regroup_spec);
+        if (PINS_USE_GUARDS) {
+            apply_regroup_spec (&inf, regroup_spec, GBgetGuardsInfo(model), ",");
+        } else {
+            apply_regroup_spec (&inf, regroup_spec, NULL, ",");
+        }
+    }
+
+    // post processing regroup specification
+    if (inf.combined != NULL) {
+        dm_free(inf.combined);
+        RTfree(inf.combined);
+    }
+
+    // undo column grouping
+    dm_ungroup_cols(inf.r);
+    dm_ungroup_cols(inf.mayw);
+    dm_ungroup_cols(inf.mustw);
+
+    merge_matrices(&inf);
+
+    if (col_ins != NULL) {
+        RTfree(inf.pairs);
+        RTfree(inf.sorted_pairs);
+    }
+
+    r = inf.old_r;
+    mayw = inf.old_mayw;
+    mustw = inf.old_mustw;
+    // create new model
+    model_t             group = GBcreateBase ();
+    GBcopyChunkMaps (group, model);
+
+    struct group_context *ctx = RTmalloc (sizeof *ctx);
+
+    GBsetContext (group, ctx);
+
+    GBsetNextStateLong (group, group_long);
+    GBsetActionsLong(group, actions_long);
+    GBsetNextStateAll (group, group_all);
+
+    // fill statemapping: assumption this is a bijection
+    {
+        int                 Nparts = dm_ncols (r);
+        if (Nparts != lts_type_get_state_length (GBgetLTStype (model)))
+            Fatal (1, error,
+                   "state mapping in file doesn't match the specification");
+        ctx->len = Nparts;
+        ctx->statemap = RTmalloc (Nparts * sizeof (int));
+        for (int i = 0; i < Nparts; i++) {
+            int                 s = r->col_perm.data[i].becomes;
+            ctx->statemap[i] = s;
+        }
+    }
+
+    // fill transition mapping: assumption: this is a surjection
+    {
+        int                 oldNgroups = dm_nrows (m);
+        int                 newNgroups = dm_nrows (r);
+        Print1  (info, "Regrouping: %d->%d groups", oldNgroups,
+                 newNgroups);
+        ctx->transbegin = RTmalloc ((1 + newNgroups) * sizeof (int));
+        ctx->transmap = RTmalloc (oldNgroups * sizeof (int));
+        // maps old group to new group
+        ctx->groupmap = RTmalloc (oldNgroups * sizeof (int));
+
+        // stores which states slots have to be copied
+        ctx->group_cpy = RTmalloc (oldNgroups * sizeof(int*));
+
+        for (int i = 0; i < oldNgroups; i++)
+            ctx->group_cpy[i] = RTmalloc (dm_ncols(mayw) * sizeof(int));
+
+        int                 p = 0;
+        for (int i = 0; i < newNgroups; i++) {
+            int                 first = r->row_perm.data[i].becomes;
+            int                 all_in_group = first;
+            ctx->transbegin[i] = p;
+            int                 n = 0;
+            do {
+
+                // for each old transition group set for each slot whether the value
+                // needs to be copied. The value needs to be copied if the new dependency
+                // is a may-write (W) and the old dependency is a copy (-).
+                for (int j = 0; j < dm_ncols(mayw); j++) {
+                    if (    dm_is_set(mayw, i, j) &&
+                            !dm_is_set(mustw, i, j) &&
+                            !dm_is_set(original_may_write, all_in_group, ctx->statemap[j])) {
+                        ctx->group_cpy[all_in_group][j] = 1;
+                    } else {
+                        ctx->group_cpy[all_in_group][j] = 0;
+                    }
+                }
+
+                ctx->groupmap[all_in_group] = i;
+                ctx->transmap[p + n] = all_in_group;
+                n++;
+                all_in_group = r->row_perm.data[all_in_group].group;
+            } while (all_in_group != first);
+            p = p + n;
+        }
+        ctx->transbegin[newNgroups] = p;
+
+    }
+
+    lts_type_t ltstype=GBgetLTStype (model);
+    if (log_active(debug)){
+        lts_type_printf(debug,ltstype);
+    }
+    Warning(debug,"permuting ltstype");
+    ltstype=lts_type_permute(ltstype,ctx->statemap);
+    if (log_active(debug)){
+        lts_type_printf(debug,ltstype);
+    }
+    GBsetLTStype (group, ltstype);
+
+    // set new dependency matrices
+    GBsetDMInfoMayWrite (group, mayw);
+    GBsetDMInfoMustWrite(group, mustw);
+
+    // here we either transform the read matrix or the actions read matrix
+    if (PINS_USE_GUARDS) { // we have transformed the actions read matrix
+
+        // set the new actions read matrix
+        GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, r, PINS_MAY_SET,
+                    PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+
+        // transform the read matrix and set it
+        matrix_t *read = RTmalloc (sizeof (matrix_t));
+        dm_create(read, dm_nrows (r), dm_ncols (r));
+        combine_rows(read, GBgetDMInfoRead (model), dm_nrows (r), ctx->transbegin,
+                         ctx->transmap);
+        dm_copy_col_info(r, read);
+        GBsetDMInfoRead(group, read);
+    } else { // we have transformed the read matrix
+
+        // transform the actions read matrix and set it
+        matrix_t *read = RTmalloc (sizeof (matrix_t));
+        dm_create(read, dm_nrows (r), dm_ncols (r));
+        combine_rows(read, GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), dm_nrows (r), ctx->transbegin,
+                         ctx->transmap);
+        dm_copy_col_info(r, read);
+        GBsetMatrix(group, LTSMIN_MATRIX_ACTIONS_READS, read, PINS_MAY_SET,
+                    PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
+        // set the new read matrix
+        GBsetDMInfoRead(group, r);
+    }
+
+
+    // create a new combined dependency matrix
+    matrix_t *new_dm = RTmalloc (sizeof (matrix_t));
+    dm_copy (GBgetDMInfoRead(group), new_dm);
+    dm_apply_or(new_dm, mayw);
+    GBsetDMInfo (group, new_dm);
+
+    // copy state label matrix and apply the same permutation
+    matrix_t           *s = RTmalloc (sizeof (matrix_t));
+
+    if (GBgetStateLabelInfo(model) != NULL) {
+        dm_copy (GBgetStateLabelInfo (model), s);
+
+        dm_copy_col_info(r, s);
+
+        GBsetStateLabelInfo(group, s);
+    }
+
+    // set the guards per transition group
+    if (PINS_USE_GUARDS) {
+        guard_t** guards_info = RTmalloc(sizeof(guard_t*) * dm_nrows(r));
+        for (int i = 0; i < dm_nrows(r); i++) {
+            int oldGroup = r->row_perm.data[i].becomes;
+            guard_t* guards = RTmalloc(sizeof(guard_t) + sizeof(int[GBgetGuard(model, oldGroup)->count]));
+            guards->count = GBgetGuard(model, oldGroup)->count;
+            for (int g = 0; g < guards->count; g++) {
+                guards->guard[g] = GBgetGuard(model, oldGroup)->guard[g];
+            }
+            guards_info[i] = guards;
+        }
+        GBsetGuardsInfo(group, guards_info);
+    }
+
+    GBsetStateLabelShort (group, group_state_labels_short);
+    GBsetStateLabelLong (group, group_state_labels_long);
+    GBsetStateLabelsAll (group, group_state_labels_all);
+    GBsetGroupsOfEdge (group, group_groups_of_edge);
+    GBsetPrettyPrint (group, group_chunk_pretty_print);
+
+    GBinitModelDefaults (&group, model);
+
+    // permute initial state
+    {
+        int                 len = ctx->len;
+        int                 s0[len], news0[len];
+        GBgetInitialState (model, s0);
+        for (int i = 0; i < len; i++)
+            news0[i] = s0[ctx->statemap[i]];
+        GBsetInitialState (group, news0);
+    }
+
+    RTstopTimer(t);
+    RTprintTimer(infoShort, t, "Regrouping took");
+    RTdeleteTimer(t);
+
+    if (group_exit) {
+        GBExit(model);
+        HREabort(LTSMIN_EXIT_SUCCESS);
+    }
+
+    // who is responsible for freeing matrix_t dm_info in group?
+    // probably needed until program termination
+    return group;
 }
