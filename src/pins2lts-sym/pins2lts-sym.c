@@ -4186,7 +4186,7 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
     if (x) {
         double e_count;
         vset_count(x, NULL, &e_count);
-	char* formula;
+	char* formula = NULL;
 	// recall: mu-formulas, ctl-star formulas, ctl-formulas, ltl-formulas
 	if (i < num_mu)
 	  formula = mu_formulas[i];
