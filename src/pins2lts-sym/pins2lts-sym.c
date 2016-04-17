@@ -844,11 +844,11 @@ inv_svar_destroy(void* context)
 }
 
 struct rel_expr_info {
-    int* vec;
-    int len;
-    int* deps;
-    ltsmin_expr_t e;
-    ltsmin_parse_env_t env;
+    int* vec; // a long vector to use for expanding short vectors
+    int len; // number of dependencies in this relational expression
+    int* deps; // the dependencies in this relational expression
+    ltsmin_expr_t e; // the relation expression
+    ltsmin_parse_env_t env; // its environment
 };
 
 static void
@@ -3824,24 +3824,13 @@ init_invariant_detection()
     if (inv_par) label_locks = (int*) RTmallocZero(sizeof(int[sLbls]));
 }
 
-static vset_t
-get_svar_eq_int_set (int state_idx, int state_match, vset_t visited)
-{
-  vset_t result=vset_create(domain, -1, NULL);
-  int proj[1] = {state_idx};
-  int match[1] = {state_match};
-  vset_copy_match(result, visited, 1, proj, match);
-
-  return result;
-}
-
 /* Naive textbook mu-calculus algorithm
  * Taken from:
  * Model Checking and the mu-calculus, E. Allen Emerson
  * DIMACS Series in Discrete Mathematics, 1997 - Citeseer
  */
 static vset_t
-mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_t mu_var_man)
+mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t* mu_var, array_manager_t mu_var_man)
 {
     vset_t result = NULL;
     switch(mu_expr->token) {
@@ -3851,41 +3840,30 @@ mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_
         return result;
     case MU_FALSE:
         return vset_create(domain, -1, NULL);
-    case MU_EQ: { // svar == int
-        /* Currently MU_EQ works only in the context of an SVAR/INTEGER pair */
-        if (mu_expr->arg1->token != MU_SVAR)
-            Abort("Expecting == with state variable on the left side!\n");
-        if (mu_expr->arg2->token != MU_NUM)
-            Abort("Expecting == with int on the right side!\n");
-        result = get_svar_eq_int_set(mu_expr->arg1->idx, mu_expr->arg2->idx, visited);
-    } break;
     case MU_OR: { // OR
-        result = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
-        vset_t mc = mu_compute(mu_expr->arg2, visited, mu_var, mu_var_man);
+        result = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
+        vset_t mc = mu_compute(mu_expr->arg2, env, visited, mu_var, mu_var_man);
         vset_union(result, mc);
         vset_destroy(mc);
     } break;
     case MU_AND: { // AND
-        result = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
-        vset_t mc = mu_compute(mu_expr->arg2, visited, mu_var, mu_var_man);
+        result = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
+        vset_t mc = mu_compute(mu_expr->arg2, env, visited, mu_var, mu_var_man);
         vset_intersect(result, mc);
         vset_destroy(mc);
     } break;
     case MU_NOT: { // NEGATION
         result = vset_create(domain, -1, NULL);
         vset_copy(result, visited);
-        vset_t mc = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
+        vset_t mc = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
         vset_minus(result, mc);
         vset_destroy(mc);
     } break;
-    case MU_NEXT: // X
-        Abort("unhandled MU_NEXT");
-        break;
     case MU_EXIST: { // E
         if (mu_expr->arg1->token == MU_NEXT) {
             vset_t temp = vset_create(domain, -1, NULL);
             result = vset_create(domain, -1, NULL);
-            vset_t g = mu_compute(mu_expr->arg1->arg1, visited, mu_var, mu_var_man);
+            vset_t g = mu_compute(mu_expr->arg1->arg1, env, visited, mu_var, mu_var_man);
 
             for(int i=0;i<nGrps;i++){
                 vset_prev(temp,g,group_next[i],visited);
@@ -3898,9 +3876,6 @@ mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_
             Abort("invalid operator following MU_EXIST, expecting MU_NEXT");
         }
     } break;
-    case MU_NUM:
-        Abort("unhandled MU_NUM");
-        break;
     case MU_SVAR: {
         if (mu_expr->idx < N) { // state variable
             Abort("Unhandled MU_SVAR");
@@ -3909,9 +3884,6 @@ mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_
             vset_join(result, visited, label_true[mu_expr->idx - N]);
         }
     } break;
-    case MU_EVAR:
-        Abort("unhandled MU_EVAR");
-        break;
     case MU_VAR:
         ensure_access(mu_var_man, mu_expr->idx);
         result = vset_create(domain, -1, NULL);
@@ -3927,7 +3899,7 @@ mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_
             // compute ! phi
             vset_t notphi = vset_create(domain, -1, NULL);
             vset_copy(notphi, visited);
-            vset_t phi = mu_compute(mu_expr->arg1->arg1, visited, mu_var, mu_var_man);
+            vset_t phi = mu_compute(mu_expr->arg1->arg1, env, visited, mu_var, mu_var_man);
             vset_minus(notphi, phi);
             vset_destroy(phi);
 
@@ -3961,7 +3933,7 @@ mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_
             do {
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
-                tmp = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
+                tmp = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
             vset_destroy(tmp);
             // new var reference
@@ -3979,13 +3951,57 @@ mu_compute(ltsmin_expr_t mu_expr, vset_t visited, vset_t* mu_var, array_manager_
             do {
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
-                tmp = mu_compute(mu_expr->arg1, visited, mu_var, mu_var_man);
+                tmp = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
             vset_destroy(tmp);
             // new var reference
             mu_var[mu_expr->idx] = old;
         }
         break;
+    case MU_EQ:
+    case MU_NEQ:
+    case MU_LT:
+    case MU_LEQ:
+    case MU_GT:
+    case MU_GEQ: {
+        result = vset_create(domain, -1, NULL);
+
+        set_pins_semantics(model, mu_expr, env, &mu_expr->annotation->state_deps);
+        struct rel_expr_info ctx;
+
+        int vec[N];
+        GBsetInitialState(model, vec);
+        ctx.vec = vec;
+        ctx.len = bitvector_n_high(&mu_expr->annotation->state_deps);
+        int deps[ctx.len];
+        bitvector_high_bits(&mu_expr->annotation->state_deps, deps);
+        ctx.deps = deps;
+
+        ctx.e = mu_expr;
+        ctx.env = env;
+
+        vset_t tmp = vset_create(domain, ctx.len, deps);
+        vset_project(tmp, visited);
+
+        // count when verbose
+        if (log_active(infoLong)) {
+            double elem_count;
+            vset_count(tmp, NULL, &elem_count);
+            if (elem_count >= 10000.0 * SPEC_REL_PERF) {
+                const char* p = LTSminPrintExpr(mu_expr, env);
+                Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
+            }
+        }
+
+        vset_t true_states = vset_create(domain, ctx.len, deps);
+
+        vset_update(true_states, tmp, rel_expr_cb, &ctx);
+
+        vset_join(result, true_states, visited);
+        vset_destroy(tmp);
+        vset_destroy(true_states);
+        break;
+    }
     default:
         Abort("encountered unhandled mu operator");
     }
@@ -4050,7 +4066,7 @@ init_mu_calculus()
             mu_var_mans[i] = create_manager(65535);
             mu_vars[i] = NULL;
             ADD_ARRAY(mu_var_mans[i], mu_vars[i], vset_t);
-            vset_t x = mu_compute(mu_exprs[i], tmp, mu_vars[i], mu_var_mans[i]);
+            vset_t x = mu_compute(mu_exprs[i], mu_parse_env[i], tmp, mu_vars[i], mu_var_mans[i]);
             vset_destroy(x);
         }
 
