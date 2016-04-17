@@ -635,7 +635,7 @@ pred_tree_walk(ltsmin_expr_t e, ltsmin_parse_env_t env, lts_type_t lts_type)
                     return e;
                 }
                 case PRED_VAR:
-                    LTSminLogExpr (error, "Symbolic variables are not supported semantically: ", e, env);
+                    LTSminLogExpr (error, "Symbolic variables are not supported in predicates: ", e, env);
                     HREabort (LTSMIN_EXIT_FAILURE);
                 default: {
                     LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
