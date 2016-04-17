@@ -1,6 +1,8 @@
 #ifndef PINS2PINS_GROUP
 #define PINS2PINS_GROUP
 
+extern int      PINS_USE_GUARDS;
+
 /**
 \brief Reorder and regroup transitions and state vectors
 */

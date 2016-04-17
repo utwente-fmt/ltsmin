@@ -6,12 +6,13 @@
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-guards.h>
 
-#define                 USE_GUARDS_OPTION "pins-guards"
+#define          USE_GUARDS_EVAL_OPTION "pins-guard-eval"
 
-int              PINS_USE_GUARDS = 0;
+int              PINS_GUARD_EVAL = 0;
 
 struct poptOption guards_options[]={
-    { USE_GUARDS_OPTION , 'g' , POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &PINS_USE_GUARDS , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
+    { USE_GUARDS_EVAL_OPTION, 'g', POPT_ARG_VAL|POPT_ARGFLAG_DOC_HIDDEN, &PINS_GUARD_EVAL, 1,
+      "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
     POPT_TABLEEND
 };
 
@@ -48,32 +49,24 @@ model_t
 GBaddGuards (model_t model)
 {
     HREassert (model != NULL, "No model");
-    /* if --pins-guards is set, then check implementation */
-    if (!PINS_USE_GUARDS) {
-        if (!GBhasGuardsInfo (model)) return model;
-        else {
-            model_t         unguarded = GBcreateBase ();
-            GBinitModelDefaults (&unguarded, model);
-            GBsetGuardsInfo (unguarded, NULL);
-            return unguarded;
-        }
-    } else {
-        /* check if the implementation actually supports and exports guards */
-        sl_group_t *guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-        if (guards == NULL || guards->count == 0) {
-            Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-        }
 
-        model_t             guarded = GBcreateBase ();
+    if (!PINS_GUARD_EVAL) return model;
 
-        guard_ctx_t        *ctx = RTmalloc (sizeof(guard_ctx_t));
-        ctx->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
-
-        GBsetContext (guarded, ctx);
-        GBinitModelDefaults (&guarded, model);
-        GBsetNextStateAll (guarded, guards_all);
-
-        return guarded;        
+    /* check if the implementation actually supports and exports guards */
+    sl_group_t *guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
+    if (guards == NULL || guards->count == 0) {
+        Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_EVAL_OPTION").");
     }
+
+    model_t             guarded = GBcreateBase ();
+
+    guard_ctx_t        *ctx = RTmalloc (sizeof(guard_ctx_t));
+    ctx->guard_status = RTmalloc(sizeof(int[pins_get_state_label_count(model)]));
+
+    GBsetContext (guarded, ctx);
+    GBinitModelDefaults (&guarded, model);
+    GBsetNextStateAll (guarded, guards_all);
+
+    return guarded;
 }
 
