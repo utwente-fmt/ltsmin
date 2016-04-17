@@ -174,11 +174,13 @@ type_check_equal_format(lts_type_t lts_type, int left, int right, ltsmin_expr_t 
 static inline void
 type_check_equal_type(lts_type_t lts_type, int left, int right, ltsmin_expr_t e, ltsmin_parse_env_t env)
 {
-    const char* ex = LTSminPrintExpr(e, env);
-    Abort("LHS (%s) and RHS (%s) are not of the same type: \"%s\"",
-            lts_type_get_type(lts_type, left),
-            lts_type_get_type(lts_type, right),
-            ex);
+    if (left != right) {
+        const char* ex = LTSminPrintExpr(e, env);
+        Abort("LHS (%s) and RHS (%s) are not of the same type: \"%s\"",
+                lts_type_get_type(lts_type, left),
+                lts_type_get_type(lts_type, right),
+                ex);
+    }
 }
 
 static lts_annotation_t
