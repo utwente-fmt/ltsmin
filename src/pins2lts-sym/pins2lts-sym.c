@@ -935,8 +935,9 @@ VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, v
                 double elem_count;
                 vset_count(rel->tmp, NULL, &elem_count);
                 if (elem_count >= 10000.0 * SPEC_REL_PERF) {                    
-                    const char* p = LTSminPrintExpr(e, env);
+                    char* p = LTSminPrintExpr(e, env);
                     Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
+                    RTfree(p);
                 }
             }
 
