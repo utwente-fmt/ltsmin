@@ -4058,19 +4058,12 @@ init_mu_calculus()
         mu_var_mans = (array_manager_t*) RTmalloc(sizeof(array_manager_t) * num_total);
         mu_vars = (vset_t**) RTmalloc(sizeof(vset_t*) * num_total);
 
-        vset_t tmp = vset_create(domain, -1, NULL);
-
         for (int i = 0; i < num_total; i++) {
-            // run a small test to check correctness of mu formula
             // setup var manager
             mu_var_mans[i] = create_manager(65535);
             mu_vars[i] = NULL;
             ADD_ARRAY(mu_var_mans[i], mu_vars[i], vset_t);
-            vset_t x = mu_compute(mu_exprs[i], mu_parse_env[i], tmp, mu_vars[i], mu_var_mans[i]);
-            vset_destroy(x);
         }
-
-        vset_destroy(tmp);
     }
 }
 
