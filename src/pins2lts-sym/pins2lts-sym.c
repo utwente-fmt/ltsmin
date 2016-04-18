@@ -4035,8 +4035,14 @@ init_mu_calculus()
 	total = 0;
         for (int i = 0; i < num_mu; i++) {
             mu_parse_env[i] = LTSminParseEnvCreate();
-            Warning(info, "parsing MU-calculus formula");
+            Warning(info, "parsing mu-calculus formula");
             mu_exprs[i] = mu_parse_file(mu_formulas[i], mu_parse_env[i], ltstype);
+            if (log_active(infoLong)) {
+                const char s[] = "Loaded and optimized mu-calculus formula #%d: ";
+                char buf[snprintf(NULL, 0, s, i + 1) + 1];
+                sprintf(buf, s, i + 1);
+                LTSminLogExpr(infoLong, buf, mu_exprs[i], mu_parse_env[i]);
+            }
         }
 	total += num_mu;
         for (int i = 0; i < num_ctl_star; i++) {
@@ -4045,14 +4051,26 @@ init_mu_calculus()
             ltsmin_expr_t ctl_star = ctl_parse_file(ctl_star_formulas[i], mu_parse_env[total + i], ltstype);
             Warning(info, "converting CTL* %s to mu-calculus", ctl_star_formulas[i]);
             mu_exprs[total + i] = ctl_star_to_mu(ctl_star);
+            if (log_active(infoLong)) {
+                const char s[] = "Converted CTL* to mu-calculus formula #%d: ";
+                char buf[snprintf(NULL, 0, s, i + 1) + 1];
+                sprintf(buf, s, i + 1);
+                LTSminLogExpr(infoLong, buf, mu_exprs[total + i], mu_parse_env[total + i]);
+            }
         }
 	total += num_ctl_star;
         for (int i = 0; i < num_ctl; i++) {
             mu_parse_env[total + i] = LTSminParseEnvCreate();
             Warning(info, "parsing CTL formula");
-            ltsmin_expr_t ctl = ctl_parse_file(ctl_formulas[i], mu_parse_env[total + i], ltstype);
+            mu_exprs[total + i] = ctl_parse_file(ctl_formulas[i], mu_parse_env[total + i], ltstype);
             Warning(info, "converting CTL %s to mu-calculus", ctl_formulas[i]);
-            mu_exprs[total + i] = ctl_to_mu(ctl, mu_parse_env[total + i]);
+            mu_exprs[total + i] = ctl_to_mu(mu_exprs[total + i], mu_parse_env[total + i], ltstype);
+            if (log_active(infoLong)) {
+                const char s[] = "Converted CTL to mu-calculus formula #%d: ";
+                char buf[snprintf(NULL, 0, s, i + 1) + 1];
+                sprintf(buf, s, i + 1);
+                LTSminLogExpr(infoLong, buf, mu_exprs[total + i], mu_parse_env[total + i]);
+            }
         }
 	total += num_ctl;
         for (int i = 0; i < num_ltl; i++) {
@@ -4061,6 +4079,12 @@ init_mu_calculus()
             ltsmin_expr_t ltl = ctl_parse_file(ltl_formulas[i], mu_parse_env[total + i], ltstype);
             Warning(info, "converting LTL %s to mu-calculus", ltl_formulas[i]);
             mu_exprs[total + i] = ltl_to_mu(ltl);
+            if (log_active(infoLong)) {
+                const char s[] = "Converted LTL to mu-calculus formula #%d: ";
+                char buf[snprintf(NULL, 0, s, i + 1) + 1];
+                sprintf(buf, s, i + 1);
+                LTSminLogExpr(infoLong, buf, mu_exprs[total + i], mu_parse_env[total + i]);
+            }
         }
 	total += num_ltl;
 
