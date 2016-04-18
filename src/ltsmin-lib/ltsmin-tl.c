@@ -757,6 +757,9 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
         if (e->arg1->token == CTL_EXIST) {
             if (e->arg1->arg1->token == CTL_NEXT) { // !EX p is AX !p, !p can be optimized
                 e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                LTSminExprRehash(e->arg1->arg1->arg1);
+                e->arg1->arg1->arg1->parent = e->arg1->arg1;
                 e->arg1->token = CTL_ALL;
                 e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_ALL));
                 LTSminExprRehash(e->arg1);
@@ -826,6 +829,24 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
                 LTSminExprRehash(e->arg1);
                 LTSminExprDestroy(e, 0);
                 return e->arg1;
+            }
+        }
+    } else {
+        if (e->node_type == UNARY_OP) {
+            ltsmin_expr_t c = ltsmin_expr_optimize(e->arg1, env, ctl_optimize);
+            if (c != e->arg1) {
+                e->arg1 = c; c->parent = e;
+                LTSminExprRehash(e);
+                return e;
+            }
+        } else if (e->node_type == BINARY_OP) {
+            ltsmin_expr_t left = ltsmin_expr_optimize(e->arg1, env, ctl_optimize);
+            ltsmin_expr_t right = ltsmin_expr_optimize(e->arg2, env, ctl_optimize);
+            if (left != e->arg1 || right != e->arg2) {
+                e->arg1 = left; left->parent = e;
+                e->arg2 = right; right->parent = e;
+                LTSminExprRehash(e);
+                return e;
             }
         }
     }
