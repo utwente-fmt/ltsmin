@@ -1066,7 +1066,7 @@ inv_cleanup()
             bitvector_set(&state_label_used, i);
         }
     }
-    
+
     if (label_true != NULL) {
         for (int i = 0; i < sLbls; i++) {
             if (!bitvector_is_set(&state_label_used, i)) {
@@ -4289,6 +4289,11 @@ VOID_TASK_1(actual_main, void*, arg)
 
     bitvector_create(&state_label_used, sLbls);
     if (inv_detect != NULL) init_invariant_detection();
+    else if (PINS_USE_GUARDS) {
+        for (int i = 0; i < nGuards; i++) {
+            bitvector_set(&state_label_used, i);
+        }
+    }
 
     /* turn on Lace again (for Sylvan) */
     if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
