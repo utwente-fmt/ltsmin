@@ -753,7 +753,82 @@ create_ctl_env(ltsmin_parse_env_t env)
 ltsmin_expr_t
 ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
 {
-    (void) e; (void) env;
+    if (e->node_type == UNARY_OP && e->token == CTL_NOT) {
+        if (e->arg1->token == CTL_EXIST) {
+            if (e->arg1->arg1->token == CTL_NEXT) { // !EX p is AX !p, !p can be optimized
+                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
+                e->arg1->token = CTL_ALL;
+                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_ALL));
+                LTSminExprRehash(e->arg1);
+                LTSminExprDestroy(e, 0);
+                return e->arg1;
+            } else if (e->arg1->arg1->token == CTL_FUTURE) { // !EF p is AG !p, !p can be optimized
+                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                LTSminExprRehash(e->arg1->arg1->arg1);
+                e->arg1->arg1->arg1->parent = e->arg1->arg1;
+                e->arg1->arg1->token = CTL_GLOBALLY;
+                e->arg1->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_GLOBALLY));
+                LTSminExprRehash(e->arg1->arg1);
+                e->arg1->token = CTL_ALL;
+                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_ALL));
+                LTSminExprRehash(e->arg1);
+                LTSminExprDestroy(e, 0);
+                return e->arg1;
+            } else if (e->arg1->arg1->token == CTL_GLOBALLY) { // !EG p is AF !p, !p can be optimized
+                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                LTSminExprRehash(e->arg1->arg1->arg1);
+                e->arg1->arg1->arg1->parent = e->arg1->arg1;
+                e->arg1->arg1->token = CTL_FUTURE;
+                e->arg1->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_FUTURE));
+                LTSminExprRehash(e->arg1->arg1);
+                e->arg1->token = CTL_ALL;
+                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_ALL));
+                LTSminExprRehash(e->arg1);
+                LTSminExprDestroy(e, 0);
+                return e->arg1;
+            }
+        } else if (e->arg1->token == CTL_ALL) {
+            if (e->arg1->arg1->token == CTL_NEXT) { // !AX p is EX !p, !p can be optimized
+                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                LTSminExprRehash(e->arg1->arg1->arg1);
+                e->arg1->arg1->arg1->parent = e->arg1->arg1;
+                e->arg1->token = CTL_EXIST;
+                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_EXIST));
+                LTSminExprRehash(e->arg1);
+                LTSminExprDestroy(e, 0);
+                return e->arg1;
+            } else if (e->arg1->arg1->token == CTL_FUTURE) { // !AF p is EG !p, !p can be optimized
+                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                LTSminExprRehash(e->arg1->arg1->arg1);
+                e->arg1->arg1->arg1->parent = e->arg1->arg1;
+                e->arg1->arg1->token = CTL_GLOBALLY;
+                e->arg1->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_GLOBALLY));
+                LTSminExprRehash(e->arg1->arg1);
+                e->arg1->token = CTL_EXIST;
+                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_EXIST));
+                LTSminExprRehash(e->arg1);
+                LTSminExprDestroy(e, 0);
+                return e->arg1;
+            } else if (e->arg1->arg1->token == CTL_GLOBALLY) { // !AG p is EF !p, !p can be optimized
+                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                LTSminExprRehash(e->arg1->arg1->arg1);
+                e->arg1->arg1->arg1->parent = e->arg1->arg1;
+                e->arg1->arg1->token = CTL_FUTURE;
+                e->arg1->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_FUTURE));
+                LTSminExprRehash(e->arg1->arg1);
+                e->arg1->token = CTL_EXIST;
+                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_EXIST));
+                LTSminExprRehash(e->arg1);
+                LTSminExprDestroy(e, 0);
+                return e->arg1;
+            }
+        }
+    }
     return e;
 }
 
