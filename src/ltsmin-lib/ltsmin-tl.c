@@ -1010,8 +1010,8 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, ltsmin_parse_env_t env, int free)
      * T(!f) = !T(f)
      * T(f & g) = T(f) & T(g)
      * T(EX f) = <.> T(f)
-     * T(EG f) = nu Q. f & <.> Q
-     * T(E[f U g]) = mu Q. g | (f & <.> Q)
+     * T(EG f) = nu Q. T(f) & <.> Q
+     * T(E[f U g]) = mu Q. T(g) | (T(f) & <.> Q)
      */
 
     const int mu_token = ctl2mu_token(in->token);
@@ -1047,42 +1047,67 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, ltsmin_parse_env_t env, int free)
                 }
                 case CTL_EXIST: case CTL_ALL: {
                     switch (in->arg1->token) {
-                    case CTL_UNTIL: { // translate A/E p U q  into  MU Z. q \/ (p /\ A/E X Z)
-                        const int var = create_mu_var(free, env);
-                        ltsmin_expr_t Z = LTSminExpr(MU_VAR, MU_VAR, var, 0, 0);
+                    case CTL_UNTIL: {
+			// translate E p U q  into  MU Z. q \/ (p /\ E X Z)
+			// translate A p U q  into  MU Z. q \/ (p /\ (A X Z /\ EX true))
+                        create_mu_var(free, env);
+                        ltsmin_expr_t Z = LTSminExpr(MU_VAR, MU_VAR, free, 0, 0);
                         ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
                         res->arg1 = X;
                         res->arg1->parent = res;
                         LTSminExprRehash(res);
+			if (in->token == CTL_ALL) {
+			    ltsmin_expr_t True = LTSminExpr(CONSTANT, MU_TRUE, LTSminConstantIdx(env, MU_NAME(MU_TRUE)), NULL, NULL);
+			    ltsmin_expr_t XTrue = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), True, 0);
+			    ltsmin_expr_t NoDeadlock = LTSminExpr(UNARY_OP, MU_EXIST, LTSminUnaryIdx(env, MU_NAME(MU_EXIST)), XTrue, 0);
+			    res = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), res, NoDeadlock);
+			}
                         ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
                         ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), P, res);
                         ltsmin_expr_t Q = ctlmu(in->arg1->arg2, env, free + 1);
                         ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, LTSminBinaryIdx(env, MU_NAME(MU_OR)), Q, A);
-                        ltsmin_expr_t result = LTSminExpr(MU_FIX, MU_MU, var, O, 0);
+                        ltsmin_expr_t result = LTSminExpr(MU_FIX, MU_MU, free, O, 0);
                         return result;
                     }
-                    case CTL_FUTURE: { // translate A/E F p into MU Z. p \/ A/E X Z
-                        const int var = create_mu_var(free, env);
-                        ltsmin_expr_t Z = LTSminExpr(MU_VAR, MU_VAR, var, 0, 0);
+                    case CTL_FUTURE: {
+			// translate E F p into MU Z. p \/ E X Z
+			// translate A F p into MU Z. p \/ (A X Z /\ E X true)
+                        create_mu_var(free, env);
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
                         ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
                         res->arg1 = X;
                         res->arg1->parent = res;
                         LTSminExprRehash(res);
+			if (in->token == CTL_ALL) {
+			    ltsmin_expr_t True = LTSminExpr(CONSTANT, MU_TRUE, LTSminConstantIdx(env, MU_NAME(MU_TRUE)), NULL, NULL);
+			    ltsmin_expr_t XTrue = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), True, 0);
+			    ltsmin_expr_t NoDeadlock = LTSminExpr(UNARY_OP, MU_EXIST, LTSminUnaryIdx(env, MU_NAME(MU_EXIST)), XTrue, 0);
+			    res = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), res, NoDeadlock);
+			}
                         ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
                         ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, LTSminBinaryIdx(env, MU_NAME(MU_OR)), P, res);
-                        ltsmin_expr_t result = LTSminExpr(MU_FIX, MU_MU, var, O, 0);
+                        ltsmin_expr_t result = LTSminExpr(MU_FIX, MU_MU, free, O, 0);
                         return result;
                     }
-                    case CTL_GLOBALLY: { // translate A/E G p into NU Z. p /\ A/E X Z
-                        const int var = create_mu_var(free, env);
-                        ltsmin_expr_t Z = LTSminExpr(MU_VAR, MU_VAR, var, 0, 0);
+                    case CTL_GLOBALLY: {
+			// translate A G p into NU Z. p /\ A X Z
+			// translate E G p into NU Z. p /\ (E X Z \/ AX false)
+                        create_mu_var(free, env);
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
                         ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
                         res->arg1 = X;
                         res->arg1->parent = res;
                         LTSminExprRehash(res);
+			if (in->token == CTL_EXIST) {
+			    ltsmin_expr_t False = LTSminExpr(CONSTANT, MU_FALSE, LTSminConstantIdx(env, MU_NAME(MU_FALSE)), NULL, NULL);
+			    ltsmin_expr_t XFalse = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), False, 0);
+			    ltsmin_expr_t Deadlock = LTSminExpr(UNARY_OP, MU_ALL, LTSminUnaryIdx(env, MU_NAME(MU_ALL)), XFalse, 0);
+			    res = LTSminExpr(BINARY_OP, MU_OR, LTSminBinaryIdx(env, MU_NAME(MU_OR)), res, Deadlock);
+			}
+
                         ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
                         ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), P, res);
-                        ltsmin_expr_t result = LTSminExpr(NU_FIX, MU_NU, var, A, 0);
+                        ltsmin_expr_t result = LTSminExpr(NU_FIX, MU_NU, free, A, 0);
                         return result;
                     }
                     case CTL_NEXT: { // translate A/E X to A/E X
@@ -1098,7 +1123,7 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, ltsmin_parse_env_t env, int free)
                         return res;
                     }
                     default:
-                        Abort("ctl_to_mu: subformula of A/E should start with U,F,G,X");
+                        Abort("ctl_to_mu: subformula of A/E should start with U,F,G, or X");
                     }
                 }
                 case CTL_FUTURE: case CTL_GLOBALLY: case CTL_NEXT: {
