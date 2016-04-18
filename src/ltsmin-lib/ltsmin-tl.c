@@ -1116,7 +1116,7 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, ltsmin_parse_env_t env, int free)
             switch (in->token) {
                 case CTL_NOT: { // traverse child
                     res->arg1 = ctlmu(in->arg1, env, free);
-                    res->arg2->parent = res;
+                    res->arg1->parent = res;
                     LTSminExprRehash(res);
                     return res;
                 }
