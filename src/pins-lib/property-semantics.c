@@ -12,66 +12,69 @@
 #include <pins-lib/pins-util.h>
 #include <pins-lib/por/pins2pins-por.h>
 
-void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps)
+void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps, bitvector_t *sl_deps)
 {
-    // compute all state variable dependencies
-    const bitvector_t *sv = &e->annotation->state_deps;
-    const bitvector_t *sl = &e->annotation->state_label_deps;
-    const matrix_t *el = &e->annotation->edge_label_deps;
-    
-    // add state label dependencies
-    if (deps == NULL) dm_prod(deps, sl, GBgetStateLabelInfo(model));
+    const lts_type_t lts_type = GBgetLTStype(model);
 
-    if (PINS_POR) {
-        // set state variable visibility
-        for (int i = 0; i < (int) bitvector_size(sv); i++) {
-            if (bitvector_is_set(sv, i)) pins_add_state_variable_visible(model, i);
+    switch (e->node_type) {
+        case BINARY_OP: {
+            set_pins_semantics(model, e->arg1, env, deps, sl_deps);
+            set_pins_semantics(model, e->arg2, env, deps, sl_deps);
+            break;
         }
-    }
-
-    if (PINS_POR) {
-        // set state label visibility
-        for (int i = 0; i < (int) bitvector_size(sl); i++) {
-            if (bitvector_is_set(sl, i)) pins_add_state_label_visible(model, i);
+        case UNARY_OP: {
+            set_pins_semantics(model, e->arg1, env, deps, sl_deps);
+            break;
         }
-    }
+        case SVAR: {
+            const int N = lts_type_get_state_length(lts_type);
+            if (e->idx < N) { // state variable
+                if (deps != NULL) bitvector_set(deps, e->idx);
+                if (PINS_POR) pins_add_state_variable_visible(model, e->idx);
+            } else { // state label
+                if (sl_deps != NULL) bitvector_set(sl_deps, e->idx - N);
+                if (deps != NULL) dm_row_union(deps, GBgetStateLabelInfo(model), e->idx - N);
+                if (PINS_POR) pins_add_state_label_visible(model, e->idx - N);
+            }
+            break;
+        }
+        case EVAR: {
+            const int type = lts_type_get_edge_label_typeno(GBgetLTStype(model), e->idx);
+            const int n_chunks = pins_chunk_count(model, type);
+            const int value = LTSminExprSibling(e)->idx;
 
-    // set group visibility
-    for (int i = 0; i < dm_nrows(el); i++) {
-        const int type = lts_type_get_edge_label_typeno(GBgetLTStype(model), i);
-        const int n_chunks = pins_chunk_count(model, type);
-        for (int j = 0; j < dm_ncols(el); j++) {
-            if (dm_is_set(el, i, j)) {
-                chunk c;
-                c.data = SIgetC(env->values, j, (int*) &c.len);
+            chunk c;
+            c.data = SIgetC(env->values, value, (int*) &c.len);
 
-                const int idx = pins_chunk_put(model, type, c);
+            const int idx = pins_chunk_put(model, type, c);
 
-                if (lts_type_get_format(GBgetLTStype(model), type) == LTStypeEnum) {
-                    if (pins_chunk_count(model, type) != n_chunks) {
-                        char id[c.len * 2 + 6];
-                        chunk2string(c, sizeof(id), id);
-                        Warning(info, "Value for identifier '%s' cannot be found in table for enum type %s.",
-                            id, lts_type_get_type(GBgetLTStype(model),type));
-                    }
-                }
-                
-                int* groups = NULL;
-                const int n = GBgroupsOfEdge(model, i, idx, &groups);
-                if (n > 0) {
-                    for (int k = 0; k < n; k++) {
-                        const int group = groups[k];
-                        if (PINS_POR) pins_add_group_visible(model, group);
-                        if (deps != NULL) dm_row_union(deps, GBgetDMInfoRead(model), group);
-                    }
-                    RTfree(groups);
-                } else {
-                    char s[c.len * 2 + 6];
-                    chunk2string(c, sizeof(s), s);
-                    Abort("There is no group that can produce edge label %s", s);
+            if (lts_type_get_format(GBgetLTStype(model), type) == LTStypeEnum) {
+                if (pins_chunk_count(model, type) != n_chunks) {
+                    char id[c.len * 2 + 6];
+                    chunk2string(c, sizeof(id), id);
+                    Warning(info, "Value for identifier '%s' cannot be found in table for enum type %s.",
+                        id, lts_type_get_type(GBgetLTStype(model),type));
                 }
             }
+
+            int* groups = NULL;
+            const int n = GBgroupsOfEdge(model, e->idx, idx, &groups);
+            if (n > 0) {
+                for (int k = 0; k < n; k++) {
+                    const int group = groups[k];
+                    if (PINS_POR) pins_add_group_visible(model, group);
+                    if (deps != NULL) dm_row_union(deps, GBgetDMInfoRead(model), group);
+                }
+                RTfree(groups);
+            } else {
+                char s[c.len * 2 + 6];
+                chunk2string(c, sizeof(s), s);
+                Abort("There is no group that can produce edge label %s", s);
+            }            
+            break;
         }
+        default:
+            break;
     }
 }
 
@@ -128,7 +131,7 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
         case PRED_CHUNK: {
             chunk c;
             c.data = SIgetC(env->values, e->idx, (int*) &c.len);
-            return pins_chunk_put(model, LTSminExprSibling(e)->annotation->chunk_type, c);
+            return pins_chunk_put(model, ltsmin_expr_type_check(LTSminExprSibling(e), env, GBgetLTStype(model)), c);
         }
         case PRED_NOT:
             return !eval_predicate(model, e->arg1, state, env);

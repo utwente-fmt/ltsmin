@@ -11,29 +11,35 @@
 #include <util-lib/dynamic-array.h>
 
 const char *
+S_NAME(ltsmin_expr_case s)
+{
+    switch (s) {
+    case S_TRUE:             return "true";
+    case S_FALSE:            return "false";
+    case S_NOT:              return "!";
+    case S_LT:               return "<";
+    case S_LEQ:              return "<=";
+    case S_GT:               return ">";
+    case S_GEQ:              return ">=";
+    case S_OR:               return "||";
+    case S_AND:              return "&&";
+    case S_EQ:               return "==";
+    case S_NEQ:              return "!=";
+    case S_EQUIV:            return "<->";
+    case S_IMPLY:            return "->";
+    case S_MULT:             return "*";
+    case S_DIV:              return "/";
+    case S_REM:              return "%";
+    case S_ADD:              return "+";
+    case S_SUB:              return "-";
+    default:        Abort ("Not a keyword/operator, token id: %d", s);
+    }
+}
+
+const char *
 PRED_NAME(Pred pred)
 {
-    switch (pred) {
-    case PRED_TRUE:             return "true";
-    case PRED_FALSE:            return "false";
-    case PRED_NOT:              return "!";
-    case PRED_LT:               return "<";
-    case PRED_LEQ:              return "<=";
-    case PRED_GT:               return ">";
-    case PRED_GEQ:              return ">=";
-    case PRED_OR:               return "||";
-    case PRED_AND:              return "&&";
-    case PRED_EQ:               return "==";
-    case PRED_NEQ:              return "!=";
-    case PRED_EQUIV:            return "<->";
-    case PRED_IMPLY:            return "->";
-    case PRED_MULT:             return "*";
-    case PRED_DIV:              return "/";
-    case PRED_REM:              return "%";
-    case PRED_ADD:              return "+";
-    case PRED_SUB:              return "-";
-    default:        Abort ("Not a keyword/operator, token id: %d", pred);
-    }
+    return S_NAME((ltsmin_expr_case) pred);
 }
 
 const char *
@@ -183,868 +189,412 @@ type_check_equal_type(lts_type_t lts_type, int left, int right, ltsmin_expr_t e,
     }
 }
 
-static lts_annotation_t
-create_annotation()
+int
+ltsmin_expr_type_check(const ltsmin_expr_t e, const ltsmin_parse_env_t env, const lts_type_t lts_type)
 {
-    return RTmallocZero(sizeof(struct lts_annotation_s));
-}
+    switch (e->token) {
+        case SVAR: {
+            const int N = lts_type_get_state_length(lts_type);
+            if (e->idx < N) { // state variable
+                return lts_type_get_state_typeno(lts_type, e->idx);
+            } else {
+                return lts_type_get_state_label_typeno(lts_type, e->idx - N);
+            }
+        }
+        case EVAR: {
+            const ltsmin_expr_t other = LTSminExprSibling(e);
+            if (other->token != CHUNK) {
+                LTSminLogExpr (error, "An edge should be paired with a chunk: ", e, env);
+                HREabort (LTSMIN_EXIT_FAILURE);
+            }
+            return lts_type_get_edge_label_typeno(lts_type, e->idx);
+        }
+        case INT:
+            return type_check_get_type(lts_type, LTSMIN_TYPE_NUMERIC, e, env);
+        case CHUNK: {
+            const ltsmin_expr_t other = LTSminExprSibling(e);
+            if (other == NULL) {
+                LTSminLogExpr(error, "Unbound chunk: ", e, env);
+                HREabort(LTSMIN_EXIT_FAILURE);
+            }
+            return ltsmin_expr_type_check(other, env, lts_type);
+        }
+        case S_FALSE: case S_TRUE:
+            return type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
+        case VAR:
+            return -1;
+        case S_LT: case S_LEQ: case S_GT: case S_GEQ: {
+            const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
+            type_check_require_type(lts_type, left, LTSMIN_TYPE_NUMERIC, e->arg1, env);
+            const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
+            type_check_require_type(lts_type, right, LTSMIN_TYPE_NUMERIC, e->arg2, env);
 
-static void
-copy_annotation(const lts_annotation_t src, lts_annotation_t tgt)
-{
-    bitvector_copy(&tgt->state_deps, &src->state_deps);
-    bitvector_copy(&tgt->state_label_deps, &src->state_label_deps);
-    dm_copy(&tgt->edge_label_deps, &src->edge_label_deps);
-    tgt->chunk_type = src->chunk_type;
-}
+            type_check_equal_format(lts_type, left, right, e, env);
 
-static void
-destroy_annotation(lts_annotation_t a)
-{
-    if (a != NULL) {
-        bitvector_free(&a->state_deps);
-        bitvector_free(&a->state_label_deps);
-        dm_free(&a->edge_label_deps);
-        RTfree(a);
+            return type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
+        }
+        case S_EQ: case S_NEQ: {
+            const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
+            const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
+
+            type_check_equal_type(lts_type, left, right, e, env);
+            type_check_equal_format(lts_type, left, right, e, env);
+
+            return type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
+        }
+        case S_OR: case S_AND: case S_EQUIV: case S_IMPLY: {
+            const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
+            const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
+
+            type_check_require_type(lts_type, left, LTSMIN_TYPE_BOOL, e->arg1, env);
+            type_check_require_type(lts_type, right, LTSMIN_TYPE_BOOL, e->arg2, env);
+
+            type_check_equal_format(lts_type, left, right, e, env);
+
+            return left;
+        }
+        case S_MULT: case S_DIV: case S_REM: case S_ADD: case S_SUB: {
+            const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
+            const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
+            
+            type_check_require_type(lts_type, left, LTSMIN_TYPE_NUMERIC, e->arg1, env);
+            type_check_require_type(lts_type, right, LTSMIN_TYPE_NUMERIC, e->arg2, env);
+
+            type_check_equal_format(lts_type, left, right, e, env);
+
+            return left;
+        }
+        case S_NOT: case MU_FIX: case NU_FIX: case EXISTS_STEP: case FORALL_STEP: case EDGE_EXIST: case EDGE_ALL: {
+            const int child = ltsmin_expr_type_check(e->arg1, env, lts_type);
+
+            type_check_require_type(lts_type, child, LTSMIN_TYPE_BOOL, e->arg1, env);
+
+            return child;
+        }
+        default: {
+            switch (e->node_type) {
+                case BINARY_OP: {
+                    const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
+                    const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
+
+                    type_check_equal_type(lts_type, left, right, e, env);
+                    type_check_equal_format(lts_type, left, right, e, env);
+
+                    return left;
+                }
+                case UNARY_OP: {
+                    const int child = ltsmin_expr_type_check(e->arg1, env, lts_type);
+                    
+                    return child;
+                }
+                default: {
+                    LTSminLogExpr(error, "Unsupported expression: ", e, env);
+                    HREabort(LTSMIN_EXIT_FAILURE);
+                }
+            }
+        }
     }
 }
 
-static inline void
-pre_decorate(const ltsmin_expr_t e, ltsmin_expr_t child)
+ltsmin_expr_t
+ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env, tl_optimize_t tl_optimize)
 {
-    child->create_annotation = e->create_annotation;
-    child->copy_annotation = e->copy_annotation;
-    child->destroy_annotation = e->destroy_annotation;
-}
 
-static inline void
-init_decoration(ltsmin_expr_t e, ltsmin_parse_env_t env, lts_type_t lts_type)
-{
-    e->annotation = e->create_annotation();
-    bitvector_create(&e->annotation->state_deps, lts_type_get_state_length(lts_type));
-    bitvector_create(&e->annotation->state_label_deps, lts_type_get_state_label_count(lts_type));
-    dm_create(&e->annotation->edge_label_deps,
-            lts_type_get_edge_label_count(lts_type),
-            SIgetCount(env->values));
-    e->annotation->chunk_type = -2;
-}
-
-static inline void
-decorate(const ltsmin_expr_t e, ltsmin_expr_t child)
-{
-    bitvector_union(&e->annotation->state_deps, &child->annotation->state_deps);
-    bitvector_union(&e->annotation->state_label_deps, &child->annotation->state_label_deps);
-    dm_apply_or(&e->annotation->edge_label_deps, &child->annotation->edge_label_deps);
-}
-
-static ltsmin_expr_t
-pred_tree_walk(ltsmin_expr_t e, ltsmin_parse_env_t env, lts_type_t lts_type)
-{
-    ltsmin_expr_t l = NULL;
-    ltsmin_expr_t r = NULL;
+    ltsmin_expr_t left, right;
+    left = right = NULL;
 
     switch (e->node_type) {
         case BINARY_OP: {
-            init_decoration(e, env, lts_type);
-            
-            pre_decorate(e, e->arg1);
-            pre_decorate(e, e->arg2);
 
-            l = pred_tree_walk(e->arg1, env, lts_type);
-            r = pred_tree_walk(e->arg2, env, lts_type);
-
-            if (l != e->arg1 || r != e->arg2) {
-                e->arg1 = l;
-                e->arg2 = r;
-                LTSminExprRehash(e);
-            }
+            left = ltsmin_expr_optimize(e->arg1, env, tl_optimize);
+            right = ltsmin_expr_optimize(e->arg2, env, tl_optimize);
 
             switch (e->token) {
-                case PRED_AND: {
-                    if (l->token == PRED_FALSE) { // false /\ a is false
-                        LTSminExprDestroy(r, 1);
+                case S_AND: {
+                    if (left->token == S_FALSE) { // false /\ a is false
+                        LTSminExprDestroy(right, 1);
                         LTSminExprDestroy(e, 0);
-                        return l;
-                    }
-                    if (r->token == PRED_FALSE) { // a /\ false is false
-                        LTSminExprDestroy(l, 1);
+                        return left;
+                    } else if (right->token == S_FALSE) { // a /\ false is false
+                        LTSminExprDestroy(left, 1);
                         LTSminExprDestroy(e, 0);
-                        return r;
-                    }
-                    if (l->token == PRED_TRUE) { // true /\ a is a
-                        LTSminExprDestroy(l, 1);
+                        return right;
+                    } else if (left->token == S_TRUE) { // true /\ a is a
+                        LTSminExprDestroy(left, 1);
                         LTSminExprDestroy(e, 0);
-                        return r;
-                    }
-                    if (r->token == PRED_TRUE) { // a /\ true is a
-                        LTSminExprDestroy(r, 1);
+                        return right;
+                    } else if (right->token == S_TRUE) { // a /\ true is a
+                        LTSminExprDestroy(right, 1);
                         LTSminExprDestroy(e, 0);
-                        return l;
-                    }
-                    break;
-                }
-                case PRED_OR: {
-                    if (l->token == PRED_TRUE) { // true \/ a is true
-                        LTSminExprDestroy(r, 1);
+                        return left;
+                    } else if (LTSminExprEq(left, right)) { // a /\ a is a
                         LTSminExprDestroy(e, 0);
-                        return l;
-                    }
-                    if (r->token == PRED_TRUE) { // a \/ true is true
-                        LTSminExprDestroy(l, 1);
-                        LTSminExprDestroy(e, 0);
-                        return r;
-                    }
-                    if (l->token == PRED_FALSE) { // false \/ a is a
-                        LTSminExprDestroy(l, 1);
-                        LTSminExprDestroy(e, 0);
-                        return r;
-                    }
-                    if (r->token == PRED_FALSE) { // a \/ false is a
-                        LTSminExprDestroy(r, 1);
-                        LTSminExprDestroy(e, 0);
-                        return l;
+                        LTSminExprDestroy(right, 1);
+                        return left;
                     }
                     break;
                 }
-                case PRED_EQ: case PRED_EQUIV: {
-                    if (l->token == PRED_TRUE) { // true {<->,==} a is a
-                        LTSminExprDestroy(l, 1);
+                case S_OR: {
+                    if (left->token == S_TRUE) { // true \/ a is true
+                        LTSminExprDestroy(right, 1);
                         LTSminExprDestroy(e, 0);
-                        return r;
-                    }
-                    if (r->token == PRED_TRUE) { // a {<->,==} true is a
-                        LTSminExprDestroy(r, 1);
+                        return left;
+                    } else if (right->token == S_TRUE) { // a \/ true is true
+                        LTSminExprDestroy(left, 1);
                         LTSminExprDestroy(e, 0);
-                        return l;
-                    }
-                    if (l->token == PRED_FALSE) { // false {<->,==} a is !a, !a can be optimized
-                        LTSminExprDestroy(l, 1);
+                        return right;
+                    } else if (left->token == S_FALSE) { // false \/ a is a
+                        LTSminExprDestroy(left, 1);
                         LTSminExprDestroy(e, 0);
-                        ltsmin_expr_t n = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), r, 0);
-                        return pred_tree_walk(n, env, lts_type);
-                    }
-                    if (r->token == PRED_FALSE) { // a {<->,==} false is !a, !a can be optimized
-                        LTSminExprDestroy(r, 1);
+                        return right;
+                    } else if (right->token == S_FALSE) { // a \/ false is a
+                        LTSminExprDestroy(right, 1);
                         LTSminExprDestroy(e, 0);
-                        ltsmin_expr_t n = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), l, 0);
-                        return pred_tree_walk(n, env, lts_type);
-                    }
-                    break;
-                }
-                case PRED_NEQ: {
-                    if (l->token == PRED_TRUE) { // true != a is !a, !a can be optimized
-                        LTSminExprDestroy(l, 1);
+                        return left;
+                    } else if (LTSminExprEq(left, right)) { // a \/ a is a
                         LTSminExprDestroy(e, 0);
-                        ltsmin_expr_t n = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), r, 0);
-                        return pred_tree_walk(n, env, lts_type);
-                    }
-                    if (r->token == PRED_TRUE) { // a != true is !a, !a can be optimized
-                        LTSminExprDestroy(r, 1);
-                        LTSminExprDestroy(e, 0);
-                        ltsmin_expr_t n = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), l, 0);
-                        return pred_tree_walk(n, env, lts_type);
-                    }
-                    if (l->token == PRED_FALSE) { // false != a is a
-                        LTSminExprDestroy(l, 1);
-                        LTSminExprDestroy(e, 0);
-                        return r;
-                    }
-                    if (r->token == PRED_FALSE) { // a != false is a
-                        LTSminExprDestroy(r, 1);
-                        LTSminExprDestroy(e, 0);
-                        return l;
+                        LTSminExprDestroy(right, 1);
+                        return left;
                     }
                     break;
                 }
-                case PRED_IMPLY: {
-                    if (l->token == PRED_FALSE || r->token == PRED_TRUE) { // false -> a is true, a -> true is true
-                        ltsmin_expr_t n = LTSminExpr(CONSTANT, PRED_TRUE, LTSminConstantIdx(env, PRED_NAME(PRED_TRUE)), 0, 0);
-                        pre_decorate(e, n);
-                        init_decoration(n, env, lts_type);
-                        n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
+                case S_EQ: case S_EQUIV: {
+                    if (LTSminExprEq(left, right)) { // a {<->, ==} a is true
                         LTSminExprDestroy(e, 1);
-                        return n;
-                    }
-                    if (l->token == PRED_TRUE) { // true -> a is a
-                        LTSminExprDestroy(l, 1);
+                        return LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
+                    } else if (left->token == S_TRUE) { // true {<->,==} a is a
+                        LTSminExprDestroy(left, 1);
                         LTSminExprDestroy(e, 0);
-                        return r;
-                    }
-                    if (r->token == PRED_FALSE) { // a -> false is !a, !a can be optimized
-                        LTSminExprDestroy(r, 1);
+                        return right;
+                    } else if (right->token == S_TRUE) { // a {<->,==} true is a
+                        LTSminExprDestroy(right, 1);
                         LTSminExprDestroy(e, 0);
-                        ltsmin_expr_t n = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), l, 0);
-                        return pred_tree_walk(n, env, lts_type);
+                        return left;
+                    } else if (left->token == S_FALSE) { // false {<->,==} a is !a, !a can be optimized
+                        LTSminExprDestroy(left, 1);
+                        LTSminExprDestroy(e, 0);
+                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), right, 0);
+                        return ltsmin_expr_optimize(e, env, tl_optimize);
+                    } else if (right->token == S_FALSE) { // a {<->,==} false is !a, !a can be optimized
+                        LTSminExprDestroy(right, 1);
+                        LTSminExprDestroy(e, 0);
+                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
+                        return ltsmin_expr_optimize(e, env, tl_optimize);
                     }
                     break;
                 }
-            }
-
-            if (LTSminExprEq(l, r)) {
-                switch (e->token) {
-                    case PRED_LEQ: case PRED_GEQ:
-                    case PRED_EQUIV: case PRED_IMPLY:
-                    case PRED_EQ: { // a {<=, >=, <->, ->, ==} a is true
-                        ltsmin_expr_t n = LTSminExpr(CONSTANT, PRED_TRUE, LTSminConstantIdx(env, PRED_NAME(PRED_TRUE)), 0, 0);
-                        pre_decorate(e, n);
-                        init_decoration(n, env, lts_type);
-                        n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
+                case S_NEQ: {
+                    if (LTSminExprEq(left, right)) { // a != a is false
                         LTSminExprDestroy(e, 1);
-                        return n;
-                    }
-                    case PRED_LT: case PRED_GT:
-                    case PRED_NEQ: { // a {<, >, !=} a is false
-                        ltsmin_expr_t n = LTSminExpr(CONSTANT, PRED_FALSE,  LTSminConstantIdx(env, PRED_NAME(PRED_FALSE)), 0, 0);
-                        pre_decorate(e, n);
-                        init_decoration(n, env, lts_type);
-                        n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-                        LTSminExprDestroy(e, 1);
-                        return n;
-                    }
-                    case PRED_OR: case PRED_AND: { // a {\/, /\} a is a
+                        return LTSminExpr(CONSTANT, S_FALSE,  LTSminConstantIdx(env, S_NAME(S_FALSE)), 0, 0);
+                    } else if (left->token == S_FALSE) { // false != a is a
+                        LTSminExprDestroy(left, 1);
                         LTSminExprDestroy(e, 0);
-                        LTSminExprDestroy(r, 1);
-                        return l;
+                        return right;
+                    } else if (right->token == S_FALSE) { // a != false is a
+                        LTSminExprDestroy(right, 1);
+                        LTSminExprDestroy(e, 0);
+                        return left;
+                    } else if (left->token == S_TRUE) { // true != a is !a, !a can be optimized
+                        LTSminExprDestroy(left, 1);
+                        LTSminExprDestroy(e, 0);
+                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), right, 0);
+                        return ltsmin_expr_optimize(e, env, tl_optimize);
+                    } else if (right->token == S_TRUE) { // a != true is !a, !a can be optimized
+                        LTSminExprDestroy(right, 1);
+                        LTSminExprDestroy(e, 0);
+                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
+                        return ltsmin_expr_optimize(e, env, tl_optimize);
                     }
-                    case PRED_SUB:
-                    case PRED_REM: { // a {-, %} a is 0
-                        ltsmin_expr_t n = LTSminExpr(INT, INT, 0, 0, 0);
-                        pre_decorate(e, n);
-                        init_decoration(n, env, lts_type);
-                        n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_NUMERIC, e, env);
-                        LTSminExprDestroy(e, 1);
-                        return n;
-                    }
-                    case PRED_DIV: { // a / a is 1
-                        ltsmin_expr_t n = LTSminExpr(INT, INT, 1, 0, 0);
-                        pre_decorate(e, n);
-                        init_decoration(n, env, lts_type);
-                        n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_NUMERIC, e, env);
-                        LTSminExprDestroy(e, 1);
-                        return n;
-                    }
-                }
-            }
-
-            decorate(e, e->arg1);
-            decorate(e, e->arg2);
-
-            const int left = e->arg1->annotation->chunk_type;
-            const int right = e->arg2->annotation->chunk_type;
-
-            int type = -1;
-            switch (e->token) {
-                case PRED_LT: case PRED_LEQ: case PRED_GT: case PRED_GEQ:
-                    type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-                case PRED_MULT: case PRED_DIV: case PRED_REM: case PRED_ADD: case PRED_SUB: {
-                    type_check_require_type(lts_type, left, LTSMIN_TYPE_NUMERIC, e->arg1, env);
-                    type_check_require_type(lts_type, right, LTSMIN_TYPE_NUMERIC, e->arg2, env);
-                    
-                    type_check_equal_format(lts_type, left, right, e, env);
-
-                    e->annotation->chunk_type = type == -1 ? left : type;
                     break;
                 }
-                case PRED_OR: case PRED_AND: case PRED_EQUIV: case PRED_IMPLY: {
-                    type_check_require_type(lts_type, left, LTSMIN_TYPE_BOOL, e->arg1, env);
-                    type_check_require_type(lts_type, right, LTSMIN_TYPE_BOOL, e->arg2, env);
-
-                    const data_format_t format[1] = { LTStypeEnum };
-                    type_check_require_format(lts_type, left, format, 1, e->arg1, env, "enum");
-                    type_check_require_format(lts_type, right, format, 1, e->arg2, env, "enum");
-                    
-                    e->annotation->chunk_type = left;
+                case S_IMPLY: {
+                    if (LTSminExprEq(left, right)) { // a {->} a is true
+                        LTSminExprDestroy(e, 1);
+                        return LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
+                    } else if (left->token == S_FALSE || right->token == S_TRUE) { // false -> a is true, a -> true is true
+                        LTSminExprDestroy(e, 1);
+                        return LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
+                    } else if (left->token == S_TRUE) { // true -> a is a
+                        LTSminExprDestroy(left, 1);
+                        LTSminExprDestroy(e, 0);
+                        return right;
+                    } else if (right->token == S_FALSE) { // a -> false is !a, !a can be optimized
+                        LTSminExprDestroy(right, 1);
+                        LTSminExprDestroy(e, 0);
+                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
+                        return ltsmin_expr_optimize(e, env, tl_optimize);
+                    }
                     break;
                 }
-                case PRED_EQ: case PRED_NEQ: {
-                    const data_format_t formats[2] = { LTStypeEnum, LTStypeChunk };
-                    if (left >= 0 && right < 0) {
-                        type_check_require_format(lts_type, left, formats, 2, e->arg2, env, "enum, chunk");
-                        e->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);;
-                        break;
-                    } else if (right >= 0 && left < 0) {
-                        type_check_require_format(lts_type, right, formats, 2, e->arg1, env, "enum, chunk");
-                        e->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);;
-                        break;
-                    } else {
-		        e->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-			break;
-		    }
+                case S_LEQ: case S_GEQ: {
+                    if (LTSminExprEq(left, right)) { // a {<=, >=} a is true
+                        LTSminExprDestroy(e, 1);
+                        return LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
+                    }
+                    break;
+                }
+                case S_LT: case S_GT: {
+                    if (LTSminExprEq(left, right)) { // a {<, >} a is false
+                        LTSminExprDestroy(e, 1);
+                        return LTSminExpr(CONSTANT, S_FALSE,  LTSminConstantIdx(env, S_NAME(S_FALSE)), 0, 0);
+                    }
+                    break;
+                }
+                case S_REM: {
+                    if (right->idx == 0) {
+                        LTSminLogExpr (error, "division by zero in: ", e, env);
+                        HREabort(LTSMIN_EXIT_FAILURE);
+                    }
+                }
+                case S_SUB: {
+                    if (LTSminExprEq(left, right)) { // a {-, %} a is 0
+                        LTSminExprDestroy(e, 1);
+                        return LTSminExpr(INT, INT, 0, 0, 0);
+                    }
+                    break;
+                }
+                case S_DIV: {
+                    if (right->idx == 0) {
+                        LTSminLogExpr (error, "division by zero in: ", e, env);
+                        HREabort(LTSMIN_EXIT_FAILURE);
+                    }
+                    if (LTSminExprEq(left, right)) { // a / a is 1
+                        LTSminExprDestroy(e, 1);
+                        return LTSminExpr(INT, INT, 1, 0, 0);
+                    }
+                    break;
                 }
                 default: {
-                    LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
-                    HREabort (LTSMIN_EXIT_FAILURE);
+                    if (tl_optimize != NULL) {
+                        return tl_optimize(e, env);
+                    }
+                    break;
                 }
+            }
+
+            if (e->arg1 != left || e->arg2 != right) {
+                e->arg1 = left; left->parent = e;
+                e->arg2 = right; right->parent = e;
+                LTSminExprRehash(e);
             }
             return e;
         }
         case UNARY_OP: {
+            ltsmin_expr_t n = e;
+            left = e->arg1;
             switch (e->token) {
-                case PRED_NOT: {
-                    ltsmin_expr_t n = NULL;
-                    switch (e->arg1->token) {
-                        case PRED_LT: { // !(a < b) is a >= b
-                            n = LTSminExpr(BINARY_OP, PRED_GEQ, LTSminBinaryIdx(env, PRED_NAME(PRED_GEQ)), e->arg1->arg1, e->arg1->arg2);
-                            pre_decorate(e, n);
+                case S_NOT: {
+                    switch (left->token) {
+                        case S_LT: { // !(a < b) is a >= b
                             LTSminExprDestroy(e, 0);
+                            n = LTSminExpr(BINARY_OP, S_GEQ, LTSminBinaryIdx(env, S_NAME(S_GEQ)), left->arg1, left->arg2);
                             break;
                         }
-                        case PRED_LEQ: { // !(a <= b) is a > b
-                            n = LTSminExpr(BINARY_OP, PRED_GT, LTSminBinaryIdx(env, PRED_NAME(PRED_GT)), e->arg1->arg1, e->arg1->arg2);
-                            pre_decorate(e, n);
+                        case S_LEQ: { // !(a <= b) is a > b
                             LTSminExprDestroy(e, 0);
+                            n = LTSminExpr(BINARY_OP, S_GT, LTSminBinaryIdx(env, S_NAME(S_GT)), left->arg1, left->arg2);
                             break;
                         }
-                        case PRED_GT: { // !(a > b) is a <= b
-                            n = LTSminExpr(BINARY_OP, PRED_LEQ, LTSminBinaryIdx(env, PRED_NAME(PRED_LEQ)), e->arg1->arg1, e->arg1->arg2);
-                            pre_decorate(e, n);
+                        case S_GT: { // !(a > b) is a <= b
                             LTSminExprDestroy(e, 0);
+                            n = LTSminExpr(BINARY_OP, S_LEQ, LTSminBinaryIdx(env, S_NAME(S_LEQ)), left->arg1, left->arg2);
                             break;
                         }
-                        case PRED_GEQ: { // !(a >= b) is a < b
-                            n = LTSminExpr(BINARY_OP, PRED_LT, LTSminBinaryIdx(env, PRED_NAME(PRED_LT)), e->arg1->arg1, e->arg1->arg2);
-                            pre_decorate(e, n);
+                        case S_GEQ: { // !(a >= b) is a < b
                             LTSminExprDestroy(e, 0);
+                            n = LTSminExpr(BINARY_OP, S_LT, LTSminBinaryIdx(env, S_NAME(S_LT)), left->arg1, left->arg2);
                             break;
                         }
-                        case PRED_EQ: { // !(a == b) is a != b
-                            n = LTSminExpr(BINARY_OP, PRED_NEQ, LTSminBinaryIdx(env, PRED_NAME(PRED_NEQ)), e->arg1->arg1, e->arg1->arg2);
-                            pre_decorate(e, n);
+                        case S_EQ: { // !(a == b) is a != b
                             LTSminExprDestroy(e, 0);
+                            n = LTSminExpr(BINARY_OP, S_NEQ, LTSminBinaryIdx(env, S_NAME(S_NEQ)), left->arg1, left->arg2);
                             break;
                         }
-                        case PRED_NEQ: { // !(a != b) is a == b
-                            n = LTSminExpr(BINARY_OP, PRED_EQ, LTSminBinaryIdx(env, PRED_NAME(PRED_EQ)), e->arg1->arg1, e->arg1->arg2);
-                            pre_decorate(e, n);
+                        case S_NEQ: { // !(a != b) is a == b
                             LTSminExprDestroy(e, 0);
+                            n = LTSminExpr(BINARY_OP, S_EQ, LTSminBinaryIdx(env, S_NAME(S_EQ)), left->arg1, left->arg2);
                             break;
                         }
-                        case PRED_TRUE: { // !true is false
-                            n = LTSminExpr(CONSTANT, PRED_FALSE, LTSminConstantIdx(env, PRED_NAME(PRED_FALSE)), 0, 0);
-                            pre_decorate(e, n);
+                        case S_TRUE: { // !true is false
                             LTSminExprDestroy(e, 1);
+                            n = LTSminExpr(CONSTANT, S_FALSE, LTSminConstantIdx(env, S_NAME(S_FALSE)), 0, 0);
                             break;
                         }
-                        case PRED_FALSE: { // !false is true
-                            n = LTSminExpr(CONSTANT, PRED_TRUE, LTSminConstantIdx(env, PRED_NAME(PRED_TRUE)), 0, 0);
-                            pre_decorate(e, n);
+                        case S_FALSE: { // !false is true
                             LTSminExprDestroy(e, 1);
+                            n = LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
                             break;
                         }
-                        case PRED_NOT: { // !!a is a
-                            n = LTSminExprClone(e->arg1->arg1);
-                            pre_decorate(e, n);
-                            LTSminExprDestroy(e->arg1, 0);
+                        case S_NOT: { // !!a is a
+                            LTSminExprDestroy(left, 0);
                             LTSminExprDestroy(e, 0);
+                            n = left->arg1;
                             break;
                         }
-                        case PRED_OR: { // !(a || b) is !a && !b
-                            l = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), e->arg1->arg1, 0);
-                            r = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), e->arg1->arg2, 0);
-                            n = LTSminExpr(BINARY_OP, PRED_AND, LTSminBinaryIdx(env, PRED_NAME(PRED_AND)), l, r);
-                            pre_decorate(e, n);
+                        case S_OR: { // !(a || b) is !a && !b
                             LTSminExprDestroy(e, 0);
+                            ltsmin_expr_t child = left;
+                            left = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), child->arg1, 0);
+                            right = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), child->arg2, 0);
+                            n = LTSminExpr(BINARY_OP, S_AND, LTSminBinaryIdx(env, S_NAME(S_AND)), left, right);
                             break;
                         }
-                        case PRED_AND: { // !(a && b) is !a || !b
-                            l = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), e->arg1->arg1, 0);
-                            r = LTSminExpr(UNARY_OP, PRED_NOT, LTSminUnaryIdx(env, PRED_NAME(PRED_NOT)), e->arg1->arg2, 0);
-                            n = LTSminExpr(BINARY_OP, PRED_OR,  LTSminBinaryIdx(env, PRED_NAME(PRED_OR)), l, r);
-                            pre_decorate(e, n);
+                        case S_AND: { // !(a && b) is !a || !b
                             LTSminExprDestroy(e, 0);
+                            ltsmin_expr_t child = left;
+                            left = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), child->arg1, 0);
+                            right = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), child->arg2, 0);
+                            n = LTSminExpr(BINARY_OP, S_OR,  LTSminBinaryIdx(env, S_NAME(S_OR)), left, right);
+                            break;
+                        }
+                        default: {
+                            if (tl_optimize != NULL) {
+                                return tl_optimize(e, env);
+                            }
                             break;
                         }
                     }
-                    if (n != NULL) {
-                        init_decoration(n, env, lts_type);
-
-                        n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, n, env);
-                        return pred_tree_walk(n, env, lts_type);
-                    }
-                }
-            }
-
-            init_decoration(e, env, lts_type);
-
-            pre_decorate(e, e->arg1);
-            
-            l = pred_tree_walk(e->arg1, env, lts_type);
-
-            if (l != e->arg1) {
-                e->arg1 = l;
-                LTSminExprRehash(e);
-            }
-
-            decorate(e, e->arg1);
-
-            const int type = e->arg1->annotation->chunk_type;
-
-            switch (e->token) {
-                case PRED_NOT: {
-                    type_check_require_type(lts_type, type, LTSMIN_TYPE_BOOL, e->arg1, env);
-
-                    const data_format_t format[1] = { LTStypeEnum };
-                    type_check_require_format(lts_type, type, format, 1, e->arg1, env, "enum");
-                    e->annotation->chunk_type = type;
-                    return e;
+                    break;
                 }
                 default: {
-                    LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
-                    HREabort (LTSMIN_EXIT_FAILURE);
+                    if (tl_optimize != NULL) {
+                        return tl_optimize(e, env);
+                    }
+                    break;
                 }
             }
+
+            if (e != n) {
+                n->arg1->parent = n;
+                LTSminExprRehash(n);
+            }
+
+            return ltsmin_expr_optimize(n, env, tl_optimize);
         }
         default: {
-            init_decoration(e, env, lts_type);
-            switch (e->token) {
-                case SVAR: {
-                    int N = lts_type_get_state_length (lts_type);
-                    if (e->idx < N) {
-                        bitvector_set(&e->annotation->state_deps, e->idx);
-                        e->annotation->chunk_type = lts_type_get_state_typeno (lts_type, e->idx);
-                        return e;
-                    } else {
-                        bitvector_set(&e->annotation->state_label_deps, e->idx - N);
-                        type_check_require_type(lts_type, lts_type_get_state_label_typeno(lts_type, e->idx - N), LTSMIN_TYPE_GUARD, e, env);
-                        e->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-                        return e;
-                    }
-                }
-                case EVAR: {
-                    const ltsmin_expr_t chunk = LTSminExprSibling(e);
-                    if (chunk->token != CHUNK) {
-                        LTSminLogExpr (error, "An edge should be paired with a chunk: ", e, env);
-                        HREabort (LTSMIN_EXIT_FAILURE);
-                    }
-                    dm_set(&e->annotation->edge_label_deps, e->idx, chunk->idx);
-                    e->annotation->chunk_type = lts_type_get_edge_label_typeno(lts_type, e->idx);
-                    return e;
-                }
-                case INT: {
-                    e->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_NUMERIC, e, env);
-                    return e;
-                }
-                case CHUNK: {
-                    e->annotation->chunk_type = -1;
-                    return e;
-                }
-                case PRED_FALSE:
-                case PRED_TRUE: {
-                    e->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-                    return e;
-                }
-                case PRED_VAR:
-                    LTSminLogExpr (error, "Symbolic variables are not supported in predicates: ", e, env);
-                    HREabort (LTSMIN_EXIT_FAILURE);
-                default: {
-                    LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
-                    HREabort (LTSMIN_EXIT_FAILURE);
-                }
+            if (tl_optimize != NULL) {
+                return tl_optimize(e, env);
             }
+            break;
         }
     }
-    return NULL;
+    return e;
 }
 
-static inline void
-optimize_weak_until(ltsmin_expr_t e, ltsmin_parse_env_t env)
+ltsmin_expr_t
+ltl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
 {
-    ltsmin_expr_t u = LTSminExpr(BINARY_OP, LTL_UNTIL, LTSminBinaryIdx(env, LTL_NAME(LTL_UNTIL)), e->arg1, e->arg2);
-    ltsmin_expr_t g = LTSminExpr(UNARY_OP, LTL_GLOBALLY, LTSminUnaryIdx(env, LTL_NAME(LTL_GLOBALLY)), e->arg1, NULL);
-    LTSminExprDestroy(e, 0);
-    e = LTSminExpr(BINARY_OP, LTL_OR, LTSminBinaryIdx(env, LTL_NAME(LTL_OR)), u, g);
-}
-
-static ltsmin_expr_t
-ltl_tree_walk(ltsmin_expr_t e, ltsmin_parse_env_t env, lts_type_t lts_type)
-{
-    init_decoration(e, env, lts_type);
-    
-    switch (e->node_type) {
-        case BINARY_OP: {
-            switch (e->token) {
-                case LTL_WEAK_UNTIL:
-                    optimize_weak_until(e, env);
-                case LTL_OR: case LTL_AND: case LTL_EQUIV: case LTL_IMPLY:
-                case LTL_RELEASE: case LTL_UNTIL: {
-
-                    pre_decorate(e, e->arg1);
-                    pre_decorate(e, e->arg2);
-
-                    ltsmin_expr_t l = ltl_tree_walk(e->arg1, env, lts_type);
-                    ltsmin_expr_t r = ltl_tree_walk(e->arg2, env, lts_type);
-
-                    if (l != e->arg1 || r != e->arg2) {
-                        e->arg1 = l;
-                        e->arg2 = r;
-                        LTSminExprRehash(e);
-                    }
-
-                    switch (e->token) {
-                        case LTL_AND: {
-                            if (l->token == LTL_FALSE) { // false /\ a is false
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            if (r->token == LTL_FALSE) { // a /\ false is false
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (l->token == LTL_TRUE) { // true /\ a is a
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (r->token == LTL_TRUE) { // a /\ true is a
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            break;
-                        }
-                        case LTL_OR: {
-                            if (l->token == LTL_TRUE) { // true \/ a is true
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            if (r->token == LTL_TRUE) { // a \/ true is true
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (l->token == LTL_FALSE) { // false \/ a is a
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (r->token == LTL_FALSE) { // a \/ false is a
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            break;
-                        }
-                        case LTL_EQUIV: {
-                            if (l->token == LTL_TRUE) { // true <-> a is a
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (r->token == LTL_TRUE) { // a <-> true is a
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            if (l->token == LTL_FALSE) { // false <-> a is !a, !a can be optimized
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                ltsmin_expr_t n = LTSminExpr(UNARY_OP, LTL_NOT, LTSminUnaryIdx(env, LTL_NAME(LTL_NOT)), r, 0);
-                                return pred_tree_walk(n, env, lts_type);
-                            }
-                            if (r->token == LTL_FALSE) { // a <-> false is !a, !a can be optimized
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                ltsmin_expr_t n = LTSminExpr(UNARY_OP, LTL_NOT, LTSminUnaryIdx(env, LTL_NAME(LTL_NOT)), l, 0);
-                                return pred_tree_walk(n, env, lts_type);
-                            }
-                            break;
-                        }
-                        case LTL_IMPLY: {
-                            if (l->token == LTL_FALSE || r->token == LTL_TRUE) { // false -> a is true, a -> true is true
-                                ltsmin_expr_t n = LTSminExpr(CONSTANT, LTL_TRUE, LTSminConstantIdx(env, LTL_NAME(LTL_TRUE)), 0, 0);
-                                pre_decorate(e, n);
-                                init_decoration(n, env, lts_type);
-                                n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-                                LTSminExprDestroy(e, 1);
-                                return n;
-                            }
-                            if (l->token == LTL_TRUE) { // true -> a is a
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (r->token == LTL_FALSE) { // a -> false is !a, !a can be optimized
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                ltsmin_expr_t n = LTSminExpr(UNARY_OP, LTL_NOT, LTSminUnaryIdx(env, LTL_NAME(LTL_NOT)), l, 0);
-                                return pred_tree_walk(n, env, lts_type);
-                            }
-                            break;
-                        }
-                    }
-
-                    if (LTSminExprEq(l, r)) {
-                        switch (e->token) {
-                            case LTL_EQUIV: case LTL_IMPLY: { // a {<->, ->} a is true
-                                ltsmin_expr_t n = LTSminExpr(CONSTANT, LTL_TRUE, LTSminConstantIdx(env, LTL_NAME(LTL_TRUE)), 0, 0);
-                                pre_decorate(e, n);
-                                init_decoration(n, env, lts_type);
-                                n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-                                LTSminExprDestroy(e, 1);
-                                return n;
-                            }
-                            case LTL_OR: case LTL_AND: { // a {\/, /\} a is a
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                        }
-                    }
-
-                    decorate(e, e->arg1);
-                    decorate(e, e->arg2);
-
-                    const int left = e->arg1->annotation->chunk_type;
-                    const int right = e->arg2->annotation->chunk_type;
-
-                    type_check_require_type(lts_type, left, LTSMIN_TYPE_BOOL, e->arg1, env);
-                    type_check_require_type(lts_type, right, LTSMIN_TYPE_BOOL, e->arg2, env);
-
-                    const data_format_t format[1] = { LTStypeEnum };
-                    type_check_require_format(lts_type, left, format, 1, e->arg1, env, "enum");
-                    type_check_require_format(lts_type, right, format, 1, e->arg2, env, "enum");
-
-                    e->annotation->chunk_type = left;
-
-                    return e;
-                }
-                default: {
-                    return pred_tree_walk(e, env, lts_type);
-                }
-            }
-        }
-        case UNARY_OP: {
-            switch (e->token) {
-                case LTL_NOT:
-                case LTL_FUTURE: case LTL_GLOBALLY: case LTL_NEXT: {
-
-                    pre_decorate(e, e->arg1);
-
-                    ltsmin_expr_t c = ltl_tree_walk(e->arg1, env, lts_type);
-
-                    if (c != e->arg1) {
-                        e->arg1 = c;
-                        LTSminExprRehash(e);
-                    }
-
-                    decorate(e, e->arg1);
-
-                    const int type = e->arg1->annotation->chunk_type;
-                    
-                    type_check_require_type(lts_type, type, LTSMIN_TYPE_BOOL, e->arg1, env);
-
-                    const data_format_t format[1] = { LTStypeEnum };
-                    type_check_require_format(lts_type, type, format, 1, e->arg1, env, "enum");
-
-                    e->annotation->chunk_type = type;
-                    return e;
-                }
-                default: {
-                    return pred_tree_walk(e, env, lts_type);
-                }
-            }
-        }
-        default: {
-            return pred_tree_walk(e, env, lts_type);
+    switch (e->token) {
+        case LTL_WEAK_UNTIL: {
+            ltsmin_expr_t u = LTSminExpr(BINARY_OP, LTL_UNTIL, LTSminBinaryIdx(env, LTL_NAME(LTL_UNTIL)), e->arg1, e->arg2);
+            ltsmin_expr_t g = LTSminExpr(UNARY_OP, LTL_GLOBALLY, LTSminUnaryIdx(env, LTL_NAME(LTL_GLOBALLY)), e->arg1, NULL);
+            LTSminExprDestroy(e, 0);
+            return LTSminExpr(BINARY_OP, LTL_OR, LTSminBinaryIdx(env, LTL_NAME(LTL_OR)), u, g);
         }
     }
-}
 
-static ltsmin_expr_t
-ctl_tree_walk(ltsmin_expr_t e, ltsmin_parse_env_t env, lts_type_t lts_type)
-{
-    init_decoration(e, env, lts_type);
-    
-    switch (e->node_type) {
-        case BINARY_OP: {            
-            switch (e->token) {
-                case CTL_OR: case CTL_AND: case CTL_EQUIV: case CTL_IMPLY:
-                case CTL_UNTIL: {
-
-                    pre_decorate(e, e->arg1);
-                    pre_decorate(e, e->arg2);
-                    
-                    ltsmin_expr_t l = ctl_tree_walk(e->arg1, env, lts_type);
-                    ltsmin_expr_t r = ctl_tree_walk(e->arg2, env, lts_type);
-
-                    if (l != e->arg1 || r != e->arg2) {
-                        e->arg1 = l;
-                        e->arg2 = r;
-                        LTSminExprRehash(e);
-                    }
-
-                    switch (e->token) {
-                        case CTL_AND: {
-                            if (l->token == CTL_FALSE) { // false /\ a is false
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            if (r->token == CTL_FALSE) { // a /\ false is false
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (l->token == CTL_TRUE) { // true /\ a is a
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (r->token == CTL_TRUE) { // a /\ true is a
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            break;
-                        }
-                        case CTL_OR: {
-                            if (l->token == CTL_TRUE) { // true \/ a is true
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            if (r->token == CTL_TRUE) { // a \/ true is true
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (l->token == CTL_FALSE) { // false \/ a is a
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (r->token == CTL_FALSE) { // a \/ false is a
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            break;
-                        }
-                        case CTL_EQUIV: {
-                            if (l->token == CTL_TRUE) { // true <-> a is a
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (r->token == CTL_TRUE) { // a <-> true is a
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                return l;
-                            }
-                            if (l->token == CTL_FALSE) { // false <-> a is !a, !a can be optimized
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                ltsmin_expr_t n = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), r, 0);
-                                return pred_tree_walk(n, env, lts_type);
-                            }
-                            if (r->token == CTL_FALSE) { // a <-> false is !a, !a can be optimized
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                ltsmin_expr_t n = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), l, 0);
-                                return pred_tree_walk(n, env, lts_type);
-                            }
-                            break;
-                        }
-                        case CTL_IMPLY: {
-                            if (l->token == CTL_FALSE || r->token == CTL_TRUE) { // false -> a is true, a -> true is true
-                                ltsmin_expr_t n = LTSminExpr(CONSTANT, CTL_TRUE, LTSminConstantIdx(env, CTL_NAME(CTL_TRUE)), 0, 0);
-                                pre_decorate(e, n);
-                                init_decoration(n, env, lts_type);
-                                n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-                                LTSminExprDestroy(e, 1);
-                                return n;
-                            }
-                            if (l->token == CTL_TRUE) { // true -> a is a
-                                LTSminExprDestroy(l, 1);
-                                LTSminExprDestroy(e, 0);
-                                return r;
-                            }
-                            if (r->token == CTL_FALSE) { // a -> false is !a, !a can be optimized
-                                LTSminExprDestroy(r, 1);
-                                LTSminExprDestroy(e, 0);
-                                ltsmin_expr_t n = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), l, 0);
-                                return pred_tree_walk(n, env, lts_type);
-                            }
-                            break;
-                        }
-                    }
-
-                    if (LTSminExprEq(l, r)) {
-                        switch (e->token) {
-                            case CTL_EQUIV: case CTL_IMPLY: { // a {<->, ->} a is true
-                                ltsmin_expr_t n = LTSminExpr(CONSTANT, CTL_TRUE, LTSminConstantIdx(env, CTL_NAME(CTL_TRUE)), 0, 0);
-                                pre_decorate(e, n);
-                                init_decoration(n, env, lts_type);
-                                n->annotation->chunk_type = type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-                                LTSminExprDestroy(e, 1);
-                                return n;
-                            }
-                            case CTL_OR: case CTL_AND: { // a {\/, /\} a is a
-                                LTSminExprDestroy(e, 0);
-                                LTSminExprDestroy(r, 1);
-                                return l;
-                            }
-                        }
-                    }
-
-                    decorate(e, e->arg1);
-                    decorate(e, e->arg2);
-
-                    const int left = e->arg1->annotation->chunk_type;
-                    const int right = e->arg2->annotation->chunk_type;
-
-                    type_check_require_type(lts_type, left, LTSMIN_TYPE_BOOL, e->arg1, env);
-                    type_check_require_type(lts_type, right, LTSMIN_TYPE_BOOL, e->arg2, env);
-
-                    const data_format_t format[1] = { LTStypeEnum };
-                    type_check_require_format(lts_type, left, format, 1, e->arg1, env, "enum");
-                    type_check_require_format(lts_type, right, format, 1, e->arg2, env, "enum");
-
-                    e->annotation->chunk_type = left;
-
-                    return e;
-                }
-                default: {
-                    return pred_tree_walk(e, env, lts_type);
-                }
-            }
-        }
-        case UNARY_OP: {
-            switch (e->token) {
-                case CTL_NOT:
-                case CTL_NEXT: case CTL_FUTURE: case CTL_GLOBALLY: case CTL_EXIST: case CTL_ALL: {
-
-                    pre_decorate(e, e->arg1);
-                    
-                    ltsmin_expr_t c = ctl_tree_walk(e->arg1, env, lts_type);
-
-                    if (c != e->arg1) {
-                        e->arg1 = c;
-                        LTSminExprRehash(e);
-                    }
-
-                    decorate(e, e->arg1);
-
-                    const int type = e->arg1->annotation->chunk_type;
-
-                    const data_format_t format[1] = { LTStypeEnum };
-                    type_check_require_format(lts_type, type, format, 1, e->arg1, env, "enum");
-                    
-                    e->annotation->chunk_type = type;
-                    return e;
-                }
-                default: {
-                    return pred_tree_walk(e, env, lts_type);
-                }
-            }
-        }
-        default: {
-            return pred_tree_walk(e, env, lts_type);
-        }
-    }
+    return e;
 }
 
 ltsmin_expr_t
@@ -1081,17 +631,11 @@ pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t lts_type)
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
-    env->expr->create_annotation = create_annotation;
-    env->expr->destroy_annotation = destroy_annotation;
-    env->expr->copy_annotation = copy_annotation;
+    const int type = ltsmin_expr_type_check(env->expr, env, lts_type);
 
-    ltsmin_expr_t expr = pred_tree_walk(env->expr, env, lts_type);
-
-    if (expr != env->expr) LTSminExprRehash(expr);
-
-    type_check_require_type(lts_type, expr->annotation->chunk_type, LTSMIN_TYPE_BOOL, expr, env);
-
-    return expr;
+    type_check_require_type(lts_type, type, LTSMIN_TYPE_BOOL, env->expr, env);
+    
+    return ltsmin_expr_optimize(env->expr, env, NULL);
 }
 
 /* Parser Priorities:
@@ -1151,19 +695,19 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
-    env->expr->create_annotation = create_annotation;
-    env->expr->destroy_annotation = destroy_annotation;
-    env->expr->copy_annotation = copy_annotation;
-    
-    ltsmin_expr_t expr = ltl_tree_walk(env->expr, env, ltstype);
-    
-    if (expr != env->expr) LTSminExprRehash(expr);
+    const int type = ltsmin_expr_type_check(env->expr, env, ltstype);
 
-    type_check_require_type(ltstype, expr->annotation->chunk_type, LTSMIN_TYPE_BOOL, expr, env);
+    type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    return expr;
+    return ltsmin_expr_optimize(env->expr, env, ltl_optimize);
 }
 
+ltsmin_expr_t
+ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
+{
+    (void) e; (void) env;
+    return e;
+}
 
 /* CTL:
  *     E. M. Clarke, E. A. Emerson and A. P. Sistla,
@@ -1227,152 +771,12 @@ ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
-    env->expr->create_annotation = create_annotation;
-    env->expr->destroy_annotation = destroy_annotation;
-    env->expr->copy_annotation = copy_annotation;
+    const int type = ltsmin_expr_type_check(env->expr, env, ltstype);
 
-    ltsmin_expr_t expr = ctl_tree_walk(env->expr, env, ltstype);
+    type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    if (expr != env->expr) LTSminExprRehash(expr);
-
-    type_check_require_type(ltstype, expr->annotation->chunk_type, LTSMIN_TYPE_BOOL, expr, env);
-
-    return expr;
+    return ltsmin_expr_optimize(env->expr, env, ctl_optimize);
 }
-
-static ltsmin_expr_t
-mu_tree_walk(ltsmin_expr_t e, ltsmin_parse_env_t env, lts_type_t lts_type)
-{
-    init_decoration(e, env, lts_type);
-    
-    switch (e->node_type) {
-    case BINARY_OP: {
-	switch (e->token) {
-	case MU_OR: case MU_AND: {
-	    pre_decorate(e,e->arg1);
-	    pre_decorate(e,e->arg2);
-	    ltsmin_expr_t l = mu_tree_walk(e->arg1, env, lts_type);
-	    ltsmin_expr_t r = mu_tree_walk(e->arg2, env, lts_type);
-	    if (l != e->arg1 || r != e->arg2) {
-		e->arg1 = l;
-		e->arg2 = r;
-		LTSminExprRehash(e);
-	    }
-
-	    switch (e->token) {
-	    case MU_AND: {
-		if (l->token == MU_FALSE) { // false /\ a is false
-		    LTSminExprDestroy(r, 1);
-		    LTSminExprDestroy(e, 0);
-		    return l;
-		}
-		if (r->token == MU_FALSE) { // a /\ false is false
-		    LTSminExprDestroy(l, 1);
-		    LTSminExprDestroy(e, 0);
-		    return r;
-		}
-		if (l->token == MU_TRUE) { // true /\ a is a
-		    LTSminExprDestroy(l, 1);
-		    LTSminExprDestroy(e, 0);
-		    return r;
-		}
-		if (r->token == MU_TRUE) { // a /\ true is a
-		    LTSminExprDestroy(r, 1);
-		    LTSminExprDestroy(e, 0);
-		    return l;
-		}
-		break;
-	    }
-	    case MU_OR: {
-		if (l->token == MU_TRUE) { // true \/ a is true
-		    LTSminExprDestroy(r, 1);
-		    LTSminExprDestroy(e, 0);
-		    return l;
-		}
-		if (r->token == MU_TRUE) { // a \/ true is true
-		    LTSminExprDestroy(l, 1);
-		    LTSminExprDestroy(e, 0);
-		    return r;
-		}
-		if (l->token == MU_FALSE) { // false \/ a is a
-		    LTSminExprDestroy(l, 1);
-		    LTSminExprDestroy(e, 0);
-		    return r;
-		}
-		if (r->token == MU_FALSE) { // a \/ false is a
-		    LTSminExprDestroy(r, 1);
-		    LTSminExprDestroy(e, 0);
-		    return l;
-		}
-		break;
-	    }
-	    }
-
-	    if (LTSminExprEq(l, r)) {
-		switch (e->token) {
-		case MU_OR: case MU_AND: { // a {\/, /\} a is a
-		    LTSminExprDestroy(e, 0);
-		    LTSminExprDestroy(r, 1);
-		    return l;
-		}
-		}
-	    }
-	    decorate(e, e->arg1);
-	    decorate(e, e->arg2);
-
-	    const int left = e->arg1->annotation->chunk_type;
-	    const int right = e->arg2->annotation->chunk_type;
-
-	    type_check_require_type(lts_type, left, LTSMIN_TYPE_BOOL, e->arg1, env);
-	    type_check_require_type(lts_type, right, LTSMIN_TYPE_BOOL, e->arg2, env);
-
-	    const data_format_t format[1] = { LTStypeEnum };
-	    type_check_require_format(lts_type, left, format, 1, e->arg1, env, "enum");
-	    type_check_require_format(lts_type, right, format, 1, e->arg2, env, "enum");
-
-	    e->annotation->chunk_type = left;
-
-	    return e;
-	}
-	default: {
-	    return pred_tree_walk(e, env, lts_type);
-	}
-	}
-    }
-    case UNARY_OP: {
-	switch (e->token) {
-	case MU_NOT: case MU_NEXT: case MU_EXIST: case MU_ALL: {
-
-	    pre_decorate(e, e->arg1);
-                    
-	    ltsmin_expr_t c = mu_tree_walk(e->arg1, env, lts_type);
-
-	    if (c != e->arg1) {
-		e->arg1 = c;
-		LTSminExprRehash(e);
-	    }
-
-	    decorate(e, e->arg1);
-
-	    const int type = e->arg1->annotation->chunk_type;
-
-	    const data_format_t format[1] = { LTStypeEnum };
-	    type_check_require_format(lts_type, type, format, 1, e->arg1, env, "enum");
-                    
-	    e->annotation->chunk_type = type;
-	    return e;
-	}
-	default: {
-	    return pred_tree_walk(e, env, lts_type);
-	}
-	}
-    }
-    default: {
-	return pred_tree_walk(e, env, lts_type);
-    }
-    }
-}
-
     
 /*
  * From: Modal mu-calculi, Julian Bradfield and Colin Stirling
@@ -1424,17 +828,11 @@ mu_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
-    env->expr->create_annotation = create_annotation;
-    env->expr->destroy_annotation = destroy_annotation;
-    env->expr->copy_annotation = copy_annotation;
+    const int type = ltsmin_expr_type_check(env->expr, env, ltstype);
 
-    ltsmin_expr_t expr = mu_tree_walk(env->expr, env, ltstype);
-    if (expr != env->expr) LTSminExprRehash(expr);
+    type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    type_check_require_type(ltstype, expr->annotation->chunk_type, LTSMIN_TYPE_BOOL, expr, env);
-    
-    env->expr=NULL;
-    return expr;
+    return ltsmin_expr_optimize(env->expr, env, NULL);
 }
 
 

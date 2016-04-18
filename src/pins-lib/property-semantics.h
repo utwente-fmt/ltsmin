@@ -17,8 +17,8 @@
 #include <pins-lib/pins-util.h>
 #include <util-lib/util.h>
 
-/* set visibility in PINS and dependencies in e->annotation->state_deps */
-extern void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps);
+/* set visibility in PINS and dependencies in deps (if not NULL) */
+extern void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps, bitvector_t *sl_deps);
 
 extern long eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t env);
 

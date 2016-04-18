@@ -378,16 +378,6 @@ ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,
     hash[3] = arg1?arg1->hash:0;
     hash[4] = arg2?arg2->hash:0;
     E->hash = SuperFastHash((const char*)hash, sizeof(hash), 0x0739c2d6);
-    if (arg1 != NULL) {
-        E->create_annotation = arg1->create_annotation;
-        E->copy_annotation = arg1->copy_annotation;
-        E->destroy_annotation = arg1->destroy_annotation;
-    } else {
-        E->create_annotation = NULL;
-        E->copy_annotation = NULL;
-        E->destroy_annotation = NULL;
-    }
-    if (E->create_annotation != NULL) E->annotation = E->create_annotation();
     E->context = NULL;
     E->destroy_context = NULL;
     return E;
@@ -430,13 +420,6 @@ ltsmin_expr_t LTSminExprClone(ltsmin_expr_t expr)
 
     if (e->arg1 != NULL) e->arg1->parent = e;
     if (e->arg2 != NULL) e->arg2->parent = e;
-
-    if (e->create_annotation != NULL) {
-        e->annotation = e->create_annotation();
-        if (e->copy_annotation != NULL) {
-            e->copy_annotation(expr->annotation, e->annotation);
-        }
-    } else e->annotation = NULL;
     
     return e;
 }
@@ -446,10 +429,6 @@ void LTSminExprDestroy(ltsmin_expr_t expr, int recursive)
 {
     if (recursive && expr->arg1) LTSminExprDestroy(expr->arg1, recursive);
     if (recursive && expr->arg2) LTSminExprDestroy(expr->arg2, recursive);
-    if (expr->destroy_annotation != NULL) {
-        expr->destroy_annotation(expr->annotation);
-        expr->annotation = NULL;
-    }
     if (expr->destroy_context != NULL) {
         expr->destroy_context(expr->context);
         expr->context = NULL;
@@ -459,7 +438,7 @@ void LTSminExprDestroy(ltsmin_expr_t expr, int recursive)
 
 ltsmin_expr_t LTSminExprSibling(ltsmin_expr_t e)
 {
-//    HREassert(e->parent != NULL);
+    HREassert(e->parent != NULL);
             
     if (e->parent->arg1 == e) return e->parent->arg2;
     return e->parent->arg1;

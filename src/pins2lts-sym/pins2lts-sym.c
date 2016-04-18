@@ -336,6 +336,8 @@ static ltsmin_expr_t* inv_expr;
 static proj_info* inv_proj = NULL;
 static vset_t* inv_set = NULL;
 static int* inv_violated = NULL;
+static bitvector_t* inv_deps = NULL;
+static bitvector_t* inv_sl_deps = NULL;
 static int num_inv_violated = 0;
 static bitvector_t state_label_used;
 
@@ -1077,7 +1079,7 @@ inv_cleanup()
     int n_violated = 0;
     for (int i = 0; i < num_inv; i++) {
         if (!inv_violated[i]) {
-            bitvector_union(&state_label_used, &inv_expr[i]->annotation->state_label_deps);
+            bitvector_union(&state_label_used, &inv_sl_deps[i]);
         } else n_violated++;
     }
     
@@ -3634,9 +3636,11 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
     case PRED_LEQ:
     case PRED_GT:
     case PRED_GEQ: {
-        set_pins_semantics(model, e, env, &e->annotation->state_deps);
+        bitvector_t deps;
+        bitvector_create(&deps, N);
+        set_pins_semantics(model, e, env, &deps, NULL);
         
-        const int len = bitvector_n_high(&e->annotation->state_deps);
+        const int len = bitvector_n_high(&deps);
 
         c = RTmalloc(sizeof(struct inv_info_s)
                 + sizeof(struct inv_rel_s)
@@ -3652,11 +3656,12 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
         GBgetInitialState(model, rel->vec);
         
         rel->len = len;
-        bitvector_high_bits(&e->annotation->state_deps, rel->deps);
+        bitvector_high_bits(&deps, rel->deps);
         rel->tmp = vset_create(domain, rel->len, rel->deps);
         rel->true_states = vset_create(domain, rel->len, rel->deps);
         rel->false_states = vset_create(domain, rel->len, rel->deps);
         if (!inv_bin_par) rel->shortcut = vset_create(domain, -1, NULL);
+        bitvector_free(&deps);
         break;
     }
     default:
@@ -3804,6 +3809,9 @@ init_invariant_detection()
     inv_expr = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * num_inv);
     inv_violated = (int*) RTmallocZero(sizeof(int) * num_inv);
     inv_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * num_inv);
+    inv_deps = (bitvector_t*) RTmalloc(sizeof(bitvector_t) * num_inv);
+    inv_sl_deps = (bitvector_t*) RTmalloc(sizeof(bitvector_t) * num_inv);
+    
     for (int i = 0; i < num_inv; i++) {
         inv_parse_env[i] = LTSminParseEnvCreate();
         inv_expr[i] = pred_parse_file(inv_detect[i], inv_parse_env[i], ltstype);
@@ -3813,10 +3821,12 @@ init_invariant_detection()
             sprintf(buf, s, i + 1);
             LTSminLogExpr(infoLong, buf, inv_expr[i], inv_parse_env[i]);
         }
-        set_pins_semantics(model, inv_expr[i], inv_parse_env[i], &inv_expr[i]->annotation->state_deps);
-        inv_proj[i].len = bitvector_n_high(&inv_expr[i]->annotation->state_deps);
+        bitvector_create(&inv_deps[i], N);
+        bitvector_create(&inv_sl_deps[i], sLbls);
+        set_pins_semantics(model, inv_expr[i], inv_parse_env[i], &inv_deps[i], &inv_sl_deps[i]);
+        inv_proj[i].len = bitvector_n_high(&inv_deps[i]);
         inv_proj[i].proj = (int*) RTmalloc(inv_proj[i].len * sizeof(int));
-        bitvector_high_bits(&inv_expr[i]->annotation->state_deps, inv_proj[i].proj);
+        bitvector_high_bits(&inv_deps[i], inv_proj[i].proj);
     }
 
     inv_cleanup();
@@ -3966,21 +3976,25 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
     case MU_GEQ: {
         result = vset_create(domain, -1, NULL);
 
-        set_pins_semantics(model, mu_expr, env, &mu_expr->annotation->state_deps);
+        bitvector_t deps;
+        bitvector_create(&deps, N);
+
+        set_pins_semantics(model, mu_expr, env, &deps, NULL);
         struct rel_expr_info ctx;
 
         int vec[N];
         GBsetInitialState(model, vec);
         ctx.vec = vec;
-        ctx.len = bitvector_n_high(&mu_expr->annotation->state_deps);
-        int deps[ctx.len];
-        bitvector_high_bits(&mu_expr->annotation->state_deps, deps);
-        ctx.deps = deps;
+        ctx.len = bitvector_n_high(&deps);
+        int d[ctx.len];
+        bitvector_high_bits(&deps, d);
+        bitvector_free(&deps);
+        ctx.deps = d;
 
         ctx.e = mu_expr;
         ctx.env = env;
 
-        vset_t tmp = vset_create(domain, ctx.len, deps);
+        vset_t tmp = vset_create(domain, ctx.len, d);
         vset_project(tmp, visited);
 
         // count when verbose
@@ -3993,7 +4007,7 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
             }
         }
 
-        vset_t true_states = vset_create(domain, ctx.len, deps);
+        vset_t true_states = vset_create(domain, ctx.len, d);
 
         vset_update(true_states, tmp, rel_expr_cb, &ctx);
 
@@ -4013,7 +4027,8 @@ static vset_t** mu_vars = NULL;
 
 static void
 init_mu_calculus()
-{   int total = num_mu + num_ctl_star + num_ctl + num_ltl;
+{
+    int total = num_mu + num_ctl_star + num_ctl + num_ltl;
     if (total > 0) {
         mu_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * total);
 	mu_exprs = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * total);
@@ -4022,7 +4037,6 @@ init_mu_calculus()
             mu_parse_env[i] = LTSminParseEnvCreate();
             Warning(info, "parsing MU-calculus formula");
             mu_exprs[i] = mu_parse_file(mu_formulas[i], mu_parse_env[i], ltstype);
-	    set_pins_semantics(model, mu_exprs[i], mu_parse_env[i], &(mu_exprs[i])->annotation->state_deps);
         }
 	total += num_mu;
         for (int i = 0; i < num_ctl_star; i++) {
@@ -4031,7 +4045,6 @@ init_mu_calculus()
             ltsmin_expr_t ctl_star = ctl_parse_file(ctl_star_formulas[i], mu_parse_env[total + i], ltstype);
             Warning(info, "converting CTL* %s to mu-calculus", ctl_star_formulas[i]);
             mu_exprs[total + i] = ctl_star_to_mu(ctl_star);
-	    set_pins_semantics(model, mu_exprs[total + i], mu_parse_env[total + i], &mu_exprs[total + i]->annotation->state_deps);
         }
 	total += num_ctl_star;
         for (int i = 0; i < num_ctl; i++) {
@@ -4040,7 +4053,6 @@ init_mu_calculus()
             ltsmin_expr_t ctl = ctl_parse_file(ctl_formulas[i], mu_parse_env[total + i], ltstype);
             Warning(info, "converting CTL %s to mu-calculus", ctl_formulas[i]);
             mu_exprs[total + i] = ctl_to_mu(ctl, mu_parse_env[total + i]);
-	    set_pins_semantics(model, mu_exprs[total + i], mu_parse_env[total + i], &mu_exprs[total + i]->annotation->state_deps);
         }
 	total += num_ctl;
         for (int i = 0; i < num_ltl; i++) {
@@ -4049,7 +4061,6 @@ init_mu_calculus()
             ltsmin_expr_t ltl = ctl_parse_file(ltl_formulas[i], mu_parse_env[total + i], ltstype);
             Warning(info, "converting LTL %s to mu-calculus", ltl_formulas[i]);
             mu_exprs[total + i] = ltl_to_mu(ltl);
-	    set_pins_semantics(model, mu_exprs[total + i], mu_parse_env[total + i], &mu_exprs[total + i]->annotation->state_deps);
         }
 	total += num_ltl;
 

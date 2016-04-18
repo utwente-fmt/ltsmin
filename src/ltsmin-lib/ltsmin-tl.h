@@ -8,13 +8,6 @@
 #include <ltsmin-lib/ltsmin-grammar.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 
-struct lts_annotation_s {
-    bitvector_t         state_deps;
-    bitvector_t         state_label_deps;
-    matrix_t            edge_label_deps;
-    int                 chunk_type;
-};
-
 /* Predicate language */
 typedef enum {
     PRED_SVAR  = SVAR,
@@ -174,6 +167,16 @@ extern ltsmin_expr_t ctl_to_mu(ltsmin_expr_t, ltsmin_parse_env_t env);
 extern ltsmin_expr_t ltl_to_mu(ltsmin_expr_t);
 extern char* ltsmin_expr_print_ctl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_mu(ltsmin_expr_t, char*);
+
+extern int ltsmin_expr_type_check(const ltsmin_expr_t, const ltsmin_parse_env_t, const lts_type_t);
+
+typedef ltsmin_expr_t (*tl_optimize_t)(ltsmin_expr_t, const ltsmin_parse_env_t);
+
+extern ltsmin_expr_t ltl_optimize(ltsmin_expr_t, const ltsmin_parse_env_t);
+extern ltsmin_expr_t ctl_optimize(ltsmin_expr_t, const ltsmin_parse_env_t);
+extern ltsmin_expr_t mu_optimize(ltsmin_expr_t, const ltsmin_parse_env_t);
+
+extern ltsmin_expr_t ltsmin_expr_optimize(ltsmin_expr_t, const ltsmin_parse_env_t, tl_optimize_t);
 
 /* ctl* to mu conversion
  *

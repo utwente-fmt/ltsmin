@@ -1522,7 +1522,7 @@ gsea_setup(const char *output)
         opt.env = LTSminParseEnvCreate();
         opt.inv_expr = pred_parse_file (opt.inv_detect, opt.env, GBgetLTStype(opt.model));
         if (PINS_POR) {
-            set_pins_semantics(opt.model, opt.inv_expr, opt.env, NULL);
+            set_pins_semantics(opt.model, opt.inv_expr, opt.env, NULL, NULL);
             set_cycle_proviso ();
         }
     }
