@@ -110,10 +110,6 @@ struct ltsmin_expr_s {
     ltsmin_expr_t       arg2;
     uint32_t            hash;
     ltsmin_expr_t       parent;
-    lts_annotation_t    annotation;
-    void                (*copy_annotation)(const lts_annotation_t src, lts_annotation_t tgt);
-    lts_annotation_t    (*create_annotation)();
-    void                (*destroy_annotation)(lts_annotation_t a);
     void*               context;
     void                (*destroy_context)(void* c);
 };

@@ -781,7 +781,7 @@ GBaddLTL (model_t model)
     
     // mark the parts the buchi automaton uses for reading
     for (int k=0; k < ba->predicate_count; k++) {
-        set_pins_semantics(model, ba->predicates[k], ba->env, &formula_state_dep);
+        set_pins_semantics(model, ba->predicates[k], ba->env, &formula_state_dep, NULL);
     }
 
     // add one column to the matrix
