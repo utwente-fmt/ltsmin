@@ -4063,7 +4063,13 @@ init_mu_calculus()
             mu_parse_env[total + i] = LTSminParseEnvCreate();
             Warning(info, "parsing CTL formula");
             mu_exprs[total + i] = ctl_parse_file(ctl_formulas[i], mu_parse_env[total + i], ltstype);
-            Warning(info, "converting CTL %s to mu-calculus", ctl_formulas[i]);
+            if (log_active(infoLong)) {
+                const char s[] = "Loaded and optimized CTL formula #%d: ";
+                char buf[snprintf(NULL, 0, s, i + 1) + 1];
+                sprintf(buf, s, i + 1);
+                LTSminLogExpr(infoLong, buf, mu_exprs[total + i], mu_parse_env[total + i]);
+            }
+            Warning(info, "converting CTL to mu-calculus...");
             mu_exprs[total + i] = ctl_to_mu(mu_exprs[total + i], mu_parse_env[total + i], ltstype);
             if (log_active(infoLong)) {
                 const char s[] = "Converted CTL to mu-calculus formula #%d: ";
