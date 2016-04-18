@@ -4235,8 +4235,6 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 {
     vset_t x = mu_compute(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
     if (x != NULL) {
-        double e_count;
-        vset_count(x, NULL, &e_count);
 	char* formula = NULL;
 	// recall: mu-formulas, ctl-star formulas, ctl-formulas, ltl-formulas
 	if (i < num_mu) {
@@ -4250,9 +4248,14 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 	} else {
             Warning(error, "Number of formulas doesn't match (%d+%d+%d+%d)", num_mu, num_ctl_star, num_ctl, num_ltl);
         }
+        
+        if (log_active(infoLong)) {
+            double e_count;
+            vset_count(x, NULL, &e_count);
+            Warning(infoLong, "Formula %s holds for %.*g states,", formula, DBL_DIG, e_count);
+        }
 
-        Warning(info, "Formula %s holds for %.*g states,", formula, DBL_DIG, e_count);
-        Warning(info, "the initial state is %sin the set", vset_member(x, init) ? "" : "not ");
+        Warning(info, "Formula %s %s for the initial state", formula, vset_member(x, init) ? "holds" : "does not hold");
         vset_destroy(x);
     }
 }
