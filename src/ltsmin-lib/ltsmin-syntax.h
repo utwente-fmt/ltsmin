@@ -24,6 +24,7 @@ extern void ltsmin_parse_stream(int select,ltsmin_parse_env_t env,stream_t strea
 
 extern ltsmin_parse_env_t LTSminParseEnvCreate();
 extern void LTSminParseEnvDestroy(ltsmin_parse_env_t);
+extern void LTSminParseEnvReset(ltsmin_parse_env_t);
 
 extern void LTSminKeyword(ltsmin_parse_env_t env, int token,const char* keyword);
 

@@ -72,6 +72,26 @@ void LTSminParseEnvDestroy(ltsmin_parse_env_t env) {
     return;
 }
 
+void LTSminParseEnvReset(ltsmin_parse_env_t env) {
+    SIreset(env->keywords);
+    SIreset(env->constant_ops);
+    SIreset(env->unary_ops);
+    SIreset(env->binary_ops);
+    SIreset(env->idents);
+    destroy_manager(env->constant_man);
+    destroy_manager(env->unary_man);
+    destroy_manager(env->binary_man);
+    env->constant_info=NULL;
+    env->unary_info=NULL;
+    env->binary_info=NULL;
+    env->constant_man=create_manager(32);
+    ADD_ARRAY(env->constant_man,env->constant_info,struct op_info);
+    env->unary_man=create_manager(32);
+    ADD_ARRAY(env->unary_man,env->unary_info,struct op_info);
+    env->binary_man=create_manager(32);
+    ADD_ARRAY(env->binary_man,env->binary_info,struct op_info);
+}
+
 int LTSminValueIndex(ltsmin_parse_env_t env,const char* name){
     return SIput(env->values,name);
 }
