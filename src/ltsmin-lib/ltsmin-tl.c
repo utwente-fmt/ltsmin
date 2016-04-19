@@ -297,17 +297,16 @@ ltsmin_expr_type_check(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
 }
 
 ltsmin_expr_t
-ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env, tl_optimize_t tl_optimize)
+ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env)
 {
-
     ltsmin_expr_t left, right;
     left = right = NULL;
 
     switch (e->node_type) {
         case BINARY_OP: {
 
-            left = ltsmin_expr_optimize(e->arg1, env, tl_optimize);
-            right = ltsmin_expr_optimize(e->arg2, env, tl_optimize);
+            left = ltsmin_expr_optimize(e->arg1, env);
+            right = ltsmin_expr_optimize(e->arg2, env);
 
             switch (e->token) {
                 case S_AND: {
@@ -374,12 +373,12 @@ ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env, tl_optimize_
                         LTSminExprDestroy(left, 1);
                         LTSminExprDestroy(e, 0);
                         e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), right, 0);
-                        return ltsmin_expr_optimize(e, env, tl_optimize);
+                        return ltsmin_expr_optimize(e, env);
                     } else if (right->token == S_FALSE) { // a {<->,==} false is !a, !a can be optimized
                         LTSminExprDestroy(right, 1);
                         LTSminExprDestroy(e, 0);
                         e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
-                        return ltsmin_expr_optimize(e, env, tl_optimize);
+                        return ltsmin_expr_optimize(e, env);
                     }
                     break;
                 }
@@ -399,12 +398,12 @@ ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env, tl_optimize_
                         LTSminExprDestroy(left, 1);
                         LTSminExprDestroy(e, 0);
                         e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), right, 0);
-                        return ltsmin_expr_optimize(e, env, tl_optimize);
+                        return ltsmin_expr_optimize(e, env);
                     } else if (right->token == S_TRUE) { // a != true is !a, !a can be optimized
                         LTSminExprDestroy(right, 1);
                         LTSminExprDestroy(e, 0);
                         e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
-                        return ltsmin_expr_optimize(e, env, tl_optimize);
+                        return ltsmin_expr_optimize(e, env);
                     }
                     break;
                 }
@@ -423,7 +422,7 @@ ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env, tl_optimize_
                         LTSminExprDestroy(right, 1);
                         LTSminExprDestroy(e, 0);
                         e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
-                        return ltsmin_expr_optimize(e, env, tl_optimize);
+                        return ltsmin_expr_optimize(e, env);
                     }
                     break;
                 }
@@ -466,9 +465,6 @@ ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env, tl_optimize_
                     break;
                 }
                 default: {
-                    if (tl_optimize != NULL) {
-                        return tl_optimize(e, env);
-                    }
                     break;
                 }
             }
@@ -549,18 +545,12 @@ ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env, tl_optimize_
                             break;
                         }
                         default: {
-                            if (tl_optimize != NULL) {
-                                return tl_optimize(e, env);
-                            }
                             break;
                         }
                     }
                     break;
                 }
                 default: {
-                    if (tl_optimize != NULL) {
-                        return tl_optimize(e, env);
-                    }
                     break;
                 }
             }
@@ -568,14 +558,18 @@ ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env, tl_optimize_
             if (e != n) {
                 n->arg1->parent = n;
                 LTSminExprRehash(n);
+                return ltsmin_expr_optimize(n, env);
+            } else {
+                e->arg1 = ltsmin_expr_optimize(e->arg1, env);
+                if (e->arg1 != n->arg1) {
+                    e->arg1->parent = e;
+                    LTSminExprRehash(e);
+                }
+                return e;
             }
-
-            return ltsmin_expr_optimize(n, env, tl_optimize);
+            break;
         }
         default: {
-            if (tl_optimize != NULL) {
-                return tl_optimize(e, env);
-            }
             break;
         }
     }
@@ -641,7 +635,7 @@ pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t lts_type)
 
     type_check_require_type(lts_type, type, LTSMIN_TYPE_BOOL, env->expr, env);
     
-    return ltsmin_expr_optimize(env->expr, env, NULL);
+    return ltsmin_expr_optimize(env->expr, env);
 }
 
 static void
@@ -710,7 +704,7 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    return ltsmin_expr_optimize(env->expr, env, ltl_optimize);
+    return ltsmin_expr_optimize(env->expr, env);
 }
 
 static void
@@ -757,7 +751,7 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
         if (e->arg1->token == CTL_EXIST) {
             if (e->arg1->arg1->token == CTL_NEXT) { // !EX p is AX !p, !p can be optimized
                 e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
                 LTSminExprRehash(e->arg1->arg1->arg1);
                 e->arg1->arg1->arg1->parent = e->arg1->arg1;
                 e->arg1->token = CTL_ALL;
@@ -767,7 +761,7 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
                 return e->arg1;
             } else if (e->arg1->arg1->token == CTL_FUTURE) { // !EF p is AG !p, !p can be optimized
                 e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
                 LTSminExprRehash(e->arg1->arg1->arg1);
                 e->arg1->arg1->arg1->parent = e->arg1->arg1;
                 e->arg1->arg1->token = CTL_GLOBALLY;
@@ -780,7 +774,7 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
                 return e->arg1;
             } else if (e->arg1->arg1->token == CTL_GLOBALLY) { // !EG p is AF !p, !p can be optimized
                 e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
                 LTSminExprRehash(e->arg1->arg1->arg1);
                 e->arg1->arg1->arg1->parent = e->arg1->arg1;
                 e->arg1->arg1->token = CTL_FUTURE;
@@ -795,7 +789,7 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
         } else if (e->arg1->token == CTL_ALL) {
             if (e->arg1->arg1->token == CTL_NEXT) { // !AX p is EX !p, !p can be optimized
                 e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
                 LTSminExprRehash(e->arg1->arg1->arg1);
                 e->arg1->arg1->arg1->parent = e->arg1->arg1;
                 e->arg1->token = CTL_EXIST;
@@ -805,7 +799,7 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
                 return e->arg1;
             } else if (e->arg1->arg1->token == CTL_FUTURE) { // !AF p is EG !p, !p can be optimized
                 e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
                 LTSminExprRehash(e->arg1->arg1->arg1);
                 e->arg1->arg1->arg1->parent = e->arg1->arg1;
                 e->arg1->arg1->token = CTL_GLOBALLY;
@@ -818,7 +812,7 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
                 return e->arg1;
             } else if (e->arg1->arg1->token == CTL_GLOBALLY) { // !AG p is EF !p, !p can be optimized
                 e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env, ctl_optimize);
+                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
                 LTSminExprRehash(e->arg1->arg1->arg1);
                 e->arg1->arg1->arg1->parent = e->arg1->arg1;
                 e->arg1->arg1->token = CTL_FUTURE;
@@ -831,25 +825,8 @@ ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
                 return e->arg1;
             }
         }
-    } else {
-        if (e->node_type == UNARY_OP) {
-            ltsmin_expr_t c = ltsmin_expr_optimize(e->arg1, env, ctl_optimize);
-            if (c != e->arg1) {
-                e->arg1 = c; c->parent = e;
-                LTSminExprRehash(e);
-                return e;
-            }
-        } else if (e->node_type == BINARY_OP) {
-            ltsmin_expr_t left = ltsmin_expr_optimize(e->arg1, env, ctl_optimize);
-            ltsmin_expr_t right = ltsmin_expr_optimize(e->arg2, env, ctl_optimize);
-            if (left != e->arg1 || right != e->arg2) {
-                e->arg1 = left; left->parent = e;
-                e->arg2 = right; right->parent = e;
-                LTSminExprRehash(e);
-                return e;
-            }
-        }
     }
+    
     return e;
 }
 
@@ -887,7 +864,7 @@ ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    return ltsmin_expr_optimize(env->expr, env, ctl_optimize);
+    return ltsmin_expr_optimize(env->expr, env);
 }
 
 static void
@@ -950,7 +927,7 @@ mu_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    return ltsmin_expr_optimize(env->expr, env, NULL);
+    return ltsmin_expr_optimize(env->expr, env);
 }
 
 
