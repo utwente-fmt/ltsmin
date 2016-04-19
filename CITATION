@@ -1,0 +1,55 @@
+If you were to refer to the LTSmin toolset, we would appreciate if you would use
+one of the following (APA-style) references (depending on the part(s) of the
+toolset that you are referring to):
+
+Kant, G., Laarman, A., Meijer, J., van de Pol, J., Blom, S., & van Dijk, T. (2015).
+LTSmin: High-performance language-independent model checking.
+In Tools and Algorithms for the Construction and Analysis of Systems (pp. 692-707). Springer.
+
+Laarman, A., van de Pol, J., & Weber, M. (2011). Multi-core LTSmin:
+Marrying modularity and scalability. In NASA Formal Methods (pp. 506-511). Springer.
+
+Blom, S., van de Pol, J., & Weber, M. (2010). LTSmin: Distributed and symbolic reachability.
+In Computer Aided Verification (pp. 354-359). Springer.
+
+
+Bibtex:
+
+@Inbook{Kant2015,
+    author="Kant, Gijs and Laarman, Alfons and Meijer, Jeroen and Pol, Jaco and Blom, Stefan and Dijk, Tom",
+    editor="Baier, Christel and Tinelli, Cesare",
+    chapter="LTSmin: High-Performance Language-Independent Model Checking",
+    title="Tools and Algorithms for the Construction and Analysis of Systems (TACAS)",
+    year="2015",
+    publisher="Springer",
+    pages="692--707",
+    isbn="978-3-662-46681-0",
+    doi="10.1007/978-3-662-46681-0_61",
+}
+
+@Inbook{Laarman2011,
+    author="Laarman, Alfons and Pol, Jaco and Weber, Michael",
+    editor="Bobaru, Mihaela and Havelund, Klaus and Holzmann, Gerard J. and Joshi, Rajeev",
+    chapter="Multi-Core LTSmin: Marrying Modularity and Scalability",
+    title="NASA Formal Methods (NFM)",
+    year="2011",
+    publisher="Springer",
+    pages="506--511",
+    isbn="978-3-642-20398-5",
+    doi="10.1007/978-3-642-20398-5_40",
+}
+
+@inbook{Blom2010,
+    Author = {Blom, Stefan and Pol, Jaco and Weber, Michael},
+    Chapter = {LTSmin: Distributed and Symbolic Reachability},
+    Doi = {10.1007/978-3-642-14295-6_31},
+    Editor = {Touili, Tayssir and Cook, Byron and Jackson, Paul},
+    Isbn = {978-3-642-14295-6},
+    Pages = {354--359},
+    Publisher = {Springer},
+    Title = {Computer Aided Verification (CAV)},
+    Year = {2010},
+}
+
+
+
