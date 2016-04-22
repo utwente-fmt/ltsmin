@@ -635,7 +635,7 @@ ltsmin_expr_t ctlmu(ltsmin_expr_t in, ltsmin_parse_env_t env, int free)
 			// translate E p U q  into  MU Z. q \/ (p /\ E X Z)
 			// translate A p U q  into  MU Z. q \/ (p /\ (A X Z /\ EX true))
                         create_mu_var(free, env);
-                        ltsmin_expr_t Z = LTSminExpr(MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
                         ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
                         res->arg1 = X;
                         res->arg1->parent = res;
@@ -744,9 +744,107 @@ ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in, ltsmin_parse_env_t env, lts_type_t lts
     return n;
 }
 
+
+
+
 ltsmin_expr_t ltl_to_mu(ltsmin_expr_t in)
 { // TODO use BA or TGBA from SPOT
-  return ctl_star_to_mu(in);
+    return ctl_star_to_mu(ltl_to_ctl_star(in));
+}
+
+MU mu_dual(MU token) {
+    switch(token) {
+        case MU_ALL: return MU_EXIST;
+        case MU_EXIST: return MU_ALL;
+        case MU_MU: return MU_NU;
+        case MU_NU: return MU_MU;
+        case MU_AND: return MU_OR;
+        case MU_OR: return MU_AND;
+        case MU_NEXT: return MU_NEXT;
+        case MU_TRUE: return MU_FALSE;
+        case MU_FALSE: return MU_TRUE;
+        case MU_EQ: return MU_NEQ;
+        case MU_LEQ: return MU_GT;
+        case MU_GT: return MU_LEQ;
+        case MU_GEQ: return MU_LT;
+        case MU_LT: return MU_GEQ;
+    default:
+	Abort("invalid token for mu_dual");
+    }
+}
+
+
+ltsmin_expr_t mu_optimize_rec(ltsmin_expr_t in, ltsmin_parse_env_t env, char negated, int* free, array_manager_t man, int rename[])
+{ // push negations inside
+  // make sure that all variables are different
+
+    switch(in->token) {
+    case MU_TRUE:
+    case MU_FALSE:  {
+	int token = (negated ? mu_dual(in->token) : in->token);
+	return LTSminExpr(CONSTANT,token,LTSminConstantIdx(env,MU_NAME(token)),0,0);
+    }
+    case MU_EQ:
+    case MU_NEQ:
+    case MU_LT:
+    case MU_LEQ:
+    case MU_GT:
+    case MU_GEQ: {
+	int token = (negated ? mu_dual(in->token) : in->token);
+	return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),in->arg1,in->arg2);
+    }
+    case MU_SVAR: {
+	if (negated) { return LTSminExpr(UNARY_OP, MU_NOT, LTSminUnaryIdx(env, MU_NAME(MU_NOT)), in, 0); }
+	else { return in; }
+    }
+    case MU_VAR: {
+	// assuming that the formula is monotonic we can ignore the sign
+	return LTSminExpr((ltsmin_expr_case)MU_VAR,MU_VAR,rename[in->idx],0,0);
+    }
+    case MU_OR:
+    case MU_AND: {
+	int token = (negated ? mu_dual(in->token) : in->token);
+	ltsmin_expr_t result1 = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+	ltsmin_expr_t result2 = mu_optimize_rec(in->arg2, env, negated, free, man, rename);
+	return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),result1,result2);
+    }
+    case MU_NOT: {
+	return mu_optimize_rec(in->arg1, env, !negated, free, man, rename); // do we care about a memory leak?
+    }
+    case MU_NEXT:
+    case MU_EXIST:
+    case MU_ALL: {
+	int token = (negated ? mu_dual(in->token) : in->token);
+	ltsmin_expr_t result = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+	result = LTSminExpr(UNARY_OP,token,LTSminUnaryIdx(env, MU_NAME(token)),result,0);
+	return result;
+    }
+    case MU_MU:
+    case MU_NU: {
+	int token = (negated ? mu_dual(in->token) : in->token);
+	int operator = (token==MU_MU ? MU_FIX : NU_FIX);
+	int index = (*free)++;
+	ensure_access(man,in->idx);
+	rename[in->idx]=index;
+	create_mu_var(index,env);
+	fprintf(stderr,"setting %d to %d\n",in->idx,rename[in->idx]);
+	ltsmin_expr_t result = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+	return LTSminExpr(operator,token,index,result,0);
+    }
+    default:
+        Abort("encountered unhandled mu operator");
+    }
+}
+
+ltsmin_expr_t mu_optimize(ltsmin_expr_t in, ltsmin_parse_env_t env)
+{   int free=0;
+    static array_manager_t man=NULL;
+    man = create_manager(512);
+    int* rename;
+    ADD_ARRAY(man, rename, int);
+    ltsmin_expr_t result = mu_optimize_rec(in,env,0,&free,man,rename);
+    destroy_manager(man);
+    return result;
 }
 
 int tableaux_node_eq(tableaux_node_t *n1, tableaux_node_t *n2)

@@ -56,6 +56,7 @@ static char** mu_formulas  = NULL;
 static int num_mu = 0;
 static int num_total = 0;
 static int mu_par = 0;
+static int mu_opt = 0;
 static ltsmin_parse_env_t* mu_parse_env = NULL;
 
 static char* dot_dir = NULL;
@@ -263,7 +264,9 @@ static  struct poptOption options[] = {
     { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par|none>" },
     { "inv-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize invariant detection", NULL },
     { "inv-bin-par", 0, POPT_ARG_VAL, &inv_bin_par, 1, "also parallelize every binary operand, may be slow when lots of state labels are to be evaluated (requires --inv-par)", NULL },
-    { "mu-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize mu-calculus", NULL },
+    { "mu-par", 0, POPT_ARG_VAL, &mu_par, 1, "parallelize mu-calculus", NULL },
+    { "mu-opt", 0, POPT_ARG_VAL, &mu_opt, 1, "optimize fix-point calculations in mu-calculus", NULL },
+
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
@@ -4038,6 +4041,13 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
     return result;
 }
 
+static vset_t
+mu_compute_optimal(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t* mu_var, array_manager_t mu_var_man)
+{
+    return mu_compute(mu_expr,env,visited,mu_var,mu_var_man);
+}
+
+
 static array_manager_t* mu_var_mans = NULL;
 static vset_t** mu_vars = NULL;
 
@@ -4249,7 +4259,19 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
 #define check_mu_go(v, i, s) CALL(check_mu_go, (v), (i), (s))
 VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 {
-    vset_t x = mu_compute(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
+    vset_t x;
+    if (mu_opt) {
+	mu_exprs[i] = mu_optimize(mu_exprs[i],mu_parse_env[i]);
+	if (log_active(infoLong)) {
+	    const char s[] = "Normalizing mu-calculus formula #%d: ";
+	    char buf[snprintf(NULL, 0, s, i + 1) + 1];
+	    sprintf(buf, s, i + 1);
+	    LTSminLogExpr(infoLong, buf, mu_exprs[i], mu_parse_env[i]);
+	}
+	x = mu_compute_optimal(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
+    }
+    else
+	x = mu_compute(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
     if (x != NULL) {
         char* formula = NULL;
         // recall: mu-formulas, ctl-star formulas, ctl-formulas, ltl-formulas
