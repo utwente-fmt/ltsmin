@@ -499,18 +499,21 @@ uf_add_acc (const uf_t *uf, ref_t state, uint32_t acc)
     if (acc == 0)
         return uf_get_acc (uf, state);
 
-    ref_t    r     = uf_find (uf, state);
-    uint32_t r_acc = atomic_read (&uf->array[r].acc_set);
+    ref_t    r;
+    uint32_t r_acc;
 
-    // only unite if it updates the acceptance set
-    if ( (r_acc | acc) != r_acc) {
+    do {
+        r = uf_find (uf, state);
+        r_acc = atomic_read (&uf->array[r].acc_set);
+
+        // only unite if it updates the acceptance set
+        if ( (r_acc | acc) == r_acc) return r_acc;
+
         // update!
         r_acc = or_fetch (&uf->array[r].acc_set, acc);
-        while (atomic_read (&uf->array[r].parent) != 0) {
-            r = uf_find (uf, r);
-            r_acc = or_fetch (&uf->array[r].acc_set, acc);
-        }
-    }
+
+    } while (atomic_read (&uf->array[r].parent) != 0);
+
     return r_acc;
 }
 
