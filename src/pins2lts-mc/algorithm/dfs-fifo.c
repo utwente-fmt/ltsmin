@@ -76,14 +76,14 @@ construct_np_lasso (wctx_t* ctx, state_info_t* successor)
     trace = trc_find_trace (successor->ref, level, shared->parent_ref,
                             ctx->initial->ref, &length);
     dfs_stack_t s = dfs_stack_create (state_info_serialize_int_size (ctx->state));
-    for (int i = 0; i < length; i++) {
+    for (size_t i = 0; i < length; i++) {
         raw_data_t d = dfs_stack_push (s, NULL);
         state_info_set (ctx->state, trace[i], LM_NULL_LATTICE);
         state_info_serialize (ctx->state, d);
         dfs_stack_enter (s);
     }
     int idx = -1;
-    for (int i = 1; i < dfs_stack_nframes (sm->stack); i++) {
+    for (size_t i = 1; i < dfs_stack_nframes (sm->stack); i++) {
         raw_data_t d = dfs_stack_peek_top (sm->stack, i);
         state_info_deserialize (ctx->state, d);
         if (ctx->state->ref == successor->ref) {
