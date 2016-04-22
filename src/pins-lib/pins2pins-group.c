@@ -33,7 +33,7 @@
 #include <dm/dm_viennacl.h>
 #endif
 
-#define                 USE_GUARDS_OPTION "pins-guard-eval"
+#define                 USE_GUARDS_OPTION "pins-guards"
 
 static const char      *regroup_spec = NULL;
 static int              cw_max_cols = -1;
