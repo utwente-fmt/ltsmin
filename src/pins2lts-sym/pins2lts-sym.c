@@ -4185,18 +4185,20 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
 		    vset_count(mu_var[Z],&n2,&e2);
 		    fprintf(stderr,"%s %s: %.0lf -> %.0lf\n",MU_NAME(muo->sign[Z]),SIget(env->idents,Z),e1,e2);
 		}
-            } while (!vset_equal(mu_var[Z], result));
 
-            // reset dependent variables with opposite sign
-	    if (!vset_equal(old,mu_var[Z]))
-		for (int i=0;i<muo->nvars;i++)
-		    if (muo->deps[Z][i] && muo->sign[Z] != muo->sign[i]) {
-			fprintf(stderr,"%s resets %s\n",SIget(env->idents,Z),SIget(env->idents,i));
-			if (muo->sign[i]==MU_MU)
-			    vset_clear(mu_var[i]);
-			if (muo->sign[i]==MU_NU)
-			    vset_copy(mu_var[i],visited);
-		    }
+		// reset dependent variables with opposite sign
+		if (!vset_equal(result,mu_var[Z]))
+		    for (int i=0;i<muo->nvars;i++)
+			if (muo->deps[Z][i] && muo->sign[Z] != muo->sign[i]) {
+			    fprintf(stderr,"%s resets %s\n",SIget(env->idents,Z),SIget(env->idents,i));
+			    if (muo->sign[i]==MU_MU)
+				vset_clear(mu_var[i]);
+			    if (muo->sign[i]==MU_NU)
+				vset_copy(mu_var[i],visited);
+			}
+		
+	    } while (!vset_equal(mu_var[Z], result));
+
 	    vset_destroy(old);
 	}
         break;
