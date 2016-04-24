@@ -3963,7 +3963,15 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
                 tmp = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
+		if (log_active(infoLong)) {
+		    long n1, n2;
+		    double e1, e2;
+		    vset_count(mu_var[mu_expr->idx],&n1,&e1);
+		    vset_count(tmp,&n2,&e2);
+		    fprintf(stderr,"MU %s: %.0lf -> %.0lf\n",SIget(env->idents,mu_expr->idx),e1,e2);
+		}
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
+	    
             vset_destroy(tmp);
             // new var reference
             mu_var[mu_expr->idx] = old;
@@ -3981,6 +3989,13 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
                 tmp = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
+		if (log_active(infoLong)) {
+		    long n1, n2;
+		    double e1, e2;
+		    vset_count(mu_var[mu_expr->idx],&n1,&e1);
+		    vset_count(tmp,&n2,&e2);
+		    fprintf(stderr,"MU %s: %.0lf -> %.0lf\n",SIget(env->idents,mu_expr->idx),e1,e2);
+		}
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
             vset_destroy(tmp);
             // new var reference
