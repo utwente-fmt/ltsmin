@@ -210,6 +210,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
         }
     case Perm_None:
         perm->real_cb (perm->call_ctx, perm->next, ti, seen);
+        ti->por_proviso &= perm->por_proviso;
         break;
     case Perm_Shift_All:
         if (0 == perm->start_group_index && ti->group >= perm->start_group)

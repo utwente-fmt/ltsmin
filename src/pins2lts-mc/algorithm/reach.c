@@ -202,9 +202,9 @@ reach_fulfil_ignoring_proviso (wctx_t *ctx, size_t successors, perm_cb_f cb)
     counter_t          *cnt = &ctx->local->counters;
     if (proviso != Proviso_None && !loc->proviso && successors > 0) {
         // proviso does not hold, explore all:
-        permute_set_por (ctx->permute, 0);
+        permute_set_por (ctx->permute, 0); // force all in permutor
         successors = permute_trans (ctx->permute, ctx->state, cb, ctx);
-        permute_set_por (ctx->permute, 1);
+        permute_set_por (ctx->permute, 1); // back to default
         cnt->ignoring++;
     }
     return successors;

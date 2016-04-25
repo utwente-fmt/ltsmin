@@ -57,6 +57,9 @@ extern permute_t       *permute_create (permutation_perm_t permutation,
 
 extern void             permute_set_model (permute_t *perm, model_t model);
 
+/**
+ * Set to 0 to force ignoring proviso
+ */
 extern void             permute_set_por (permute_t *perm, int por);
 
 extern void             permute_free (permute_t *perm);
