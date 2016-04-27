@@ -1693,7 +1693,8 @@ dm_weighted_event_span(const matrix_t* const m, int* const spans)
 
     double res = 0;
     for (int i = 0; i < dm_nrows(m); i++) {
-        res += ((double) (dm_ncols(m) - dm_first(m, i)) / (dm_ncols(m) / 2.0)) * (double) s[i];
+        if (dm_ones_in_row(m, i) == 0) res += 0;
+        else res += ((double) (dm_ncols(m) - (dm_first(m, i) + 1)) / (dm_ncols(m) / 2.0)) * (double) s[i];
     }
 
     if (spans == NULL) {
