@@ -67,7 +67,7 @@ static run_t              *run = NULL;
 static void
 exit_ltsmin (int sig)
 {
-    if (HREme(HREglobal()) == 0) {
+    if (HREme(HREglobal()) == 0 && atomic_read(&run) != NULL) {
         if ( run_stop(run) ) {
             Warning (info, "PREMATURE EXIT (caught signal: %d)", sig);
         } else {
@@ -209,6 +209,7 @@ main (int argc, char *argv[])
 
     reduce_and_print (ctx);
 
+    atomic_write (&run, NULL);
     deinit_all (ctx);
 
     GBExit (model);
