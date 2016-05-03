@@ -322,11 +322,13 @@ uf_union (const uf_t *uf, ref_t a, ref_t b)
     // lock the list entries
     if ( !uf_lock_list (uf, a, &a_l) ) {
         // HREassert ( uf_is_dead(uf, a) && uf_sameset(uf, a, b) );
+        uf_unlock_uf (uf, q);
         return 0;
     }
     if ( !uf_lock_list (uf, b, &b_l) ) {
         // HREassert ( uf_is_dead(uf, b) && uf_sameset(uf, a, b) );
         uf_unlock_list (uf, a_l);
+        uf_unlock_uf (uf, q);
         return 0;
     }
 
