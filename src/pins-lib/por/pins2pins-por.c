@@ -296,6 +296,7 @@ PORwrapper (model_t model)
 
     // check support for guards, fail without
     if (!GBhasGuardsInfo(model)) {
+        PINS_POR = PINS_POR_NONE;
         Print1 (info, "Frontend doesn't have guards. Ignoring --por.");
         return model;
     }
