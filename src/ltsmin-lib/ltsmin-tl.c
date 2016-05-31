@@ -704,7 +704,9 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    return ltsmin_expr_optimize(env->expr, env);
+    // don't optimize the expression, the Spot connection
+    // cannot distinguish a!=b from !(a==b), which causes worse automata
+    return env->expr; //ltsmin_expr_optimize(env->expr, env);
 }
 
 static void
