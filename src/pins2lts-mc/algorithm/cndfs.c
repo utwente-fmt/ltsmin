@@ -318,6 +318,7 @@ check_cndfs_proviso (wctx_t *ctx)
     if (( success && prov == INVOLATILE) ||
         (!success && state_store_get_wip(ctx->state->ref) == INVOLATILE)) {
         bitvector_set (&loc->stackbits, cur(ctx,INVOL));
+        loc->counters.ignoring += success != 0;
         return true;
     }
     return false;

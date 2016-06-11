@@ -30,6 +30,7 @@ add_results (counter_t *res, counter_t *cnt)
     res->waits += cnt->waits;
     res->bogus_red += cnt->bogus_red;
     res->exit += cnt->exit;
+    res->ignoring += cnt->ignoring;
 }
 
 static void
@@ -273,6 +274,9 @@ ndfs_print_state_stats (run_t* run, wctx_t* ctx, int index, float waittime)
                    "transitions: %zu, waits: %zu (%.2f sec)",
             rexplored, ((double)rexplored/db_elts)*100, bogus,
             ((double)bogus/db_elts), rtrans, waits, waittime);
+    if (PINS_POR != 0 && proviso == Proviso_CNDFS) {
+        Warning (infoLong, "Ignoring states: %zu", run->reduced->blue.ignoring);
+    }
 
     if ( all_red )
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",

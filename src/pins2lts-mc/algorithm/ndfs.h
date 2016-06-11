@@ -25,6 +25,7 @@ typedef struct counter_s {
     size_t              allred;         // counter: allred states
     size_t              bogus_red;      // number of bogus red colorings
     size_t              exit;           // recursive ndfss
+    size_t              ignoring;
 } counter_t;
 
 struct alg_local_s {
