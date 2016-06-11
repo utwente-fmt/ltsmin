@@ -138,7 +138,8 @@ state_store_init (model_t model, bool timed)
     store->local_bits = 0;
     while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
         store->global_bits += num_global_bits (strategy[i]);
-        store->local_bits += (~Strat_DFSFIFO & Strat_LTL & ~Strat_CNDFS & strategy[i++] ? 2 : 0);
+        store->local_bits += (~Strat_DFSFIFO & Strat_LTL & ~Strat_UFSCC & ~Strat_CNDFS & strategy[i] ? 2 : 0);
+        i++;
     }
     store->count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) :
             (Strat_CNDFS == strategy[i - 1] && PINS_POR ? 2 : 0) );
@@ -146,7 +147,7 @@ state_store_init (model_t model, bool timed)
     size_t              bits = store->global_bits + store->count_bits;
 
     // Wrap functions
-    indexing = NULL != trc_output || ((Strat_TA | Strat_LTL | Strat_SCC) & strategy[0]);
+    indexing = NULL != trc_output || ((Strat_TA | Strat_LTL) & strategy[0]);
     switch (db_type) {
     case HashTable:
         store->statistics = (dbs_stats_f) DBSLLstats;
