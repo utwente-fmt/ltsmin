@@ -97,12 +97,19 @@ static void
 pnml_exit(model_t model)
 {
     (void) model;
-    Warning(info, "max token count: %u", max_token_count);
+    Print1 (info, "max token count: %u", max_token_count);
+}
+
+static void
+update_max (int max)
+{
+    do {
+        if (max <= atomic_read(&max_token_count)) break;
+    } while (!cas(&max_token_count, atomic_read(&max_token_count), max));
 }
 
 static int
-get_successor_long(void* model, int t, int* in, void
-(*callback)(void* arg, transition_info_t* transition_info, int* out, int* cpy), void* arg)
+get_successor_long(void* model, int t, int* in, TransitionCB cb, void* arg)
 {
     pnml_context_t* context = GBgetContext(model);
 
@@ -140,23 +147,17 @@ get_successor_long(void* model, int t, int* in, void
         }
     }
 
-    if (overflown) Abort("max token count exceeded");
-
-    volatile int* ptr;
-    do {
-        ptr = &max_token_count;
-        if (max <= *ptr) break;
-    } while (!cas(ptr, *ptr, max));
+    HREassert (!overflown, "max token count exceeded");
+    update_max (max);
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
-    callback(arg, &transition_info, out, NULL);
+    cb (arg, &transition_info, out, NULL);
 
     return 1;
 }
 
 static int
-get_successor_short(void* model, int t, int* in, void
-(*callback)(void* arg, transition_info_t* transition_info, int* out, int* cpy), void* arg)
+get_successor_short(void* model, int t, int* in, TransitionCB cb, void* arg)
 {
     pnml_context_t* context = GBgetContext(model);
 
@@ -198,23 +199,17 @@ get_successor_short(void* model, int t, int* in, void
         if (arc->place != (arc + 1)->place) place++;
     }
 
-    if (overflown) Abort("max token count exceeded");
-
-    volatile int* ptr;
-    do {
-        ptr = &max_token_count;
-        if (max <= *ptr) break;
-    } while (!cas(ptr, *ptr, max));
+    HREassert (!overflown, "max token count exceeded");
+    update_max (max);
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
-    callback(arg, &transition_info, out, NULL);
+    cb (arg, &transition_info, out, NULL);
 
     return 1;
 }
 
 static int
-get_update_long(void* model, int t, int* in, void
-(*callback)(void* arg, transition_info_t* transition_info, int* out, int* cpy), void* arg)
+get_update_long(void* model, int t, int* in, TransitionCB cb, void* arg)
 {
     pnml_context_t* context = GBgetContext(model);
 
@@ -253,16 +248,11 @@ get_update_long(void* model, int t, int* in, void
         }
     }
 
-    if (overflown) Abort("max token count exceeded");
-
-    volatile int* ptr;
-    do {
-        ptr = &max_token_count;
-        if (max <= *ptr) break;
-    } while (!cas(ptr, *ptr, max));
+    HREassert (!overflown, "max token count exceeded");
+    update_max (max);
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
-    callback(arg, &transition_info, out, NULL);
+    cb (arg, &transition_info, out, NULL);
 
     return 1;
 }
@@ -613,7 +603,7 @@ noack_h(pnml_context_t* context, int transition, int* assigned)
 static int*
 noack1(pnml_context_t* context)
 {
-    Warning(info, "Computing Noack1 order");
+    Print1 (info, "Computing Noack1 order");
 
     rt_timer_t timer = RTcreateTimer();
     RTstartTimer(timer);
@@ -691,7 +681,7 @@ noack_g2(pnml_context_t* context, int transition, int* assigned)
 static int*
 noack2(pnml_context_t* context)
 {
-    Warning(info, "Computing Noack2 order");
+    Print1 (info, "Computing Noack2 order");
 
     rt_timer_t timer = RTcreateTimer();
     RTstartTimer(timer);
@@ -778,18 +768,18 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     context->pnml_transs = SIcreate();
     context->pnml_arcs = SIcreate();
 
-    Warning(infoLong, "Determining Petri net size");
+    Print1 (infoLong, "Determining Petri net size");
     xmlNode* node = xmlDocGetRootElement(doc);
     find_ids(node, context);
-    Warning(info, "Petri net has %d places, %d transitions and %d arcs",
+    Print1 (info, "Petri net has %d places, %d transitions and %d arcs",
         NUM_PLACES, NUM_TRANSS, NUM_ARCS);
 
     bitvector_create(&(context->safe_places), NUM_PLACES);
     bitvector_clear(&(context->safe_places));
 
-    Warning(infoLong, "Analyzing safe places");
+    Print1 (infoLong, "Analyzing safe places");
     if (context->toolspecific != NULL) parse_toolspecific(context->toolspecific, context);
-    Warning(info, "There are %d safe places", context->num_safe_places);
+    Print1 (info, "There are %d safe places", context->num_safe_places);
 
     lts_type_t ltstype;
     matrix_t* dm_info = RTmalloc(sizeof(matrix_t));
@@ -797,7 +787,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     matrix_t* dm_must_write_info = RTmalloc(sizeof(matrix_t));
     matrix_t* dm_update = RTmalloc(sizeof(matrix_t));
 
-    Warning(infoLong, "Creating LTS type");
+    Print1 (infoLong, "Creating LTS type");
 
     // get ltstypes
     ltstype = lts_type_create();
@@ -856,11 +846,11 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     context->arcs[NUM_ARCS].place = -1;
     context->transitions = RTmallocZero(sizeof(transition_t[NUM_TRANSS]));
 
-    Warning(infoLong, "Analyzing Petri net behavior");
+    Print1 (infoLong, "Analyzing Petri net behavior");
     node = xmlDocGetRootElement(doc);
     int* init_state = RTmallocZero(sizeof(int[NUM_PLACES]));
     parse_net(node, model, &init_state);
-    Warning(info, "Petri net %s analyzed", name);
+    Print1 (info, "Petri net %s analyzed", name);
     GBsetInitialState(model, init_state);
     RTfree(init_state);
 
@@ -920,7 +910,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
         GBsetActionsShort(model, (next_method_grey_t) get_update_short);
         GBsetNextStateShortR2W(model, (next_method_grey_t) get_successor_short);
         GBsetActionsShortR2W(model, (next_method_grey_t) get_update_short);
-    } else Warning(infoLong, "Since this net has 1-safe places, short next-state functions are not used");
+    } else Print1 (infoLong, "Since this net has 1-safe places, short next-state functions are not used");
 
     GBsetGroupsOfEdge(model, groups_of_edge);
 
@@ -929,7 +919,8 @@ PNMLloadGreyboxModel(model_t model, const char* name)
     lts_type_validate(ltstype);
 
     if (PINS_POR) {
-        Warning(infoLong, "Creating Do Not Accord matrix");
+
+        Print1 (infoLong, "Creating Do Not Accord matrix");
         matrix_t* dna_info = RTmalloc(sizeof(matrix_t));
         dm_create(dna_info, NUM_TRANSS, NUM_TRANSS);
         for (int i = 0; i < NUM_TRANSS; i++) {
@@ -949,7 +940,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
         }
         GBsetDoNotAccordInfo(model, dna_info);
 
-        Warning(infoLong, "Creating Guard Necessary Enabling Set matrix");
+        Print1 (infoLong, "Creating Guard Necessary Enabling Set matrix");
         matrix_t* gnes_info = RTmalloc(sizeof(matrix_t));
         dm_create(gnes_info, context->num_guards, NUM_TRANSS);
         for (int i = 0; i < context->num_guards; i++) {
@@ -963,7 +954,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
         }
         GBsetGuardNESInfo(model, gnes_info);
 
-        Warning(infoLong, "Creating Guard Necessary Disabling Set matrix");
+        Print1 (infoLong, "Creating Guard Necessary Disabling Set matrix");
         matrix_t* gnds_info = RTmalloc(sizeof(matrix_t));
         dm_create(gnds_info, context->num_guards, NUM_TRANSS);
         for (int i = 0; i < context->num_guards; i++) {
@@ -974,7 +965,7 @@ PNMLloadGreyboxModel(model_t model, const char* name)
         }
         GBsetGuardNDSInfo(model, gnds_info);
 
-        Warning(infoLong, "Creating Do Not Left Accord (DNB) matrix");
+        Print1 (infoLong, "Creating Do Not Left Accord (DNB) matrix");
         matrix_t* ndb_info = RTmalloc(sizeof(matrix_t));
         dm_create(ndb_info, NUM_TRANSS, NUM_TRANSS);
         for (int i = 0; i < NUM_TRANSS; i++) {
@@ -993,9 +984,11 @@ PNMLloadGreyboxModel(model_t model, const char* name)
             }
         }
         GBsetMatrix(model, LTSMIN_NOT_LEFT_ACCORDS, ndb_info, PINS_STRICT, PINS_INDEX_OTHER, PINS_INDEX_OTHER);
-    } else Warning(infoLong, "Not creating POR matrices");
+    } else Print1 (infoLong, "Not creating POR matrices");
 
     RTstopTimer(t);
-    RTprintTimer(infoShort, t, "Loading Petri net took");
+    if (HREme(HREglobal()) == 0 ) {
+        RTprintTimer(infoShort, t, "Loading Petri net took");
+    }
     RTdeleteTimer(t);
 }
