@@ -158,10 +158,10 @@ print_options (model_t model)
     if (PINS_POR) {
         int            *visibility = GBgetPorGroupVisibility (model);
         size_t          visibles = 0, labels = 0;
-        for (size_t i = 0; i < K; i++)
+        for (size_t i = 0; i < K && visibility; i++)
             visibles += visibility[i];
         visibility = GBgetPorStateLabelVisibility (model);
-        for (size_t i = 0; i < SL; i++)
+        for (size_t i = 0; i < SL && visibility; i++)
             labels += visibility[i];
         Warning (info, "Visible groups: %zu / %zu, labels: %zu / %zu", visibles, K, labels, SL);
         Warning (info, "POR cycle proviso: %s %s", key_search(provisos, proviso), strategy[0] & Strat_LTL ? "(ltl)" : "");
