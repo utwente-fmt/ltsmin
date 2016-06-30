@@ -45,9 +45,9 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
 
             chunk c;
             c.data = SIgetC(env->values, value, (int*) &c.len);
-
-            const int idx = pins_chunk_put(model, type, c);
-
+    
+            e->chunk_cache = pins_chunk_put(model, type, c);
+    
             if (lts_type_get_format(GBgetLTStype(model), type) == LTStypeEnum) {
                 if (pins_chunk_count(model, type) != n_chunks) {
                     char id[c.len * 2 + 6];
@@ -58,7 +58,7 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
             }
 
             int* groups = NULL;
-            const int n = GBgroupsOfEdge(model, e->idx, idx, &groups);
+            const int n = GBgroupsOfEdge(model, e->idx, e->chunk_cache, &groups);
             if (n > 0) {
                 for (int k = 0; k < n; k++) {
                     const int group = groups[k];
@@ -71,6 +71,12 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
                 chunk2string(c, sizeof(s), s);
                 Abort("There is no group that can produce edge label %s", s);
             }            
+            break;
+        }
+        case CHUNK: {
+            chunk c;
+            c.data = SIgetC(env->values, e->idx, (int*) &c.len);
+            e->chunk_cache = pins_chunk_put(model, ltsmin_expr_type_check(LTSminExprSibling(e), env, GBgetLTStype(model)), c);
             break;
         }
         default:
@@ -114,7 +120,7 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
             // test whether the state has at least one transition (existential) with a specific edge
             struct evar_info ctx;
             ctx.idx = e->idx;
-            ctx.num = eval_predicate(model, LTSminExprSibling(e), state, env);
+            ctx.num = e->chunk_cache;
             ctx.exists = 0;
 
             int* groups = NULL;
@@ -129,9 +135,7 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
             } else return -1;
         }
         case PRED_CHUNK: {
-            chunk c;
-            c.data = SIgetC(env->values, e->idx, (int*) &c.len);
-            return pins_chunk_put(model, ltsmin_expr_type_check(LTSminExprSibling(e), env, GBgetLTStype(model)), c);
+            return e->chunk_cache;
         }
         case PRED_NOT:
             return !eval_predicate(model, e->arg1, state, env);
