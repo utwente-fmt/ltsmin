@@ -109,6 +109,7 @@ struct ltsmin_expr_s {
     ltsmin_expr_t       arg2;
     uint32_t            hash;
     ltsmin_expr_t       parent;
+    int                 chunk_cache;
     void*               context;
     void                (*destroy_context)(void* c);
 };
