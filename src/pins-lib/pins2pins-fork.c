@@ -149,12 +149,6 @@ child_process(struct thread_info *ti)
             // read src state
             int length = ti->fc->r_lengths[group];
             int src[length];
-            printf("short read: ");
-            for (int i=0; i < length; i++) {
-                src[i] = DSreadS32(is);
-                printf("%d,", src[i]);
-            }
-            printf("\n");
             // call parent model
             int res = GBgetTransitionsShortR2W(parent_model, group, src, slave_transition_cb_short_r2w, ti);
             // signal that all successor states have been sent
