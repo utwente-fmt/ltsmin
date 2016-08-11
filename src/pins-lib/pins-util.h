@@ -3,7 +3,11 @@
 
 #include <stdlib.h>
 
+#ifdef LTSMIN_CONFIG_INCLUDED
 #include <pins-lib/pins.h>
+#else
+#include <ltsmin/pins.h>
+#endif
 
 
 extern size_t       pins_get_state_label_count (model_t model);

@@ -11,7 +11,11 @@
 #ifndef LTSMIN_STANDARD_H_
 #define LTSMIN_STANDARD_H_
 
+#ifdef LTSMIN_CONFIG_INCLUDED
 #include <hre/feedback.h>
+#else
+#include <ltsmin/feedback.h>
+#endif
 
 
 /**

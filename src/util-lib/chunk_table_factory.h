@@ -9,7 +9,12 @@
 #define CHUNK_TABLE_FACTORY_H
 
 
+#ifdef LTSMIN_CONFIG_INCLUDED
 #include <util-lib/tables.h>
+#else
+#include <ltsmin/tables.h>
+#endif
+
 
 typedef struct table_factory_s *table_factory_t;
 

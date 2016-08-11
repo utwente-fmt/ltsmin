@@ -12,7 +12,11 @@
 #include <stdint.h>
 #include <unistd.h>
 
+#ifdef LTSMIN_CONFIG_INCLUDED
 #include <util-lib/chunk_support.h>
+#else
+#include <ltsmin/chunk_support.h>
+#endif
 
 
 /**

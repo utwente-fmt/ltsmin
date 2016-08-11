@@ -1,6 +1,6 @@
 noinst_LTLIBRARIES  = libutil.la
 
-pkginclude_HEADERS = chunk_support.h string-map.h
+pkginclude_HEADERS = chunk_support.h string-map.h chunk_table_factory.h tables.h
 
 # libutil
 libutil_la_SOURCES  = balloc.c balloc.h

@@ -21,7 +21,7 @@ SUBDIRS  = por
 
 noinst_LTLIBRARIES  = libpins.la
 
-pkginclude_HEADERS = dlopen-api.h pins.h
+pkginclude_HEADERS = dlopen-api.h pins.h pins-util.h
 
 if HAVE_LIBSTEP_INFO
 noinst_LTLIBRARIES += libmcrl-pins.la
