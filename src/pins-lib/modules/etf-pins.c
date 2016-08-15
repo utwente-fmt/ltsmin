@@ -92,7 +92,7 @@ etf_groups_of_edge(model_t model, int edge_no, int index, int** groups)
     for (int i = 0; i < n_groups; i++) {
         matrix_table_t mt = ctx->trans_table[i];
         int K = MTgetCount(mt);
-        for(int j = 0; j < K; i++){
+        for(int j = 0; j < K; j++){
             uint32_t row[3];
             MTgetRow(mt, j, row);
             switch(ctx->edge_labels){
