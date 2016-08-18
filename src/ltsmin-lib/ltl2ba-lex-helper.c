@@ -57,6 +57,7 @@ linearize_ltsmin_expr(ltsmin_expr_t e, ltsmin_lin_expr_t **le)
         case LTL_LEQ:
         case LTL_GT:
         case LTL_GEQ:
+        case LTL_EN:
         case LTL_MULT:
         case LTL_DIV:
         case LTL_REM:

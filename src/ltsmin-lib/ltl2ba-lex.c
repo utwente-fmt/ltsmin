@@ -85,6 +85,7 @@ ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
         case LTL_GEQ: sprintf(buf, " >= "); break;
         case LTL_EQ: sprintf(buf, " == "); break;
         case LTL_NEQ: sprintf(buf, " != "); break;
+        case LTL_EN: sprintf(buf, " ?? "); break;
         case LTL_TRUE: sprintf(buf, "true"); break;
         case LTL_OR: sprintf(buf, " or "); break;
         case LTL_NOT: sprintf(buf, "!"); break;
@@ -169,6 +170,7 @@ tl_lex(void)
             Token(IMPLIES);
         case LTL_EQ:
         case LTL_SVAR:
+        case LTL_EN:
         case LTL_VAR:
         case LTL_NEQ:
         case LTL_LT:
@@ -264,6 +266,7 @@ ltsmin_buchi()
     res->acceptance_set = 0;
     res->predicate_count = n_symbols;
     res->predicates = RTmalloc(n_symbols * sizeof(ltsmin_expr_t));
+    res->edge_predicates = 1; // indicate that there may be transition predicates
     for (int i=0; i < n_symbols; i++) {
         ltsmin_expr_t e = ltsmin_expr_lookup (NULL, sym_table[i], &le_list);
         Debug("LTL symbol table: lookup up predicate '%s': %p", sym_table[i], e);

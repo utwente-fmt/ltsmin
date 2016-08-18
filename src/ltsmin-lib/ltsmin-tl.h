@@ -32,7 +32,8 @@ typedef enum {
     PRED_DIV   = S_DIV,
     PRED_REM   = S_REM,
     PRED_ADD   = S_ADD,
-    PRED_SUB   = S_SUB
+    PRED_SUB   = S_SUB,
+    PRED_EN    = S_EN,
 } Pred;
 
 extern ltsmin_expr_t pred_parse_file(const char *,ltsmin_parse_env_t,lts_type_t);
@@ -62,6 +63,7 @@ typedef enum {
     LTL_REM   = PRED_REM,
     LTL_ADD   = PRED_ADD,
     LTL_SUB   = PRED_SUB,
+    LTL_EN    = PRED_EN,
 
     LTL_FUTURE= TOKEN_USER,
     LTL_GLOBALLY,
@@ -100,6 +102,7 @@ typedef enum {
     CTL_REM   = PRED_REM,
     CTL_ADD   = PRED_ADD,
     CTL_SUB   = PRED_SUB,
+    CTL_EN    = PRED_EN,
 
     CTL_NEXT  = TOKEN_USER,
     CTL_UNTIL,
@@ -135,6 +138,7 @@ typedef enum {
     MU_REM                  = PRED_REM,
     MU_ADD                  = PRED_ADD,
     MU_SUB                  = PRED_SUB,
+    MU_EN                   = PRED_EN,
 
     MU_EDGE_EXIST           = EDGE_EXIST,
     MU_EDGE_ALL             = EDGE_ALL,

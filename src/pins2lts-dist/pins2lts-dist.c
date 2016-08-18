@@ -140,7 +140,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 static inline void
 invariant_detect (struct dist_thread_context *ctx, int *state)
 {
-    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, state, ctx->env) ) return;
+    if ( !inv_expr || eval_state_predicate(ctx->model, inv_expr, state, ctx->env) ) return;
     ctx->violations++;
     if (trc_output!=NULL){
         uint32_t ofs=TreeFold(ctx->dbs,(int32_t*)(state));

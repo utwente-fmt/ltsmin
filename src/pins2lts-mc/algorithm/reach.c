@@ -492,15 +492,11 @@ reach_local_setup   (run_t *run, wctx_t *ctx)
     if (inv_detect) { // local parsing
         ctx->local->env = LTSminParseEnvCreate();
         ctx->local->inv_expr = pred_parse_file (inv_detect, ctx->local->env, GBgetLTStype(ctx->model));
+        set_pins_semantics (ctx->model, ctx->local->inv_expr, ctx->local->env, NULL, NULL);
     }
 
-    if (PINS_POR) {
-        if (ctx->local->inv_expr) {
-            set_pins_semantics (ctx->model, ctx->local->inv_expr, ctx->local->env, NULL, NULL);
-        }
-        if (act_detect) {
-            pins_add_edge_label_visible (ctx->model, act_label, act_index);
-        }
+    if (PINS_POR && act_detect) {
+        pins_add_edge_label_visible (ctx->model, act_label, act_index);
     }
 
     if (files[1]) {

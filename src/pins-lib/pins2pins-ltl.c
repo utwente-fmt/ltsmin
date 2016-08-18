@@ -176,12 +176,12 @@ ltl_sl_all(model_t model, int *state, int *labels)
 }
 
 static inline int
-eval (cb_context *infoctx, int *state)
+eval (cb_context *infoctx, int *state, int* edge_labels)
 {
     ltl_context_t *ctx = infoctx->ctx;
     int pred_evals = 0; // assume < 32 predicates..
     for(int i=0; i < ctx->ba->predicate_count; i++) {
-        if (eval_predicate(GBgetParent(infoctx->model), ctx->ba->predicates[i], state, ctx->ba->env))
+        if (eval_trans_predicate(GBgetParent(infoctx->model), ctx->ba->predicates[i], state, edge_labels, ctx->ba->env))
             pred_evals |= (1 << i);
     }
     return pred_evals;
@@ -199,8 +199,13 @@ void ltl_ltsmin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 
     // evaluate predicates
     int pred_evals = infoctx->predicate_evals;
-    if (pred_evals == -1) // long calls cannot do before-hand evaluation
-        eval (infoctx, infoctx->src + 1); /* ltsmin: src instead of dst */
+
+    // long calls cannot do before-hand evaluation
+    // if there are edge vars in the BA, also perform eval again
+    if (pred_evals == -1 || ctx->ba->edge_predicates != 0) {
+        pred_evals = eval (infoctx, infoctx->src + 1, ti->labels); /* ltsmin: src instead of dst */
+    }
+
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
     if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
@@ -254,7 +259,7 @@ ltl_ltsmin_all (model_t self, int *src, TransitionCB cb,
     ltl_context_t *ctx = GBgetContext(self);
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
     // evaluate predicates (on source, so before hand!)
-    new_ctx.predicate_evals = eval (&new_ctx, src + 1); /* No EVARS! */
+    new_ctx.predicate_evals = eval (&new_ctx, src + 1, NULL); /* No EVARS! */
     GBgetTransitionsAll(ctx->parent, src + 1, ltl_ltsmin_cb, &new_ctx);
     return new_ctx.ntbtrans;
 }
@@ -269,6 +274,12 @@ void ltl_spin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
     int dst_buchi[ctx->len];
     memcpy (dst_buchi + 1, dst, ctx->old_len * sizeof(int) );
     int pred_evals = infoctx->predicate_evals;
+
+    // if there are edge vars in the BA, perform eval again
+    if (ctx->ba->edge_predicates != 0) {
+        pred_evals |= eval (infoctx, infoctx->src + 1, ti->labels);
+    }
+
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
     if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
@@ -322,7 +333,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
 
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
     // evaluate predicates (on source, so before hand!)
-    new_ctx.predicate_evals = eval (&new_ctx, src + 1); /* No EVARS! */
+    new_ctx.predicate_evals = eval (&new_ctx, src + 1, NULL); /* No EVARS! */
     GBgetTransitionsAll(ctx->parent, src + 1, ltl_spin_cb, &new_ctx);
     if (0 == new_ctx.ntbtrans) { // deadlock, let buchi continue
         int dst_buchi[ctx->len];
@@ -366,7 +377,9 @@ void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
     memcpy (dst_buchi + 1, dst, ctx->old_len * sizeof(int) );
-    int dst_pred = eval (infoctx, dst);
+
+    int dst_pred = eval (infoctx, dst, ti->labels);
+
     int i = infoctx->src[ctx->ltl_idx];
     if (i == -1) { i=0; } /* textbook: extra initial state */
     HREassert (i < ctx->ba->state_count );
@@ -541,7 +554,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
             PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
             ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env);
-            ba = ltsmin_hoa_buchi();
+            ba = ltsmin_hoa_buchi(env);
         } else {
 #endif
             HREassert(PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_BA, 

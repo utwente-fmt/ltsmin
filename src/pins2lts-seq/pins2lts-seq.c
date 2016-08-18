@@ -1259,7 +1259,7 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
 static void
 gsea_invariant_check(gsea_state_t *state, void *arg)
 {
-    if ( eval_predicate(opt.model, opt.inv_expr, state->state, opt.env) ) return; // invariant holds
+    if ( eval_state_predicate(opt.model, opt.inv_expr, state->state, opt.env) ) return; // invariant holds
 
     global.violations++;
     do_trace(NULL, arg, "Invariant violation", opt.inv_detect); // state still on stack

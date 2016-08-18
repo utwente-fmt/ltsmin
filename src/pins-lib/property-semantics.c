@@ -99,7 +99,7 @@ evar_cb(void *context, transition_info_t *ti, int *dst, int *cpy)
 }
 
 long
-eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t env)
+eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_labels, ltsmin_parse_env_t env)
 {
     const int N = lts_type_get_state_length(GBgetLTStype(model));
 
@@ -117,61 +117,70 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
                 return GBgetStateLabelLong(model, e->idx - N, state);
             }
         case PRED_EVAR: {
-            // test whether the state has at least one transition (existential) with a specific edge
-            struct evar_info ctx;
-            ctx.idx = e->idx;
-            ctx.num = e->chunk_cache;
-            ctx.exists = 0;
+            if (e->parent->token == PRED_EN) {
+                // test whether the state has at least one transition (existential) with a specific edge
+                struct evar_info ctx;
+                ctx.idx = e->idx;
+                ctx.num = e->chunk_cache;
+                ctx.exists = 0;
 
-            int* groups = NULL;
-            const int n = GBgroupsOfEdge(model, e->idx, ctx.num, &groups);
+                int* groups = NULL;
+                const int n = GBgroupsOfEdge(model, e->idx, ctx.num, &groups);
 
-            if (n > 0) {
-                for (int i = 0; i < n && ctx.exists == 0; i++) {
-                    GBgetTransitionsLong(model, groups[i], state, evar_cb, &ctx);
+                if (n > 0) {
+                    for (int i = 0; i < n && ctx.exists == 0; i++) {
+                        GBgetTransitionsLong(model, groups[i], state, evar_cb, &ctx);
+                    }
+                    RTfree(groups);
+                    return ctx.exists ? ctx.num : -1;
+                } else return -1;
+            } else if (edge_labels != NULL) {
+                if (edge_labels[0] == -1) { // error, we may not use trans!
+                    LTSminLogExpr (error, "transition checking on state predicates: ", e, env);
+                    HREabort(LTSMIN_EXIT_FAILURE);
                 }
-                RTfree(groups);
-                return ctx.exists ? ctx.num : -1;
+                return edge_labels[e->idx];
             } else return -1;
         }
         case PRED_CHUNK: {
             return e->chunk_cache;
         }
         case PRED_NOT:
-            return !eval_predicate(model, e->arg1, state, env);
+            return !eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+        case PRED_EN:
         case PRED_EQ:
-            return eval_predicate(model, e->arg1, state, env) ==
-                    eval_predicate(model, e->arg2, state, env);
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) ==
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_NEQ:
-            return eval_predicate(model, e->arg1, state, env) !=
-                    eval_predicate(model, e->arg2, state, env);
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) !=
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_AND:
-            return eval_predicate(model, e->arg1, state, env) &&
-                    eval_predicate(model, e->arg2, state, env);
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) &&
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_OR:
-            return eval_predicate(model, e->arg1, state, env) ||
-                    eval_predicate(model, e->arg2, state, env);
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) ||
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_IMPLY:
-            return !eval_predicate(model, e->arg1, state, env) ||
-                      eval_predicate(model, e->arg2, state, env);
+            return !eval_trans_predicate(model, e->arg1, state, edge_labels, env) ||
+                      eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_EQUIV:
-            return !eval_predicate(model, e->arg1, state, env) ==
-                    !eval_predicate(model, e->arg2, state, env);
+            return !eval_trans_predicate(model, e->arg1, state, edge_labels, env) ==
+                    !eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_LT:
-            return eval_predicate(model, e->arg1, state, env) <
-                    eval_predicate(model, e->arg2, state, env);
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) <
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_LEQ:
-            return eval_predicate(model, e->arg1, state, env) <=
-                    eval_predicate(model, e->arg2, state, env);
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) <=
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_GT:
-            return eval_predicate(model, e->arg1, state, env) >
-                    eval_predicate(model, e->arg2, state, env);
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) >
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_GEQ:
-            return eval_predicate(model, e->arg1, state, env) >=
-                    eval_predicate(model, e->arg2, state, env);
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) >=
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
         case PRED_MULT: {
-            const long l = eval_predicate(model, e->arg1, state, env);
-            const long r = eval_predicate(model, e->arg2, state, env);
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if (long_mult_overflow(l, r)) {
                 LTSminLogExpr (error, "integer overflow in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
@@ -179,8 +188,8 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
             return l * r;
         }
         case PRED_DIV: {
-            const long l = eval_predicate(model, e->arg1, state, env);
-            const long r = eval_predicate(model, e->arg2, state, env);
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if (r == 0 || ((l == LONG_MIN) && r == -1)) {
                 LTSminLogExpr (error, "division by zero in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
@@ -188,8 +197,8 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
             return l / r;
         }
         case PRED_REM: {
-            const long l = eval_predicate(model, e->arg1, state, env);
-            const long r = eval_predicate(model, e->arg2, state, env);
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if (r == 0 || ((l == LONG_MIN) && r == -1)) {
                 LTSminLogExpr (error, "division by zero in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
@@ -197,8 +206,8 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
             return l % r;
         }
         case PRED_ADD: {
-            const long l = eval_predicate(model, e->arg1, state, env);
-            const long r = eval_predicate(model, e->arg2, state, env);
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if ((r > 0 && l > LONG_MAX - r) || (r < 0 && l < LONG_MIN - r)) {
                 LTSminLogExpr (error, "integer overflow in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
@@ -206,8 +215,8 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
             return l + r;
         }
         case PRED_SUB: {
-            const long l = eval_predicate(model, e->arg1, state, env);
-            const long r = eval_predicate(model, e->arg2, state, env);
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if ((r > 0 && l < LONG_MIN + r) || (r < 0 && l > LONG_MAX + r)) {
                 LTSminLogExpr (error, "integer overflow in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
@@ -219,4 +228,12 @@ eval_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t en
             HREabort (LTSMIN_EXIT_FAILURE);
     }
     return 0;
+}
+
+
+long
+eval_state_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t env)
+{
+    static int edge_error[1] = {-1};
+    return eval_trans_predicate(model, e, state, edge_error, env);
 }

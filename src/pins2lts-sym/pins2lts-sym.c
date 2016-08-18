@@ -855,7 +855,7 @@ rel_expr_cb(vset_t set, void *context, int *e)
     int vec[N];
     memcpy(vec, ctx->vec, sizeof(int[N]));
     for (int i = 0; i < ctx->len; i++) vec[ctx->deps[i]] = e[i];
-    if (eval_predicate(model, ctx->e, vec, ctx->env)) vset_add(set, e);
+    if (eval_state_predicate(model, ctx->e, vec, ctx->env)) vset_add(set, e);
 }
 
 #define eval_predicate_set_par(e, env, s) CALL(eval_predicate_set_par, (e), (env), (s))
@@ -913,6 +913,7 @@ VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, v
             vset_clear(right->container);
         } break;
         case PRED_EQ:
+        case PRED_EN:
         case PRED_NEQ:
         case PRED_LT:
         case PRED_LEQ:

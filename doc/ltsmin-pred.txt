@@ -21,6 +21,7 @@ LTSmin syntax for Simple Predicate Language formulae
 |0        | true     | constant true
 |0        | false    | constant false
 |1        | ==       | test operator ('state variable name'=='number')
+|1        | ??       | enabledness operator ('edge variable name' ?? 'chunk')
 |2        | !        | Logical negation
 |4        | &&       | Logical and
 |5        | \|\|     | Logical or

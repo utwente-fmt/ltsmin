@@ -86,6 +86,7 @@ typedef enum {
     S_REM,
     S_ADD,
     S_SUB,
+    S_EN,
 
     /* special symbols */
     MU_FIX,

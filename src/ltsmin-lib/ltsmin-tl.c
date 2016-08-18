@@ -32,6 +32,7 @@ S_NAME(ltsmin_expr_case s)
     case S_REM:              return "%";
     case S_ADD:              return "+";
     case S_SUB:              return "-";
+    case S_EN:               return "??";
     default:        Abort ("Not a keyword/operator, token id: %d", s);
     }
 }
@@ -233,6 +234,12 @@ ltsmin_expr_type_check(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
 
             return type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
         }
+        case S_EN: {
+            if (e->arg1->token != EVAR && e->arg2->token != EVAR) {                
+                LTSminLogExpr(error, "LHS or RHS should be an edge variable: ", e, env);
+                HREabort(LTSMIN_EXIT_FAILURE);
+            }
+        }
         case S_EQ: case S_NEQ: {
             const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
             const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
@@ -315,6 +322,8 @@ create_pred_env(ltsmin_parse_env_t env)
 
     LTSminBinaryOperator(env, PRED_EQ,     PRED_NAME(PRED_EQ), 4);
     LTSminBinaryOperator(env, PRED_NEQ,    PRED_NAME(PRED_NEQ), 4);
+    LTSminBinaryOperator(env, PRED_EN,     PRED_NAME(PRED_EN), 4);
+
 
     LTSminPrefixOperator(env, PRED_NOT,    PRED_NAME(PRED_NOT), 5);
 
@@ -362,6 +371,9 @@ create_ltl_env(ltsmin_parse_env_t env)
 
     LTSminBinaryOperator(env, LTL_EQ,           LTL_NAME(LTL_EQ), 4);
     LTSminBinaryOperator(env, LTL_NEQ,          LTL_NAME(LTL_NEQ), 4);
+    LTSminBinaryOperator(env, LTL_EN ,          LTL_NAME(LTL_EN), 4);
+
+
     LTSminPrefixOperator(env, LTL_NOT,          LTL_NAME(LTL_NOT), 5);
 
     LTSminPrefixOperator(env, LTL_GLOBALLY,     LTL_NAME(LTL_GLOBALLY), 6);
@@ -468,6 +480,8 @@ create_ctl_env(ltsmin_parse_env_t env)
 
     LTSminBinaryOperator(env, CTL_EQ,           CTL_NAME(CTL_EQ), 4);
     LTSminBinaryOperator(env, CTL_NEQ,          CTL_NAME(CTL_NEQ), 4);
+    LTSminBinaryOperator(env, CTL_EN,           CTL_NAME(CTL_EN), 4);
+
     LTSminPrefixOperator(env, CTL_NOT,          CTL_NAME(CTL_NOT), 5);
 
     LTSminPrefixOperator(env, CTL_EXIST,        CTL_NAME(CTL_EXIST), 6);
@@ -549,6 +563,8 @@ create_mu_env(ltsmin_parse_env_t env)
 
     LTSminBinaryOperator(env, MU_EQ,  MU_NAME(MU_EQ), 4);
     LTSminBinaryOperator(env, MU_NEQ, MU_NAME(MU_NEQ), 4);
+    LTSminBinaryOperator(env, MU_EN,  MU_NAME(MU_EN), 4);
+
     LTSminPrefixOperator(env, MU_NOT, MU_NAME(MU_NOT), 5);
 
     LTSminBinaryOperator(env, MU_AND, MU_NAME(MU_AND), 6);
@@ -620,6 +636,7 @@ ltsmin_expr_t ltl_to_ctl_star_1(ltsmin_expr_t in)
         case LTL_EQUIV:     res->token = CTL_EQUIV;     break;
         case LTL_FUTURE:    res->token = CTL_FUTURE;    break;
         case LTL_GLOBALLY:  res->token = CTL_GLOBALLY;  break;
+        case LTL_EN:        res->token = CTL_EN;        break;
         //case LTL_RELEASE:   // convert..
         //case LTL_WEAK_UNTIL // convert..
         default:
@@ -713,6 +730,7 @@ MU ctl2mu_token(CTL token) { // precondition: token is not a path operator (A,E)
         case CTL_REM:       return MU_REM;
         case CTL_ADD:       return MU_ADD;
         case CTL_SUB:       return MU_SUB;
+        case CTL_EN:        return MU_EN;
         default:
 	  Abort("ctl_to_mu cannot handle path or temporal operator: %s",CTL_NAME(token));
     }
@@ -1051,6 +1069,7 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
         case CTL_REM: sprintf(buf, " %% "); break;
         case CTL_ADD: sprintf(buf, " + "); break;
         case CTL_SUB: sprintf(buf, " - "); break;
+        case CTL_EN:  sprintf(buf, " ?? "); break;
         default:
             Abort("unknown CTL token");
     }
@@ -1871,6 +1890,7 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
         case MU_NEXT: sprintf(buf, "X "); break;
         case MU_FALSE: sprintf(buf, "false"); break;
         case MU_AND: sprintf(buf, " /\\ "); break;
+        case MU_EN: sprintf(buf, " ?? "); break;
         //case MU_EQUIV: sprintf(buf, " <-> "); break;
         //case MU_IMPLY: sprintf(buf, " -> "); break;
         case MU_EXIST: sprintf(buf, "E "); break;

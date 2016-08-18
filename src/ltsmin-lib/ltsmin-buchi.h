@@ -23,6 +23,7 @@ typedef struct ltsmin_buchi {
     uint32_t acceptance_set; // HOA acceptance (0 for standard BA)
     int predicate_count;
     ltsmin_expr_t* predicates;
+    uint32_t edge_predicates; // bitset, marks edge var predicates true
     int state_count;
     int trans_count;
     ltsmin_parse_env_t env;

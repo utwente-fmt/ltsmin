@@ -245,7 +245,7 @@ struct poptOption options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION,
      (void *)alg_popt, 0, NULL, NULL},
     {"strategy", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT,
-     &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs,<strategy>|ndfs>"},
+     &arg_strategy, 0, "select the search strategy", "<bfs|sbfs|dfs|cndfs|lndfs|endfs|endfs|renault|ufscc|ndfs>"},
     {"proviso", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &arg_proviso , 0 ,
      "select proviso for LTL+POR or safety+POR", "<force-none|closed-set|stack|cndfs>"},
     {"inhibit", 0, POPT_ARG_VAL, &inhibit, 1, "Obey the inhibit matrix if the model defines it.", NULL },
