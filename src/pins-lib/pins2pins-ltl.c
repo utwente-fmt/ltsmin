@@ -743,7 +743,7 @@ GBaddLTL (model_t model)
         lts_type_set_edge_label_name (ltstype_new, edge_labels, LTSMIN_EDGE_LABEL_ACCEPTING_SET);
         lts_type_set_edge_label_type (ltstype_new, edge_labels, LTSMIN_EDGE_TYPE_ACCEPTING_SET);
         lts_type_set_edge_label_typeno (ltstype_new, edge_labels, acc_set_type);
-
+        lts_type_set_format (ltstype_new, acc_set_type, LTStypeDirect);
         HOA_ACCEPTING_SET = ba->acceptance_set;
 
         ctx->el_idx_accept_set = edge_labels;
