@@ -964,10 +964,11 @@ vdom_create_sylvan(int n)
     static int initialized=0;
     if (!initialized) {
         sylvan_init_package(1LL<<datasize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
-        sylvan_init_bdd(granularity);
+        sylvan_set_granularity(granularity);
+        sylvan_init_mtbdd();
         if (report_gc) {
-            sylvan_gc_add_mark(0, TASK(gc_start));
-            sylvan_gc_add_mark(40, TASK(gc_end));
+            sylvan_gc_hook_pregc(TASK(gc_start));
+            sylvan_gc_hook_postgc(TASK(gc_end));
         }
         initialized=1;
     }
