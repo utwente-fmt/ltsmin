@@ -1268,8 +1268,14 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
     struct group_add_info *ctx = (struct group_add_info*)context;
 
     int act_index = 0;
-    if (ti->labels != NULL && act_label != -1) act_index = ti->labels[act_label];
-    vrel_add_act(ctx->rel, ctx->src, dst, cpy, act_index);
+    if (ti->labels != NULL && act_label != -1) {
+        // add with action label
+        act_index = ti->labels[act_label];
+        vrel_add_act(ctx->rel, ctx->src, dst, cpy, act_index);
+    } else {
+        // add without action label
+        vrel_add_cpy(ctx->rel, ctx->src, dst, cpy);
+    }
 
     if (act_detect && (no_exit || ErrorActions == 0)) {
         // note: in theory, it might be possible that ti->labels == NULL,
