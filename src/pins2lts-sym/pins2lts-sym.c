@@ -4835,6 +4835,18 @@ VOID_TASK_1(actual_main, void*, arg)
         /* Call hook */
         vset_post_save(f, domain);
 
+        /* Now write action labels */
+        int action_count = 0;
+        if (act_label != -1) action_count = pins_chunk_count(model, action_typeno);
+        fwrite(&action_count, sizeof(int), 1, f);
+        for (int i=0; i<action_count; i++) {
+            chunk ch = pins_chunk_get(model, action_typeno, i);
+            uint32_t len = ch.len;
+            char *action = ch.data;
+            fwrite(&len, sizeof(uint32_t), 1, f);
+            fwrite(action, sizeof(char), len, f);
+        }
+
         /* Done! */
         fclose(f);
 
