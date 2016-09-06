@@ -14,19 +14,21 @@
 
 static int statebits = 16;
 static int actionbits = 16;
-static int datasize = 24;
+static int tablesize = 24;
 static int maxtablesize = 28;
 static int cachesize = 23;
 static int maxcachesize = 27;
 static int granularity = 1;
+static char* sizes = NULL;
 
 struct poptOption sylvan_options[] = {
-    { "sylvan-bits",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &statebits, 0, "set number of bits per integer in the state vector","<bits>"},
-    { "sylvan-tablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "set initial size of BDD table to 1<<datasize","<datasize>"},
-    { "sylvan-maxtablesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxtablesize , 0 , "set maximum size of BDD table to 1<<maxsize","<maxtablesize>"},
-    { "sylvan-cachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set initial size of memoization cache to 1<<cachesize","<cachesize>"},
-    { "sylvan-maxcachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "set maximum size of memoization cache to 1<<cachesize","<maxcachesize>"},
-    { "sylvan-granularity",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "only use memoization cache for every 1/granularity BDD levels","<granularity>"},
+    { "sylvan-bits", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &statebits, 0, "set number of bits per integer in the state vector", "<bits>"},
+    { "sylvan-sizes", 0, POPT_ARG_STRING, &sizes, 0, "set nodes table and operation cache sizes (powers of 2)", "<tablesize>,<tablemax>,<cachesize>,<cachemax>"},
+    { "sylvan-tablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &tablesize , 0 , "set initial size of BDD table to 1<<tablesize", "<tablesize>"},
+    { "sylvan-maxtablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxtablesize , 0 , "set maximum size of BDD table to 1<<maxsize", "<maxtablesize>"},
+    { "sylvan-cachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set initial size of operation cache to 1<<cachesize", "<cachesize>"},
+    { "sylvan-maxcachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "set maximum size of operation cache to 1<<cachesize", "<maxcachesize>"},
+    { "sylvan-granularity", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "only use operation cache every <granularity> BDD levels", "<granularity>"},
     POPT_TABLEEND
 };
 
@@ -971,16 +973,33 @@ vdom_create_sylvan(int n)
 
     Warning(info, "Creating a Sylvan domain.");
 
+    if (sizes != NULL) {
+        // parse it...
+        if (sscanf(sizes, "%d,%d,%d,%d", &tablesize, &maxtablesize, &cachesize, &maxcachesize) != 4) {
+            Abort("Invalid string for --sylvan-sizes, try e.g. --sylvan-sizes=23,28,22,27");
+        }
+        if (tablesize < 10 || maxtablesize < 10 || cachesize < 10 || maxcachesize < 10 ||
+            tablesize > 40 || maxtablesize > 40 || cachesize > 40 || maxcachesize > 40) {
+            Abort("Invalid string for --sylvan-sizes, must be between 10 and 40");
+        }
+        if (tablesize > maxtablesize) {
+            Abort("Invalid string for --sylvan-sizes, tablesize is larger than maxtablesize");
+        }
+        if (cachesize > maxcachesize) {
+            Abort("Invalid string for --sylvan-sizes, cachesize is larger than maxcachesize");
+        }
+    }
+
     char buf[32];
     to_h((1ULL<<maxtablesize)*24+(1ULL<<maxcachesize)*36, buf);
     Warning(info, "Sylvan allocates %s virtual memory for nodes table and operation cache.", buf);
-    to_h((1ULL<<datasize)*24+(1ULL<<cachesize)*36, buf);
+    to_h((1ULL<<tablesize)*24+(1ULL<<cachesize)*36, buf);
     Warning(info, "Initial nodes table and operation cache requires %s.", buf);
 
     // Call initializator of library (if needed)
     static int initialized=0;
     if (!initialized) {
-        sylvan_init_package(1LL<<datasize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
+        sylvan_init_package(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
         sylvan_set_granularity(granularity);
         sylvan_init_mtbdd();
         sylvan_gc_hook_pregc(TASK(gc_start));
