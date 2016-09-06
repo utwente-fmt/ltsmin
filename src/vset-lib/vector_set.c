@@ -265,7 +265,9 @@ void vdom_init_shared(vdom_t dom,int n)
 	dom->shared.set_example_match=default_set_example_match;
 	dom->shared.set_zip=default_zip;
     dom->shared.rel_update=default_rel_update;
+    dom->shared.rel_update_seq=default_rel_update;  // is actually sequential
     dom->shared.set_update=default_set_update;
+    dom->shared.set_update_seq=default_set_update;  // is actually sequential
 	dom->shared.reorder=default_reorder;
 	dom->shared.set_least_fixpoint=default_least_fixpoint;
     dom->shared.set_project_minus=default_set_project_minus;
@@ -637,8 +639,16 @@ void vrel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context) {
     rel->dom->shared.rel_update(rel, set, cb, context);
 }
 
+void vrel_update_seq(vrel_t rel, vset_t set, vrel_update_cb cb, void *context) {
+    rel->dom->shared.rel_update_seq(rel, set, cb, context);
+}
+
 void vset_update(vset_t dst, vset_t src, vset_update_cb cb, void *context) {
     dst->dom->shared.set_update(dst, src, cb, context);
+}
+
+void vset_update_seq(vset_t dst, vset_t src, vset_update_cb cb, void *context) {
+    dst->dom->shared.set_update_seq(dst, src, cb, context);
 }
 
 void vset_reorder(vdom_t dom) {

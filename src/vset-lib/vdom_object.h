@@ -15,6 +15,7 @@ struct vector_domain_shared {
 	vset_t (*set_load)(FILE* f, vdom_t dom);
 	void  (*set_add)(vset_t set,const int* e);
     void (*set_update)(vset_t dst, vset_t set, vset_update_cb cb, void *context);
+    void (*set_update_seq)(vset_t dst, vset_t set, vset_update_cb cb, void *context);
 	int (*set_member)(vset_t set,const int* e);
 	int (*set_equal)(vset_t set1,vset_t set2);
 	int (*set_is_empty)(vset_t set);
@@ -50,6 +51,7 @@ struct vector_domain_shared {
     void (*rel_add_cpy)(vrel_t rel,const int* src,const int* dst,const int* cpy);
 	void (*rel_add_act)(vrel_t rel,const int* src,const int* dst,const int* cpy,const int act);
     void (*rel_update)(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
+    void (*rel_update_seq)(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
     void (*rel_destroy)(vrel_t rel);
 
 	void (*set_next)(vset_t dst,vset_t src,vrel_t rel);

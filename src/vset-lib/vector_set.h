@@ -105,6 +105,12 @@ typedef void(*vset_update_cb)(vset_t set, void *context, int *e);
 extern void vset_update(vset_t dst, vset_t set, vset_update_cb cb, void *context);
 
 /**
+\brief Update a set with new states, obtained by calling cb for every state in set.
+This is a sequential operation.
+*/
+extern void vset_update_seq(vset_t dst, vset_t set, vset_update_cb cb, void *context);
+
+/**
 \brief Test if an element is a member.
 */
 extern int vset_member(vset_t set,const int* e);
@@ -279,6 +285,12 @@ typedef void(*vrel_update_cb)(vrel_t rel, void *context, int *e);
 \brief Update a relation with new transitions, obtained by calling cb for every state in set.
 */
 extern void vrel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
+
+/**
+\brief Update a relation with new transitions, obtained by calling cb for every state in set.
+This is a sequential operation.
+*/
+extern void vrel_update_seq(vrel_t rel, vset_t set, vrel_update_cb cb, void *context);
 
 /**
 \brief Add an element to a relation, with a copy vector.
