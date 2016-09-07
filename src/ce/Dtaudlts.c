@@ -1,3 +1,4 @@
+#include <hre/config.h>
 
 //#include "Ddlts.h"
 #include <stdlib.h>

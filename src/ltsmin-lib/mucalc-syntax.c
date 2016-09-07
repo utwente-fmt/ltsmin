@@ -4,6 +4,7 @@
  *  Created on: 18 Oct 2012
  *      Author: kant
  */
+#include <hre/config.h>
 
 #include <ltsmin-lib/mucalc-syntax.h>
 #include <ltsmin-lib/mucalc-grammar.h>
