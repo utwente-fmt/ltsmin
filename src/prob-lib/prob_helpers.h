@@ -4,6 +4,18 @@
 #include <czmq.h>
 #include <zmq.h>
 
+enum SubMessageType {
+    initial_state = 1,
+    transition_group_list,
+    variables_name_list,
+    variables_type_list,
+    state_label_matrix,
+    may_write_matrix,
+    must_write_matrix,
+    reads_action_matrix,
+    reads_guard_matrix
+};
+
 typedef struct ProBChunk {
     char *data;
     int size;
@@ -32,7 +44,7 @@ typedef struct ProBInitialResponse {
     ProBChunkArray transition_groups;
     ProBChunkArray variables;
     ProBChunkArray variable_types;
-    ProBChunkArray state_labels;
+    ProBMatrix state_labels;
 
     ProBMatrix may_write;
     ProBMatrix must_write;
@@ -50,5 +62,7 @@ void prob_destroy_initial_response(ProBInitialResponse *resp);
 void prob_destroy_state(ProBState *s);
 void prob_destroy_chunk_array(ProBChunkArray *arr);
 void prob_destroy_matrix(ProBMatrix *m);
+
+void drop_frame(zmsg_t *msg);
 
 #endif

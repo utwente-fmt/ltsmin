@@ -66,14 +66,6 @@ prob_get_zocket(prob_client_t pc)
     return pc->file;
 }
 
-void
-drop_frame(zmsg_t *msg)
-{
-    zframe_t *frame = zmsg_pop(msg);
-    assert(frame);
-    zframe_destroy(&frame);
-}
-
 int
 receive_number(zmsg_t *response)
 {
@@ -130,8 +122,6 @@ prob_init(prob_client_t pc)
     if (log_active(debug)) zmsg_print(response);
 #endif
 
-    drop_frame(response);
-    drop_frame(response);
 
     ProBInitialResponse resp = prob_get_init_response(response);
 

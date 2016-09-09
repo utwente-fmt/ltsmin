@@ -10,6 +10,14 @@
 
 #include <prob_helpers.h>
 
+void
+drop_frame(zmsg_t *msg)
+{
+    zframe_t *frame = zmsg_pop(msg);
+    assert(frame);
+    zframe_destroy(&frame);
+}
+
 int get_number(zmsg_t *msg) {
     char *nr_s = zmsg_popstr(msg);
     int nr;
@@ -50,26 +58,47 @@ ProBState prob_get_state(zmsg_t *msg) {
     return get_chunk_array(msg);
 }
 
-
 ProBInitialResponse prob_get_init_response(zmsg_t *msg) {
+    ProBInitialResponse res = {0};
+    drop_frame(msg); // message type
+    drop_frame(msg); // ID
 
-    ProBInitialResponse res;
+    char *submsg_header;
+    while ((submsg_header = zmsg_popstr(msg)) != NULL) {
+        enum SubMessageType header = atoi(submsg_header);
+        free(submsg_header);
 
-    res.initial_state = prob_get_state(msg);
+        int len = get_number(msg);
 
-    res.transition_groups = get_chunk_array(msg);
-    res.variables = get_chunk_array(msg);
-    res.variable_types = get_chunk_array(msg);
-    res.state_labels = get_chunk_array(msg);
+        switch (header) {
+            case initial_state:
+                res.initial_state = prob_get_state(msg); break;
+            case transition_group_list:
+                res.transition_groups = get_chunk_array(msg); break;
+            case variables_name_list:
+                res.variables = get_chunk_array(msg); break;
+            case variables_type_list:
+                res.variable_types = get_chunk_array(msg); break;
+            case state_label_matrix:
+                res.state_labels = prob_get_matrix(msg); break;
+            case may_write_matrix:
+                res.may_write = prob_get_matrix(msg); break;
+            case must_write_matrix:
+                res.must_write = prob_get_matrix(msg); break;
+            case reads_action_matrix:
+                res.reads_action = prob_get_matrix(msg); break;
+            case reads_guard_matrix:
+                res.reads_guard = prob_get_matrix(msg); break;
+            default:
+                for (; len >= 0; len--) {
+                    drop_frame(msg);
+                }
+        }
+    }
+    
 
-
-    res.may_write = prob_get_matrix(msg);
-    res.must_write = prob_get_matrix(msg);
-    res.reads_action = prob_get_matrix(msg);
-    res.reads_guard = prob_get_matrix(msg);
     return res;
 }
-
 
 ProBMatrixRow get_row(zmsg_t *msg) {
     ProBMatrixRow res;
@@ -137,7 +166,7 @@ void prob_destroy_initial_response(ProBInitialResponse *resp) {
 
     prob_destroy_chunk_array(&(resp->transition_groups));
     prob_destroy_chunk_array(&(resp->variables));
-    prob_destroy_chunk_array(&(resp->state_labels));
+    prob_destroy_matrix(&(resp->state_labels));
 
     prob_destroy_matrix(&resp->may_write);
     prob_destroy_matrix(&resp->must_write);
