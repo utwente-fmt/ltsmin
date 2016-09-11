@@ -233,6 +233,19 @@ prob_exit(model_t model)
     }
 }
 
+
+
+static int
+get_state_label_long(model_t model, int label, int *src) {
+    prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
+    ProBState prob = pins2prob_state(model, src);
+    lts_type_t ltstype = GBgetLTStype(model);
+    char *label_s = lts_type_get_state_label_name(ltstype, label);
+    int res = prob_get_state_label(prob_ctx->prob_client, prob, label_s);
+    //prob_destroy_state(&prob);
+    return res;
+}
+
 static void
 prob_load_model(model_t model)
 {
@@ -265,10 +278,16 @@ prob_load_model(model_t model)
     lts_type_set_edge_label_typeno(ltstype, 0, ctx->op_type_no);
 
     // init state labels
-    const int sl_size = 0;
+    const int sl_size = init.state_labels.nr_rows;
     lts_type_set_state_label_count(ltstype, sl_size);
     const int bool_type = lts_type_add_type(ltstype, "Boolean", NULL);
     lts_type_set_format(ltstype, bool_type, LTStypeBool);
+
+    for (int i = 0; i < sl_size; i++) {
+        // the state label is actually saved in the field named transition_group
+        lts_type_set_state_label_name(ltstype, i, init.state_labels.rows[i].transition_group.data);
+        lts_type_set_state_label_typeno(ltstype, i, bool_type);
+    }
 
     ctx->num_vars = init.variables.size;
 
@@ -334,8 +353,15 @@ prob_load_model(model_t model)
     GBsetDMInfo(model, dm);
 
     matrix_t* sl_info = RTmalloc(sizeof(matrix_t));
-    dm_create(sl_info, 0, 0);
+    dm_create(sl_info, sl_size, ctx->num_vars + 1);
     GBsetStateLabelInfo(model, sl_info);
+    for (int i = 0; i < sl_size; i++) {
+        for (size_t j = 0; j < init.state_labels.rows[i].variables.size; j++) {
+            const char* var = init.state_labels.rows[i].variables.chunks[j].data;
+            const int col = SIlookup(var_si, var);
+            dm_set(sl_info, i, col);
+        }
+    }
 
     // set all variables for init group to write dependent
     for (size_t i = 0; i < ctx->num_vars + 1; i++) dm_set(must_write, 0, i);
@@ -398,6 +424,7 @@ prob_load_model(model_t model)
     prob_destroy_initial_response(&init);
 
     GBsetNextStateLong(model, get_successors_long);
+    GBsetStateLabelLong(model, get_state_label_long);
 
     GBsetExit(model, prob_exit);
 
