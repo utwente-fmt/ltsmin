@@ -831,17 +831,12 @@ inv_rel_destroy(void* context)
     inv_info_destroy(info);
 }
 
-struct inv_svar_s {
-    vset_t tmp;
-};
-
 static void
 inv_svar_destroy(void* context)
 {
     struct inv_info_s* info = (struct inv_info_s*) context;
-    struct inv_svar_s* svar = (struct inv_svar_s*) info->work;
     
-    if (svar->tmp != NULL) vset_destroy(svar->tmp);
+    if (info->work != NULL) vset_destroy((vset_t) info->work);
     inv_info_destroy(info);
 }
 
@@ -880,7 +875,7 @@ VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, v
             vset_clear(c->container);
         } break;
         case PRED_SVAR: // assume state label
-            vset_join(c->container, c->container, label_true[e->idx - N]);            
+            vset_join(c->container, c->container, label_true[e->idx - N]);
             break;
         case PRED_NOT: {
             vset_copy(left->container, c->container);
@@ -977,9 +972,9 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
         case PRED_SVAR: { // assume state label
             /* following join is necessary because vset does not yet support
              * set projection of a projected set. */
-            struct inv_svar_s* svar = (struct inv_svar_s*) c->work;
+            vset_t svar = (vset_t) c->work;
 
-            vset_join(svar->tmp, c->container, states);
+            vset_join(svar, c->container, states);
             if (inv_par) {
                 volatile int* ptr = &label_locks[e->idx - N];
                 while (!cas(ptr, 0, 1)) {
@@ -987,10 +982,11 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
                     ptr = &label_locks[e->idx - N];
                 }
             }
-            eval_label(e->idx - N, svar->tmp);
+
+            eval_label(e->idx - N, svar);
             if (inv_par) label_locks[e->idx - N] = 0;
-            vset_clear(svar->tmp);
-            vset_join(c->container, c->container, label_true[e->idx - N]);            
+            vset_clear(svar);
+            vset_join(c->container, c->container, label_true[e->idx - N]);
         } break;
         case PRED_NOT: {
             vset_copy(left->container, c->container);
@@ -3618,12 +3614,10 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
         break;
     case PRED_SVAR: {
         if (e->idx >= N && !inv_bin_par) {
-            c = RTmalloc(sizeof(struct inv_info_s) + sizeof(struct inv_svar_s));
+            c = RTmalloc(sizeof(struct inv_info_s));
             e->destroy_context = inv_svar_destroy;
-            struct inv_svar_s* svar = (struct inv_svar_s*) c + sizeof(struct inv_info_s);
-            
-            c->work = svar;
-            svar->tmp = vset_create(domain, -1, NULL);
+
+            c->work = vset_create(domain, -1, NULL);
         } else {
             c = RTmalloc(sizeof(struct inv_info_s));
             e->destroy_context = inv_info_destroy;
