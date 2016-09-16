@@ -223,12 +223,12 @@ deploy:
   provider: releases
   # change this key if you want to upload to your own repository, but don't push upstream!
   api_key:
-    secure: uOlJEcM+k143sHC14Iav3YQVAVEKX8Oq0OXF4IBY1BgjGBHE6En7VemaZcWGiZX5K9pepZ2wXBtXk4VGlzZpkZAgQCayUKaQKRtNFhJJtx9ZrhAqZ4wa6hPXRKExGdYetL72S1u9bTdWXjU20k2b/ROE2opXOWdjfN/mBEkdWQQPyB1zlnqzXK8xsJVRnX7h2rCZxefP/F9Z6TDNDzKNjpHFK0WdXwOYBVzop8jFfl6dcwqvxy9Gmbh3fkJCh4rrqs01KOALXN+o/uOu9PnSnuf9JjXXK1wsMCYIGxuUfz67BzYcAy7bNrRwP+eehLKp1ntxul0YPabOLnEY4dlohWu3ryL8iFbewnqnVKuMxSJ7rAmTqpz2nWpl9mqpqqUtcGA457hsebDGEjzgr4VXx6h1rtIChrmqLoSUslY/VQWXIhY2g9YxfUNXIFt2LGU4lhmxrXwXb9yYaDkP+dy+Zk6V/IkX0vMHUET8Hqq5p85j7OoEG/NN4pjZzs9T/qXJCgTG0gI8BHBYxBA1PwndoQgqXmxPELkIY5CB8ETtf2wPE7zzTbhjg8HR4IGahWuRJeiMA+MD0uimglxdnA43aC2w7Tzp4zGc7p4TH+bjs3lFimM+uMc/hh58yweBeRDYyaVlXDAX5NdnmsF7mJc7W9cty8gkmppsDvhUmRHDzIw=
+    secure: Uhi06vZvyuuqx9uEif4BQEklwXwtIk5OYSl2Aqwca/xk+wdC8o/tVV19Zf6oiPhn/GUwkgjbyQEhM50BlyeJfUq8sMrIu6H2YMLO+BXfZv3U4VbAJTgTaaYDglFOOdoKpFW+8+8jjycQxj42Qz/ig47pMpNTc3VihgvuKI14WipRh/1fN5zqAChVtLMjL4FXgtnJDyOuZaAi/CPXKaWda1fAq8ToUFhe/fb6sRBUXGuXkHrWA3v939r0cs85Fd/8okifyVxnrlfai/e6jgQYsFFnHLrmgonaaTHM5igSYOA+78Kds5IHjMnjRUUwToKdprX6htV17Gpf8JG3eIBXBFRNYj+3BJAHIi1AgrGVWDFlOu+8r4VopT1oMd7Fo49gZcatvq6GPh4U0RaQ6y1SDFJlKvZAMvjcuNB5H5IqalCS1h93/lJCLuOQ2ZPt588lLcS5JGUCbjZWLAdQ+SQkRu7J6axnOie0wpbNYsUgrZa6g69/Ap3rnGnZ7wplAwtVHRmISM3E4Sxb+Q0DmtPs1bG+0ZehFzBqSh53F3oI3MlR262gkh0F8HTm3y8DUvcmJvaLjgmre19k6ZdjfzssiQAygmarC8Rjg9D06b3SOi/8yZngvBsYiy2ymZSUO6ikxaG0L0pmVZmw71ubkQbU9s2EEtyxzYFs1wqlpMNCl44=
   file: 
     - "ltsmin-$TRAVIS_TAG-source.tgz"
     - "/tmp/dist/$distname.tgz"
   skip_cleanup: true
   on:
     # change this repo slug if you want to upload to your own repository, but don't push upstream!
-    repo: Meijuh/ltsmin
+    repo: utwente-fmt/ltsmin
     tags: true  
