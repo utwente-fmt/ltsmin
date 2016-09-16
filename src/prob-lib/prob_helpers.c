@@ -89,6 +89,10 @@ ProBInitialResponse prob_get_init_response(zmsg_t *msg) {
                 res.reads_action = prob_get_matrix(msg); break;
             case reads_guard_matrix:
                 res.reads_guard = prob_get_matrix(msg); break;
+            case guard_info_matrix:
+                res.guard_info = prob_get_matrix(msg); break;
+            case guard_label_matrix:
+                res.guard_labels = prob_get_matrix(msg); break;
             default:
                 for (; len > 0; len--) {
                     drop_frame(msg);
