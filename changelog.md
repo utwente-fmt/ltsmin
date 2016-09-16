@@ -1,10 +1,73 @@
+# Unreleased - Release 3.0 of the LTSmin toolset
+
+- Improvements to the symbolic back-end (*2lts-sym):
+    - Precise counting of sets using the bignum interface. Meaning you
+      can now print the size of a set arbitrarily large without loss of
+      precision.
+    - Add feature that allows counting the size of a set using long doubles
+      (in addition to doubles). The symbolic back-end will automatically 
+      switch to long doubles when necessary.
+    - Add option --next-union that computes the application of a transition
+      relation together with the identify.
+    - The symbolic back-end is now capable of invariant checking.
+    - Multiple formulas, invariants are now supported through their respective
+      commandline options. If LACE is used, these properties will be checked
+      in parallel.
+    - It is now possible to output all Sylvan statistics, such as the size
+      of the node table, number of GCs etc.
+
+- Improvements w.r.t. static variable ordering:
+    - Invert the permutation of rows/columns (transition groups/state variables)
+      using options --regroup=hf --regroup=vf respectively.
+    - Transformations
+    -  on the dependency matrix ige66099b09d4ee6e884ab288497a52f254b6e9ebanore read dependencies,
+      since write dependencies seem to influence the actual size of Decision
+      Diagrams to a much greater extent.
+    - Add option --col-ins (see manpage) that can pick a column/state variable
+      and insert it at a specific index.
+    - A fast amount of static variable reordering algorithms have been added
+      available through Boost and ViennaCL. Furthermore the FORCE algorithm and
+      Noack's algorithms have been implemented, see [1]. In addition to these
+      algorithms metrics related to the quality of the static variable order
+      can be shown with option --regroup=mm.
+    - A manual group/variable order can now be given with --row-perm/--col-perm
+      respectively.
+
+- A new Petri net front-end has been added to LTSmin, see [2]. The front-end
+  reads Petri nets in the PNML format.
+
+- A front-end for B, Event-B CSP, and Z is now available through ProB, see [3].
+
+- The mCRL2 front-end now accepts files with .txt extension.
+
+- Improvements to the PINS interface:
+    - Add GBExit function that is called before a back-end exits.
+    - Add functions GB<set|get>VarPerm and GB<set|get>GroupPerm that allows
+      language front-ends to provide permutations. This is useful when
+      front-ends have language specific algorithms for static variable reordering.
+
+- Miscellaneous:
+    - All default autoconf files such ae66099b09d4ee6e884ab288497a52f254b6e9ebas README, NEWS are moved to *.md and
+      sym-linked to their old file names. The markdown styling works better with
+      Github.
+    - Major refactor to the PINS regrouping layer, simplifying its use for
+      developers.
+    - LTSmin now uses Travis CI.
+
+ 1. Bandwidth and Wavefront Reduction for Static Variable Ordering in Symbolic Reachability Analysis -
+     http://dx.doi.org/10.1007/978-3-319-40648-0_20
+ 1. Complete Results for the 2016 Edition of the Model Checking Contest -
+     http://mcc.lip6.fr/
+ 1. Symbolic Reachability Analysis of B Through ProB and LTSmin -
+     http://dx.doi.org/10.1007/978-3-319-33693-0_18
+
 # January 23, 2015 - Release 2.1 of the LTSmin toolset
 
 This release is accompanied by the tool paper:
 LTSmin: High-Performance Language-Independent Model Checking [6].
 
 - Improvements to symbolic backend (*2lts-sym):
-    - Parallelized transition relation learning and application using Lace [5] 
+    - Parallelized transition relatioBandwidth and Wavefront Reduction for Static Variable Ordering in Symbolic Reachability Analysisn learning and application using Lace [5] 
     - Exploiting read, write and copy dependencies [3]
     - Parallelized guard learning and application (--pins-guards, --no-soundness-check) [1]
     - Improved regrouping algorithm for bandwidth reduction (-rcw)
