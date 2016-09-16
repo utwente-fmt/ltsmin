@@ -13,7 +13,8 @@ enum SubMessageType {
     may_write_matrix,
     must_write_matrix,
     reads_action_matrix,
-    reads_guard_matrix
+    reads_guard_matrix,
+    limit_message_types=128 // avoid undefined behaviour if we get new message types
 };
 
 typedef struct ProBChunk {
