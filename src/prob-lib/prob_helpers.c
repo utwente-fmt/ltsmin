@@ -90,7 +90,7 @@ ProBInitialResponse prob_get_init_response(zmsg_t *msg) {
             case reads_guard_matrix:
                 res.reads_guard = prob_get_matrix(msg); break;
             default:
-                for (; len >= 0; len--) {
+                for (; len > 0; len--) {
                     drop_frame(msg);
                 }
         }
