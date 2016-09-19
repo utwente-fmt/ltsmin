@@ -294,9 +294,11 @@ prob_load_model(model_t model)
     }
 
 
+    string_index_t si_guards = SIcreate();
     for (int i = 0; i < sl_guards_size; i++) {
         lts_type_set_state_label_name(ltstype, i + sl_inv_size, init.guard_info.rows[i].transition_group.data);
         lts_type_set_state_label_typeno(ltstype, i + sl_inv_size, guard_type);
+        SIputAt(si_guards, init.guard_info.rows[i].transition_group.data, i);
     }
 
 
@@ -310,10 +312,11 @@ prob_load_model(model_t model)
         sl_group_t *sl_group_guard = RTmallocZero(sizeof(sl_group_t) + sl_guards_size * sizeof(int));
         sl_group_guard->count = sl_guards_size;
         for (int i = 0; i < sl_group_guard->count; i++) {
-            sl_group_guard->sl_idx[i] = i; // TODO: i + sl_inv_size?
+            sl_group_guard->sl_idx[i] = i + sl_inv_size; // TODO: should it be just "i"?
         }
         GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guard);
     }
+
 
 
     ctx->num_vars = init.variables.size;
@@ -356,6 +359,8 @@ prob_load_model(model_t model)
     // make sure to set the lts-type before anything else in the GB
     GBsetLTStype(model, ltstype);
 
+
+
     const int num_groups = init.transition_groups.size;
 
     ctx->op_type = RTmalloc(sizeof(int[num_groups]));
@@ -367,6 +372,25 @@ prob_load_model(model_t model)
         ctx->op_type[i] = at;
         SIputAt(op_si,name,i);
     }
+
+
+
+    guard_t **guard_info = RTmalloc(num_groups * sizeof(guard_t*));
+    for (int i = 0; i < num_groups; i++) {
+        int idx_transition_group = SIlookup(op_si, init.guard_info.rows[i].transition_group.data);
+        guard_info[idx_transition_group] = RTmalloc(sizeof(int) * (init.guard_info.nr_rows +1));
+        guard_info[idx_transition_group]->count = init.guard_info.rows[i].variables.size;
+
+        for (size_t j = 0; j < init.guard_info.rows[i].variables.size; j++) {
+            int idx_guard = SIlookup(si_guards, init.guard_info.rows[i].variables.chunks[j].data);
+            guard_info[idx_transition_group]->guard[j] = idx_guard;
+        }
+    }
+    SIdestroy(&si_guards);
+    GBsetGuardsInfo(model, guard_info);
+
+
+
 
     matrix_t* must_write = RTmalloc(sizeof(matrix_t));
     matrix_t* read = RTmalloc(sizeof(matrix_t));
