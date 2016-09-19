@@ -278,16 +278,43 @@ prob_load_model(model_t model)
     lts_type_set_edge_label_typeno(ltstype, 0, ctx->op_type_no);
 
     // init state labels
-    const int sl_size = init.state_labels.nr_rows;
+    const int sl_inv_size = init.state_labels.nr_rows;
+    const int sl_guards_size = init.guard_info.nr_rows;
+    const int sl_size = sl_inv_size + sl_guards_size;
     lts_type_set_state_label_count(ltstype, sl_size);
     const int bool_type = lts_type_add_type(ltstype, "Boolean", NULL);
     lts_type_set_format(ltstype, bool_type, LTStypeBool);
+    const int guard_type = lts_type_add_type(ltstype, "guard", NULL);
+    lts_type_set_format (ltstype, guard_type, LTStypeTrilean); // TODO: LTStypeBool could be sufficient
 
-    for (int i = 0; i < sl_size; i++) {
+    for (int i = 0; i < sl_inv_size; i++) {
         // the state label is actually saved in the field named transition_group
         lts_type_set_state_label_name(ltstype, i, init.state_labels.rows[i].transition_group.data);
         lts_type_set_state_label_typeno(ltstype, i, bool_type);
     }
+
+
+    for (int i = 0; i < sl_guards_size; i++) {
+        lts_type_set_state_label_name(ltstype, i + sl_inv_size, init.guard_info.rows[i].transition_group.data);
+        lts_type_set_state_label_typeno(ltstype, i + sl_inv_size, guard_type);
+    }
+
+
+    sl_group_t *sl_group_all = RTmallocZero(sizeof(sl_group_t) + sl_size * sizeof(int));
+    sl_group_all->count = sl_size;
+    for (int i = 0; i < sl_group_all->count; i++) {
+        sl_group_all->sl_idx[i] = i;
+    }
+    GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
+    if (sl_guards_size > 0) {
+        sl_group_t *sl_group_guard = RTmallocZero(sizeof(sl_group_t) + sl_guards_size * sizeof(int));
+        sl_group_guard->count = sl_guards_size;
+        for (int i = 0; i < sl_group_guard->count; i++) {
+            sl_group_guard->sl_idx[i] = i; // TODO: i + sl_inv_size?
+        }
+        GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guard);
+    }
+
 
     ctx->num_vars = init.variables.size;
 
@@ -355,11 +382,18 @@ prob_load_model(model_t model)
     matrix_t* sl_info = RTmalloc(sizeof(matrix_t));
     dm_create(sl_info, sl_size, ctx->num_vars + 1);
     GBsetStateLabelInfo(model, sl_info);
-    for (int i = 0; i < sl_size; i++) {
+    for (int i = 0; i < sl_inv_size; i++) {
         for (size_t j = 0; j < init.state_labels.rows[i].variables.size; j++) {
             const char* var = init.state_labels.rows[i].variables.chunks[j].data;
             const int col = SIlookup(var_si, var);
             dm_set(sl_info, i, col);
+        }
+    }
+    for (int i = 0; i < sl_guards_size; i++) {
+        for (size_t j = 0; j < init.guard_labels.rows[i].variables.size; j++) {
+            const char* var = init.guard_labels.rows[i].variables.chunks[j].data;
+            const int col = SIlookup(var_si, var);
+            dm_set(sl_info, i+sl_inv_size, col);
         }
     }
 
