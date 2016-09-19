@@ -82,7 +82,9 @@ before_install:
 
 install:  
   # update brew
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update && brew install
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update && 
+    brew uninstall libtool && 
+    brew install
     asciidoc
     xmlto
     viennacl
@@ -90,7 +92,8 @@ install:
     ant
     ghc
     cabal-install
-    popt && 
+    popt
+    libtool &&
     export XML_CATALOG_FILES=/usr/local/etc/xml/catalog; fi
    
   # for building mCRL2:  
