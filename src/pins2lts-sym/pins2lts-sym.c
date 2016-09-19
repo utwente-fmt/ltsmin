@@ -878,7 +878,6 @@ VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, v
             if (e->idx < N) { // state variable
                 vset_t svar = (vset_t) c->work;
                 vset_join(c->container, c->container, svar);
-                vset_clear(svar);
             } else { // state label
                 vset_join(c->container, c->container, label_true[e->idx - N]);
             }
@@ -992,10 +991,10 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
                 eval_label(e->idx - N, svar);
                 if (inv_par) label_locks[e->idx - N] = 0;
                 vset_join(c->container, c->container, label_true[e->idx - N]);
+                vset_clear(svar);
             } else { // state variable
                 vset_join(c->container, c->container, svar);
             }
-            vset_clear(svar);
         } break;
         case PRED_NOT: {
             vset_copy(left->container, c->container);
