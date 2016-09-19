@@ -49,8 +49,9 @@ env:
     WITH_PROB="yes"
     GHCVER="7.10.3"
     HAPPYVER="1.19.5"
-    ZMQ_NAME="zeromq-4.1.4"
-    ZMQ_URL="http://download.zeromq.org/$ZMQ_NAME.tar.gz"
+    ZMQ_VERSION="4.1.5"
+    ZMQ_NAME="zeromq-$ZMQ_VERSION"
+    ZMQ_URL="https://github.com/zeromq/zeromq4-1/releases/download/v$ZMQ_VERSION/$ZMQ_NAME.tar.gz"
 
 addons:
   apt:
