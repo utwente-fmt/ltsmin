@@ -197,7 +197,7 @@ prob_get_state_label(prob_client_t pc, ProBState s, char *label)
     zmsg_t *request = zmsg_new();
     zmsg_addstr(request, "get-state-label");
     zmsg_addstrf(request, "%d", pc->id_count);
-    zmsg_addstr(request, label);
+    zmsg_addstrf(request, "DA%s", label);
     prob_put_state(request, s);
     zmsg_send(&request, pc->zocket);
     zmsg_destroy(&request);

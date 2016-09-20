@@ -290,14 +290,16 @@ prob_load_model(model_t model)
 
     string_index_t si_guards = SIcreate();
     for (int i = 0; i < sl_guards_size; i++) {
-        lts_type_set_state_label_name(ltstype, i, init.guard_labels.rows[i].transition_group.data);
+        lts_type_set_state_label_name(ltstype, i, init.guard_labels.rows[i].transition_group.data + 2); // skip the 'DA'
+        // guards will be known as 'guard_X'
         lts_type_set_state_label_typeno(ltstype, i, guard_type);
         SIputAt(si_guards, init.guard_labels.rows[i].transition_group.data, i);
     }
 
     for (int i = 0; i < sl_inv_size; i++) {
         // the state label is actually saved in the field named transition_group
-        lts_type_set_state_label_name(ltstype, i + sl_guards_size, init.state_labels.rows[i].transition_group.data);
+        lts_type_set_state_label_name(ltstype, i + sl_guards_size, init.state_labels.rows[i].transition_group.data + 2); // skip the 'DA'
+        // invariants will be known as 'invX'
         lts_type_set_state_label_typeno(ltstype, i + sl_guards_size, bool_type);
     }
 
