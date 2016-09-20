@@ -279,7 +279,7 @@ prob_load_model(model_t model)
 
     // init state labels
     const int sl_inv_size = init.state_labels.nr_rows;
-    const int sl_guards_size = init.guard_info.nr_rows;
+    const int sl_guards_size = init.guard_labels.nr_rows;
     const int sl_size = sl_inv_size + sl_guards_size;
     lts_type_set_state_label_count(ltstype, sl_size);
     const int bool_type = lts_type_add_type(ltstype, "Boolean", NULL);
@@ -296,9 +296,9 @@ prob_load_model(model_t model)
 
     string_index_t si_guards = SIcreate();
     for (int i = 0; i < sl_guards_size; i++) {
-        lts_type_set_state_label_name(ltstype, i + sl_inv_size, init.guard_info.rows[i].transition_group.data);
+        lts_type_set_state_label_name(ltstype, i + sl_inv_size, init.guard_labels.rows[i].transition_group.data);
         lts_type_set_state_label_typeno(ltstype, i + sl_inv_size, guard_type);
-        SIputAt(si_guards, init.guard_info.rows[i].transition_group.data, i);
+        SIputAt(si_guards, init.guard_labels.rows[i].transition_group.data, i);
     }
 
 
