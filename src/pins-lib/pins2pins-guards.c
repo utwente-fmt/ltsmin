@@ -11,7 +11,7 @@
 int              PINS_GUARD_EVAL = 0;
 
 struct poptOption guards_options[]={
-    { USE_GUARDS_EVAL_OPTION, 'g', POPT_ARG_VAL|POPT_ARGFLAG_DOC_HIDDEN, &PINS_GUARD_EVAL, 1,
+    { USE_GUARDS_EVAL_OPTION, 0, POPT_ARG_VAL|POPT_ARGFLAG_DOC_HIDDEN, &PINS_GUARD_EVAL, 1,
       "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
     POPT_TABLEEND
 };
