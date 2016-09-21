@@ -73,7 +73,7 @@ struct poptOption group_options[] = {
 #endif
     { "regroup-exit", 0, POPT_ARG_NONE, &group_exit, 0, "exit after regrouping is done", NULL },
     { "regroup-time", 0, POPT_ARG_NONE, &group_time, 0, "print the timing information of each transformation", NULL },
-    { USE_GUARDS_OPTION, 'g', POPT_ARG_VAL|POPT_ARGFLAG_DOC_HIDDEN, &PINS_USE_GUARDS, 1,
+    { USE_GUARDS_OPTION, 'g', POPT_ARG_NONE, &PINS_USE_GUARDS, 0,
       "use guards in reordering layer" , NULL},
     POPT_TABLEEND
 };
