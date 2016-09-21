@@ -937,6 +937,7 @@ guard_t** GBgetGuardsInfo(model_t model) {
 }
 
 void GBsetGuard(model_t model, int group, guard_t* guard) {
+    HREassert (guard->count > 0, "group must have at least one guard");
     model->guards[group] = guard;
 }
 
