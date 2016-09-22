@@ -557,6 +557,27 @@ static void setup_read_write_matrices(model_t model,
 
 }
 
+static void setup_dna_matrix(model_t model, ProBInitialResponse init, string_index_t si_op) {
+    ProBMatrix dna = init.do_not_accord;
+    int ngroups = dna.nr_rows;
+
+    matrix_t *dna_info = RTmalloc(sizeof(matrix_t));
+    dm_create(dna_info, ngroups, ngroups);
+    for (int i = 0; i < ngroups; i++) {
+        ProBMatrixRow current_row = dna.rows[i];
+        int row = SIlookup(si_op, current_row.transition_group.data);
+        int row_length = current_row.variables.size;
+        for (int j = 0; j < row_length; j++) {
+            char *name = current_row.variables.chunks[j].data;
+            int col = SIlookup(si_op, name);
+            dm_set(dna_info, row, col);
+        }
+        dm_set(dna_info, 0, i); // DA$init_state does not 
+        dm_set(dna_info, i, 0); // accord with anything
+    }
+    GBsetDoNotAccordInfo(model, dna_info);
+}
+
 static void
 prob_load_model(model_t model)
 {
@@ -616,8 +637,10 @@ prob_load_model(model_t model)
 
     setup_state_label_info(model, ctx, init, var_si);
 
-
     setup_read_write_matrices(model, ctx, num_groups, init, var_si, op_si);
+
+    setup_dna_matrix(model, init, op_si);
+
 
     int init_state[ctx->num_vars + 1];
     prob2pins_state(init.initial_state, init_state, model);
