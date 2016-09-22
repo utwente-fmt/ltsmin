@@ -315,11 +315,16 @@ static void setup_state_labels(model_t model,
     const int sl_size = sl_inv_size + sl_guards_size;
     lts_type_set_state_label_count(ltstype, sl_size);
 
+    char *guard_is_init_is_false = "guard_is_init==0";
+    char *guard_is_init_is_true  = "guard_is_init==1";
+
     // set up two special guards
-    lts_type_set_state_label_name(ltstype, PROB_IS_INIT_EQUALS_FALSE_GUARD, "guard_is_init==0");
+    lts_type_set_state_label_name(ltstype, PROB_IS_INIT_EQUALS_FALSE_GUARD, guard_is_init_is_false);
     lts_type_set_state_label_typeno(ltstype, PROB_IS_INIT_EQUALS_FALSE_GUARD, guard_type);
-    lts_type_set_state_label_name(ltstype, PROB_IS_INIT_EQUALS_TRUE_GUARD,  "guard_is_init==1");
+    lts_type_set_state_label_name(ltstype, PROB_IS_INIT_EQUALS_TRUE_GUARD, guard_is_init_is_true);
     lts_type_set_state_label_typeno(ltstype, PROB_IS_INIT_EQUALS_TRUE_GUARD, guard_type);
+    SIputAt(si_guards, guard_is_init_is_false, PROB_IS_INIT_EQUALS_FALSE_GUARD);
+    SIputAt(si_guards, guard_is_init_is_true,  PROB_IS_INIT_EQUALS_TRUE_GUARD);
 
     for (int i = 2; i < sl_guards_size; i++) { // move all other guards by two
         lts_type_set_state_label_name(ltstype, i, init.guard_labels.rows[i-2].transition_group.data + 2); // skip the 'DA'
@@ -435,7 +440,6 @@ static void setup_guard_info(model_t model,
             guard_info[idx_transition_group]->guard[j + 1] = idx_guard;
         }
     }
-    SIdestroy(&si_guards);
     GBsetGuardsInfo(model, guard_info);
 }
 
@@ -578,6 +582,42 @@ static void setup_dna_matrix(model_t model, ProBInitialResponse init, string_ind
     GBsetDoNotAccordInfo(model, dna_info);
 }
 
+static void setup_may_be_coenabled_matrix(model_t model, ProBInitialResponse init, string_index_t guard_si) {
+    ProBMatrix may_be_coenabled = init.may_be_coenabled;
+    int size = may_be_coenabled.nr_rows + 2;
+
+    matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
+    dm_create(gce_info, size, size);
+
+    // special guards are co-enabled with themselves (reflexivity)
+    dm_set(gce_info, PROB_IS_INIT_EQUALS_FALSE_GUARD, PROB_IS_INIT_EQUALS_FALSE_GUARD);
+    dm_set(gce_info, PROB_IS_INIT_EQUALS_TRUE_GUARD,  PROB_IS_INIT_EQUALS_TRUE_GUARD);
+    // special guards are not co-enabled with each other
+    
+    for (int i = 2; i < size; i++) {
+        // special guards might be co-enabled with regular guards
+        dm_set(gce_info, PROB_IS_INIT_EQUALS_FALSE_GUARD, i);
+        dm_set(gce_info, i, PROB_IS_INIT_EQUALS_FALSE_GUARD);
+        dm_set(gce_info, PROB_IS_INIT_EQUALS_TRUE_GUARD, i);
+        dm_set(gce_info, i, PROB_IS_INIT_EQUALS_TRUE_GUARD);
+
+        // regular guard co-enabled relationship
+        ProBMatrixRow current_row = may_be_coenabled.rows[i-2];
+        int row = SIlookup(guard_si, current_row.transition_group.data);
+        int row_length = current_row.variables.size;
+        for (int j = 0; j < row_length; j++) {
+            char *name = current_row.variables.chunks[j].data;
+            int col = SIlookup(guard_si, name);
+            dm_set(gce_info, row, col);
+            dm_set(gce_info, col, row); // symmetry
+        }
+        dm_set(gce_info, i, i);
+
+    }
+
+    GBsetGuardCoEnabledInfo(model, gce_info);
+}
+
 static void
 prob_load_model(model_t model)
 {
@@ -641,6 +681,8 @@ prob_load_model(model_t model)
 
     setup_dna_matrix(model, init, op_si);
 
+    setup_may_be_coenabled_matrix(model, init, si_guards);
+
 
     int init_state[ctx->num_vars + 1];
     prob2pins_state(init.initial_state, init_state, model);
@@ -655,6 +697,7 @@ prob_load_model(model_t model)
 
     GBsetExit(model, prob_exit);
 
+    SIdestroy(&si_guards);
     SIdestroy(&var_si);
     SIdestroy(&op_si);
 }
