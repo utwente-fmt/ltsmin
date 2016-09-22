@@ -20,6 +20,10 @@
 #include <util-lib/chunk_support.h>
 #include <util-lib/util.h>
 
+
+#define PROB_IS_INIT_EQUALS_FALSE_GUARD 0
+#define PROB_IS_INIT_EQUALS_TRUE_GUARD  1
+
 // is_init is a reserved state variable
 static const char* IS_INIT = "is_init";
 
@@ -255,15 +259,21 @@ static void setup_state_labels(model_t model,
                                int guard_type) {
     // init state labels
     const int sl_inv_size = init.state_labels.nr_rows;
-    const int sl_guards_size = init.guard_labels.nr_rows;
+    const int sl_guards_size = init.guard_labels.nr_rows + 2; // two special guards
     const int sl_size = sl_inv_size + sl_guards_size;
     lts_type_set_state_label_count(ltstype, sl_size);
 
-    for (int i = 0; i < sl_guards_size; i++) {
-        lts_type_set_state_label_name(ltstype, i, init.guard_labels.rows[i].transition_group.data + 2); // skip the 'DA'
+    // set up two special guards
+    lts_type_set_state_label_name(ltstype, PROB_IS_INIT_EQUALS_FALSE_GUARD, "guard_is_init==0");
+    lts_type_set_state_label_typeno(ltstype, PROB_IS_INIT_EQUALS_FALSE_GUARD, guard_type);
+    lts_type_set_state_label_name(ltstype, PROB_IS_INIT_EQUALS_TRUE_GUARD,  "guard_is_init==1");
+    lts_type_set_state_label_typeno(ltstype, PROB_IS_INIT_EQUALS_TRUE_GUARD, guard_type);
+
+    for (int i = 2; i < sl_guards_size; i++) { // move all other guards by two
+        lts_type_set_state_label_name(ltstype, i, init.guard_labels.rows[i-2].transition_group.data + 2); // skip the 'DA'
         // guards will be known as 'guard_X'
         lts_type_set_state_label_typeno(ltstype, i, guard_type);
-        SIputAt(si_guards, init.guard_labels.rows[i].transition_group.data, i);
+        SIputAt(si_guards, init.guard_labels.rows[i-2].transition_group.data, i);
     }
 
     for (int i = 0; i < sl_inv_size; i++) {
@@ -279,7 +289,7 @@ static void setup_state_labels(model_t model,
         sl_group_all->sl_idx[i] = i;
     }
     GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
-    if (sl_guards_size > 0) {
+    if (sl_guards_size > 2) {
         sl_group_t *sl_group_guard = RTmallocZero(sizeof(sl_group_t) + sl_guards_size * sizeof(int));
         sl_group_guard->count = sl_guards_size;
         for (int i = 0; i < sl_group_guard->count; i++) {
@@ -357,11 +367,20 @@ static void setup_guard_info(model_t model,
     for (int i = 0; i < num_groups; i++) {
         int idx_transition_group = SIlookup(op_si, init.guard_info.rows[i].transition_group.data);
         guard_info[idx_transition_group] = RTmalloc(sizeof(int) * (init.guard_info.nr_rows +1));
-        guard_info[idx_transition_group]->count = init.guard_info.rows[i].variables.size;
+        guard_info[idx_transition_group]->count = init.guard_info.rows[i].variables.size + 1;
+
+        // additionally set is_init == false or is_init == true as a guard
+        if (idx_transition_group == 0) {
+            // just making sure
+            assert(0 == strcmp(init.guard_info.rows[i].transition_group.data, "DA$init_state"));
+            guard_info[idx_transition_group]->guard[0] = PROB_IS_INIT_EQUALS_FALSE_GUARD; 
+        } else {
+            guard_info[idx_transition_group]->guard[0] = PROB_IS_INIT_EQUALS_TRUE_GUARD; 
+        }
 
         for (size_t j = 0; j < init.guard_info.rows[i].variables.size; j++) {
             int idx_guard = SIlookup(si_guards, init.guard_info.rows[i].variables.chunks[j].data);
-            guard_info[idx_transition_group]->guard[j] = idx_guard;
+            guard_info[idx_transition_group]->guard[j + 1] = idx_guard;
         }
     }
     SIdestroy(&si_guards);
@@ -373,16 +392,24 @@ static void setup_state_label_info(model_t model,
                                    ProBInitialResponse init,
                                    string_index_t var_si) {
     const int sl_inv_size = init.state_labels.nr_rows;
-    const int sl_guards_size = init.guard_labels.nr_rows;
+    const int sl_guards_size = init.guard_labels.nr_rows + 2; // two special guards (see below)
     const int sl_size = sl_inv_size + sl_guards_size;
 
     matrix_t* sl_info = RTmalloc(sizeof(matrix_t));
     dm_create(sl_info, sl_size, ctx->num_vars + 1);
-    for (int i = 0; i < sl_guards_size; i++) {
-        for (size_t j = 0; j < init.guard_labels.rows[i].variables.size; j++) {
-            const char* var = init.guard_labels.rows[i].variables.chunks[j].data;
+
+    // two special guards:
+    // first guard is is_init == 0 depends on is_init, which is the last variable in the list
+    dm_set(sl_info, PROB_IS_INIT_EQUALS_FALSE_GUARD, ctx->num_vars);
+    // second guard is is_init == 1 depends on is_init, and depends on the same variable
+    dm_set(sl_info, PROB_IS_INIT_EQUALS_TRUE_GUARD, ctx->num_vars);
+
+    for (int i = 2; i < sl_guards_size; i++) {
+        // all other guards move up two slots
+        for (size_t j = 0; j < init.guard_labels.rows[i-2].variables.size; j++) {
+            const char* var = init.guard_labels.rows[i-2].variables.chunks[j].data;
             const int col = SIlookup(var_si, var);
-            dm_set(sl_info, i, col);
+            dm_set(sl_info, i, col); 
         }
     }
 
