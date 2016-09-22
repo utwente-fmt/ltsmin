@@ -619,6 +619,56 @@ static void setup_may_be_coenabled_matrix(model_t model, ProBInitialResponse ini
     GBsetGuardCoEnabledInfo(model, gce_info);
 }
 
+static void setup_necessary_enabling_set(model_t model, ProBInitialResponse init, string_index_t guard_si, string_index_t op_si, int ngroups) {
+    ProBMatrix nes = init.necessary_enabling_set;
+    int nguards = nes.nr_rows + 2;
+
+
+    matrix_t *gnes_info = RTmalloc(sizeof(matrix_t));
+    dm_create(gnes_info, nguards, ngroups);
+
+    dm_set(gnes_info, PROB_IS_INIT_EQUALS_TRUE_GUARD, 0); // $init_state enables is_init == true
+
+    for (int i = 2; i < nguards; i++) {
+        ProBMatrixRow current_row = nes.rows[i-2];
+        int row = SIlookup(guard_si, current_row.transition_group.data);
+        int row_length = current_row.variables.size;
+        for (int j = 0; j < row_length; j++) {
+            char *name = current_row.variables.chunks[j].data;
+            int col = SIlookup(op_si, name);
+            dm_set(gnes_info, row, col);
+        }
+    }
+
+    GBsetGuardNESInfo(model, gnes_info);
+}
+
+static void setup_necessary_disabling_set(model_t model, ProBInitialResponse init, string_index_t guard_si, string_index_t op_si, int ngroups) {
+    ProBMatrix nes = init.necessary_disabling_set;
+    int nguards = nes.nr_rows + 2;
+
+
+    matrix_t *gnds_info = RTmalloc(sizeof(matrix_t));
+    dm_create(gnds_info, nguards, ngroups);
+
+    dm_set(gnds_info, PROB_IS_INIT_EQUALS_FALSE_GUARD, 0); // $init_state disables is_init == false
+
+    for (int i = 2; i < nguards; i++) {
+        ProBMatrixRow current_row = nes.rows[i-2];
+        int row = SIlookup(guard_si, current_row.transition_group.data);
+        int row_length = current_row.variables.size;
+        for (int j = 0; j < row_length; j++) {
+            char *name = current_row.variables.chunks[j].data;
+            int col = SIlookup(op_si, name);
+            dm_set(gnds_info, row, col);
+            assert(row != -1);
+            assert(col != -1);
+        }
+    }
+
+    GBsetGuardNDSInfo(model, gnds_info);
+}
+
 static void
 prob_load_model(model_t model)
 {
@@ -684,6 +734,8 @@ prob_load_model(model_t model)
 
     setup_may_be_coenabled_matrix(model, init, si_guards);
 
+    setup_necessary_enabling_set (model, init, si_guards, op_si, num_groups);
+    setup_necessary_disabling_set(model, init, si_guards, op_si, num_groups);
 
     int init_state[ctx->num_vars + 1];
     prob2pins_state(init.initial_state, init_state, model);
