@@ -75,6 +75,7 @@ addons:
       - happy-1.19.5
       - libnuma-dev
       - liblzma-dev
+      - dejagnu
       
 before_install:
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; 
@@ -93,7 +94,8 @@ install:
     ghc
     cabal-install
     popt
-    libtool &&
+    libtool
+    dejagnu &&
     export XML_CATALOG_FILES=/usr/local/etc/xml/catalog; fi
    
   # for building mCRL2:  
