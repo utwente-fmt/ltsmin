@@ -78,8 +78,11 @@ addons:
       - dejagnu
       
 before_install:
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; 
-    then export PATH=/opt/ghc/$GHCVER/bin:/opt/happy/$HAPPYVER/bin:$PATH; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then 
+        export PATH=/opt/ghc/$GHCVER/bin:/opt/happy/$HAPPYVER/bin:$PATH &&
+        export MAKEFLAGS=-j2; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+        export MAKEFLAGS=-j1; fi
 
 install:  
   # update brew
@@ -120,7 +123,7 @@ install:
     pushd /tmp/$ZMQ_NAME &&
     ./autogen.sh &&
     ./configure --enable-static --enable-shared --prefix="$HOME/ltsmin-deps" --without-libsodium --without-pgm --without-documentation &&
-    make -j2 &&
+    make &&
     make install &&
     popd; fi
     
@@ -133,7 +136,7 @@ install:
     pushd /tmp/czmq-$CZMQ_VERSION &&
     ./autogen.sh &&
     ./configure --enable-static --enable-shared --prefix="$HOME/ltsmin-deps" --with-libzmq="$HOME/ltsmin-deps" &&
-    make -j2 LDFLAGS="-lpthread" &&
+    make LDFLAGS="-lpthread" &&
     make install &&
     popd; fi
     
@@ -144,8 +147,8 @@ install:
     mkdir /tmp/mCRL2/build &&
     pushd /tmp/mCRL2/build &&
     cmake ../src -DMCRL2_ENABLE_GUI_TOOLS=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="$HOME/ltsmin-deps" -DMCRL2_MAN_PAGES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_C_COMPILER="$CC" &&
-    make -j2 &&
-    make install -j2 &&
+    make &&
+    make install &&
     mv "$HOME/ltsmin-deps/share/mcrl2/lib/"* "$HOME/ltsmin-deps/lib" &&
     popd; fi
   
@@ -207,8 +210,8 @@ before_script:
 script:
   - ./ltsminreconf &&
     ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make -j2; fi
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make -j2 LDFLAGS="-Wl,--no-export-dynamic -lltdl -lnuma -llzma -all-static"; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make LDFLAGS="-Wl,--no-export-dynamic -lltdl -lnuma -llzma -all-static"; fi
   - make check
   - make dist &&
     export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
