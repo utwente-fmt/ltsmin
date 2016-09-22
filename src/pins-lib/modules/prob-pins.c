@@ -484,13 +484,20 @@ static void setup_read_write_matrices(model_t model,
     matrix_t* must_write = RTmalloc(sizeof(matrix_t));
     matrix_t* read = RTmalloc(sizeof(matrix_t));
     matrix_t* dm = RTmalloc(sizeof(matrix_t));
+
+    // TODO: we still need this one, but the reads_action
+    //       matrix we send contains reads from parameters...
+    //matrix_t* reads_action = RTmalloc(sizeof(matrix_t));
     dm_create(must_write, num_groups, ctx->num_vars + 1);
     dm_create(read, num_groups, ctx->num_vars + 1);
+    //dm_create(reads_action, num_groups, ctx->num_vars + 1);
 
     GBsetDMInfoMustWrite(model, must_write);
     GBsetDMInfoRead(model, read);
 
     GBsetDMInfo(model, dm);
+    //GBsetMatrix(model, LTSMIN_MATRIX_ACTIONS_READS, reads_action,
+    //            PINS_MAY_SET, PINS_INDEX_GROUP, PINS_INDEX_STATE_VECTOR);
 
 
 
@@ -530,6 +537,7 @@ static void setup_read_write_matrices(model_t model,
             const char* var = init.reads_action.rows[i].variables.chunks[j].data;
             const int col = SIlookup(var_si, var);
             dm_set(read, row, col);
+            //dm_set(reads_action, row, col);
         }
     }
 
