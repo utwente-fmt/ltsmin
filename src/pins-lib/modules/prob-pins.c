@@ -584,10 +584,11 @@ static void setup_dna_matrix(model_t model, ProBInitialResponse init, string_ind
 
 static void setup_may_be_coenabled_matrix(model_t model, ProBInitialResponse init, string_index_t guard_si) {
     ProBMatrix may_be_coenabled = init.may_be_coenabled;
+    // this is an upper triangle matrix; the diagonal is not included
     int size = may_be_coenabled.nr_rows + 2;
 
     matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
-    dm_create(gce_info, size, size);
+    dm_create(gce_info, size+1, size+1); // the last element (on the diagonal) is not included
 
     // special guards are co-enabled with themselves (reflexivity)
     dm_set(gce_info, PROB_IS_INIT_EQUALS_FALSE_GUARD, PROB_IS_INIT_EQUALS_FALSE_GUARD);
@@ -612,8 +613,8 @@ static void setup_may_be_coenabled_matrix(model_t model, ProBInitialResponse ini
             dm_set(gce_info, col, row); // symmetry
         }
         dm_set(gce_info, i, i);
-
     }
+    dm_set(gce_info, size, size);
 
     GBsetGuardCoEnabledInfo(model, gce_info);
 }
