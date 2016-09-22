@@ -16,6 +16,10 @@ enum SubMessageType {
     reads_guard_matrix,
     guard_info_matrix,
     guard_label_matrix,
+    necessary_enabling_set,
+    necessary_disabling_set,
+    do_not_accord_matrix,
+    may_be_coenabled_matrix,
     limit_message_types=128 // avoid undefined behaviour if we get new message types
 };
 
@@ -56,6 +60,11 @@ typedef struct ProBInitialResponse {
 
     ProBMatrix guard_info;
     ProBMatrix guard_labels; // exactly like state_labels
+
+    ProBMatrix necessary_enabling_set;
+    ProBMatrix necessary_disabling_set;
+    ProBMatrix do_not_accord;
+    ProBMatrix may_be_coenabled;
 } ProBInitialResponse;
 
 

@@ -93,6 +93,14 @@ ProBInitialResponse prob_get_init_response(zmsg_t *msg) {
                 res.guard_info = prob_get_matrix(msg); break;
             case guard_label_matrix:
                 res.guard_labels = prob_get_matrix(msg); break;
+            case necessary_enabling_set:
+                res.necessary_enabling_set = prob_get_matrix(msg); break;
+            case necessary_disabling_set:
+                res.necessary_disabling_set = prob_get_matrix(msg); break;
+            case do_not_accord_matrix:
+                res.do_not_accord = prob_get_matrix(msg); break;
+            case may_be_coenabled_matrix:
+                res.may_be_coenabled = prob_get_matrix(msg); break;
             default:
                 for (; len > 0; len--) {
                     drop_frame(msg);
