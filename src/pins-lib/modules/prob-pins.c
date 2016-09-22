@@ -184,6 +184,38 @@ prob2pins_state(ProBState s, int *state, model_t model)
     Debugf("\n");
 }
 
+
+static int
+next_action_long(model_t model, int group, int *src, TransitionCB cb, void *ctx) {
+    prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
+
+    int operation_type = prob_ctx->op_type_no;
+
+    chunk op_name = pins_chunk_get (model, operation_type, prob_ctx->op_type[group]);
+
+    ProBState prob = pins2prob_state(model, src);
+
+    int nr_successors;
+    ProBState *successors = prob_next_action(prob_ctx->prob_client, prob, op_name.data, &nr_successors);
+    prob_destroy_state(&prob);
+
+    int s[prob_ctx->num_vars + 1];
+    s[prob_ctx->num_vars] = 1;
+    for (int i = 0; i < nr_successors; i++) {
+
+        int transition_labels[1] = { prob_ctx->op_type[group] };
+        transition_info_t transition_info = { transition_labels, group, 0 };
+
+        prob2pins_state(successors[i], s, model);
+        prob_destroy_state(successors + i);
+        cb(ctx, &transition_info, s, NULL);
+    }
+
+    RTfree(successors);
+
+    return nr_successors;
+}
+
 static int
 get_successors_long(model_t model, int group, int *src, TransitionCB cb, void *ctx)
 {
@@ -242,12 +274,32 @@ prob_exit(model_t model)
 static int
 get_state_label_long(model_t model, int label, int *src) {
     prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
-    ProBState prob = pins2prob_state(model, src);
-    lts_type_t ltstype = GBgetLTStype(model);
-    char *label_s = lts_type_get_state_label_name(ltstype, label);
-    int res = prob_get_state_label(prob_ctx->prob_client, prob, label_s);
-    //prob_destroy_state(&prob);
-    return res;
+    switch (label) {
+        case PROB_IS_INIT_EQUALS_FALSE_GUARD: {
+            int res = src[prob_ctx->num_vars];
+//            chunk c = pins_chunk_get(model, prob_ctx->var_type[prob_ctx->num_vars + 1], src[prob_ctx->num_vars + 1]);
+//            printf("%d\n", c.len);
+//            int res = *((int*) c.data);
+            assert(res == 0 || res == 1);
+            return res == 0;
+        }
+        case PROB_IS_INIT_EQUALS_TRUE_GUARD: {
+            int res = src[prob_ctx->num_vars];
+            //chunk c = pins_chunk_get(model, prob_ctx->var_type[prob_ctx->num_vars + 1], src[prob_ctx->num_vars + 1]);
+            //printf("%d\n", c.len);
+            //int res = *((int*) c.data);
+            assert(res == 0 || res == 1);
+            return res == 1;
+        }
+        default: {
+            lts_type_t ltstype = GBgetLTStype(model);
+            ProBState prob = pins2prob_state(model, src);
+            char *label_s = lts_type_get_state_label_name(ltstype, label);
+            int res = prob_get_state_label(prob_ctx->prob_client, prob, label_s);
+            //prob_destroy_state(&prob);
+            return res;
+        }
+    }
 }
 
 
@@ -568,6 +620,7 @@ prob_load_model(model_t model)
 
     GBsetNextStateLong(model, get_successors_long);
     GBsetStateLabelLong(model, get_state_label_long);
+    GBsetActionsLong(model, next_action_long);
 
     GBsetExit(model, prob_exit);
 

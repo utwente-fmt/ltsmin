@@ -12,6 +12,7 @@ extern void prob_client_destroy(prob_client_t pc);
 extern const char* prob_get_zocket(prob_client_t pc);
 
 extern ProBState* prob_next_state(prob_client_t pc, ProBState s, char *transitiongroup, int *size);
+extern ProBState* prob_next_action(prob_client_t pc, ProBState s, char *transitiongroup, int *size);
 
 extern void prob_terminate(prob_client_t pc);
 

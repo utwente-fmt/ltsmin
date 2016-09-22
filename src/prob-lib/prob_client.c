@@ -151,11 +151,11 @@ prob_init(prob_client_t pc)
 }
 
 // Note: size is part of the result, it will contain the number of states.
-ProBState *
-prob_next_state(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
-{
+
+static ProBState *
+prob_next_x(prob_client_t pc, ProBState s, char *transitiongroup, int *size, char *header) {
     zmsg_t *request = zmsg_new();
-    zmsg_addstr(request, "get-next-state");
+    zmsg_addstr(request, header);
     zmsg_addstrf(request, "%d", pc->id_count);
     zmsg_addstr(request, transitiongroup);
 
@@ -189,6 +189,18 @@ prob_next_state(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
     }
     zmsg_destroy(&response);
     return successors;
+}
+
+ProBState *
+prob_next_state(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
+{
+    return prob_next_x(pc, s, transitiongroup, size, "get-next-state");
+}
+
+ProBState *
+prob_next_action(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
+{
+    return prob_next_x(pc, s, transitiongroup, size, "next-update");
 }
 
 int
