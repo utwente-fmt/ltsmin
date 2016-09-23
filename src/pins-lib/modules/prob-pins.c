@@ -633,6 +633,10 @@ static void setup_may_be_coenabled_matrix(model_t model, ProBInitialResponse ini
         dm_set(gce_info, i, i);
     }
     dm_set(gce_info, size, size);
+    dm_set(gce_info, 0, size);
+    dm_set(gce_info, size, 0);
+    dm_set(gce_info, 1, size);
+    dm_set(gce_info, size, 1);
 
     GBsetGuardCoEnabledInfo(model, gce_info);
 }
