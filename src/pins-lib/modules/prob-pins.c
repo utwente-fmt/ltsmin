@@ -622,10 +622,12 @@ static void setup_may_be_coenabled_matrix(model_t model, ProBInitialResponse ini
 static void setup_necessary_enabling_set(model_t model, ProBInitialResponse init, string_index_t guard_si, string_index_t op_si, int ngroups) {
     ProBMatrix nes = init.necessary_enabling_set;
     int nguards = nes.nr_rows + 2;
+    const int sl_inv_size = init.state_labels.nr_rows;
+    const int sl_size = sl_inv_size + nguards;
 
 
     matrix_t *gnes_info = RTmalloc(sizeof(matrix_t));
-    dm_create(gnes_info, nguards, ngroups);
+    dm_create(gnes_info, sl_size, ngroups);
 
     dm_set(gnes_info, PROB_IS_INIT_EQUALS_TRUE_GUARD, 0); // $init_state enables is_init == true
 
@@ -639,6 +641,12 @@ static void setup_necessary_enabling_set(model_t model, ProBInitialResponse init
             dm_set(gnes_info, row, col);
         }
     }
+    // set all variables for invariants (for now?)
+    for (int i = 0; i < sl_inv_size; i++) {
+        for (int j = 0; j < ngroups; j++) {
+            dm_set(gnes_info, i + nguards, j);
+        }
+    }
 
     GBsetGuardNESInfo(model, gnes_info);
 }
@@ -646,10 +654,12 @@ static void setup_necessary_enabling_set(model_t model, ProBInitialResponse init
 static void setup_necessary_disabling_set(model_t model, ProBInitialResponse init, string_index_t guard_si, string_index_t op_si, int ngroups) {
     ProBMatrix nes = init.necessary_disabling_set;
     int nguards = nes.nr_rows + 2;
+    const int sl_inv_size = init.state_labels.nr_rows;
+    const int sl_size = sl_inv_size + nguards;
 
 
     matrix_t *gnds_info = RTmalloc(sizeof(matrix_t));
-    dm_create(gnds_info, nguards, ngroups);
+    dm_create(gnds_info, sl_size, ngroups);
 
     dm_set(gnds_info, PROB_IS_INIT_EQUALS_FALSE_GUARD, 0); // $init_state disables is_init == false
 
@@ -661,8 +671,12 @@ static void setup_necessary_disabling_set(model_t model, ProBInitialResponse ini
             char *name = current_row.variables.chunks[j].data;
             int col = SIlookup(op_si, name);
             dm_set(gnds_info, row, col);
-            assert(row != -1);
-            assert(col != -1);
+        }
+    }
+    // set all variables for invariants (for now?)
+    for (int i = 0; i < sl_inv_size; i++) {
+        for (int j = 0; j < ngroups; j++) {
+            dm_set(gnds_info, i + nguards, j);
         }
     }
 
