@@ -26,7 +26,27 @@ matrix:
     # Anyways, gcc is tested on linux.
     - compiler: gcc
       os: osx
-
+      
+# Trigger different builds for different front-ends, to speed up testing (with dejagnu).
+env:
+    - CONFIGURE_WITH="--disable-dependency-tracking"
+      CFLAGS="-DNDEBUG"
+      RELEASE_BUILD="yes"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-unit             --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-DVE              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-ETF              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-Promela          --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-LPS                              --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-PBES                             --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-PNML             --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-ProB             --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-LTL              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-safety           --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-POR              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-DFS-FIFO         --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-SCC              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-test-all --enable-test-LTS-generation                   --disable-doxygen-doc --disable-dependency-tracking"
+    
 addons:
   apt:
     sources:
@@ -60,8 +80,6 @@ before_install:
     export DIVINE_URL="https://github.com/utwente-fmt/divine2/releases/download/$DIVINE_VERSION/$DIVINE_NAME" &&
     export VIENNACL_NAME="ViennaCL-1.7.1" &&
     export VIENNACL_URL="http://netcologne.dl.sourceforge.net/project/viennacl/1.7.x/$VIENNACL_NAME.tar.gz" &&
-    export WITH_MCRL2="yes" &&
-    export WITH_PROB="yes" &&
     export GHCVER="7.10.3" &&
     export HAPPYVER="1.19.5" &&
     export ZMQ_VERSION="4.1.5" &&
@@ -118,7 +136,7 @@ install:
     
   # install zmq from source, since libzmq3-dev in apt is missing dependencies for a full static LTSmin build (pgm and sodium are missing)
   # I filed a bug report here: https://github.com/travis-ci/travis-ci/issues/5701
-  - if [ $WITH_PROB = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libzmq.a" ]; then 
+  - if [ ! -f "$HOME/ltsmin-deps/lib/libzmq.a" ]; then 
     wget "$ZMQ_URL" -P /tmp &&
     tar -xf "/tmp/$ZMQ_NAME.tar.gz" -C /tmp &&
     pushd /tmp/$ZMQ_NAME &&
@@ -131,7 +149,7 @@ install:
   # install czmq from source
   # since czmq is not distributed in Ubuntu.
   # the LDFLAGS is necessary, because of a bug: https://github.com/zeromq/czmq/issues/1323
-  - if [ $WITH_PROB = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libczmq.a" ]; then 
+  - if [ ! -f "$HOME/ltsmin-deps/lib/libczmq.a" ]; then 
     wget "$CZMQ_URL" -P /tmp &&
     tar -xf "/tmp/v$CZMQ_VERSION.tar.gz" -C /tmp &&
     pushd /tmp/czmq-$CZMQ_VERSION &&
@@ -142,7 +160,7 @@ install:
     popd; fi
     
   # install mCRL2 on Linux
-  - if [ "$TRAVIS_OS_NAME" = "linux" -a "$WITH_MCRL2" = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libmcrl2_core.a" ]; then 
+  - if [ "$TRAVIS_OS_NAME" = "linux" -a ! -f "$HOME/ltsmin-deps/lib/libmcrl2_core.a" ]; then 
     mkdir /tmp/mCRL2 &&
     svn co -q --non-interactive --trust-server-cert "$MCRL2_SVN" -r"$MCRL2_REV" /tmp/mCRL2/src &&
     mkdir /tmp/mCRL2/build &&
@@ -154,7 +172,7 @@ install:
     popd; fi
   
   # install mCRL2 on OSX
-  - if [ "$TRAVIS_OS_NAME" = "osx" -a "$WITH_MCRL2" = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libmcrl2_core.a" ]; then
+  - if [ "$TRAVIS_OS_NAME" = "osx" -a ! -f "$HOME/ltsmin-deps/lib/libmcrl2_core.a" ]; then
     wget "$MCRL2_URL" -P /tmp &&
     hdiutil attach "/tmp/$MCRL2_FILE.dmg" &&
     tar -xf "/Volumes/$MCRL2_VER/$MCRL2_VER.pkg/Contents/Archive.pax.gz" -C "$HOME" &&
@@ -165,7 +183,7 @@ install:
     hdiutil detach "/Volumes/$MCRL2_VER"; fi
   
   # fix missing (for mcrl2-201409.1) libdparser.a; download it and merge into libmcrl2_core.a  
-  - if [ "$WITH_MCRL2" = "yes" -a ! -f "$HOME/ltsmin-deps/lib/libdparser.a" ]; then
+  - if [ ! -f "$HOME/ltsmin-deps/lib/libdparser.a" ]; then
     wget "https://github.com/utwente-fmt/ltsmin-travis/raw/master/$TRAVIS_OS_NAME/mCRL2/libdparser.a" -P "$HOME/ltsmin-deps/lib" &&
     pushd "$HOME/ltsmin-deps/lib" &&
     ar -x libmcrl2_core.a && ar -x libdparser.a && rm libmcrl2_core.a && ar -qcs libmcrl2_core.a *.o &&
@@ -210,14 +228,15 @@ before_script:
 
 script:
   - ./ltsminreconf &&
-    ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop
+    ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop $CONFIGURE_WITH
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make; fi
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make LDFLAGS="-Wl,--no-export-dynamic -lltdl -lnuma -llzma -all-static"; fi
-  - make check -j1
-  - make dist &&
+  - if [ "x$RELEASE_BUILD" != "xyes" ]; then make check -j1; fi
+  - if [ "x$RELEASE_BUILD" = "xyes" ]; then 
+    make dist &&
     export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
-    mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TRAVIS_TAG-source.tgz"
-  - if [ ${#TRAVIS_TAG} -gt 0 ]; then
+    mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TRAVIS_TAG-source.tgz"; fi
+  - if [ -n $TRAVIS_TAG -a "x$RELEASE_BUILD" = "xyes" ]; then
     make install &&
     cp "$HOME/ltsmin-deps/bin/divine" /tmp/dist/bin &&
     cp "$HOME/ltsmin-deps/bin/txt2lps" /tmp/dist/bin &&
