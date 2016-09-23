@@ -302,6 +302,24 @@ get_state_label_long(model_t model, int label, int *src) {
     }
 }
 
+static void get_label_group(model_t model, sl_group_enum_t group, int *src, int *label) {
+    assert(group == GB_SL_GUARDS);
+    prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
+    label[0] = get_state_label_long(model, 0, src);
+    label[1] = get_state_label_long(model, 1, src);
+    if (label[PROB_IS_INIT_EQUALS_FALSE_GUARD] == 1) {
+        sl_group_t *guards = GBgetStateLabelGroupInfo(model, group);
+        int sl_guard_size = guards->count;
+        for (int i = 2; i < sl_guard_size; i++) {
+            label[i] = 0;
+        }
+    } else if (label[PROB_IS_INIT_EQUALS_TRUE_GUARD] == 1) {
+        ProBState prob = pins2prob_state(model, src);
+        prob_get_label_group(prob_ctx->prob_client, prob, group, label + 2);
+    } else {
+        assert(0);
+    }
+}
 
 static void setup_state_labels(model_t model,
                                ProBInitialResponse init,
@@ -755,6 +773,7 @@ prob_load_model(model_t model)
     prob2pins_state(init.initial_state, init_state, model);
     init_state[ctx->num_vars] = 0;
     GBsetInitialState(model, init_state);
+    GBsetStateLabelsGroup(model, get_label_group);
 
     prob_destroy_initial_response(&init);
 

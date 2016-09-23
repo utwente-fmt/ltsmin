@@ -226,6 +226,29 @@ prob_get_state_label(prob_client_t pc, ProBState s, char *label)
     return res;
 }
 
+void prob_get_label_group(prob_client_t pc, ProBState s, int group, int *res) {
+    zmsg_t *request = zmsg_new();
+    zmsg_addstr(request, "get-state-label-group");
+    zmsg_addstrf(request, "%d", pc->id_count);
+    zmsg_addstrf(request, "DA%d", group);
+    prob_put_state(request, s);
+    zmsg_send(&request, pc->zocket);
+    zmsg_destroy(&request);
+    zmsg_t *response = zmsg_recv(pc->zocket);
+    drop_frame(response);
+    drop_frame(response);
+
+    char *result_s;
+    for (int i = 0; (result_s = zmsg_popstr(response)) != NULL; i++) {
+        int r;
+        sscanf(result_s, "%d", &r);
+        res[i] = r;
+        RTfree(result_s);
+    }
+
+    zmsg_destroy(&response);
+}
+
 void
 prob_terminate(prob_client_t pc)
 {
