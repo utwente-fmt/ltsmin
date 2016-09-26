@@ -364,14 +364,12 @@ static void setup_state_labels(model_t model,
         sl_group_all->sl_idx[i] = i;
     }
     GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
-    if (sl_guards_size > 2) {
-        sl_group_t *sl_group_guard = RTmallocZero(sizeof(sl_group_t) + sl_guards_size * sizeof(int));
-        sl_group_guard->count = sl_guards_size;
-        for (int i = 0; i < sl_group_guard->count; i++) {
-            sl_group_guard->sl_idx[i] = i;
-        }
-        GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guard);
+    sl_group_t *sl_group_guard = RTmallocZero(sizeof(sl_group_t) + sl_guards_size * sizeof(int));
+    sl_group_guard->count = sl_guards_size;
+    for (int i = 0; i < sl_group_guard->count; i++) {
+        sl_group_guard->sl_idx[i] = i;
     }
+    GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guard);
 
 }
 
@@ -604,9 +602,12 @@ static void setup_may_be_coenabled_matrix(model_t model, ProBInitialResponse ini
     ProBMatrix may_be_coenabled = init.may_be_coenabled;
     // this is an upper triangle matrix; the diagonal is not included
     int size = may_be_coenabled.nr_rows + 2;
+    int guards_from_prob_exist = init.guard_labels.nr_rows != 0;
 
     matrix_t *gce_info = RTmalloc(sizeof(matrix_t));
-    dm_create(gce_info, size+1, size+1); // the last element (on the diagonal) is not included
+    dm_create(gce_info, size + 1 * guards_from_prob_exist,
+                        size + 1 * guards_from_prob_exist); // the last element (on the diagonal) is not included
+                                                            // though we need to distinguish "no guards" from "one guard"
 
     // special guards are co-enabled with themselves (reflexivity)
     dm_set(gce_info, PROB_IS_INIT_EQUALS_FALSE_GUARD, PROB_IS_INIT_EQUALS_FALSE_GUARD);
@@ -632,11 +633,13 @@ static void setup_may_be_coenabled_matrix(model_t model, ProBInitialResponse ini
         }
         dm_set(gce_info, i, i);
     }
-    dm_set(gce_info, size, size);
-    dm_set(gce_info, 0, size);
-    dm_set(gce_info, size, 0);
-    dm_set(gce_info, 1, size);
-    dm_set(gce_info, size, 1);
+    if (guards_from_prob_exist) {
+        dm_set(gce_info, size, size);
+        dm_set(gce_info, 0, size);
+        dm_set(gce_info, size, 0);
+        dm_set(gce_info, 1, size);
+        dm_set(gce_info, size, 1);
+    }
 
     GBsetGuardCoEnabledInfo(model, gce_info);
 }
