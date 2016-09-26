@@ -149,13 +149,14 @@ install:
   # install czmq from source
   # since czmq is not distributed in Ubuntu.
   # the LDFLAGS is necessary, because of a bug: https://github.com/zeromq/czmq/issues/1323
+  # the CFLAGS is necessary, because we need to unset NDEBUG: https://github.com/zeromq/czmq/issues/1519
   - if [ ! -f "$HOME/ltsmin-deps/lib/libczmq.a" ]; then 
     wget "$CZMQ_URL" -P /tmp &&
     tar -xf "/tmp/v$CZMQ_VERSION.tar.gz" -C /tmp &&
     pushd /tmp/czmq-$CZMQ_VERSION &&
     ./autogen.sh &&
     ./configure --enable-static --enable-shared --prefix="$HOME/ltsmin-deps" --with-libzmq="$HOME/ltsmin-deps" &&
-    make LDFLAGS="-lpthread" &&
+    make CFLAGS="" LDFLAGS="-lpthread" &&
     make install &&
     popd; fi
     
