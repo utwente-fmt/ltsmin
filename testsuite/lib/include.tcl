@@ -236,3 +236,15 @@ proc compile_promela { prom_models } {
     return true
 }
 
+proc compile_DVE { DVE_models } {
+    global EXAMPLES_PATH
+
+    foreach DVE_model $DVE_models {
+        set commands {"divine compile -l $EXAMPLES_PATH/$DVE_model"}
+        foreach command $commands {
+            puts [subst "Executing precommand: '$command'"]
+            eval exec $command
+        }
+    }
+    return true
+}

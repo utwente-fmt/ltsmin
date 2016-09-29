@@ -21,8 +21,11 @@ set langs [dict create]
 # Language frontends:
 # -------------------
 
+set DVE_model "gear.1.dve"
+compile_DVE $DVE_model
+
 # dve:
-dict set langs dve model "gear.1.dve"
+dict set langs dve model "${DVE_model}2C"
 dict set langs dve options mc "--threads=$num_threads"
 
 dict set langs dve exp_output "2689 states 3567 transitions"
