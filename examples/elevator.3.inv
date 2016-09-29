@@ -1,1 +1,1 @@
-Person_2 == in_elevator -> ! floor_queue_2\[0\]==2
+Person_2 == "in_elevator" -> ! floor_queue_2\[0\]==2

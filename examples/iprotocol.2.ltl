@@ -1,1 +1,1 @@
-(([] <> Medium==dataOk) && ([]<>Medium==nakOk)) -> ([]<>Consumer==consume)
+(([] <> Medium=="dataOk") && ([]<>Medium=="nakOk")) -> ([]<>Consumer=="consume")
