@@ -208,3 +208,13 @@ bitvector_invert(bitvector_t *bv)
     if (used_bits < WORD_BITS)
         bv->data[bv->n_words-1] &= mask;
 }
+
+void
+bitvector_high_bits(bitvector_t *bv, int *bits)
+{
+    if (bv->n_bits > INT_MAX) Abort("bitvector too large");
+    
+    for (int i = 0, j = 0; i < (int) bv->n_bits; i++) {
+        if (bitvector_is_set(bv, i)) bits[j++] = i;
+    }
+}
