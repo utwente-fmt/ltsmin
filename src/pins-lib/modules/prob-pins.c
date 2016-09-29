@@ -663,6 +663,7 @@ static void setup_necessary_enabling_set(model_t model, ProBInitialResponse init
         for (int j = 0; j < row_length; j++) {
             char *name = current_row.variables.chunks[j].data;
             int col = SIlookup(op_si, name);
+            dm_set(gnes_info, row, 0); // $init_state might enable any guard
             dm_set(gnes_info, row, col);
         }
     }
@@ -695,6 +696,7 @@ static void setup_necessary_disabling_set(model_t model, ProBInitialResponse ini
         for (int j = 0; j < row_length; j++) {
             char *name = current_row.variables.chunks[j].data;
             int col = SIlookup(op_si, name);
+            dm_set(gnds_info, row, 0); // $init_state might disable any guard
             dm_set(gnds_info, row, col);
         }
     }
