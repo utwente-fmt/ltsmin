@@ -949,6 +949,19 @@ VOID_TASK_0(gc_end)
 }
 
 /**
+ * Small helper function
+ */
+static char*
+to_h(double size, char *buf)
+{
+    const char* units[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+    int i = 0;
+    for (;size>1024;size/=1024) i++;
+    sprintf(buf, "%.*f %s", i, size, units[i]);
+    return buf;
+}
+
+/**
  * Create a domain with object size n
  */
 vdom_t
@@ -956,7 +969,13 @@ vdom_create_sylvan(int n)
 {
     LACE_ME;
 
-    Warning(info,"Creating a Sylvan domain.");
+    Warning(info, "Creating a Sylvan domain.");
+
+    char buf[32];
+    to_h((1ULL<<maxtablesize)*24+(1ULL<<maxcachesize)*36, buf);
+    Warning(info, "Sylvan allocates %s virtual memory for nodes table and operation cache.", buf);
+    to_h((1ULL<<datasize)*24+(1ULL<<cachesize)*36, buf);
+    Warning(info, "Initial nodes table and operation cache requires %s.", buf);
 
     // Call initializator of library (if needed)
     static int initialized=0;
