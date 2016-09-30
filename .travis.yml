@@ -90,14 +90,14 @@ before_install:
     export DDD_URL="http://ddd.lip6.fr/download/$DDD_VERSION.tar.gz"
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then        
         export PROB_NAME="ProB.linux64.tar.gz" &&
-        export PROB_URL="http://nightly.cobra.cs.uni-duesseldorf.de/ltsmin/$PROB_NAME" &&        
+        export PROB_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/linux/$PROB_NAME" &&        
         export MCRL2_REV="13391" &&
         export MCRL2_SVN="https://svn.win.tue.nl/repos/MCRL2/trunk" &&
         export PATH=/opt/ghc/$GHCVER/bin:/opt/happy/$HAPPYVER/bin:$PATH &&
         export MAKEFLAGS=-j2; fi
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then  
-        export PROB_NAME="ProB.mac_os.10.7.5.x86_64.tar.gz" &&
-        export PROB_URL="http://nightly.cobra.cs.uni-duesseldorf.de/ltsmin/$PROB_NAME" &&
+        export PROB_NAME="ProB.mac_os.10.12.x86_64.tar.gz" &&
+        export PROB_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/osx/$PROB_NAME" &&
         export MCRL2_FILE="mcrl2-201409.1_x86_64" &&
         export MCRL2_URL="http://www.mcrl2.org/download/release/$MCRL2_FILE.dmg" &&
         export MCRL2_VER="mcrl2-201409.1.13218_x86_64" &&
