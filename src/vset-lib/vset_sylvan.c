@@ -14,10 +14,10 @@
 
 static int statebits = 16;
 static int actionbits = 16;
-static int datasize = 23;
+static int datasize = 24;
 static int maxtablesize = 28;
-static int cachesize = 24;
-static int maxcachesize = 28;
+static int cachesize = 23;
+static int maxcachesize = 27;
 static int granularity = 1;
 
 struct poptOption sylvan_options[] = {
