@@ -19,7 +19,6 @@ static int maxtablesize = 28;
 static int cachesize = 24;
 static int maxcachesize = 28;
 static int granularity = 1;
-static int report_gc = 0;
 
 struct poptOption sylvan_options[] = {
     { "sylvan-bits",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &statebits, 0, "set number of bits per integer in the state vector","<bits>"},
@@ -28,7 +27,6 @@ struct poptOption sylvan_options[] = {
     { "sylvan-cachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set initial size of memoization cache to 1<<cachesize","<cachesize>"},
     { "sylvan-maxcachesize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "set maximum size of memoization cache to 1<<cachesize","<maxcachesize>"},
     { "sylvan-granularity",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "only use memoization cache for every 1/granularity BDD levels","<granularity>"},
-    { "sylvan-report-gc", 0, POPT_ARG_NONE, &report_gc, 0, "report when garbage collection starts/finishes", 0},
     POPT_TABLEEND
 };
 
@@ -966,10 +964,8 @@ vdom_create_sylvan(int n)
         sylvan_init_package(1LL<<datasize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
         sylvan_set_granularity(granularity);
         sylvan_init_mtbdd();
-        if (report_gc) {
-            sylvan_gc_hook_pregc(TASK(gc_start));
-            sylvan_gc_hook_postgc(TASK(gc_end));
-        }
+        sylvan_gc_hook_pregc(TASK(gc_start));
+        sylvan_gc_hook_postgc(TASK(gc_end));
         initialized=1;
     }
 
