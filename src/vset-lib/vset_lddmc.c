@@ -16,16 +16,7 @@
 #include <sylvan_cache.h>
 #include <sylvan.h>
 
-static int datasize = 22; // 23 = 128 MB
-static int maxtablesize = 28;  // 28 = 8196 MB
-static int cachesize = 24; // 24 = 576 MB
-static int maxcachesize = 28; // 28 = 9216 MB
-
 struct poptOption lddmc_options[]= {
-    { "lddmc-tablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &datasize , 0 , "log2 initial size of LDD nodes table", "<tablesize>"},
-    { "lddmc-maxtablesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxtablesize , 0 , "log2 maximum size of LDD nodes table", "<maxtablesize>"},
-    { "lddmc-cachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "log2 size of memoization cache", "<cachesize>"},
-    { "lddmc-maxcachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "log2 maximum size of memoization cache", "<maxcachesize>"},
     POPT_TABLEEND
 };
 
@@ -858,18 +849,15 @@ set_function_pointers(vdom_t dom)
     dom->shared.separates_rw=separates_rw;
 }
 
+void ltsmin_initialize_sylvan(); // defined in vset_sylvan.c
+
 vdom_t
 vdom_create_lddmc(int n)
 {
     Warning(info,"Creating a multi-core ListDD domain.");
 
-    /* Initialize library if necessary */
-    static int initialized = 0;
-    if (!initialized) {
-        sylvan_init_package(1LL<<datasize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
-        sylvan_init_ldd();
-        initialized = 1;
-    }
+    ltsmin_initialize_sylvan();
+    sylvan_init_ldd();
 
     /* Create data structure */
     vdom_t dom = (vdom_t)RTmalloc(sizeof(struct vector_domain));

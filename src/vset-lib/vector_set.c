@@ -89,7 +89,7 @@ struct poptOption vset_options[]={
       "select a vector set implementation from native ListDD (32-bit or 64-bit),"
       " ATermDD with *list* encoding,"
       " ATermDD with *tree* encoding, BuDDy using the *fdd* feature,"
-      " DDD, Sylvan, or multicore ListDD (default: first available)" , "<ldd64|ldd|list|tree|fdd|ddd|sylvan|lddmc>" },
+      " DDD, Sylvan BDDs, or Sylvan LDDs (default: first available)" , "<ldd64|ldd|list|tree|fdd|ddd|sylvan|lddmc>" },
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd64_options , 0 , "ListDD64 options" , NULL},
 #ifdef HAVE_ATERM2_H

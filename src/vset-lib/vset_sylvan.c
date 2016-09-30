@@ -964,14 +964,14 @@ to_h(double size, char *buf)
 }
 
 /**
- * Create a domain with object size n
+ * Function to initialize Sylvan, also used by vset_lddmc
  */
-vdom_t
-vdom_create_sylvan(int n)
+void
+ltsmin_initialize_sylvan()
 {
-    LACE_ME;
-
-    Warning(info, "Creating a Sylvan domain.");
+    static int initialized=0;
+    if (initialized) return;
+    initialized=1;
 
     if (sizes != NULL) {
         // parse it...
@@ -997,15 +997,22 @@ vdom_create_sylvan(int n)
     Warning(info, "Initial nodes table and operation cache requires %s.", buf);
 
     // Call initializator of library (if needed)
-    static int initialized=0;
-    if (!initialized) {
-        sylvan_init_package(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
-        sylvan_set_granularity(granularity);
-        sylvan_init_mtbdd();
-        sylvan_gc_hook_pregc(TASK(gc_start));
-        sylvan_gc_hook_postgc(TASK(gc_end));
-        initialized=1;
-    }
+    sylvan_init_package(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
+    sylvan_set_granularity(granularity);
+    sylvan_gc_hook_pregc(TASK(gc_start));
+    sylvan_gc_hook_postgc(TASK(gc_end));
+}
+
+/**
+ * Create a domain with object size n
+ */
+vdom_t
+vdom_create_sylvan(int n)
+{
+    Warning(info, "Creating a Sylvan domain.");
+
+    ltsmin_initialize_sylvan();
+    sylvan_init_mtbdd();
 
     // Create data structure of domain
     vdom_t dom = (vdom_t)RTmalloc(sizeof(struct vector_domain));
@@ -1021,6 +1028,8 @@ vdom_create_sylvan(int n)
             prime_vars[i*statebits+j] = 2*(i*statebits+j)+1;
         }
     }
+
+    LACE_ME;
 
     dom->state_variables = sylvan_ref(sylvan_set_fromarray(state_vars, statebits * n));
     dom->prime_variables = sylvan_ref(sylvan_set_fromarray(prime_vars, statebits * n));
