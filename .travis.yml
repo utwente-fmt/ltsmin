@@ -74,7 +74,7 @@ addons:
 before_install:
   - export CZMQ_VERSION="3.0.2" &&
     export CZMQ_URL="https://github.com/zeromq/czmq/archive/v$CZMQ_VERSION.tar.gz" &&
-    export DIVINE_VERSION="1.2" &&
+    export DIVINE_VERSION="1.3" &&
     export DIVINE_COMPILER="gcc-4.9" &&
     export DIVINE_NAME="divine2-ltsmin-$DIVINE_VERSION-$TRAVIS_OS_NAME-$DIVINE_COMPILER.tgz" &&
     export DIVINE_URL="https://github.com/utwente-fmt/divine2/releases/download/$DIVINE_VERSION/$DIVINE_NAME" &&
