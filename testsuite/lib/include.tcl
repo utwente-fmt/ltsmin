@@ -82,67 +82,78 @@ proc runmytest { test_name command_line exp_output} {
 
         "Zobrist and treedbs is not implemented" {
             xfail "The combination of zobrist and treedbs is not implemented";
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
 	    
         "unimplemented combination --strategy=bfs, --state=table" {
-    	    xfail "unimplemented combination --strategy=bfs, --state=table";
-    	    catch { exp_close }
-    	    return
+            xfail "unimplemented combination --strategy=bfs, --state=table";
+            catch { close }
+            wait
+            return
 	    }
 
         "Decision diagram package does not support least fixpoint" {
-    	    xfail "Decision diagram package does not support least fixpoint";
-    	    catch { exp_close }
-    	    return
+            xfail "Decision diagram package does not support least fixpoint";
+            catch { close }
+            wait
+            return
         }
         
         "SCC search only works in combination with an accepting state label" {
             xfail "SCC search only works in combination with an accepting state label";
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "BCG support was not enabled at compile time." {
             xfail "BCG support was not enabled at compile time."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "cannot write state labels to AUT file" {
             xfail "cannot write state labels to AUT file"
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "Vector set implementation does not support vset_join operation." {
             xfail "Vector set implementation does not support vset_join operation."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "guard-splitting not supported with saturation=" {
             xfail "guard-splitting not supported with saturation="
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "No long next-state function implemented for this language module (--pins-guards)." {
             xfail "No long next-state function implemented for this language module (--pins-guards)."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "Cannot apply branching bisimulation to an LTS with state labels." {
             xfail "Cannot apply branching bisimulation to an LTS with state labels."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "Cleary tree not supported in combination with error trails or the MCNDFS algorithms." {
             xfail "Cleary tree not supported in combination with error trails or the MCNDFS algorithms."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
@@ -183,8 +194,8 @@ proc runmytest { test_name command_line exp_output} {
         }
 
     }
-    catch { exp_close }
-    set result [exp_wait]
+    catch { close }
+    set result [wait]
     set exit_code [lindex $result 3]
 
     #puts "DEBUG: exit_code: $exit_code"
