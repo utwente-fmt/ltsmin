@@ -4941,7 +4941,7 @@ VOID_TASK_1(actual_main, void*, arg)
     if (vset_default_domain!=VSET_Sylvan && vset_default_domain!=VSET_LDDmc) {
         lace_resume();
     } else if (SYLVAN_STATS) {
-        sylvan_stats_report(stderr, 0);
+        sylvan_stats_report(stderr);
     }
 
     GBExit(model);
