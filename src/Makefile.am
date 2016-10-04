@@ -85,6 +85,7 @@ SUBDIRS += mc-lib
 
 if HAVE_SYLVAN
 SUBDIRS += pins2lts-sym
+SUBDIRS += ldd2bdd
 endif
 SUBDIRS += pins2lts-mc
 SUBDIRS += pins2lts-seq

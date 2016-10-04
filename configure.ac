@@ -543,6 +543,7 @@ AC_CONFIG_FILES([
        src/spg-lib/Makefile
        src/gcf-tool/Makefile
        src/etf-convert/Makefile
+       src/ldd2bdd/Makefile
        src/ltsmin-printtrace/Makefile
        src/ltsmin-compare/Makefile
        src/ltsmin-convert/Makefile
