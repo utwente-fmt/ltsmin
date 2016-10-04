@@ -738,7 +738,11 @@ VOID_TASK_2(eval_label, int, label, vset_t, set)
     ctx_false.result = 0;
 
     // evaluate labels and add to label_false[guard] when false
+#if SPEC_MT_SAFE
     vset_update(label_false[label], label_tmp[label], eval_cb, &ctx_false);
+#else
+    vset_update_seq(label_false[label], label_tmp[label], eval_cb, &ctx_false);
+#endif
 
     struct label_add_info ctx_true;
 
@@ -746,7 +750,11 @@ VOID_TASK_2(eval_label, int, label, vset_t, set)
     ctx_true.result = 1;
 
     // evaluate labels and add to label_true[label] when true
+#if SPEC_MT_SAFE
     vset_update(label_true[label], label_tmp[label], eval_cb, &ctx_true);
+#else
+    vset_update_seq(label_true[label], label_tmp[label], eval_cb, &ctx_true);
+#endif
 
     vset_clear(label_tmp[label]);
 }
@@ -1348,7 +1356,11 @@ VOID_TASK_2(expand_group_next, int, group, vset_t, set)
         }
     }
 
+#if SPEC_MT_SAFE
     vrel_update(group_next[group], group_tmp[group], explore_cb, &ctx);
+#else
+    vrel_update_seq(group_next[group], group_tmp[group], explore_cb, &ctx);
+#endif
     vset_clear(group_tmp[group]);
 }
 
@@ -1373,7 +1385,11 @@ expand_group_next_projected(vrel_t rel, vset_t set, void *context)
     int group = expand_ctx->group;
     group_ctx.group = group;
     group_ctx.set = NULL;
+#if SPEC_MT_SAFE
     vrel_update(rel, set, explore_cb, &group_ctx);
+#else
+    vrel_update_seq(rel, set, explore_cb, &group_ctx);
+#endif
 }
 
 static void
@@ -4659,6 +4675,16 @@ VOID_TASK_1(actual_main, void*, arg)
     if (inhibit_matrix != NULL && sat_strategy != NO_SAT) Abort("Maximal progress is incompatibale with saturation.");
     if (files[1] != NULL && strcmp(files[1] + strlen(files[1]) - 4, ".etf") != 0) Abort("Only ETF output format is supported.");
 
+#if !SPEC_MT_SAFE
+    if (strategy == PAR_P) {
+        strategy = BFS_P;
+        Print(info, "Front-end not thread-safe; using --order=bfs-prev instead of --order=par-prev.");
+    } else if (strategy == PAR) {
+        strategy = BFS;
+        Print(info, "Front-end not thread-safe; using --order=bfs instead of --order=par.");
+    }
+#endif
+
     /* turn off Lace for now to speed up while not using parallelism */
     lace_suspend();
 
@@ -4928,11 +4954,6 @@ main (int argc, char *argv[])
     while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
     poptFreeContext(optCon);
 
-#if !SPEC_MT_SAFE
-    if (lace_n_workers != 1) lace_n_workers = 1;
-    Warning(info, "Falling back to 1 LACE worker, since front-end is not thread-safe.");
-#endif
-    
 #if defined(PROB)
     if (lace_n_workers != 1) lace_n_workers = 1;
     Warning(info, "Falling back to 1 LACE worker, since the ProB front-end is not yet compatible with HRE.");
