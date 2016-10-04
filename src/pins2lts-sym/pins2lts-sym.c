@@ -62,7 +62,6 @@ static ltsmin_parse_env_t* mu_parse_env = NULL;
 static char* dot_dir = NULL;
 
 static char* transitions_save_filename = NULL;
-static char* transitions_load_filename = NULL;
 
 static char* trc_output = NULL;
 static char* trc_type   = "gcf";
@@ -120,8 +119,6 @@ static enum {
     CHAIN,
     NONE
 } strategy = BFS_P;
-
-static int expand_groups = 1; // set to 0 if transitions are loaded from file
 
 static size_t lace_n_workers = 0;
 static size_t lace_dqsize = 40960000; // can be very big, no problemo
@@ -277,7 +274,6 @@ static  struct poptOption options[] = {
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },
     { "type", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &trc_type, 0, "trace type to write", "<aut|gcd|gcf|dir|fsm|bcg>" },
     { "save-symbolic-lts", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write the resulting symbolic LTS to", "<outputfile>" },
-    { "load-transitions", 0 , POPT_ARG_STRING, &transitions_load_filename, 0, "symbolic LTS file to read transition relations from", "<inputfile>" },
     { mu_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a MU-calculus formula  (can be given multiple times)" , "<mu-file>.mu" },
     { ctl_star_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL* formula  (can be given multiple times)" , "<ctl-star-file>.ctl" },
     { ctl_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL formula  (can be given multiple times)" , "<ctl-file>.ctl" },
@@ -1343,8 +1339,6 @@ explore_cb(vrel_t rel, void *context, int *src)
 #define expand_group_next(g, s) CALL(expand_group_next, (g), (s))
 VOID_TASK_2(expand_group_next, int, group, vset_t, set)
 {
-    if (!expand_groups) return; // assume transitions loaded from file cannot expand further
-
     struct group_add_info ctx;
     ctx.group = group;
     ctx.set = set;
@@ -1377,8 +1371,6 @@ struct expand_info {
 static inline void
 expand_group_next_projected(vrel_t rel, vset_t set, void *context)
 {
-    if (!expand_groups) return; // assume transitions loaded from file cannot expand further
-
     struct expand_info *expand_ctx = (struct expand_info*)context;
     (*expand_ctx->eg_count)++;
 
@@ -4718,51 +4710,14 @@ VOID_TASK_1(actual_main, void*, arg)
 
     if (next_union) vset_next_fn = vset_next_union_src;
 
-    if (transitions_load_filename != NULL) {
-        FILE *f = fopen(transitions_load_filename, "r");
-        if (f == 0) Abort("Cannot open '%s' for reading!", transitions_load_filename);
+    init_domain(VSET_IMPL_AUTOSELECT);
 
-        domain = vdom_create_domain_from_file(f, VSET_IMPL_AUTOSELECT);
+    initial = vset_create(domain, -1, NULL);
+    src = (int*)alloca(sizeof(int)*N);
+    GBgetInitialState(model, src);
+    vset_add(initial, src);
 
-        /* Call hook */
-        vset_pre_load(f, domain);
-
-        /* Read initial state */
-        initial = vset_load(f, domain);
-
-        /* Read number of transitions and all transitions */
-        if (fread(&nGrps, sizeof(int), 1, f)!=1) Abort("Invalid file format.");
-        group_next = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
-        for(int i = 0; i < nGrps; i++) group_next[i] = vrel_load_proj(f, domain);
-        for(int i = 0; i < nGrps; i++) vrel_load(f, group_next[i]);
-
-        /* Call hook */
-        vset_post_load(f, domain);
-
-        /* Done! */
-        fclose(f);
-
-        /* Load state into src and initialize globals */
-        N = vdom_vector_size(domain);
-        src = (int*)alloca(sizeof(int)*N);
-        vset_example(initial, src);
-        // we do not need group_explored, group_tmp, projs
-        group_explored = group_tmp = NULL;
-        r_projs = w_projs = NULL;
-
-        Print(infoShort, "Loaded transition relations from '%s'...", files[0]);
-        expand_groups = 0;
-    } else {
-        init_domain(VSET_IMPL_AUTOSELECT);
-
-        initial = vset_create(domain, -1, NULL);
-        src = (int*)alloca(sizeof(int)*N);
-        GBgetInitialState(model, src);
-        vset_add(initial, src);
-
-        Print(infoShort, "got initial state");
-        expand_groups = 1;
-    }
+    Print(infoShort, "got initial state");
 
     /* if writing .dot files, open directory first */
     if (dot_dir != NULL) {
