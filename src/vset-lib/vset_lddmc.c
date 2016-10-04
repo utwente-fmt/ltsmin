@@ -102,8 +102,8 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
     rel->mdd  = lddmc_false;
     rel->size = r_k + w_k;
 
-    uint32_t meta[dom->shared.size*2+1];
-    memset(meta, 0, sizeof(uint32_t[dom->shared.size*2+1]));
+    uint32_t meta[dom->shared.size*2+2];
+    memset(meta, 0, sizeof(uint32_t[dom->shared.size*2+2]));
     int r_i=0, w_i=0, i=0, j=0;
     for (;;) {
         int type = 0;
@@ -120,12 +120,13 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
         else if (type == 2) { meta[j++] = 4; }
         else if (type == 3) { meta[j++] = 1; meta[j++] = 2; }
         if (r_i == r_k && w_i == w_k) {
+            meta[j++] = 5; // action label
             meta[j++] = (uint32_t)-1;
             break;
         }
         i++;
     }
-        
+
     rel->meta = lddmc_ref(lddmc_cube((uint32_t*)meta, j));
 
     return rel;
@@ -155,7 +156,7 @@ set_add(vset_t set, const int* e)
 }
 
 static void
-rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
+rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const int act)
 {
     int i=0, j=0, k=0;
 
@@ -174,16 +175,25 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
             vec[k++] = dst[j++];
         } else if (v == (uint32_t)-1) {
             break;
+        } else if (v == 5) {
+            cpy_vec[k] = 0; // no copy nodes on action labels
+            vec[k++] = act;
         }
         meta = lddmc_follow(meta, v);
     }
 
-    assert(k == rel->size);
+    assert(k == rel->size + 1); // plus 1, because action label
 
     LACE_ME;
     MDD old = rel->mdd;
     rel->mdd = lddmc_ref(lddmc_union_cube_copy(rel->mdd, (uint32_t*)vec, cpy_vec, k));
     lddmc_deref(old);
+}
+
+static void
+rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
+{
+    return rel_add_act(rel, src, dst, cpy, 0);
 }
 
 static void
@@ -801,6 +811,7 @@ set_function_pointers(vdom_t dom)
     //dom->shared.rel_destroy=rel_destroy;
     dom->shared.rel_add=rel_add;
     dom->shared.rel_add_cpy=rel_add_cpy;
+    dom->shared.rel_add_act=rel_add_act;
     dom->shared.rel_count=rel_count;
     dom->shared.rel_update=rel_update;
 
