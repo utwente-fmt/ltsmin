@@ -61,8 +61,6 @@ static ltsmin_parse_env_t* mu_parse_env = NULL;
 
 static char* dot_dir = NULL;
 
-static char* transitions_save_filename = NULL;
-
 static char* trc_output = NULL;
 static char* trc_type   = "gcf";
 static int   dlk_detect = 0;
@@ -273,7 +271,6 @@ static  struct poptOption options[] = {
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },
     { "type", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &trc_type, 0, "trace type to write", "<aut|gcd|gcf|dir|fsm|bcg>" },
-    { "save-symbolic-lts", 0 , POPT_ARG_STRING, &transitions_save_filename, 0, "file to write the resulting symbolic LTS to", "<outputfile>" },
     { mu_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a MU-calculus formula  (can be given multiple times)" , "<mu-file>.mu" },
     { ctl_star_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL* formula  (can be given multiple times)" , "<ctl-star-file>.ctl" },
     { ctl_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL formula  (can be given multiple times)" , "<ctl-file>.ctl" },
@@ -4669,7 +4666,19 @@ VOID_TASK_1(actual_main, void*, arg)
     /* check for unsupported options */
     if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
     if (inhibit_matrix != NULL && sat_strategy != NO_SAT) Abort("Maximal progress is incompatibale with saturation.");
-    if (files[1] != NULL && strcmp(files[1] + strlen(files[1]) - 4, ".etf") != 0) Abort("Only ETF output format is supported.");
+    if (files[1] != NULL) {
+        char *ext = strrchr(files[1], '.');
+        if (ext == NULL || ext == files[1]) {
+            Abort("Output filename has no extension!");
+        }
+        if (strcasecmp(ext, ".etf") != 0) {
+            // not ETF
+            if (!(vset_default_domain == VSET_Sylvan && strcasecmp(ext, ".bdd") == 0) &&
+                !(vset_default_domain == VSET_LDDmc  && strcasecmp(ext, ".ldd") == 0)) {
+                Abort("Only supported output formats are ETF, BDD (with --vset=sylvan) and LDD (with --vset=lddmc)");
+            }
+        }
+    }
 
 #if !SPEC_MT_SAFE
     if (strategy == PAR_P) {
@@ -4762,57 +4771,58 @@ VOID_TASK_1(actual_main, void*, arg)
     /* report states */
     final_stat_reporting(visited);
 
-    /* save vset/vrel data */
-    if (transitions_save_filename != NULL) {
-        FILE *f = fopen(transitions_save_filename, "w");
-        if (f == NULL) Abort("Cannot open '%s' for writing!", transitions_save_filename);
+    /* save LTS */
+    if (files[1] != NULL) {
+        char *ext = strrchr(files[1], '.');
+        if (strcasecmp(ext, ".etf") == 0) {
+            do_output(files[1], visited);
+        } else {
+            // if not .etf, then the filename ends with .bdd or .ldd, symbolic LTS
+            FILE *f = fopen(files[1], "w");
+            if (f == NULL) Abort("Cannot open '%s' for writing!", files[1]);
 
-        /* Call hook */
-        vset_pre_save(f, domain);
+            /* Call hook */
+            vset_pre_save(f, domain);
 
-        /* Write domain */
-        vdom_save(f, domain);
+            /* Write domain */
+            vdom_save(f, domain);
 
-        /* Write initial state */
-        vset_save(f, initial);
+            /* Write initial state */
+            vset_save(f, initial);
 
-        /* Write number of transitions and all transitions */
-        fwrite(&nGrps, sizeof(int), 1, f);
-        for (int i=0; i<nGrps; i++) vrel_save_proj(f, group_next[i]);
-        for (int i=0; i<nGrps; i++) vrel_save(f, group_next[i]);
+            /* Write number of transitions and all transitions */
+            fwrite(&nGrps, sizeof(int), 1, f);
+            for (int i=0; i<nGrps; i++) vrel_save_proj(f, group_next[i]);
+            for (int i=0; i<nGrps; i++) vrel_save(f, group_next[i]);
 
-        /* Write reachable states */
-        int save_reachable = 1;
-        fwrite(&save_reachable, sizeof(int), 1, f);
-        vset_save(f, visited);
+            /* Write reachable states */
+            int save_reachable = 1;
+            fwrite(&save_reachable, sizeof(int), 1, f);
+            vset_save(f, visited);
 
-        /* Call hook */
-        vset_post_save(f, domain);
+            /* Call hook */
+            vset_post_save(f, domain);
 
-        /* Now write action labels */
-        int action_count = 0;
-        if (act_label != -1) action_count = pins_chunk_count(model, action_typeno);
-        fwrite(&action_count, sizeof(int), 1, f);
-        for (int i=0; i<action_count; i++) {
-            chunk ch = pins_chunk_get(model, action_typeno, i);
-            uint32_t len = ch.len;
-            char *action = ch.data;
-            fwrite(&len, sizeof(uint32_t), 1, f);
-            fwrite(action, sizeof(char), len, f);
+            /* Now write action labels */
+            int action_count = 0;
+            if (act_label != -1) action_count = pins_chunk_count(model, action_typeno);
+            fwrite(&action_count, sizeof(int), 1, f);
+            for (int i=0; i<action_count; i++) {
+                chunk ch = pins_chunk_get(model, action_typeno, i);
+                uint32_t len = ch.len;
+                char *action = ch.data;
+                fwrite(&len, sizeof(uint32_t), 1, f);
+                fwrite(action, sizeof(char), len, f);
+            }
+
+            /* Done! */
+            fclose(f);
+
+            Print(infoShort, "Result symbolic LTS written to '%s'", files[1]);
         }
-
-        /* Done! */
-        fclose(f);
-
-        Print(infoShort, "Result symbolic LTS written to '%s'", transitions_save_filename);
     }
 
     CHECK_MU(visited, src);
-
-    /* save LTS */
-    if (files[1] != NULL) {
-        do_output(files[1], visited);
-    }
 
     /* optionally print counts of all group_next and group_explored sets */
     long   n_count;
