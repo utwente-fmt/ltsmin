@@ -61,7 +61,7 @@ else
         totalMemMB=$(( $totalMemGB*1024 ))
     fi
 fi
-heapMB=$(( $totalMemMB*100/75 ))
+heapMB=$(( $totalMemMB*75/100 ))
 commitedMB=$(( $heapMB/2 ))
 
 java -Xms${commitedMB}m -Xmx${heapMB}m -Xss64m -cp $CP spins.Compile ${1+"$@"}
