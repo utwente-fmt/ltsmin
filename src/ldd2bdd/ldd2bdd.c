@@ -429,9 +429,12 @@ struct poptOption sylvan_options[] = {
 /**
  * Program options
  */
+static int check_results = 0; // by default, do not check computed transition relations
+
 static struct poptOption options[] = {
     { NULL, 0, POPT_ARG_INCLUDE_TABLE, lace_options, 0, "Lace options", NULL},
     { NULL, 0, POPT_ARG_INCLUDE_TABLE, sylvan_options, 0, "Sylvan options", NULL},
+    { "check-results", 0, 0, &check_results, 0, NULL, NULL },
     POPT_TABLEEND
 };
 
@@ -687,17 +690,17 @@ VOID_TASK_1(actual_main, void*, arg)
         MTBDD new_vars = meta_to_bdd(next[i]->meta, bits_mdd, 0);
         mtbdd_refs_push(new_vars);
 
-        // Test if the transition is correctly converted
-        MTBDD test = sylvan_relnext(new_states, new_rel, new_vars);
-        mtbdd_refs_push(test);
-        MDD succ = lddmc_relprod(states->mdd, next[i]->mdd, next[i]->meta);
-        lddmc_refs_push(succ);
-        MTBDD test2 = bdd_from_ldd(succ, bits_mdd, 0);
-        if (test != test2) Abort("Conversion error!");
-        
-        mtbdd_refs_pop(1);
-        lddmc_refs_pop(1);
-        // we keep new_rel and new_vars reffed
+        if (check_results) {
+            // Test if the transition is correctly converted
+            MTBDD test = sylvan_relnext(new_states, new_rel, new_vars);
+            mtbdd_refs_push(test);
+            MDD succ = lddmc_relprod(states->mdd, next[i]->mdd, next[i]->meta);
+            lddmc_refs_push(succ);
+            MTBDD test2 = bdd_from_ldd(succ, bits_mdd, 0);
+            if (test != test2) Abort("Conversion error!");
+            mtbdd_refs_pop(1);
+            lddmc_refs_pop(1);
+        }
 
         // Report number of nodes
         if (verbose) Print(info, "Transition %d: %zu BDD nodes", i, mtbdd_nodecount(new_rel));
