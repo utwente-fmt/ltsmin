@@ -237,11 +237,13 @@ proc compile_promela { prom_models } {
     }
 
     foreach prom_model $prom_models {
-        set commands {"$binpaths(spins) $EXAMPLES_PATH/$prom_model"}
-# "mv $prom_model.spins $EXAMPLES_PATH/"
-        foreach command $commands {
-            puts [subst "Executing precommand: '$command'"]
-            eval exec $command
+        puts "Executing precommand: '$binpaths(spins) $EXAMPLES_PATH/$prom_model'"
+        set rc [catch { exec $binpaths(spins) $EXAMPLES_PATH/$prom_model } msg ]
+
+        if { $rc != 0 } {
+            fail "Failed executing precommand"
+            puts "this is what I got on stderr: $msg"
+            exit $rc
         }
     }
     return true
@@ -251,10 +253,13 @@ proc compile_DVE { DVE_models } {
     global EXAMPLES_PATH
 
     foreach DVE_model $DVE_models {
-        set commands {"divine compile -l $EXAMPLES_PATH/$DVE_model"}
-        foreach command $commands {
-            puts [subst "Executing precommand: '$command'"]
-            eval exec $command
+        puts "Executing precommand: 'divine compile -l $EXAMPLES_PATH/$DVE_model'"
+        set rc [catch { exec divine compile -l $EXAMPLES_PATH/$DVE_model } msg ]
+
+        if { $rc != 0 } {
+            fail "Failed executing precommand"
+            puts "this is what I got on stderr: $msg"
+            exit $rc
         }
     }
     return true
