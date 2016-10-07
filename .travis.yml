@@ -232,4 +232,5 @@ deploy:
   on:
     # change this repo slug if you want to upload to your own repository, but don't push upstream!
     repo: utwente-fmt/ltsmin
-    tags: true  
+    tags: true
+    condition: "x$RELEASE_BUILD = xyes"
