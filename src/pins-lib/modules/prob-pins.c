@@ -330,7 +330,8 @@ static void setup_state_labels(model_t model,
     // init state labels
     const int sl_inv_size = init.state_labels.nr_rows;
     const int sl_guards_size = init.guard_labels.nr_rows + 2; // two special guards
-    const int sl_size = sl_inv_size + sl_guards_size;
+    const int sl_ltl_size = init.ltl_labels.nr_rows;
+    const int sl_size = sl_inv_size + sl_guards_size + sl_ltl_size;
     lts_type_set_state_label_count(ltstype, sl_size);
 
     char *guard_is_init_is_false = "guard_is_init==0";
@@ -356,6 +357,11 @@ static void setup_state_labels(model_t model,
         lts_type_set_state_label_name(ltstype, i + sl_guards_size, init.state_labels.rows[i].transition_group.data + 2); // skip the 'DA'
         // invariants will be known as 'invX'
         lts_type_set_state_label_typeno(ltstype, i + sl_guards_size, bool_type);
+    }
+
+    for (int i = 0; i < sl_ltl_size; i++) {
+        lts_type_set_state_label_name(ltstype, i + sl_guards_size + sl_inv_size, init.ltl_labels.rows[i].transition_group.data + 2); // skip the 'DA'
+        lts_type_set_state_label_typeno(ltstype, i + sl_guards_size + sl_inv_size, bool_type);
     }
 
     sl_group_t *sl_group_all = RTmallocZero(sizeof(sl_group_t) + sl_size * sizeof(int));
@@ -465,7 +471,8 @@ static void setup_state_label_info(model_t model,
                                    string_index_t var_si) {
     const int sl_inv_size = init.state_labels.nr_rows;
     const int sl_guards_size = init.guard_labels.nr_rows + 2; // two special guards (see below)
-    const int sl_size = sl_inv_size + sl_guards_size;
+    const int sl_ltl_size = init.ltl_labels.nr_rows;
+    const int sl_size = sl_inv_size + sl_guards_size + sl_ltl_size;
 
     matrix_t* sl_info = RTmalloc(sizeof(matrix_t));
     dm_create(sl_info, sl_size, ctx->num_vars + 1);
@@ -490,6 +497,14 @@ static void setup_state_label_info(model_t model,
             const char* var = init.state_labels.rows[i].variables.chunks[j].data;
             const int col = SIlookup(var_si, var);
             dm_set(sl_info, i+sl_guards_size, col);
+        }
+    }
+
+    for (int i = 0; i < sl_ltl_size; i++) {
+        for (size_t j = 0; j < init.ltl_labels.rows[i].variables.size; j++) {
+            const char* var = init.ltl_labels.rows[i].variables.chunks[j].data;
+            const int col = SIlookup(var_si, var);
+            dm_set(sl_info, i+sl_guards_size+sl_inv_size, col);
         }
     }
     GBsetStateLabelInfo(model, sl_info);
@@ -648,7 +663,8 @@ static void setup_necessary_enabling_set(model_t model, ProBInitialResponse init
     ProBMatrix nes = init.necessary_enabling_set;
     int nguards = nes.nr_rows + 2;
     const int sl_inv_size = init.state_labels.nr_rows;
-    const int sl_size = sl_inv_size + nguards;
+    const int sl_ltl_size = init.ltl_labels.nr_rows;
+    const int sl_size = sl_inv_size + nguards + sl_ltl_size;
 
 
     matrix_t *gnes_info = RTmalloc(sizeof(matrix_t));
@@ -668,7 +684,7 @@ static void setup_necessary_enabling_set(model_t model, ProBInitialResponse init
         }
     }
     // set all variables for invariants (for now?)
-    for (int i = 0; i < sl_inv_size; i++) {
+    for (int i = 0; i < sl_inv_size + sl_ltl_size; i++) {
         for (int j = 0; j < ngroups; j++) {
             dm_set(gnes_info, i + nguards, j);
         }
@@ -681,7 +697,8 @@ static void setup_necessary_disabling_set(model_t model, ProBInitialResponse ini
     ProBMatrix nes = init.necessary_disabling_set;
     int nguards = nes.nr_rows + 2;
     const int sl_inv_size = init.state_labels.nr_rows;
-    const int sl_size = sl_inv_size + nguards;
+    const int sl_ltl_size = init.ltl_labels.nr_rows;
+    const int sl_size = sl_inv_size + nguards + sl_ltl_size;
 
 
     matrix_t *gnds_info = RTmalloc(sizeof(matrix_t));
@@ -701,7 +718,7 @@ static void setup_necessary_disabling_set(model_t model, ProBInitialResponse ini
         }
     }
     // set all variables for invariants (for now?)
-    for (int i = 0; i < sl_inv_size; i++) {
+    for (int i = 0; i < sl_inv_size + sl_ltl_size; i++) {
         for (int j = 0; j < ngroups; j++) {
             dm_set(gnds_info, i + nguards, j);
         }

@@ -20,6 +20,7 @@ enum SubMessageType {
     necessary_disabling_set,
     do_not_accord_matrix,
     may_be_coenabled_matrix,
+    ltl_label_matrix,
     limit_message_types=128 // avoid undefined behaviour if we get new message types
 };
 
@@ -65,6 +66,8 @@ typedef struct ProBInitialResponse {
     ProBMatrix necessary_disabling_set;
     ProBMatrix do_not_accord;
     ProBMatrix may_be_coenabled;
+
+    ProBMatrix ltl_labels; // exactly like state_labels
 } ProBInitialResponse;
 
 

@@ -101,6 +101,8 @@ ProBInitialResponse prob_get_init_response(zmsg_t *msg) {
                 res.do_not_accord = prob_get_matrix(msg); break;
             case may_be_coenabled_matrix:
                 res.may_be_coenabled = prob_get_matrix(msg); break;
+            case ltl_label_matrix:
+                res.ltl_labels = prob_get_matrix(msg); break;
             default:
                 for (; len > 0; len--) {
                     drop_frame(msg);
