@@ -16,41 +16,48 @@ set commands [dict create]
 set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs" "ufscc"}
 
 # anderson:
+compile_DVE {"anderson.1.prop4.dve"}
+
 foreach s $strategies {
     dict set commands test16_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=2 \
-    	--strategy=$s -s22 $EXAMPLES_PATH/anderson.1.prop4.dve"
+    	--strategy=$s -s22 anderson.1.prop4.dve2C"
     dict set commands test16_dve_mc_$s exp "633945 states|unique states count:        633945"
 }
 dict set commands test_16_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	$EXAMPLES_PATH/anderson.1.prop4.dve"
+	anderson.1.prop4.dve2C"
 # This expected value is assumed to be the same as previous multicore results. This is untested!
 dict set commands test_16_dve_seq exp "633945 states"
 
-compile_promela {"peterson3.pml" "zune.pml"}
 
-# peterson
+# p117
+compile_promela {"p117.pml"}
+
 foreach s $strategies {
     dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) --threads=2 \
-	--strategy=$s -s20 peterson3.pml.spins"
-    dict set commands test16_seq_$s exp "167277 states|unique states count:        167277"
+	--strategy=$s -s20 p117.pml.spins"
+    dict set commands test16_seq_$s exp "354 states|unique states count:        354"
 }
 dict set commands test16_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
-					peterson3.pml.spins"
-dict set commands test16_prom_seq exp "167277 states"
+					p117.pml.spins"
+dict set commands test16_prom_seq exp "354 states"
 
 # TEST 17:
 
 # iprotocol
+compile_DVE {"iprotocol.2.prop4.dve"}
+
 foreach s $strategies {
     dict set commands test17_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=2 \
-	-s22 --strategy=$s $EXAMPLES_PATH/iprotocol.2.prop4.dve"
+	-s22 --strategy=$s iprotocol.2.prop4.dve2C"
     dict set commands test17_dve_mc_$s exp "Accepting cycle FOUND"
 }
 dict set commands test_17_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	$EXAMPLES_PATH/iprotocol.2.prop4.dve"
+	iprotocol.2.prop4.dve2C"
 dict set commands test_17_dve_seq exp "accepting cycle found"
 
 # zune:
+compile_promela {"zune.pml"}
+
 foreach s $strategies {
     dict set commands test17_prom_mc_$s cmd "$binpaths(prom2lts-mc) --threads=2 \
 	-s22 --strategy=$s zune.pml.spins"
@@ -61,27 +68,30 @@ dict set commands test17_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
 dict set commands test17_prom_seq exp "accepting cycle found"
 
 # TEST 18:
+compile_DVE {"iprotocol.2.dve"}
+
 dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --strategy=ndfs \
-	-s22 $EXAMPLES_PATH/iprotocol.2.dve \
+	-s22 iprotocol.2.dve2C \
 	--ltl=$EXAMPLES_PATH/iprotocol.2.ltl"
 dict set commands test18_mc exp "Accepting cycle FOUND"
 
 # NOTE: the difference in the use of captitals in the expected output between this and previous test
 dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	$EXAMPLES_PATH/iprotocol.2.dve \
+	iprotocol.2.dve2C \
 	--ltl=$EXAMPLES_PATH/iprotocol.2.ltl"
 dict set commands test18_seq exp "accepting cycle found"
 
 
 # TEST 19:
+compile_DVE {"elevator.3.dve"}
 
 dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=ndfs \
-	-s22 $EXAMPLES_PATH/elevator.3.dve \
+	-s22 elevator.3.dve2C \
 	--ltl=$EXAMPLES_PATH/elevator.3.ltl"]
 dict set commands test19_mc exp "495463 states"
 
 dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	$EXAMPLES_PATH/elevator.3.dve \
+	elevator.3.dve2C \
 	--ltl=$EXAMPLES_PATH/elevator.3.ltl"
 dict set commands test19_seq exp "495463 states"
 
