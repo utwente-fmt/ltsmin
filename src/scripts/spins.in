@@ -76,7 +76,7 @@ if [ $no_compile == 1 ]; then
     exit 0
 fi
 
-gcc -fPIC -shared -O2 -ggdb $CFLAGS $output_file -o $promela_name.spins \
+gcc -fPIC -shared -O2 -ggdb $CFLAGS -pthread $output_file -o $promela_name.spins \
     -Wno-parentheses-equality \
     -Wno-initializer-overrides \
     -Wno-unused-but-set-variable \
