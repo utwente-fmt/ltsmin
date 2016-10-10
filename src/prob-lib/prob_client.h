@@ -20,7 +20,7 @@ extern void prob_disconnect(prob_client_t pc);
 
 extern void prob_connect(prob_client_t pc, const char* file);
 
-extern ProBInitialResponse prob_init(prob_client_t pc);
+extern ProBInitialResponse prob_init(prob_client_t pc, int is_por);
 
 extern void print_matrix(const ProBMatrix m);
 

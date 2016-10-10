@@ -99,12 +99,13 @@ void print_matrix(const ProBMatrix m) {
 
 
 ProBInitialResponse
-prob_init(prob_client_t pc)
+prob_init(prob_client_t pc, int is_por)
 {
     Debugf("initializing ProB Zocket\n")
     zmsg_t *request = zmsg_new();
     zmsg_addstr(request, "init");
     zmsg_addstrf(request, "%d", pc->id_count);
+    zmsg_addstrf(request, "%d", is_por);
 
     Debugf("sending message with length %zu, contents are:\n", zmsg_content_size(request));
 #ifdef LTSMIN_DEBUG
@@ -267,7 +268,7 @@ start_ltsmin(void)
 
     prob_client_t pc = prob_client_create();
 
-    ProBInitialResponse initial_resp = prob_init(pc);
+    ProBInitialResponse initial_resp = prob_init(pc, 0);
 
     // Some Demo code
 
