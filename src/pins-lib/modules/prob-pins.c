@@ -521,8 +521,6 @@ static void setup_read_write_matrices(model_t model,
     matrix_t* read = RTmalloc(sizeof(matrix_t));
     matrix_t* dm = RTmalloc(sizeof(matrix_t));
 
-    // TODO: we still need this one, but the reads_action
-    //       matrix we send contains reads from parameters...
     matrix_t* reads_action = RTmalloc(sizeof(matrix_t));
     dm_create(must_write, num_groups, ctx->num_vars + 1);
     dm_create(read, num_groups, ctx->num_vars + 1);
@@ -783,18 +781,30 @@ prob_load_model(model_t model)
 
     const int num_groups = setup_transition_groups(model, ctx, init, op_si);
 
-    setup_guard_info(model, num_groups, init, op_si, si_guards);
+    if (init.guard_info.nr_rows) {
+        setup_guard_info(model, num_groups, init, op_si, si_guards);
+    }
 
-    setup_state_label_info(model, ctx, init, var_si);
+    if (init.state_labels.nr_rows || init.guard_labels.nr_rows || init.ltl_labels.nr_rows) {
+        setup_state_label_info(model, ctx, init, var_si);
+    }
 
     setup_read_write_matrices(model, ctx, num_groups, init, var_si, op_si);
 
-    setup_dna_matrix(model, init, op_si);
+    if (init.do_not_accord.nr_rows) {
+        setup_dna_matrix(model, init, op_si);
+    }
 
-    setup_may_be_coenabled_matrix(model, init, si_guards);
+    if (init.may_be_coenabled.nr_rows) {
+        setup_may_be_coenabled_matrix(model, init, si_guards);
+    }
 
-    setup_necessary_enabling_set (model, init, si_guards, op_si, num_groups);
-    setup_necessary_disabling_set(model, init, si_guards, op_si, num_groups);
+    if (init.necessary_enabling_set.nr_rows) {
+        setup_necessary_enabling_set (model, init, si_guards, op_si, num_groups);
+    }
+    if (init.necessary_disabling_set.nr_rows) {
+        setup_necessary_disabling_set(model, init, si_guards, op_si, num_groups);
+    }
 
     int init_state[ctx->num_vars + 1];
     prob2pins_state(init.initial_state, init_state, model);
