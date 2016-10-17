@@ -1198,6 +1198,9 @@ wrapModel(model_t model)
     /* add dependency checking layer */
     model = GBaddCheck (model);
 
+    /* add cache */
+    model = GBaddCache (model);
+
     /* add partial order reduction */
     model = GBaddPOR (model);
 
@@ -1209,9 +1212,6 @@ wrapModel(model_t model)
 
     /* add mu calculus */
     model = GBaddMucalc (model); // Only adds LTL when a mu formula is provided
-
-    /* add cache */
-    model = GBaddCache (model);
 
     /* if 'print matrix', print matrix and abort */
     if (matrix) {
