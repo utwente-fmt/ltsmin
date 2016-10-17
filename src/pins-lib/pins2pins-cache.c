@@ -34,6 +34,17 @@ init_state_info (void *arg, void *old_array, int old_size, void *new_array,
     (void)arg;(void)old_array;
 }
 
+static void
+init_label_cache (void *arg, void *old_array, int old_size, void *new_array,
+                  int new_size) {
+    int                *array = (int *) new_array;
+    while (old_size < new_size) {
+        array[old_size] = -1;
+        old_size++;
+    }
+    (void)arg;(void)old_array;
+}
+
 /**
  *
  * Data layout:
@@ -58,8 +69,18 @@ typedef struct group_cache {
     int                *dest;
 } group_cache_t;
 
+typedef struct label_cache {
+    size_t              len;  // number of chunks touched
+    size_t              size; // len * sizeof(int), since chunks are indexed via ints?
+    string_index_t      idx;  // mapping of short state -> index
+
+    array_manager_t     label_val_man;
+    int                *label_val; // TODO: we could probably even use bytes for this
+} label_cache_t;
+
 typedef struct cache_context {
     group_cache_t *cache;
+    label_cache_t *cache_labels;
 } cache_context_t;
 
 static inline int
@@ -91,6 +112,21 @@ add_cache_entry (void *context, transition_info_t *ti, int *dst, int *cpy)
 
     src->edges++;
     (void) cpy;
+}
+
+static int
+cached_label_short (model_t self, int label, int *src) {
+    cache_context_t    *ctx = (cache_context_t *)GBgetContext (self);
+    label_cache_t      *cache = &(ctx->cache_labels[label]);
+
+    int                 idx = SIputC (cache->idx, (char *)src, cache->size);
+    ensure_access (cache->label_val_man, idx);
+
+    if (cache->label_val[idx] == -1) {
+        cache->label_val[idx] = GBgetStateLabelShort (GBgetParent(self), label, src);
+    }
+    
+    return cache->label_val[idx];
 }
 
 static int
@@ -142,6 +178,7 @@ GBaddCache (model_t model)
     HREassert (model != NULL, "No model");
     matrix_t           *p_dm = GBgetDMInfo (model);
     int                 N = dm_nrows (p_dm);
+
     group_cache_t      *cache = RTmalloc (sizeof (group_cache_t[N]));
     for (int i = 0; i < N; i++) {
         int len = dm_ones_in_row (p_dm, i);
@@ -158,15 +195,36 @@ GBaddCache (model_t model)
         cache[i].dest = NULL;
         ADD_ARRAY (cache[i].dest_man, cache[i].dest, int);
     }
+
+    matrix_t           *state_label_info = GBgetStateLabelInfo (model);
+    int                 N_labels = dm_nrows (state_label_info);
+
+
+    label_cache_t      *label_cache = RTmalloc (sizeof (label_cache_t[N_labels]));
+    for (int i = 0; i < N_labels; i++) {
+        int len = dm_ones_in_row(state_label_info, i);
+        label_cache[i].len = len;
+        label_cache[i].size = sizeof(int[len]);
+        label_cache[i].idx = SIcreate ();
+        label_cache[i].label_val_man = create_manager (256);
+        label_cache[i].label_val = NULL;
+        ADD_ARRAY_CB(label_cache[i].label_val_man, label_cache[i].label_val, int, init_label_cache, NULL);
+    }
+
+
+
     cache_context_t    *ctx = RTmalloc (sizeof(cache_context_t));
     model_t             cached = GBcreateBase ();
     ctx->cache = cache;
+    ctx->cache_labels = label_cache;
     
     GBsetDMInfo (cached, p_dm);
     GBsetContext (cached, ctx);
     
     GBsetNextStateShort (cached, cached_short);
     GBsetGroupsOfEdge (cached, cached_groups_of_edge);
+
+    GBsetStateLabelShort (cached, cached_label_short);
 
     GBinitModelDefaults (&cached, model);
 
