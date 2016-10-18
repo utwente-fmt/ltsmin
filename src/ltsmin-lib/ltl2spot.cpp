@@ -57,7 +57,15 @@ ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, in
       case LTL_NEXT:      n += snprintf(at + (at?n:0), max_buffer, " X "); break;
       case LTL_EQUIV:     n += snprintf(at + (at?n:0), max_buffer, " <-> "); break;
       case LTL_IMPLY:     n += snprintf(at + (at?n:0), max_buffer, " -> "); break;
-      case LTL_EQ:
+      case LTL_EQ:{
+        char *buffer = LTSminPrintExpr(le->lin_expr[i], env);
+        // store the predicate (only once)
+        if (at) ltsmin_expr_lookup(le->lin_expr[i], buffer, &le_list);
+        // add temporary '#' to mark predicates for Spot
+        n += snprintf(at + (at?n:0), max_buffer, "#%s#", buffer);
+        RTfree(buffer);
+        break;
+      }
       case LTL_SVAR:
       case LTL_VAR:
       case LTL_NEQ:
@@ -69,15 +77,7 @@ ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, in
       case LTL_DIV:
       case LTL_REM:
       case LTL_ADD:
-      case LTL_SUB: {
-        char *buffer = LTSminPrintExpr(le->lin_expr[i], env);
-        // store the predicate (only once)
-        if (at) ltsmin_expr_lookup(le->lin_expr[i], buffer, &le_list);
-        // add temporary '#' to mark predicates for Spot
-        n += snprintf(at + (at?n:0), max_buffer, "#%s#", buffer);
-        RTfree(buffer);
-        break;
-      }
+      case LTL_SUB: 
       default:
         Abort("unhandled LTL_TOKEN: %d\n", le->lin_expr[i]->token); 
         break;
@@ -288,6 +288,12 @@ ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba, ltsmin_parse_env_t env)
   // modify #(a1 == "S")#  to  "(a1 == 'S')"
   replace( ltl.begin(), ltl.end(), '"', '\'');
   replace( ltl.begin(), ltl.end(), '#', '\"');
+
+  // output the LTL formula
+  if (log_active(infoLong)) {
+    std::string msg = "Spot LTL formula: " + ltl;
+    Warning(infoLong, msg.c_str(), 0);
+  }
 
   // use Spot to parse the LTL and create an automata
   spot::parsed_formula f = spot::parse_infix_psl(ltl);
