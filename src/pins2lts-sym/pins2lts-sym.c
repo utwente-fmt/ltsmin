@@ -874,8 +874,14 @@ VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, v
         case PRED_FALSE: {
             vset_clear(c->container);
         } break;
-        case PRED_SVAR: // assume state label
-            vset_join(c->container, c->container, label_true[e->idx - N]);
+        case PRED_SVAR:
+            if (e->idx < N) { // state variable
+                vset_t svar = (vset_t) c->work;
+                vset_join(c->container, c->container, svar);
+                vset_clear(svar);
+            } else { // state label
+                vset_join(c->container, c->container, label_true[e->idx - N]);
+            }
             break;
         case PRED_NOT: {
             vset_copy(left->container, c->container);
@@ -961,7 +967,6 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
     if (e->node_type == BINARY_OP) right = (struct inv_info_s*) e->arg2->context;
     
     LACE_ME;
-
     switch (e->token) {
         case PRED_TRUE: {
             // do nothing (c->container already contains everything)
@@ -969,24 +974,28 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
         case PRED_FALSE: {
             vset_clear(c->container);
         } break;
-        case PRED_SVAR: { // assume state label
-            /* following join is necessary because vset does not yet support
-             * set projection of a projected set. */
+        case PRED_SVAR: {
             vset_t svar = (vset_t) c->work;
 
-            vset_join(svar, c->container, states);
-            if (inv_par) {
-                volatile int* ptr = &label_locks[e->idx - N];
-                while (!cas(ptr, 0, 1)) {
-                    lace_steal_random();
-                    ptr = &label_locks[e->idx - N];
+            if (e->idx >= N) { // state label
+                /* following join is necessary because vset does not yet support
+                 * set projection of a projected set. */
+                vset_join(svar, c->container, states);
+                if (inv_par) {
+                    volatile int* ptr = &label_locks[e->idx - N];
+                    while (!cas(ptr, 0, 1)) {
+                        lace_steal_random();
+                        ptr = &label_locks[e->idx - N];
+                    }
                 }
-            }
 
-            eval_label(e->idx - N, svar);
-            if (inv_par) label_locks[e->idx - N] = 0;
+                eval_label(e->idx - N, svar);
+                if (inv_par) label_locks[e->idx - N] = 0;
+                vset_join(c->container, c->container, label_true[e->idx - N]);
+            } else { // state variable
+                vset_join(c->container, c->container, svar);
+            }
             vset_clear(svar);
-            vset_join(c->container, c->container, label_true[e->idx - N]);
         } break;
         case PRED_NOT: {
             vset_copy(left->container, c->container);
@@ -3613,15 +3622,27 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
         e->destroy_context = inv_info_destroy;
         break;
     case PRED_SVAR: {
-        if (e->idx >= N && !inv_bin_par) {
-            c = RTmalloc(sizeof(struct inv_info_s));
-            e->destroy_context = inv_svar_destroy;
-
+        c = RTmalloc(sizeof(struct inv_info_s));
+        e->destroy_context = inv_svar_destroy;
+        if (e->idx < N) { // state variable
+            const int bool_type = lts_type_find_type(ltstype, LTSMIN_TYPE_BOOL);
+            // make sure the state variable is a Boolean
+            assert(lts_type_get_state_typeno(ltstype, e->idx) == bool_type);
+            /* create vset_t where this state variable is true. */
+            int proj[1] = { e->idx };
+            c->work = vset_create(domain, 1, proj);
+            int t[1] = { pins_chunk_put(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE)) };
+            vset_add(c->work, t);
+        } else if (!inv_bin_par) { // state label
+            /* create vset_t because we can not directly project
+             * from the invariant domain to the state label domain.
+             * However this vset_t is only necessary when we do not
+             * evaluate invariants in parallel. In the parallel setting
+             * the state labels will already be evaluated. In the sequential
+             * setting the state labels must still be evaluated because the
+             * binary operators '&&' and '||' use short-circuit evaluation. */
             c->work = vset_create(domain, -1, NULL);
-        } else {
-            c = RTmalloc(sizeof(struct inv_info_s));
-            e->destroy_context = inv_info_destroy;
-        }
+        } else c->work = NULL;
         break;
     }
     case PRED_EQ:
