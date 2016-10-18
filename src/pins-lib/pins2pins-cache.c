@@ -114,6 +114,72 @@ add_cache_entry (void *context, transition_info_t *ti, int *dst, int *cpy)
     (void) cpy;
 }
 
+void
+get_label_group_uncached_default (model_t model, sl_group_enum_t group, int *src, int *label, int *uncached) {
+    (void) uncached; // ignored, just let them calculate all labels
+    GBgetStateLabelsGroup(GBgetParent(model), group, src, label);
+}
+
+
+static void
+get_label_group_cached(model_t model, sl_group_enum_t group, int *src, int *label) {
+    cache_context_t    *ctx = (cache_context_t *)GBgetContext (model);
+
+    sl_group_t         *label_group = GBgetStateLabelGroupInfo(model, group);
+    int                 N_labels = label_group->count;
+    matrix_t           *label_info = GBgetStateLabelInfo(model);
+
+    // temporarily store short indices in stringindexes of every label
+    int                 indices[N_labels];
+    // which are required
+    int                 uncached[N_labels];
+    int                 everything_cached = 1;
+    for (int i = 0; i < N_labels; i++) {
+        // convert to short state
+        int             nth_label = label_group->sl_idx[i];
+        int             short_len = dm_ones_in_row(label_info, nth_label);
+        int             short_state[short_len];
+        dm_project_vector(label_info, nth_label, src, short_state);
+
+        // lookup in cache
+        label_cache_t  *cache = &(ctx->cache_labels[nth_label]);
+        int idx = SIputC (cache->idx, (char *)short_state, cache->size);
+        ensure_access (cache->label_val_man, idx);
+
+        // save indices
+        indices[i] = idx;
+        if (cache->label_val[idx] == -1) {
+            // cache miss
+            everything_cached = 0;
+            uncached[i] = 1;
+        } else {
+            // cache hit
+            label[i] = cache->label_val[idx];
+        }
+
+        
+    }
+
+    if (!everything_cached) {
+        // call back to evaluate required labels
+        int             label2[N_labels];
+        // in order not to break compatibility,
+        // probably it should default to GBgetStateLabelGroup()
+        GBgetStateLabelsGroupUncached(model, group, src, label2, uncached);
+        for (int i = 0; i < N_labels; i++) {
+            if (uncached[i]) {
+                // set result
+                label[i] = label2[i];
+
+                // update cache
+                int     nth_label = label_group->sl_idx[i];
+                label_cache_t *cache = &(ctx->cache_labels[nth_label]);
+                cache->label_val[indices[i]] = label2[i];
+            }
+        }
+    }
+}
+
 static int
 cached_label_short (model_t self, int label, int *src) {
     cache_context_t    *ctx = (cache_context_t *)GBgetContext (self);
@@ -225,6 +291,7 @@ GBaddCache (model_t model)
     GBsetGroupsOfEdge (cached, cached_groups_of_edge);
 
     GBsetStateLabelShort (cached, cached_label_short);
+    GBsetStateLabelsGroup (cached, get_label_group_cached);
 
     GBinitModelDefaults (&cached, model);
 

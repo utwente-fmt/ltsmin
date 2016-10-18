@@ -50,6 +50,7 @@ struct grey_box_model {
 	get_label_method_t state_labels_short;
 	get_label_method_t state_labels_long;
 	get_label_group_method_t state_labels_group;
+	get_label_group_uncached_method_t state_labels_group_uncached;
 	get_label_all_method_t state_labels_all;
 	groups_of_edge_t groups_of_edge;
 	covered_by_grey_t covered_by;
@@ -494,6 +495,7 @@ model_t GBcreateBase(){
 	model->state_labels_short=state_labels_default_short;
 	model->state_labels_long=state_labels_default_long;
 	model->state_labels_group=state_labels_default_group;
+	model->state_labels_group_uncached=get_label_group_uncached_default;
 	model->state_labels_all=state_labels_default_all;
 	model->groups_of_edge=groups_of_edge_default;
 	model->map=NULL;
@@ -588,6 +590,10 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
 
     if (model->default_filter == NULL)
         GBsetDefaultFilter (model, GBgetDefaultFilter(default_src));
+
+    if (model->state_labels_group_uncached == NULL) {
+        model->state_labels_group_uncached = get_label_group_uncached_default;
+    }
 
     for (int i = 0; i < GBgetMatrixCount(default_src); i++) {
         const char* name = GBgetMatrixName(default_src, i);
@@ -911,6 +917,10 @@ int GBgetStateLabelLong(model_t model,int label,int *state){
 
 void GBgetStateLabelsGroup(model_t model,sl_group_enum_t group,int*state,int*labels){
 	model->state_labels_group(model,group,state,labels);
+}
+
+void GBgetStateLabelsGroupUncached(model_t model,sl_group_enum_t group,int*state,int*labels,int*uncached){
+	model->state_labels_group_uncached(model,group,state,labels, uncached);
 }
 
 void GBgetStateLabelsAll(model_t model,int*state,int*labels){
