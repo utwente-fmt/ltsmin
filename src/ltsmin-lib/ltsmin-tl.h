@@ -170,12 +170,6 @@ extern char* ltsmin_expr_print_mu(ltsmin_expr_t, char*);
 
 extern int ltsmin_expr_type_check(const ltsmin_expr_t, const ltsmin_parse_env_t, const lts_type_t);
 
-extern ltsmin_expr_t ltl_optimize(ltsmin_expr_t, const ltsmin_parse_env_t);
-extern ltsmin_expr_t ctl_optimize(ltsmin_expr_t, const ltsmin_parse_env_t);
-extern ltsmin_expr_t mu_optimize(ltsmin_expr_t, const ltsmin_parse_env_t);
-
-extern ltsmin_expr_t ltsmin_expr_optimize(ltsmin_expr_t, const ltsmin_parse_env_t);
-
 /* ctl* to mu conversion
  *
  * The ctl* to mu conversion is the algorithm of Mad Dams:

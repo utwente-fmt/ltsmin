@@ -296,301 +296,6 @@ ltsmin_expr_type_check(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
     }
 }
 
-ltsmin_expr_t
-ltsmin_expr_optimize(ltsmin_expr_t e, const ltsmin_parse_env_t env)
-{
-    ltsmin_expr_t left, right;
-    left = right = NULL;
-
-    switch (e->node_type) {
-        case BINARY_OP: {
-
-            left = ltsmin_expr_optimize(e->arg1, env);
-            right = ltsmin_expr_optimize(e->arg2, env);
-
-            switch (e->token) {
-                case S_AND: {
-                    if (left->token == S_FALSE) { // false /\ a is false
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        return left;
-                    } else if (right->token == S_FALSE) { // a /\ false is false
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        return right;
-                    } else if (left->token == S_TRUE) { // true /\ a is a
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        return right;
-                    } else if (right->token == S_TRUE) { // a /\ true is a
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        return left;
-                    } else if (LTSminExprEq(left, right)) { // a /\ a is a
-                        LTSminExprDestroy(e, 0);
-                        LTSminExprDestroy(right, 1);
-                        return left;
-                    }
-                    break;
-                }
-                case S_OR: {
-                    if (left->token == S_TRUE) { // true \/ a is true
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        return left;
-                    } else if (right->token == S_TRUE) { // a \/ true is true
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        return right;
-                    } else if (left->token == S_FALSE) { // false \/ a is a
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        return right;
-                    } else if (right->token == S_FALSE) { // a \/ false is a
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        return left;
-                    } else if (LTSminExprEq(left, right)) { // a \/ a is a
-                        LTSminExprDestroy(e, 0);
-                        LTSminExprDestroy(right, 1);
-                        return left;
-                    }
-                    break;
-                }
-                case S_EQ: case S_EQUIV: {
-                    if (LTSminExprEq(left, right)) { // a {<->, ==} a is true
-                        LTSminExprDestroy(e, 1);
-                        return LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
-                    } else if (left->token == S_TRUE) { // true {<->,==} a is a
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        return right;
-                    } else if (right->token == S_TRUE) { // a {<->,==} true is a
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        return left;
-                    } else if (left->token == S_FALSE) { // false {<->,==} a is !a, !a can be optimized
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), right, 0);
-                        return ltsmin_expr_optimize(e, env);
-                    } else if (right->token == S_FALSE) { // a {<->,==} false is !a, !a can be optimized
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
-                        return ltsmin_expr_optimize(e, env);
-                    }
-                    break;
-                }
-                case S_NEQ: {
-                    if (LTSminExprEq(left, right)) { // a != a is false
-                        LTSminExprDestroy(e, 1);
-                        return LTSminExpr(CONSTANT, S_FALSE,  LTSminConstantIdx(env, S_NAME(S_FALSE)), 0, 0);
-                    } else if (left->token == S_FALSE) { // false != a is a
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        return right;
-                    } else if (right->token == S_FALSE) { // a != false is a
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        return left;
-                    } else if (left->token == S_TRUE) { // true != a is !a, !a can be optimized
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), right, 0);
-                        return ltsmin_expr_optimize(e, env);
-                    } else if (right->token == S_TRUE) { // a != true is !a, !a can be optimized
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
-                        return ltsmin_expr_optimize(e, env);
-                    }
-                    break;
-                }
-                case S_IMPLY: {
-                    if (LTSminExprEq(left, right)) { // a {->} a is true
-                        LTSminExprDestroy(e, 1);
-                        return LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
-                    } else if (left->token == S_FALSE || right->token == S_TRUE) { // false -> a is true, a -> true is true
-                        LTSminExprDestroy(e, 1);
-                        return LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
-                    } else if (left->token == S_TRUE) { // true -> a is a
-                        LTSminExprDestroy(left, 1);
-                        LTSminExprDestroy(e, 0);
-                        return right;
-                    } else if (right->token == S_FALSE) { // a -> false is !a, !a can be optimized
-                        LTSminExprDestroy(right, 1);
-                        LTSminExprDestroy(e, 0);
-                        e = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), left, 0);
-                        return ltsmin_expr_optimize(e, env);
-                    }
-                    break;
-                }
-                case S_LEQ: case S_GEQ: {
-                    if (LTSminExprEq(left, right)) { // a {<=, >=} a is true
-                        LTSminExprDestroy(e, 1);
-                        return LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
-                    }
-                    break;
-                }
-                case S_LT: case S_GT: {
-                    if (LTSminExprEq(left, right)) { // a {<, >} a is false
-                        LTSminExprDestroy(e, 1);
-                        return LTSminExpr(CONSTANT, S_FALSE,  LTSminConstantIdx(env, S_NAME(S_FALSE)), 0, 0);
-                    }
-                    break;
-                }
-                case S_REM: {
-                    if (right->idx == 0) {
-                        LTSminLogExpr (error, "division by zero in: ", e, env);
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                }
-                case S_SUB: {
-                    if (LTSminExprEq(left, right)) { // a {-, %} a is 0
-                        LTSminExprDestroy(e, 1);
-                        return LTSminExpr(INT, INT, 0, 0, 0);
-                    }
-                    break;
-                }
-                case S_DIV: {
-                    if (right->idx == 0) {
-                        LTSminLogExpr (error, "division by zero in: ", e, env);
-                        HREabort(LTSMIN_EXIT_FAILURE);
-                    }
-                    if (LTSminExprEq(left, right)) { // a / a is 1
-                        LTSminExprDestroy(e, 1);
-                        return LTSminExpr(INT, INT, 1, 0, 0);
-                    }
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-
-            if (e->arg1 != left || e->arg2 != right) {
-                e->arg1 = left; left->parent = e;
-                e->arg2 = right; right->parent = e;
-                LTSminExprRehash(e);
-            }
-            return e;
-        }
-        case UNARY_OP: {
-            ltsmin_expr_t n = e;
-            left = e->arg1;
-            switch (e->token) {
-                case S_NOT: {
-                    switch (left->token) {
-                        case S_LT: { // !(a < b) is a >= b
-                            LTSminExprDestroy(e, 0);
-                            n = LTSminExpr(BINARY_OP, S_GEQ, LTSminBinaryIdx(env, S_NAME(S_GEQ)), left->arg1, left->arg2);
-                            break;
-                        }
-                        case S_LEQ: { // !(a <= b) is a > b
-                            LTSminExprDestroy(e, 0);
-                            n = LTSminExpr(BINARY_OP, S_GT, LTSminBinaryIdx(env, S_NAME(S_GT)), left->arg1, left->arg2);
-                            break;
-                        }
-                        case S_GT: { // !(a > b) is a <= b
-                            LTSminExprDestroy(e, 0);
-                            n = LTSminExpr(BINARY_OP, S_LEQ, LTSminBinaryIdx(env, S_NAME(S_LEQ)), left->arg1, left->arg2);
-                            break;
-                        }
-                        case S_GEQ: { // !(a >= b) is a < b
-                            LTSminExprDestroy(e, 0);
-                            n = LTSminExpr(BINARY_OP, S_LT, LTSminBinaryIdx(env, S_NAME(S_LT)), left->arg1, left->arg2);
-                            break;
-                        }
-                        case S_EQ: { // !(a == b) is a != b
-                            LTSminExprDestroy(e, 0);
-                            n = LTSminExpr(BINARY_OP, S_NEQ, LTSminBinaryIdx(env, S_NAME(S_NEQ)), left->arg1, left->arg2);
-                            break;
-                        }
-                        case S_NEQ: { // !(a != b) is a == b
-                            LTSminExprDestroy(e, 0);
-                            n = LTSminExpr(BINARY_OP, S_EQ, LTSminBinaryIdx(env, S_NAME(S_EQ)), left->arg1, left->arg2);
-                            break;
-                        }
-                        case S_TRUE: { // !true is false
-                            LTSminExprDestroy(e, 1);
-                            n = LTSminExpr(CONSTANT, S_FALSE, LTSminConstantIdx(env, S_NAME(S_FALSE)), 0, 0);
-                            break;
-                        }
-                        case S_FALSE: { // !false is true
-                            LTSminExprDestroy(e, 1);
-                            n = LTSminExpr(CONSTANT, S_TRUE, LTSminConstantIdx(env, S_NAME(S_TRUE)), 0, 0);
-                            break;
-                        }
-                        case S_NOT: { // !!a is a
-                            LTSminExprDestroy(left, 0);
-                            LTSminExprDestroy(e, 0);
-                            n = left->arg1;
-                            break;
-                        }
-                        case S_OR: { // !(a || b) is !a && !b
-                            LTSminExprDestroy(e, 0);
-                            ltsmin_expr_t child = left;
-                            left = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), child->arg1, 0);
-                            right = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), child->arg2, 0);
-                            n = LTSminExpr(BINARY_OP, S_AND, LTSminBinaryIdx(env, S_NAME(S_AND)), left, right);
-                            break;
-                        }
-                        case S_AND: { // !(a && b) is !a || !b
-                            LTSminExprDestroy(e, 0);
-                            ltsmin_expr_t child = left;
-                            left = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), child->arg1, 0);
-                            right = LTSminExpr(UNARY_OP, S_NOT, LTSminUnaryIdx(env, S_NAME(S_NOT)), child->arg2, 0);
-                            n = LTSminExpr(BINARY_OP, S_OR,  LTSminBinaryIdx(env, S_NAME(S_OR)), left, right);
-                            break;
-                        }
-                        default: {
-                            break;
-                        }
-                    }
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-
-            if (e != n) {
-                n->arg1->parent = n;
-                LTSminExprRehash(n);
-                return ltsmin_expr_optimize(n, env);
-            } else {
-                e->arg1 = ltsmin_expr_optimize(e->arg1, env);
-                if (e->arg1 != n->arg1) {
-                    e->arg1->parent = e;
-                    LTSminExprRehash(e);
-                }
-                return e;
-            }
-            break;
-        }
-        default: {
-            break;
-        }
-    }
-    return e;
-}
-
-ltsmin_expr_t
-ltl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
-{
-    switch (e->token) {
-        case LTL_WEAK_UNTIL: {
-            ltsmin_expr_t u = LTSminExpr(BINARY_OP, LTL_UNTIL, LTSminBinaryIdx(env, LTL_NAME(LTL_UNTIL)), e->arg1, e->arg2);
-            ltsmin_expr_t g = LTSminExpr(UNARY_OP, LTL_GLOBALLY, LTSminUnaryIdx(env, LTL_NAME(LTL_GLOBALLY)), e->arg1, NULL);
-            LTSminExprDestroy(e, 0);
-            return LTSminExpr(BINARY_OP, LTL_OR, LTSminBinaryIdx(env, LTL_NAME(LTL_OR)), u, g);
-        }
-    }
-
-    return e;
-}
-
 static void
 create_pred_env(ltsmin_parse_env_t env)
 {
@@ -635,7 +340,7 @@ pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t lts_type)
 
     type_check_require_type(lts_type, type, LTSMIN_TYPE_BOOL, env->expr, env);
     
-    return ltsmin_expr_optimize(env->expr, env);
+    return env->expr;
 }
 
 static void
@@ -674,6 +379,41 @@ create_ltl_env(ltsmin_parse_env_t env)
     LTSminBinaryOperator(env, LTL_RELEASE,      LTL_NAME(LTL_RELEASE), 11);
 }
 
+/* Convert weak untils to until or generally */
+static ltsmin_expr_t
+ltl_tree_walker(ltsmin_expr_t in)
+{
+    ltsmin_expr_t arg1, arg2, u, g;
+    // handle sub-expressions
+    switch (in->node_type) {
+        case UNARY_OP:
+            arg1 = ltl_tree_walker(in->arg1);
+            in->arg1 = arg1;
+            LTSminExprRehash(in);
+            break;
+        case BINARY_OP:
+            arg1 = ltl_tree_walker(in->arg1);
+            arg2 = ltl_tree_walker(in->arg2);
+            switch (in->token) {
+                case LTL_WEAK_UNTIL:
+                    u = LTSminExpr(BINARY_OP, LTL_UNTIL, 0, arg1, arg2);
+                    g = LTSminExpr(UNARY_OP, LTL_GLOBALLY, 0, arg1, NULL);
+                    RTfree (in);
+                    in = LTSminExpr(BINARY_OP, LTL_OR, 0, u, g);
+                    break;
+                default:
+                    in->arg1 = arg1;
+                    in->arg2 = arg2;
+                    LTSminExprRehash(in);
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+    return in;
+}
+
 /* Parser Priorities:
  * HIGH
  *     binary priority 1          : *, /, %
@@ -704,7 +444,9 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    return ltsmin_expr_optimize(env->expr, env);
+    env->expr = ltl_tree_walker(env->expr);
+
+    return env->expr;
 }
 
 static void
@@ -744,92 +486,6 @@ create_ctl_env(ltsmin_parse_env_t env)
     LTSminBinaryOperator(env, CTL_UNTIL,        CTL_NAME(CTL_UNTIL), 11);
 }
 
-ltsmin_expr_t
-ctl_optimize(ltsmin_expr_t e, ltsmin_parse_env_t env)
-{
-    if (e->node_type == UNARY_OP && e->token == CTL_NOT) {
-        if (e->arg1->token == CTL_EXIST) {
-            if (e->arg1->arg1->token == CTL_NEXT) { // !EX p is AX !p, !p can be optimized
-                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
-                LTSminExprRehash(e->arg1->arg1->arg1);
-                e->arg1->arg1->arg1->parent = e->arg1->arg1;
-                e->arg1->token = CTL_ALL;
-                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_ALL));
-                LTSminExprRehash(e->arg1);
-                LTSminExprDestroy(e, 0);
-                return e->arg1;
-            } else if (e->arg1->arg1->token == CTL_FUTURE) { // !EF p is AG !p, !p can be optimized
-                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
-                LTSminExprRehash(e->arg1->arg1->arg1);
-                e->arg1->arg1->arg1->parent = e->arg1->arg1;
-                e->arg1->arg1->token = CTL_GLOBALLY;
-                e->arg1->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_GLOBALLY));
-                LTSminExprRehash(e->arg1->arg1);
-                e->arg1->token = CTL_ALL;
-                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_ALL));
-                LTSminExprRehash(e->arg1);
-                LTSminExprDestroy(e, 0);
-                return e->arg1;
-            } else if (e->arg1->arg1->token == CTL_GLOBALLY) { // !EG p is AF !p, !p can be optimized
-                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
-                LTSminExprRehash(e->arg1->arg1->arg1);
-                e->arg1->arg1->arg1->parent = e->arg1->arg1;
-                e->arg1->arg1->token = CTL_FUTURE;
-                e->arg1->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_FUTURE));
-                LTSminExprRehash(e->arg1->arg1);
-                e->arg1->token = CTL_ALL;
-                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_ALL));
-                LTSminExprRehash(e->arg1);
-                LTSminExprDestroy(e, 0);
-                return e->arg1;
-            }
-        } else if (e->arg1->token == CTL_ALL) {
-            if (e->arg1->arg1->token == CTL_NEXT) { // !AX p is EX !p, !p can be optimized
-                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
-                LTSminExprRehash(e->arg1->arg1->arg1);
-                e->arg1->arg1->arg1->parent = e->arg1->arg1;
-                e->arg1->token = CTL_EXIST;
-                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_EXIST));
-                LTSminExprRehash(e->arg1);
-                LTSminExprDestroy(e, 0);
-                return e->arg1;
-            } else if (e->arg1->arg1->token == CTL_FUTURE) { // !AF p is EG !p, !p can be optimized
-                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
-                LTSminExprRehash(e->arg1->arg1->arg1);
-                e->arg1->arg1->arg1->parent = e->arg1->arg1;
-                e->arg1->arg1->token = CTL_GLOBALLY;
-                e->arg1->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_GLOBALLY));
-                LTSminExprRehash(e->arg1->arg1);
-                e->arg1->token = CTL_EXIST;
-                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_EXIST));
-                LTSminExprRehash(e->arg1);
-                LTSminExprDestroy(e, 0);
-                return e->arg1;
-            } else if (e->arg1->arg1->token == CTL_GLOBALLY) { // !AG p is EF !p, !p can be optimized
-                e->arg1->arg1->arg1 = LTSminExpr(UNARY_OP, CTL_NOT, LTSminUnaryIdx(env, CTL_NAME(CTL_NOT)), e->arg1->arg1->arg1, NULL);
-                e->arg1->arg1->arg1 = ltsmin_expr_optimize(e->arg1->arg1->arg1, env);
-                LTSminExprRehash(e->arg1->arg1->arg1);
-                e->arg1->arg1->arg1->parent = e->arg1->arg1;
-                e->arg1->arg1->token = CTL_FUTURE;
-                e->arg1->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_FUTURE));
-                LTSminExprRehash(e->arg1->arg1);
-                e->arg1->token = CTL_EXIST;
-                e->arg1->idx = LTSminUnaryIdx(env, CTL_NAME(CTL_EXIST));
-                LTSminExprRehash(e->arg1);
-                LTSminExprDestroy(e, 0);
-                return e->arg1;
-            }
-        }
-    }
-    
-    return e;
-}
-
 /* CTL:
  *     E. M. Clarke, E. A. Emerson and A. P. Sistla,
  *     Automatic Verification of Finite-State Concurrent Systems Using Temporal Logic Specifications,
@@ -864,7 +520,7 @@ ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    return ltsmin_expr_optimize(env->expr, env);
+    return env->expr;
 }
 
 static void
@@ -927,7 +583,7 @@ mu_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
 
-    return ltsmin_expr_optimize(env->expr, env);
+    return env->expr;
 }
 
 
