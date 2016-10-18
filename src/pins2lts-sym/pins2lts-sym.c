@@ -4046,8 +4046,8 @@ init_mu_calculus()
     int total = num_mu + num_ctl_star + num_ctl + num_ltl;
     if (total > 0) {
         mu_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * total);
-	mu_exprs = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * total);
-	total = 0;
+        mu_exprs = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * total);
+        total = 0;
         for (int i = 0; i < num_mu; i++) {
             mu_parse_env[i] = LTSminParseEnvCreate();
             Warning(info, "parsing mu-calculus formula");
@@ -4059,7 +4059,7 @@ init_mu_calculus()
                 LTSminLogExpr(infoLong, buf, mu_exprs[i], mu_parse_env[i]);
             }
         }
-	total += num_mu;
+        total += num_mu;
         for (int i = 0; i < num_ctl_star; i++) {
             mu_parse_env[total + i] = LTSminParseEnvCreate();
             Warning(info, "parsing CTL* formula");
@@ -4073,7 +4073,7 @@ init_mu_calculus()
                 LTSminLogExpr(infoLong, buf, mu_exprs[total + i], mu_parse_env[total + i]);
             }
         }
-	total += num_ctl_star;
+        total += num_ctl_star;
         for (int i = 0; i < num_ctl; i++) {
             mu_parse_env[total + i] = LTSminParseEnvCreate();
             Warning(info, "parsing CTL formula");
@@ -4093,7 +4093,7 @@ init_mu_calculus()
                 LTSminLogExpr(infoLong, buf, mu_exprs[total + i], mu_parse_env[total + i]);
             }
         }
-	total += num_ctl;
+        total += num_ctl;
         for (int i = 0; i < num_ltl; i++) {
             mu_parse_env[total + i] = LTSminParseEnvCreate();
             Warning(info, "parsing LTL formula");
@@ -4107,9 +4107,9 @@ init_mu_calculus()
                 LTSminLogExpr(infoLong, buf, mu_exprs[total + i], mu_parse_env[total + i]);
             }
         }
-	total += num_ltl;
+        total += num_ltl;
 
-	num_total = total;
+        num_total = total;
 
         mu_var_mans = (array_manager_t*) RTmalloc(sizeof(array_manager_t) * num_total);
         mu_vars = (vset_t**) RTmalloc(sizeof(vset_t*) * num_total);
@@ -4250,17 +4250,17 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 {
     vset_t x = mu_compute(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
     if (x != NULL) {
-	char* formula = NULL;
-	// recall: mu-formulas, ctl-star formulas, ctl-formulas, ltl-formulas
-	if (i < num_mu) {
+        char* formula = NULL;
+        // recall: mu-formulas, ctl-star formulas, ctl-formulas, ltl-formulas
+        if (i < num_mu) {
             formula = mu_formulas[i];
-	} else if (i < num_mu + num_ctl_star) {
+        } else if (i < num_mu + num_ctl_star) {
             formula = ctl_star_formulas[i - num_mu];
-	} else if (i < num_mu + num_ctl_star + num_ctl) {
-	    formula = ctl_formulas[i - num_mu - num_ctl_star];
-	} else if (i < num_mu + num_ctl_star + num_ltl) {
+        } else if (i < num_mu + num_ctl_star + num_ctl) {
+            formula = ctl_formulas[i - num_mu - num_ctl_star];
+        } else if (i < num_mu + num_ctl_star + num_ltl) {
             formula = ltl_formulas[i - num_mu - num_ctl_star - num_ctl];
-	} else {
+        } else {
             Warning(error, "Number of formulas doesn't match (%d+%d+%d+%d)", num_mu, num_ctl_star, num_ctl, num_ltl);
         }
         
