@@ -122,11 +122,6 @@ get_label_group_cached(model_t model, sl_group_enum_t group, int *src, int *labe
     int                 N_labels = label_group->count;
     matrix_t           *label_info = GBgetStateLabelInfo(model);
 
-    // temporarily store short indices in stringindexes of every label
-    int                 indices[N_labels];
-    // which are required
-    int                 uncached[N_labels];
-    int                 everything_cached = 1;
     for (int i = 0; i < N_labels; i++) {
         // convert to short state
         int             nth_label = label_group->sl_idx[i];
@@ -139,37 +134,12 @@ get_label_group_cached(model_t model, sl_group_enum_t group, int *src, int *labe
         int idx = SIputC (cache->idx, (char *)short_state, cache->size);
         ensure_access (cache->label_val_man, idx);
 
-        // save indices
-        indices[i] = idx;
         if (cache->label_val[idx] == -1) {
             // cache miss
-            everything_cached = 0;
-            uncached[i] = 1;
-        } else {
-            // cache hit
-            label[i] = cache->label_val[idx];
+            // FIXME: should this be the Short or Long version of this function?
+            cache->label_val[idx] = GBgetStateLabelShort(GBgetParent(model), nth_label, short_state);
         }
-
-        
-    }
-
-    if (!everything_cached) {
-        // call back to evaluate required labels
-        int             label2[N_labels];
-        // in order not to break compatibility,
-        // probably it should default to GBgetStateLabelGroup()
-        GBgetStateLabelsGroup(GBgetParent(model), group, src, label2);
-        for (int i = 0; i < N_labels; i++) {
-            if (uncached[i]) {
-                // set result
-                label[i] = label2[i];
-
-                // update cache
-                int     nth_label = label_group->sl_idx[i];
-                label_cache_t *cache = &(ctx->cache_labels[nth_label]);
-                cache->label_val[indices[i]] = label2[i];
-            }
-        }
+        label[i] = cache->label_val[idx];
     }
 }
 
