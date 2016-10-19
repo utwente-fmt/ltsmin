@@ -90,6 +90,7 @@ add_cache_entry (void *context, transition_info_t *ti, int *dst, int *cpy)
         memcpy(pe_info + EL_OFFSET, ti->labels, ctx->Nedge_labels * sizeof *pe_info);
 
     src->edges++;
+    (void) cpy;
 }
 
 static int

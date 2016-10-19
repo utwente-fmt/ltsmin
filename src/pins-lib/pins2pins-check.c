@@ -156,7 +156,7 @@ copy_vec (check_ctx_t *ctx, int group, int *src)
 static inline int
 find_diff (check_ctx_t *ctx, int *dst, int *dst2)
 {
-    for (int idx; idx < ctx->N; idx++) {
+    for (int idx = 0; idx < ctx->N; idx++) {
         if ((ctx->src[idx] == ctx->src2[idx] || //  read
              ctx->src[idx] != dst[idx]) &&      // !copied
              dst[idx] != dst2[idx])
@@ -179,7 +179,7 @@ find (void *context, transition_info_t *ti, int *dst2, int *cpy)
     ctx->comparison_failed |= ( idx != ctx->N );
 
     int             found = isba_size_int(ctx->stack);
-    if (!ctx->comparison_failed && found == (size_t) ctx->call_idx) {
+    if (!ctx->comparison_failed && found == ctx->call_idx) {
         report ("Read dependency missing", ctx, ctx->group, ctx->idx, ctx->src2, ti);
     }
 
@@ -190,7 +190,6 @@ static void
 find_culprit_slot (check_ctx_t *ctx, int g)
 {
     int             count;
-    int             found = isba_size_int(ctx->stack);
 
     for (int i = 0; i < ctx->N; i++) {
         while (ctx->src2[i] == ctx->src[i]) {

@@ -169,5 +169,5 @@ ample_is_stubborn (por_context *ctx, int group)
 {
     HREassert (false, "ample set incompletely implemented");
     return 1;
-    (void) ctx, group;
+    (void) ctx; (void) group;
 }

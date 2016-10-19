@@ -108,10 +108,10 @@ por_transition_costs (por_context *ctx)
                         + bms_count (ctx->visible, VISIBLE_NES)
                         - ctx->visible_nes_enabled;
         if (NO_DYN_VIS) {
-            visibleNes = visibleNes = visible;
+            visibleNes = visibleNds = visible;
         }
         if (NO_V) {
-            visible = visibleNes = visibleNes = ctx->enabled_list->count * ctx->ngroups;
+            visible = visibleNds = visibleNes = ctx->enabled_list->count * ctx->ngroups;
         }
         for (int i = 0; i < ctx->ngroups; i++) {
             int             new_score;
@@ -511,7 +511,7 @@ beam_min_invisible_group (por_context* ctx, search_context_t *s)
             min_group = group;
         }
     }
-    HREassert (min_group != -1, "No min invisible group found. %zu candidates", ctx->enabled_list->count);
+    HREassert (min_group != -1, "No min invisible group found. %d candidates", ctx->enabled_list->count);
     return min_group;
 }
 
