@@ -87,6 +87,8 @@ AC_PROG_INSTALL
 AC_LANG_SAVE
 AC_LANG_C
 AC_RUN_IFELSE([AC_LANG_SOURCE([[
+#include <stdlib.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <pthread.h>
 int main()
