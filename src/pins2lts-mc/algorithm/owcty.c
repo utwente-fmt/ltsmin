@@ -143,6 +143,18 @@ owcty_reset (wctx_t *ctx)
     return size;
 }
 
+static void
+owcty_CE (run_t *run)
+{
+    /* Stop other workers, exit if some other worker was first here */
+    if ( !run_stop(run) )
+        return;
+    int                 level = -1;
+    Warning (info, " ");
+    Warning (info, "Accepting cycle FOUND at depth %d!", level);
+    Warning (info, " ");
+}
+
 static inline void
 owcty_map (wctx_t *ctx, state_info_t *successor)
 {
@@ -151,7 +163,8 @@ owcty_map (wctx_t *ctx, state_info_t *successor)
     if ( pins_state_is_accepting(ctx->model, state_info_state(successor)) ) {
         if (successor->ref == ctx->state->ref || map_pred == successor->ref) {
             //ndfs_report_cycle (ctx, successor);
-            Abort ("cycle found!");
+            owcty_CE(ctx->run);
+            //Abort ("cycle found!");
         }
         size_t              num = successor->ref + 1;
         map_pred = max (num, map_pred);
@@ -166,7 +179,8 @@ owcty_ecd (wctx_t *ctx, state_info_t *successor)
     uint32_t acc_level = ecd_get_state (loc->cyan, successor);
     if (acc_level < ctx->global->ecd.level_cur) {
         //ndfs_report_cycle (ctx, successor);
-        Abort ("Cycle found!");
+        owcty_CE(ctx->run);
+        //Abort ("Cycle found!");
     }
 }
 
