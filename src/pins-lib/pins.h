@@ -783,21 +783,6 @@ typedef void (*get_label_group_method_t)(model_t self, sl_group_enum_t group, in
 */
 extern void GBsetStateLabelsGroup(model_t model,get_label_group_method_t method);
 
-// Same as get_label_group_method_t, but only requests uncached labels (uncached[label_index] == 1) to be calculated.
-typedef void (*get_label_group_uncached_method_t)(model_t self, sl_group_enum_t group, int *src, int *label, int *uncached);
-
-/**
-\brief Same as GBsetStateLabelsGroup, however only labels where (uncached[index] == 1) have to be calculated.
-Defaults to GBsetStateLabelsGroup. Only used for better performance of state label caching.
-*/
-extern void GBsetStateLabelsGroupUncached(model_t model,get_label_group_uncached_method_t method);
-
-/**
-\brief Same as GBgetStateLabelsGroup, however only labels where (uncached[index] == 1) have to be calculated.
-Defaults to GBgetStateLabelsGroup. Only used for better performance of state label caching.
-*/
-extern void GBgetStateLabelsGroupUncached(model_t model, sl_group_enum_t group, int *src, int *label, int *uncached);
-
 /// Type of label retrieval methods.
 typedef int (*get_label_method_t)(model_t self, int label, int *src);
 

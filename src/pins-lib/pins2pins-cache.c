@@ -114,13 +114,6 @@ add_cache_entry (void *context, transition_info_t *ti, int *dst, int *cpy)
     (void) cpy;
 }
 
-void
-get_label_group_uncached_default (model_t model, sl_group_enum_t group, int *src, int *label, int *uncached) {
-    (void) uncached; // ignored, just let them calculate all labels
-    GBgetStateLabelsGroup(GBgetParent(model), group, src, label);
-}
-
-
 static void
 get_label_group_cached(model_t model, sl_group_enum_t group, int *src, int *label) {
     cache_context_t    *ctx = (cache_context_t *)GBgetContext (model);
@@ -165,7 +158,7 @@ get_label_group_cached(model_t model, sl_group_enum_t group, int *src, int *labe
         int             label2[N_labels];
         // in order not to break compatibility,
         // probably it should default to GBgetStateLabelGroup()
-        GBgetStateLabelsGroupUncached(model, group, src, label2, uncached);
+        GBgetStateLabelsGroup(GBgetParent(model), group, src, label2);
         for (int i = 0; i < N_labels; i++) {
             if (uncached[i]) {
                 // set result
