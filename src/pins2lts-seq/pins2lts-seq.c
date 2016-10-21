@@ -1173,6 +1173,9 @@ scc_state_matched(gsea_state_t *state, void *arg)
                     scc_current_reconstruct (state, &closing);
                     gc.goal_trace (NULL, arg);
                 }
+                if (!opt.no_exit) {
+                    GBExit(opt.model);
+                }
                 Warning (info, "exiting now");
                 HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
             }
@@ -1239,6 +1242,7 @@ do_trace(gsea_state_t *state, void *arg, char *type, char *name)
     Warning (info, "%s (%s) found at depth %zu!", type, name, global.depth);
     Warning (info, " ");
     if (opt.trc_output && gc.goal_trace) gc.goal_trace(state, arg);
+    GBExit(opt.model);
     Warning(info, "exiting now");
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
