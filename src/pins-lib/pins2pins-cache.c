@@ -247,7 +247,7 @@ GBaddCache (model_t model)
     ctx->cache = cache;
     ctx->cache_labels = label_cache;
     
-    GBsetDMInfo (cached, p_dm);
+    //GBsetDMInfo (cached, p_dm); // this shold be set by GBinitModelDefaults (?)
     GBsetContext (cached, ctx);
     
     GBsetNextStateShort (cached, cached_short);
@@ -255,6 +255,17 @@ GBaddCache (model_t model)
 
     GBsetStateLabelShort (cached, cached_label_short);
     GBsetStateLabelsGroup (cached, get_label_group_cached);
+
+
+    for (int i = 0; i < GBgetMatrixCount(model); i++) {
+        const char *name = GBgetMatrixName(model, i);
+        matrix_t *matrix = GBgetMatrix(model, i);
+        pins_strictness_t strictness = GBgetMatrixStrictness(model, i);
+        index_class_t row_info = GBgetMatrixRowInfo(model, i);
+        index_class_t col_info = GBgetMatrixColumnInfo(model, i);
+        GBsetMatrix(cached, name, matrix, strictness, row_info, col_info);
+    }
+
 
     GBinitModelDefaults (&cached, model);
 
