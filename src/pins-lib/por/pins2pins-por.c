@@ -527,7 +527,8 @@ PORwrapper (model_t model)
                 // is dependent?
                 for (int k = 0; k < ctx->nslots; k++) {
                     if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
-                        (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
+                        (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ||
+                        (dm_is_set( p_dm_w, i, k) && dm_is_set(p_dm_w, j, k))) {
                         dm_set( &ctx->not_accords_with, i, j );
                         break;
                     }
