@@ -4041,10 +4041,234 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
     return result;
 }
 
+/* Somewhat more clever mu-calculus algorithm. Vaguely inspired by Clarke/Grumberg/Peled.
+ * Reuse previous value, unless a competing outermost fixpoint of contrary sign changed.
+ * Static information is maintained in the sign- and deps- field of the mu-object.
+ */
+
+
 static vset_t
-mu_compute_optimal(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t* mu_var, array_manager_t mu_var_man)
+mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_t muo, vset_t* mu_var) {
+
+    vset_t result = NULL;
+    switch(mu_expr->token) {
+    case MU_TRUE:
+	//fprintf(stderr,"TRUE\n");
+        result = vset_create(domain, -1, NULL);
+        vset_copy(result, visited);
+        return result;
+    case MU_FALSE:
+	//fprintf(stderr,"FALSE\n");
+        return vset_create(domain, -1, NULL);
+    case MU_OR: { // OR
+	//fprintf(stderr,"OR\n");
+        result = mu_rec(mu_expr->arg1, env, visited, muo, mu_var);
+        vset_t mc = mu_rec(mu_expr->arg2, env, visited, muo, mu_var);
+        vset_union(result, mc);
+	//fprintf(stderr,"OR OK\n");
+        vset_destroy(mc);
+    } break;
+    case MU_AND: { // AND
+	//fprintf(stderr,"AND\n");
+        result = mu_rec(mu_expr->arg1, env, visited, muo, mu_var);
+        vset_t mc = mu_rec(mu_expr->arg2, env, visited, muo, mu_var);
+        vset_intersect(result, mc);
+	//fprintf(stderr,"AND OK\n");
+        vset_destroy(mc);
+    } break;
+    case MU_NOT: { // NEGATION
+	//fprintf(stderr,"NOT\n");
+        result = vset_create(domain, -1, NULL);
+        vset_copy(result, visited);
+        vset_t mc = mu_rec(mu_expr->arg1, env, visited, muo, mu_var);
+        vset_minus(result, mc);
+	//fprintf(stderr,"NOT OK\n");
+        vset_destroy(mc);
+    } break;
+    case MU_EXIST: { // E
+	//fprintf(stderr,"EX\n");
+        if (mu_expr->arg1->token == MU_NEXT) {
+            vset_t temp = vset_create(domain, -1, NULL);
+            result = vset_create(domain, -1, NULL);
+            vset_t g = mu_rec(mu_expr->arg1->arg1, env, visited, muo, mu_var);
+
+            for(int i=0;i<nGrps;i++){
+                vset_prev(temp,g,group_next[i],visited);
+                reduce(i, temp);
+                vset_union(result,temp);
+                vset_clear(temp);
+            }
+            vset_destroy(temp);
+        } else {
+            Abort("invalid operator following MU_EXIST, expecting MU_NEXT");
+        }
+	//fprintf(stderr,"EX OK\n");
+    } break;
+    case MU_SVAR: {
+        if (mu_expr->idx < N) { // state variable
+            Abort("Unhandled MU_SVAR");
+        } else { // state label
+            result = vset_create(domain, -1, NULL);
+            vset_join(result, visited, label_true[mu_expr->idx - N]);
+        }
+    } break;
+    case MU_VAR:
+	//fprintf(stderr,"VAR %s\n",SIget(env->idents,mu_expr->idx));
+        result = vset_create(domain, -1, NULL);
+        vset_copy(result, mu_var[mu_expr->idx]);
+        break;
+    case MU_ALL:
+        if (mu_expr->arg1->token == MU_NEXT) {
+            // implemented as AX phi = ! EX ! phi
+
+	    //fprintf(stderr,"AX\n");
+            result = vset_create(domain, -1, NULL);
+            vset_copy(result, visited);
+
+            // compute ! phi
+            vset_t notphi = vset_create(domain, -1, NULL);
+            vset_copy(notphi, visited);
+            vset_t phi = mu_rec(mu_expr->arg1->arg1, env, visited, muo, mu_var);
+            vset_minus(notphi, phi);
+            vset_destroy(phi);
+
+            vset_t temp = vset_create(domain, -1, NULL);
+            vset_t prev = vset_create(domain, -1, NULL);
+
+            // EX !phi
+            for(int i=0;i<nGrps;i++){
+                vset_prev(temp,notphi,group_next[i],visited);
+                reduce(i, temp);
+                vset_union(prev,temp);
+                vset_clear(temp);
+            }
+            vset_destroy(temp);
+
+            // and negate result again
+            vset_minus(result, prev);
+            vset_destroy(prev);
+            vset_destroy(notphi);
+	    //fprintf(stderr,"AX OK\n");
+
+        } else {
+            Abort("invalid operator following MU_ALL, expecting MU_NEXT");
+        }
+        break;
+    case MU_MU: case MU_NU:
+        {   // continue at the value of last iteration
+	    int Z = mu_expr->idx;
+            vset_t old = vset_create(domain, -1, NULL);
+	    result = vset_create(domain, -1, NULL);
+	    vset_copy(old,mu_var[Z]);
+            do {
+                vset_copy(result,mu_var[Z]);
+		vset_copy(mu_var[Z],mu_rec(mu_expr->arg1, env, visited, muo, mu_var));
+		if (log_active(infoLong)) {
+		    long n1, n2;
+		    double e1, e2;
+		    vset_count(result,&n1,&e1);
+		    vset_count(mu_var[Z],&n2,&e2);
+		    fprintf(stderr,"%s %s: %.0lf -> %.0lf\n",MU_NAME(muo->sign[Z]),SIget(env->idents,Z),e1,e2);
+		}
+            } while (!vset_equal(mu_var[Z], result));
+
+            // reset dependent variables with opposite sign
+	    if (!vset_equal(old,mu_var[Z]))
+		for (int i=0;i<muo->nvars;i++)
+		    if (muo->deps[Z][i] && muo->sign[Z] != muo->sign[i]) {
+			fprintf(stderr,"%s resets %s\n",SIget(env->idents,Z),SIget(env->idents,i));
+			if (muo->sign[i]==MU_MU)
+			    vset_clear(mu_var[i]);
+			if (muo->sign[i]==MU_NU)
+			    vset_copy(mu_var[i],visited);
+		    }
+	    vset_destroy(old);
+	}
+        break;
+    case MU_EQ:
+    case MU_NEQ:
+    case MU_LT:
+    case MU_LEQ:
+    case MU_GT:
+    case MU_GEQ: {
+	//fprintf(stderr,"EQ\n");
+        result = vset_create(domain, -1, NULL);
+
+        bitvector_t deps;
+        bitvector_create(&deps, N);
+
+        set_pins_semantics(model, mu_expr, env, &deps, NULL);
+        struct rel_expr_info ctx;
+
+        int vec[N];
+        GBsetInitialState(model, vec);
+        ctx.vec = vec;
+        ctx.len = bitvector_n_high(&deps);
+        int d[ctx.len];
+        bitvector_high_bits(&deps, d);
+        bitvector_free(&deps);
+        ctx.deps = d;
+
+        ctx.e = mu_expr;
+        ctx.env = env;
+
+        vset_t tmp = vset_create(domain, ctx.len, d);
+        vset_project(tmp, visited);
+
+        // count when verbose
+        if (log_active(infoLong)) {
+            double elem_count;
+            vset_count(tmp, NULL, &elem_count);
+            if (elem_count >= 10000.0 * SPEC_REL_PERF) {
+                const char* p = LTSminPrintExpr(mu_expr, env);
+                Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
+            }
+        }
+
+        vset_t true_states = vset_create(domain, ctx.len, d);
+
+        vset_update(true_states, tmp, rel_expr_cb, &ctx);
+
+        vset_join(result, true_states, visited);
+        vset_destroy(tmp);
+        vset_destroy(true_states);
+        break;
+    }
+    default:
+        Abort("encountered unhandled mu operator");
+    }
+    return result;
+}
+
+
+static vset_t
+mu_compute_optimal(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited)
 {
-    return mu_compute(mu_expr,env,visited,mu_var,mu_var_man);
+    int nvars = mu_optimize(&mu_expr,env);
+    mu_object_t muo = mu_object(mu_expr,nvars);
+
+    if (log_active(infoLong)) {
+	const char s[] = "Normalizing mu-calculus formula: ";
+	char buf[snprintf(NULL, 0, s) + 1];
+	sprintf(buf, s);
+	LTSminLogExpr(infoLong, buf, mu_expr, env);
+    }
+
+    // initialize mu/nu fixpoint variables at least/largest values
+    vset_t* mu_var = (vset_t*)RTmalloc(sizeof(vset_t)*nvars);
+    for (int i = 0 ; i < nvars ; i++) {
+	if (muo->sign[i]==MU_MU)
+	    mu_var[i] = vset_create(domain,-1,NULL);
+	else if (muo->sign[i]==MU_NU) {
+	    mu_var[i] = vset_create(domain,-1,NULL);
+	    vset_copy(mu_var[i],visited);
+	}
+	else
+	    Warning(info,"Gaps between fixpoint variables");
+    }
+    vset_t result = mu_rec(mu_expr,env,visited,muo,mu_var);
+    // TODO: mu_object_destroy(muo);
+    return result;
 }
 
 
@@ -4261,13 +4485,7 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 {
     vset_t x;
     if (mu_opt) {
-        if (log_active(infoLong)) {
-            const char s[] = "Normalizing mu-calculus formula #%d: ";
-            char buf[snprintf(NULL, 0, s, i + 1) + 1];
-            sprintf(buf, s, i + 1);
-            LTSminLogExpr(infoLong, buf, mu_exprs[i], mu_parse_env[i]);
-        }
-        x = mu_compute_optimal(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
+	    x = mu_compute_optimal(mu_exprs[i], mu_parse_env[i], visited);
     } else {
         x = mu_compute(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
     }

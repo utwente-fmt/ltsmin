@@ -189,7 +189,7 @@ struct mu_object_s {
     int top;       // top of the stack
 };
 
-extern mu_object_t mu_object(ltsmin_expr_t in, int maxvar);
+extern mu_object_t mu_object(ltsmin_expr_t in, int nvars);
 
 /********** TABLEAUX FOR THE TRANSLATION FROM CTL-STAR TO MU_CALCULUS ********/
 

@@ -576,11 +576,12 @@ MU ctl2mu_token(CTL token) { // precondition: token is not a path operator (A,E)
 static void
 create_mu_var(int num, ltsmin_parse_env_t env)
 {
-    const char f[] = "Z%d";
-    char b[snprintf(NULL, 0, f, num) + 1];
-    sprintf(b, f, num);
-
-    SIputAt(env->idents, b, num);
+    if (!SIget(env->idents,num)) {
+	const char f[] = "Z%d";
+	char b[snprintf(NULL, 0, f, num) + 1];
+	sprintf(b, f, num);
+	SIputAt(env->idents, b, num);
+    }
 }
 
 
@@ -834,12 +835,12 @@ ltsmin_expr_t mu_optimize_rec(ltsmin_expr_t in, ltsmin_parse_env_t env, char neg
 }
 
 int mu_optimize(ltsmin_expr_t *inout, ltsmin_parse_env_t env)
-{   int free=SIgetCount(env->idents);
+{   int free=0;
     static array_manager_t man=NULL;
     man = create_manager(512);
     int* rename;
     ADD_ARRAY(man, rename, int);
-    *inout = mu_optimize_rec(*inout,env,0,&free,man,rename);
+    *inout = mu_optimize_rec(*inout,env,false,&free,man,rename);
     destroy_manager(man); // TODO: check if this is correct; seems to go wrong
     return free;
 }
@@ -873,16 +874,17 @@ void mu_object_rec(ltsmin_expr_t in, mu_object_t this)
     }
 }
 
-mu_object_t mu_object(ltsmin_expr_t in, int maxvar)
+mu_object_t mu_object(ltsmin_expr_t in, int nvars)
 { // this function critically assumes that all mu/nu variables are distinct and occur in increasing order
     mu_object_t result = RT_NEW(struct mu_object_s);
-    result->nvars = maxvar;
-    result->sign = (int*) RTmalloc( sizeof(int) * maxvar );
-    result->deps = (int**) RTmalloc( sizeof(int*) * maxvar);
-    for (int i=0; i<maxvar; i++)
-	result->deps[i]=RTmallocZero(sizeof(int) * maxvar);
-    result->stack = (int*) RTmallocZero(sizeof(char) * maxvar); // could use bitset
+    result->nvars = nvars;
+    result->sign = (int*) RTmallocZero( sizeof(int) * nvars );
+    result->deps = (int**) RTmalloc( sizeof(int*) * nvars);
+    for (int i=0; i<nvars; i++)
+	result->deps[i]=RTmallocZero(sizeof(int) * nvars);
+    result->stack = (int*) RTmallocZero(sizeof(char) * nvars); // could use bitset
     result->top = 0;
+
     mu_object_rec(in,result);
 
     // compute transitive closure of deps
@@ -890,9 +892,9 @@ mu_object_t mu_object(ltsmin_expr_t in, int maxvar)
     char change;
     do {
 	change=0;
-	for (int i=0;i<maxvar;i++)
-	    for (int j=0;j<maxvar;j++)
-		for (int k=0;k<maxvar;k++)
+	for (int i=0;i<nvars;i++)
+	    for (int j=0;j<nvars;j++)
+		for (int k=0;k<nvars;k++)
 		    if (deps[i][j] && deps[j][k] && !deps[i][k]) {
 			change=1;
 			deps[i][k] = 1;
