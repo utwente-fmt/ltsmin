@@ -8,7 +8,7 @@
       (in addition to doubles). The symbolic back-end will automatically 
       switch to long doubles when necessary.
     - Add option --next-union that computes the application of a transition
-      relation together with the identify.
+      relation together with the identity.
     - The symbolic back-end is now capable of invariant checking.
     - Multiple formulas, invariants are now supported through their respective
       commandline options. If LACE is used, these properties will be checked
@@ -19,13 +19,12 @@
 - Improvements w.r.t. static variable ordering:
     - Invert the permutation of rows/columns (transition groups/state variables)
       using options --regroup=hf --regroup=vf respectively.
-    - Transformations
-    -  on the dependency matrix ige66099b09d4ee6e884ab288497a52f254b6e9ebanore read dependencies,
+    - Transformations on the dependency matrix ignore read dependencies,
       since write dependencies seem to influence the actual size of Decision
       Diagrams to a much greater extent.
     - Add option --col-ins (see manpage) that can pick a column/state variable
       and insert it at a specific index.
-    - A fast amount of static variable reordering algorithms have been added
+    - A vast amount of static variable reordering algorithms have been added
       available through Boost and ViennaCL. Furthermore the FORCE algorithm and
       Noack's algorithms have been implemented, see [1]. In addition to these
       algorithms metrics related to the quality of the static variable order
@@ -47,7 +46,7 @@
       front-ends have language specific algorithms for static variable reordering.
 
 - Miscellaneous:
-    - All default autoconf files such ae66099b09d4ee6e884ab288497a52f254b6e9ebas README, NEWS are moved to *.md and
+    - All default autoconf files such as README, NEWS are moved to *.md and
       sym-linked to their old file names. The markdown styling works better with
       Github.
     - Major refactor to the PINS regrouping layer, simplifying its use for
