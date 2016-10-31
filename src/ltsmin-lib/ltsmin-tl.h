@@ -176,6 +176,23 @@ extern ltsmin_expr_t ltl_to_mu(ltsmin_expr_t);
 extern char* ltsmin_expr_print_ctl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_mu(ltsmin_expr_t, char*);
 
+// optimizes expression: negations inside, rename variables apart
+// return the number of (different) variables
+extern int mu_optimize(ltsmin_expr_t*, const ltsmin_parse_env_t);
+
+typedef struct mu_object_s *mu_object_t;
+struct mu_object_s {
+    int nvars;     // nr. of mu-calculus variables
+    int *sign;     // sign of variable n (MU_MU or MU_NU)
+    int **deps;    // deps[i][j] is true if mu/nu Zi (... mu/nu Zj ( ... Zi ...) ...)
+    int *stack;   // used to store local context in recursion
+    int top;       // top of the stack
+};
+
+extern mu_object_t mu_object(ltsmin_expr_t in, int maxvar);
+
+/********** TABLEAUX FOR THE TRANSLATION FROM CTL-STAR TO MU_CALCULUS ********/
+
 /* ctl* to mu conversion
  *
  * The ctl* to mu conversion is the algorithm of Mad Dams:

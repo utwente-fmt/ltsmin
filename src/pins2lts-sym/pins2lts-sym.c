@@ -4261,7 +4261,8 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 {
     vset_t x;
     if (mu_opt) {
-	mu_exprs[i] = mu_optimize(mu_exprs[i],mu_parse_env[i]);
+	int nvars = mu_optimize(&mu_exprs[i],mu_parse_env[i]);
+
 	if (log_active(infoLong)) {
 	    const char s[] = "Normalizing mu-calculus formula #%d: ";
 	    char buf[snprintf(NULL, 0, s, i + 1) + 1];
