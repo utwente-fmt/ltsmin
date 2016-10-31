@@ -790,6 +790,10 @@ ltsmin_expr_t mu_optimize_rec(ltsmin_expr_t in, ltsmin_parse_env_t env, char neg
             int token = (negated ? (int) mu_dual(in->token) : in->token);
             return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),in->arg1,in->arg2);
         }
+        case MU_EN: {
+            if (negated) return LTSminExpr(UNARY_OP, MU_NOT, LTSminUnaryIdx(env, MU_NAME(MU_NOT)), in, 0);
+            else return in;
+        }
         case MU_SVAR: {
             if (negated) { return LTSminExpr(UNARY_OP, MU_NOT, LTSminUnaryIdx(env, MU_NAME(MU_NOT)), in, 0); }
             else { return in; }

@@ -4009,7 +4009,8 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
     case MU_LT:
     case MU_LEQ:
     case MU_GT:
-    case MU_GEQ: {
+    case MU_GEQ:
+    case MU_EN: {
         result = vset_create(domain, -1, NULL);
 
         bitvector_t deps;
@@ -4208,7 +4209,8 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
     case MU_LT:
     case MU_LEQ:
     case MU_GT:
-    case MU_GEQ: {
+    case MU_GEQ:
+    case MU_EN: {
 	    Warning(debug, "EQ");
         result = vset_create(domain, -1, NULL);
 
