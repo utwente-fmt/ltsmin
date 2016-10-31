@@ -839,9 +839,8 @@ ltsmin_expr_t mu_optimize_rec(ltsmin_expr_t in, ltsmin_parse_env_t env, char neg
 int mu_optimize(ltsmin_expr_t *inout, ltsmin_parse_env_t env)
 {
     int free=0;
-    static array_manager_t man=NULL;
-    man = create_manager(512);
-    int* rename;
+    array_manager_t man = create_manager(512);
+    int* rename = NULL;
     ADD_ARRAY(man, rename, int);
     *inout = mu_optimize_rec(*inout,env,false,&free,man,rename);
     destroy_manager(man); // TODO: check if this is correct; seems to go wrong
