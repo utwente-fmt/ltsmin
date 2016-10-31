@@ -15,6 +15,7 @@
       in parallel.
     - It is now possible to output all Sylvan statistics, such as the size
       of the node table, number of GCs etc.
+    - Add option --mu-opt that enables a faster mu-calculus model checker.
 
 - Improvements w.r.t. static variable ordering:
     - Invert the permutation of rows/columns (transition groups/state variables)
@@ -31,6 +32,13 @@
       can be shown with option --regroup=mm.
     - A manual group/variable order can now be given with --row-perm/--col-perm
       respectively.
+
+- Improvements to the LTSmin language (see `man ltsmin-pred`):
+    - Added the enabledness operator `??` to the LTSMin language,
+      see `man ltsmin-pred`.
+    - Native LTSmin support for signed 32-bit integers is added,
+      including some basic arithmatic operators.
+    - Added a type format checker.
 
 - A new Petri net front-end has been added to LTSmin, see [2]. The front-end
   reads Petri nets in the PNML format.
