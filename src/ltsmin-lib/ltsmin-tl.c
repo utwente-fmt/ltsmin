@@ -743,9 +743,6 @@ ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in, ltsmin_parse_env_t env, lts_type_t lts
     return n;
 }
 
-
-
-
 ltsmin_expr_t ltl_to_mu(ltsmin_expr_t in)
 { // TODO use BA or TGBA from SPOT
     return ctl_star_to_mu(ltl_to_ctl_star(in));
@@ -774,68 +771,70 @@ MU mu_dual(MU token) {
 
 
 ltsmin_expr_t mu_optimize_rec(ltsmin_expr_t in, ltsmin_parse_env_t env, char negated, int* free, array_manager_t man, int rename[])
-{ // push negations inside (at least no mu/nu under a negation)
-  // ensure that all variables are different
-  // ensure mu/nu variable binders occur in increasing order. That is: if mu Zi ( ... nu Zj ...) then i<j
+{
+    // push negations inside (at least no mu/nu under a negation)
+    // ensure that all variables are different
+    // ensure mu/nu variable binders occur in increasing order. That is: if mu Zi ( ... nu Zj ...) then i<j
     switch(in->token) {
-    case MU_TRUE:
-    case MU_FALSE:  {
-	int token = (negated ? (int) mu_dual(in->token) : in->token);
-	return LTSminExpr(CONSTANT,token,LTSminConstantIdx(env,MU_NAME(token)),0,0);
-    }
-    case MU_EQ:
-    case MU_NEQ:
-    case MU_LT:
-    case MU_LEQ:
-    case MU_GT:
-    case MU_GEQ: {
-	int token = (negated ? (int) mu_dual(in->token) : in->token);
-	return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),in->arg1,in->arg2);
-    }
-    case MU_SVAR: {
-	if (negated) { return LTSminExpr(UNARY_OP, MU_NOT, LTSminUnaryIdx(env, MU_NAME(MU_NOT)), in, 0); }
-	else { return in; }
-    }
-    case MU_VAR: {
-	// assuming that the formula is monotonic we can ignore the sign
-	return LTSminExpr((ltsmin_expr_case)MU_VAR,MU_VAR,rename[in->idx],0,0);
-    }
-    case MU_OR:
-    case MU_AND: {
-	int token = (negated ? (int) mu_dual(in->token) : in->token);
-	ltsmin_expr_t result1 = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
-	ltsmin_expr_t result2 = mu_optimize_rec(in->arg2, env, negated, free, man, rename);
-	return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),result1,result2);
-    }
-    case MU_NOT: {
-	return mu_optimize_rec(in->arg1, env, !negated, free, man, rename); // do we care about a memory leak?
-    }
-    case MU_NEXT:
-    case MU_EXIST:
-    case MU_ALL: {
-	int token = (negated ? (int) mu_dual(in->token) : in->token);
-	ltsmin_expr_t result = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
-	result = LTSminExpr(UNARY_OP,token,LTSminUnaryIdx(env, MU_NAME(token)),result,0);
-	return result;
-    }
-    case MU_MU:
-    case MU_NU: {
-	int token = (negated ? (int) mu_dual(in->token) : in->token);
-	int operator = (token==MU_MU ? MU_FIX : NU_FIX);
-	int index = (*free)++;
-	ensure_access(man,in->idx);
-	rename[in->idx]=index;
-	create_mu_var(index,env);
-	ltsmin_expr_t result = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
-	return LTSminExpr(operator,token,index,result,0);
-    }
-    default:
-        Abort("encountered unhandled mu operator");
+        case MU_TRUE:
+        case MU_FALSE:  {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            return LTSminExpr(CONSTANT,token,LTSminConstantIdx(env,MU_NAME(token)),0,0);
+        }
+        case MU_EQ:
+        case MU_NEQ:
+        case MU_LT:
+        case MU_LEQ:
+        case MU_GT:
+        case MU_GEQ: {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),in->arg1,in->arg2);
+        }
+        case MU_SVAR: {
+            if (negated) { return LTSminExpr(UNARY_OP, MU_NOT, LTSminUnaryIdx(env, MU_NAME(MU_NOT)), in, 0); }
+            else { return in; }
+        }
+        case MU_VAR: {
+            // assuming that the formula is monotonic we can ignore the sign
+            return LTSminExpr((ltsmin_expr_case)MU_VAR,MU_VAR,rename[in->idx],0,0);
+        }
+        case MU_OR:
+        case MU_AND: {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            ltsmin_expr_t result1 = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+            ltsmin_expr_t result2 = mu_optimize_rec(in->arg2, env, negated, free, man, rename);
+            return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),result1,result2);
+        }
+        case MU_NOT: {
+            return mu_optimize_rec(in->arg1, env, !negated, free, man, rename); // do we care about a memory leak?
+        }
+        case MU_NEXT:
+        case MU_EXIST:
+        case MU_ALL: {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            ltsmin_expr_t result = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+            result = LTSminExpr(UNARY_OP,token,LTSminUnaryIdx(env, MU_NAME(token)),result,0);
+            return result;
+        }
+        case MU_MU:
+        case MU_NU: {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            int operator = (token==MU_MU ? MU_FIX : NU_FIX);
+            int index = (*free)++;
+            ensure_access(man,in->idx);
+            rename[in->idx]=index;
+            create_mu_var(index,env);
+            ltsmin_expr_t result = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+            return LTSminExpr(operator,token,index,result,0);
+        }
+        default:
+            Abort("encountered unhandled mu operator");
     }
 }
 
 int mu_optimize(ltsmin_expr_t *inout, ltsmin_parse_env_t env)
-{   int free=0;
+{
+    int free=0;
     static array_manager_t man=NULL;
     man = create_manager(512);
     int* rename;
@@ -846,42 +845,49 @@ int mu_optimize(ltsmin_expr_t *inout, ltsmin_parse_env_t env)
 }
 
 void mu_object_rec(ltsmin_expr_t in, mu_object_t this)
-{   // store the sign of mu/nu variables, and compute the direct dependencies
+{
+    // store the sign of mu/nu variables, and compute the direct dependencies
     switch(in->token) {
-    case MU_VAR:
-	for (int i=this->top-1; this->stack[i] != in->idx; i--) {
-	    // iterate all bindings on the stack until (not including) this variable
-	    fprintf(stderr,"Dependency %d -> %d\n",in->idx,this->stack[i]);
-	    this->deps[in->idx][this->stack[i]] = true;
-	}
-	break;
-    case MU_OR: case MU_AND:
-	mu_object_rec(in->arg1,this);
-	mu_object_rec(in->arg2,this);
-	break;
-    case MU_NOT: case MU_NEXT: case MU_EXIST: case MU_ALL:
-	mu_object_rec(in->arg1,this);
-	break;
-    case MU_MU: case MU_NU: {
-	int var = in->idx;
-	this->sign[var]= in->token;
-	this->stack[this->top++] = var;
-	mu_object_rec(in->arg1,this);
-	this->top--;
-	break;
-    }
-    default: ;
+        case MU_VAR: {
+            for (int i=this->top-1; this->stack[i] != in->idx; i--) {
+                // iterate all bindings on the stack until (not including) this variable
+                Warning(debug, "Dependency %d -> %d", in->idx, this->stack[i]);
+                this->deps[in->idx][this->stack[i]] = true;
+            }
+            break;
+        }
+        case MU_OR: case MU_AND: {
+            mu_object_rec(in->arg1,this);
+            mu_object_rec(in->arg2,this);
+            break;
+        }
+        case MU_NOT: case MU_NEXT: case MU_EXIST: case MU_ALL: {
+            mu_object_rec(in->arg1,this);
+            break;
+        }
+        case MU_MU: case MU_NU: {
+            int var = in->idx;
+            this->sign[var]= in->token;
+            this->stack[this->top++] = var;
+            mu_object_rec(in->arg1,this);
+            this->top--;
+            break;
+        }
+        default: ;
     }
 }
 
 mu_object_t mu_object(ltsmin_expr_t in, int nvars)
-{ // this function critically assumes that all mu/nu variables are distinct and occur in increasing order
+{ 
+    // this function critically assumes that all mu/nu variables
+    // are distinct and occur in increasing order
     mu_object_t result = RT_NEW(struct mu_object_s);
     result->nvars = nvars;
     result->sign = (int*) RTmallocZero( sizeof(int) * nvars );
     result->deps = (int**) RTmalloc( sizeof(int*) * nvars);
-    for (int i=0; i<nvars; i++)
-	result->deps[i]=RTmallocZero(sizeof(int) * nvars);
+    for (int i=0; i<nvars; i++) {
+        result->deps[i]=RTmallocZero(sizeof(int) * nvars);
+    }
     result->stack = (int*) RTmallocZero(sizeof(char) * nvars); // could use bitset
     result->top = 0;
 
@@ -891,15 +897,17 @@ mu_object_t mu_object(ltsmin_expr_t in, int nvars)
     int** deps=result->deps;
     char change;
     do {
-	change=0;
-	for (int i=0;i<nvars;i++)
-	    for (int j=0;j<nvars;j++)
-		for (int k=0;k<nvars;k++)
-		    if (deps[i][j] && deps[j][k] && !deps[i][k]) {
-			change=1;
-			deps[i][k] = 1;
-			fprintf(stderr,"Dependency %d ->> %d\n",i,k);
-		    }
+        change=0;
+        for (int i=0;i<nvars;i++) {
+            for (int j=0;j<nvars;j++)
+            for (int k=0;k<nvars;k++) {
+                if (deps[i][j] && deps[j][k] && !deps[i][k]) {
+                    change=1;
+                    deps[i][k] = 1;
+                    fprintf(stderr,"Dependency %d ->> %d\n",i,k);
+                }
+            }
+        }
     } while (change==1);
 
     return result;

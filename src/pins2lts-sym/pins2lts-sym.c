@@ -3963,13 +3963,14 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
                 tmp = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
-		if (log_active(infoLong)) {
-		    long n1, n2;
-		    double e1, e2;
-		    vset_count(mu_var[mu_expr->idx],&n1,&e1);
-		    vset_count(tmp,&n2,&e2);
-		    fprintf(stderr,"MU %s: %.0lf -> %.0lf\n",SIget(env->idents,mu_expr->idx),e1,e2);
-		}
+                if (log_active(infoLong)) {
+                    long n1, n2;
+                    double e1, e2;
+                    vset_count(mu_var[mu_expr->idx], &n1, &e1);
+                    vset_count(tmp, &n2, &e2);
+                    Warning(infoLong, "MU %s: %.0lf -> %.0lf",
+                        SIget(env->idents,mu_expr->idx), e1, e2);
+                }
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
 	    
             vset_destroy(tmp);
@@ -3989,13 +3990,14 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
                 tmp = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
-		if (log_active(infoLong)) {
-		    long n1, n2;
-		    double e1, e2;
-		    vset_count(mu_var[mu_expr->idx],&n1,&e1);
-		    vset_count(tmp,&n2,&e2);
-		    fprintf(stderr,"MU %s: %.0lf -> %.0lf\n",SIget(env->idents,mu_expr->idx),e1,e2);
-		}
+                if (log_active(infoLong)) {
+                    long n1, n2;
+                    double e1, e2;
+                    vset_count(mu_var[mu_expr->idx], &n1, &e1);
+                    vset_count(tmp, &n2, &e2);
+                    Warning(infoLong, "MU %s: %.0lf -> %.0lf",
+                        SIget(env->idents,mu_expr->idx), e1, e2);
+                }
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
             vset_destroy(tmp);
             // new var reference
@@ -4060,48 +4062,47 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
  * Reuse previous value, unless a competing outermost fixpoint of contrary sign changed.
  * Static information is maintained in the sign- and deps- field of the mu-object.
  */
-
-
 static vset_t
 mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_t muo, vset_t* mu_var) {
 
     vset_t result = NULL;
     switch(mu_expr->token) {
     case MU_TRUE:
-	//fprintf(stderr,"TRUE\n");
+        Warning(debug, "TRUE");
+
         result = vset_create(domain, -1, NULL);
         vset_copy(result, visited);
         return result;
     case MU_FALSE:
-	//fprintf(stderr,"FALSE\n");
+	    Warning(debug, "FALSE");
         return vset_create(domain, -1, NULL);
     case MU_OR: { // OR
-	//fprintf(stderr,"OR\n");
+	    Warning(debug, "OR");
         result = mu_rec(mu_expr->arg1, env, visited, muo, mu_var);
         vset_t mc = mu_rec(mu_expr->arg2, env, visited, muo, mu_var);
         vset_union(result, mc);
-	//fprintf(stderr,"OR OK\n");
+	    Warning(debug, "OR OK");
         vset_destroy(mc);
     } break;
     case MU_AND: { // AND
-	//fprintf(stderr,"AND\n");
+	    Warning(debug, "AND");
         result = mu_rec(mu_expr->arg1, env, visited, muo, mu_var);
         vset_t mc = mu_rec(mu_expr->arg2, env, visited, muo, mu_var);
         vset_intersect(result, mc);
-	//fprintf(stderr,"AND OK\n");
+	    Warning(debug, "AND OK");
         vset_destroy(mc);
     } break;
     case MU_NOT: { // NEGATION
-	//fprintf(stderr,"NOT\n");
+	    Warning(debug, "NOT");
         result = vset_create(domain, -1, NULL);
         vset_copy(result, visited);
         vset_t mc = mu_rec(mu_expr->arg1, env, visited, muo, mu_var);
         vset_minus(result, mc);
-	//fprintf(stderr,"NOT OK\n");
+	    Warning(debug, "NOT OK");
         vset_destroy(mc);
     } break;
     case MU_EXIST: { // E
-	//fprintf(stderr,"EX\n");
+	    Warning(debug, "EX");
         if (mu_expr->arg1->token == MU_NEXT) {
             vset_t temp = vset_create(domain, -1, NULL);
             result = vset_create(domain, -1, NULL);
@@ -4117,7 +4118,7 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
         } else {
             Abort("invalid operator following MU_EXIST, expecting MU_NEXT");
         }
-	//fprintf(stderr,"EX OK\n");
+	    Warning(debug, "EX OK");
     } break;
     case MU_SVAR: {
         if (mu_expr->idx < N) { // state variable
@@ -4128,7 +4129,7 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
         }
     } break;
     case MU_VAR:
-	//fprintf(stderr,"VAR %s\n",SIget(env->idents,mu_expr->idx));
+	    Warning(debug, "VAR %s", SIget(env->idents,mu_expr->idx));
         result = vset_create(domain, -1, NULL);
         vset_copy(result, mu_var[mu_expr->idx]);
         break;
@@ -4136,7 +4137,7 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
         if (mu_expr->arg1->token == MU_NEXT) {
             // implemented as AX phi = ! EX ! phi
 
-	    //fprintf(stderr,"AX\n");
+	        Warning(debug, "AX");
             result = vset_create(domain, -1, NULL);
             vset_copy(result, visited);
 
@@ -4163,7 +4164,7 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
             vset_minus(result, prev);
             vset_destroy(prev);
             vset_destroy(notphi);
-	    //fprintf(stderr,"AX OK\n");
+	        Warning(debug, "AX OK");
 
         } else {
             Abort("invalid operator following MU_ALL, expecting MU_NEXT");
@@ -4171,36 +4172,36 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
         break;
     case MU_MU: case MU_NU:
         {   // continue at the value of last iteration
-	    int Z = mu_expr->idx;
+            int Z = mu_expr->idx;
             vset_t old = vset_create(domain, -1, NULL);
-	    result = vset_create(domain, -1, NULL);
-	    vset_copy(old,mu_var[Z]);
+            result = vset_create(domain, -1, NULL);
+            vset_copy(old,mu_var[Z]);
             do {
                 vset_copy(result,mu_var[Z]);
-		vset_copy(mu_var[Z],mu_rec(mu_expr->arg1, env, visited, muo, mu_var));
-		if (log_active(infoLong)) {
-		    long n1, n2;
-		    double e1, e2;
-		    vset_count(result,&n1,&e1);
-		    vset_count(mu_var[Z],&n2,&e2);
-		    fprintf(stderr,"%s %s: %.0lf -> %.0lf\n",MU_NAME(muo->sign[Z]),SIget(env->idents,Z),e1,e2);
-		}
+                vset_copy(mu_var[Z],mu_rec(mu_expr->arg1, env, visited, muo, mu_var));
+                if (log_active(infoLong)) {
+                    long n1, n2;
+                    double e1, e2;
+                    vset_count(result, &n1, &e1);
+                    vset_count(mu_var[Z], &n2, &e2);
+                    Warning(infoLong, "%s %s: %.0lf -> %.0lf",
+                        MU_NAME(muo->sign[Z]), SIget(env->idents,Z), e1, e2);
+                }
 
-		// reset dependent variables with opposite sign
-		if (!vset_equal(result,mu_var[Z]))
-		    for (int i=0;i<muo->nvars;i++)
-			if (muo->deps[Z][i] && muo->sign[Z] != muo->sign[i]) {
-			    fprintf(stderr,"%s resets %s\n",SIget(env->idents,Z),SIget(env->idents,i));
-			    if (muo->sign[i]==MU_MU)
-				vset_clear(mu_var[i]);
-			    if (muo->sign[i]==MU_NU)
-				vset_copy(mu_var[i],visited);
-			}
-		
-	    } while (!vset_equal(mu_var[Z], result));
+                // reset dependent variables with opposite sign
+                if (!vset_equal(result,mu_var[Z]))
+                    for (int i=0;i<muo->nvars;i++) {
+                        if (muo->deps[Z][i] && muo->sign[Z] != muo->sign[i]) {
+                            Warning(debug, "%s resets %s",
+                                SIget(env->idents,Z), SIget(env->idents,i));
+                            if (muo->sign[i]==MU_MU) vset_clear(mu_var[i]);
+                            if (muo->sign[i]==MU_NU) vset_copy(mu_var[i],visited);
+                        }
+                    }
+            } while (!vset_equal(mu_var[Z], result));
 
-	    vset_destroy(old);
-	}
+            vset_destroy(old);
+        }
         break;
     case MU_EQ:
     case MU_NEQ:
@@ -4208,7 +4209,7 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
     case MU_LEQ:
     case MU_GT:
     case MU_GEQ: {
-	//fprintf(stderr,"EQ\n");
+	    Warning(debug, "EQ");
         result = vset_create(domain, -1, NULL);
 
         bitvector_t deps;
@@ -4265,23 +4266,20 @@ mu_compute_optimal(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited
     mu_object_t muo = mu_object(mu_expr,nvars);
 
     if (log_active(infoLong)) {
-	const char s[] = "Normalizing mu-calculus formula: ";
-	char buf[snprintf(NULL, 0, s) + 1];
-	sprintf(buf, s);
-	LTSminLogExpr(infoLong, buf, mu_expr, env);
+        const char s[] = "Normalizing mu-calculus formula: ";
+        char buf[snprintf(NULL, 0, s) + 1];
+        sprintf(buf, s);
+        LTSminLogExpr(infoLong, buf, mu_expr, env);
     }
 
     // initialize mu/nu fixpoint variables at least/largest values
     vset_t* mu_var = (vset_t*)RTmalloc(sizeof(vset_t)*nvars);
     for (int i = 0 ; i < nvars ; i++) {
-	if (muo->sign[i]==MU_MU)
-	    mu_var[i] = vset_create(domain,-1,NULL);
-	else if (muo->sign[i]==MU_NU) {
-	    mu_var[i] = vset_create(domain,-1,NULL);
-	    vset_copy(mu_var[i],visited);
-	}
-	else
-	    Warning(info,"Gaps between fixpoint variables");
+        if (muo->sign[i]==MU_MU) mu_var[i] = vset_create(domain,-1,NULL);
+        else if (muo->sign[i]==MU_NU) {
+            mu_var[i] = vset_create(domain,-1,NULL);
+            vset_copy(mu_var[i],visited);
+        } else Warning(info, "Gaps between fixpoint variables");
     }
     vset_t result = mu_rec(mu_expr,env,visited,muo,mu_var);
     // TODO: mu_object_destroy(muo);
