@@ -17,16 +17,20 @@ LTSmin syntax for Simple Predicate Language formulae
 [options="header"]
 
 |===================================================================
-|Priority | Operator | Meaning
-|0        | true     | constant true
-|0        | false    | constant false
-|1        | ==       | test operator ('state variable name'=='number')
-|1        | ??       | enabledness operator ('edge variable name' ?? 'chunk')
-|2        | !        | Logical negation
-|4        | &&       | Logical and
-|5        | \|\|     | Logical or
-|6        | $$<->$$  | Logical equivalence
-|7        | $$->$$   | Logical implication
+|Priority | Operator      | Meaning
+|0        | true          | constant true
+|0        | false         | constant false
+|0        | maybe         | constant maybe
+|1        | * / %         | multiplication, division and remainder
+|2        | + -           | addition, subtraction
+|3        | < $$<=$$ > >= | less than, less than or equal, greater than, greater than or equal
+|4        | ==            | test operator ('state variable name'=='number')
+|4        | ??            | enabledness operator ('edge variable name' ?? 'chunk')
+|5        | !             | Logical negation
+|6        | &&            | Logical and
+|7        | \|\|          | Logical or
+|8        | $$<->$$       | Logical equivalence
+|9        | $$->$$        | Logical implication
 |===================================================================
 
 
