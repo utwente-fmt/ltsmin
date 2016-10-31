@@ -4261,18 +4261,16 @@ VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 {
     vset_t x;
     if (mu_opt) {
-	int nvars = mu_optimize(&mu_exprs[i],mu_parse_env[i]);
-
-	if (log_active(infoLong)) {
-	    const char s[] = "Normalizing mu-calculus formula #%d: ";
-	    char buf[snprintf(NULL, 0, s, i + 1) + 1];
-	    sprintf(buf, s, i + 1);
-	    LTSminLogExpr(infoLong, buf, mu_exprs[i], mu_parse_env[i]);
-	}
-	x = mu_compute_optimal(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
+        if (log_active(infoLong)) {
+            const char s[] = "Normalizing mu-calculus formula #%d: ";
+            char buf[snprintf(NULL, 0, s, i + 1) + 1];
+            sprintf(buf, s, i + 1);
+            LTSminLogExpr(infoLong, buf, mu_exprs[i], mu_parse_env[i]);
+        }
+        x = mu_compute_optimal(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
+    } else {
+        x = mu_compute(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
     }
-    else
-	x = mu_compute(mu_exprs[i], mu_parse_env[i], visited, mu_vars[i], mu_var_mans[i]);
     if (x != NULL) {
         char* formula = NULL;
         // recall: mu-formulas, ctl-star formulas, ctl-formulas, ltl-formulas
