@@ -49,13 +49,13 @@ prob_connect(prob_client_t pc, const char* file)
     if (pc->zocket == NULL) Abort("Could not create zsocket");
     pc->file = strdup(file);
 
-    if (zsocket_connect(pc->zocket, pc->file) != 0) Abort("Could not connect to zocket %s", pc->file);
+    if (zsocket_connect(pc->zocket, pc->file, "") != 0) Abort("Could not connect to zocket %s", pc->file);
 }
 
 void
 prob_disconnect(prob_client_t pc)
 {
-    if (zsocket_disconnect(pc->zocket, pc->file) != 0) Warning(info, "Could not disconnect from zocket %s", pc->file);
+    if (zsocket_disconnect(pc->zocket, pc->file, "") != 0) Warning(info, "Could not disconnect from zocket %s", pc->file);
     zsocket_destroy(pc->ctx, pc->zocket);
     zctx_destroy(&(pc->ctx));
 }
