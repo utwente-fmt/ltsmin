@@ -13,7 +13,7 @@
 #include <mc-lib/atomics.h>
 #include <util-lib/fast_hash.h>
 
-#include <cache.h>
+#include <sylvan_cache.h>
 #include <sylvan.h>
 
 static int datasize = 22; // 23 = 128 MB
