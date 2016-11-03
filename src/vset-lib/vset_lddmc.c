@@ -607,9 +607,9 @@ set_load(FILE* f, vdom_t dom)
     lddmc_serialize_fromfile(f);
 
     size_t mdd, proj;
-    fread(&mdd, sizeof(size_t), 1, f);
-    fread(&proj, sizeof(size_t), 1, f);
-    fread(&set->size, sizeof(int), 1, f);
+    if (fread(&mdd, sizeof(size_t), 1, f) < 1) Abort("invalid read");
+    if (fread(&proj, sizeof(size_t), 1, f) < 1) Abort("invalid read");
+    if (fread(&set->size, sizeof(int), 1, f) < 1) Abort("invalid read");
     set->mdd = lddmc_ref(lddmc_serialize_get_reversed(mdd));
     set->proj = lddmc_ref(lddmc_serialize_get_reversed(proj));
 
@@ -635,8 +635,8 @@ rel_load(FILE* f, vrel_t rel)
     lddmc_serialize_fromfile(f);
 
     size_t mdd, meta;
-    fread(&mdd, sizeof(size_t), 1, f);
-    fread(&meta, sizeof(size_t), 1, f);
+    if (fread(&mdd, sizeof(size_t), 1, f) < 1) Abort("invalid read");
+    if (fread(&meta, sizeof(size_t), 1, f) < 1) Abort("invalid read");
     rel->mdd = lddmc_ref(lddmc_serialize_get_reversed(mdd));
     rel->meta = lddmc_ref(lddmc_serialize_get_reversed(meta));
     rel->size = calculate_size(rel->meta);
@@ -881,6 +881,6 @@ vdom_t
 vdom_create_lddmc_from_file(FILE *f)
 {
     size_t vector_size;
-    fread(&vector_size, sizeof(size_t), 1, f);
+    if (fread(&vector_size, sizeof(size_t), 1, f) < 1) Abort("invalid read");
     return vdom_create_lddmc((int)vector_size);
 }
