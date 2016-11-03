@@ -415,6 +415,12 @@ AS_IF([test x"$HAVE_ZMQ" = "x1"],[AX_CZMQ(,[
     AC_SUBST(PROB_LIBS)
 ])])
 
+AC_ARG_ENABLE([werror],
+    [AS_HELP_STRING([--enable-werror], [Use -Werror @<:@no@:>@])],
+    [:],
+    [enable_werror=no])
+AS_IF([test x"$enable_werror" = "xyes"], [AC_SUBST([AM_CFLAGS], [-Werror])])
+
 #AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
