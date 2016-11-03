@@ -347,7 +347,7 @@ tarjan_run (run_t *run, wctx_t *ctx)
     alg_local_t        *loc        = ctx->local;
     raw_data_t         *addr;
     raw_data_t          state_data;
-    bool                on_stack;
+    int                 on_stack;
     hash32_t            hash;
 
 #ifdef HAVE_PROFILER

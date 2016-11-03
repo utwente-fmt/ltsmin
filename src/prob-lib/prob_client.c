@@ -80,7 +80,7 @@ receive_number(zmsg_t *response)
     char *nr_s = zmsg_popstr(response);
     int nr;
     int rc = sscanf(nr_s, "%d", &nr);
-    assert(rc == 1);
+    assert(rc == 1); (void) rc;
     RTfree(nr_s);
     return nr;
 }

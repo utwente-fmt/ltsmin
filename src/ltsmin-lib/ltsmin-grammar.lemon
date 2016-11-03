@@ -1,6 +1,5 @@
 %include {
 #include <hre/config.h>
-#include <assert.h>
 #include <stdlib.h>
 
 #include <hre/user.h>
@@ -8,6 +7,12 @@
 #include <ltsmin-lib/etf-util.h>
 #include <ltsmin-lib/etf-internal.h>
 #include <ltsmin-lib/ltsmin-parse-env.h>
+/* solves the issue where lemon parses this file
+ with -Werror and -DNDEBUG */
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <assert.h>
 }
 
 /* Section common parser configuration.

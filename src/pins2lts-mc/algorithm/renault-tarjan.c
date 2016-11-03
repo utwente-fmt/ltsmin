@@ -399,7 +399,7 @@ renault_run  (run_t *run, wctx_t *ctx)
     r_uf_alg_shared_t  *shared     = (r_uf_alg_shared_t*) ctx->run->shared;
     raw_data_t         *addr;
     raw_data_t          state_data;
-    bool                on_stack;
+    int                 on_stack;
     hash32_t            hash;
     char                claim;
     int                 transitions;

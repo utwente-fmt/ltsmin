@@ -233,7 +233,7 @@ int get_priority(const parity_game* g, const int* s)
     {
         if (vset_member(g->v_priority[priority], s)) { found = true; break; }
     }
-    assert(found);
+    assert(found); (void) found;
     return priority;
 }
 
@@ -561,7 +561,7 @@ void check_strategy(const parity_game* g, const recursive_result* strategy, cons
             Print(infoLong, "Player %d, random run %d", p, i);
             bool random_run = random_strategy_play(g, strategy, p);
             if ((p == player && result) || (p != player && !result)) {
-                assert(random_run);
+                assert(random_run); (void) random_run;
             }
         }
     }

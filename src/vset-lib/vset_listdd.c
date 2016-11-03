@@ -1775,7 +1775,7 @@ set_visit_mdd(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* co
 
     const uint32_t op = (uint32_t) OP_VISIT | (cache_op << 8);
 
-    if (set->proj != NULL) mdd_visit_proj(set->mdd, cbs, ctx_size, context, op, set->p_id);
+    if (set->p_len != -1) mdd_visit_proj(set->mdd, cbs, ctx_size, context, op, set->p_id);
     else mdd_visit(set->mdd, cbs, ctx_size, context, op);
 }
 

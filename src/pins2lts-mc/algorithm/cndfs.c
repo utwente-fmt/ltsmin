@@ -346,7 +346,7 @@ on_stack_accepting_up (wctx_t *ctx, int *accepting)
 {
     cndfs_alg_local_t      *cloc = (cndfs_alg_local_t *) ctx->local;
     size_t                 *depth;
-    bool                    on_stack;
+    int                     on_stack;
     on_stack = fset_find (cloc->fset, NULL, &ctx->state->ref, (void**)&depth, true);
     HREassert (on_stack != FSET_FULL);
     if (!on_stack) {

@@ -484,7 +484,7 @@ reach_print_stats   (run_t *run, wctx_t *ctx)
 void
 reach_local_setup   (run_t *run, wctx_t *ctx)
 {
-    if ((strategy[0] & Strat_DFS) && Proviso_Stack) {
+    if ((strategy[0] & Strat_DFS) & Proviso_Stack) {
         ctx->local->cyan = fset_create (sizeof(ref_t), 0, 10, 20);
     }
 

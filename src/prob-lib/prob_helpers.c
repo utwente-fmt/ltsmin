@@ -14,7 +14,7 @@ int get_number(zmsg_t *msg) {
     char *nr_s = zmsg_popstr(msg);
     int nr;
     int rc = sscanf(nr_s,"%d",&nr);
-    assert(rc==1);
+    assert(rc==1); (void) rc;
     RTfree(nr_s);
 
     return nr;
@@ -106,7 +106,7 @@ void prob_put_state(zmsg_t *msg, ProBState s) {
 void prob_destroy_chunk_array(ProBChunkArray *arr) {
     RTfree(arr->chunks);
     arr->chunks = NULL;
-    *arr = (ProBChunkArray) {0};
+    *arr = (ProBChunkArray) {NULL, 0};
 }
 
 void prob_destroy_state(ProBState *s) {
@@ -115,7 +115,7 @@ void prob_destroy_state(ProBState *s) {
 
 void destroy_chunk(ProBChunk *norris) {
     RTfree(norris->data);
-    *norris = (ProBChunk) {0};
+    *norris = (ProBChunk) {NULL, 0};
 }
 
 void destroy_matrix_row(ProBMatrixRow row) {
@@ -129,7 +129,7 @@ void prob_destroy_matrix(ProBMatrix *m) {
         destroy_matrix_row(m->rows[i]);
     }
     RTfree(m->rows);
-    *m = (ProBMatrix) {0};
+    *m = (ProBMatrix) {0, NULL};
 }
 
 void prob_destroy_initial_response(ProBInitialResponse *resp) {

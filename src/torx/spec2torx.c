@@ -147,7 +147,7 @@ main (int argc, char *argv[])
     Warning (info, "got initial state");
     dbs = TreeDBScreate (N);
     int ini_idx = TreeFold (dbs, ini);
-    assert (ini_idx == 0);
+    assert (ini_idx == 0); (void) ini_idx;
 
     torx_ctx_t          ctx = { model, ltstype };
     torx_ui (&ctx);
