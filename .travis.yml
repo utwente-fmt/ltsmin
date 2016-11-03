@@ -29,7 +29,7 @@ matrix:
       
 # Trigger different builds for different front-ends, to speed up testing (with dejagnu).
 env:
-    - CONFIGURE_WITH="--disable-dependency-tracking"
+    - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror"
       CFLAGS="-DNDEBUG"
       RELEASE_BUILD="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-unit             --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
