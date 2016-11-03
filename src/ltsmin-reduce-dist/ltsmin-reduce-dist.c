@@ -109,7 +109,7 @@ int main(int argc, char*argv[]){
 
             table_iterator_t it = VTiterator (vt);
             for (int i = 0; IThasNext(it); i++) {
-                chunk c = ITnext (vt);
+                chunk c = ITnext (it);
                 if (c.len==3 && !strncmp(c.data,LTSMIN_EDGE_VALUE_TAU,3)){
                     if (tau>=0) Fatal(1,error,"more than one silent action");
                     tau=i;
