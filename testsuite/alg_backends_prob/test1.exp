@@ -33,7 +33,7 @@ run_test_for_alg_backends $alg_be $langs $backends
 dict set langs prob exp_output "state space has 10"
 dict set backends sym params "--order=" {bfs-prev}
 dict set backends sym params "--saturation=" {none}
-dict set backends sym params "--vset=" {"lddmc --lace-workers=2 --lddmc-tablesize=20 --lddmc-maxtablesize=20 --lddmc-cachesize=20 --lddmc-maxcachesize=20"}
+dict set backends sym params "--vset=" {"lddmc --lace-workers=2 --sylvan-tablesize=20 --sylvan-maxtablesize=20 --sylvan-cachesize=20 --sylvan-maxcachesize=20"}
 dict set backends sym options {""}
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends

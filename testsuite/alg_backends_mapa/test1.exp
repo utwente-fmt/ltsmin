@@ -34,7 +34,7 @@ dict set langs mapa exp_output "state space has 4"
 dict set backends sym options {""}
 dict set backends sym params "--order=" {bfs-prev bfs par par-prev}
 dict set backends sym params "--saturation=" {none}
-dict set backends sym params "--vset=" {"ldd --lace-workers=1" "fdd --lace-workers=1" "ldd64 --lace-workers=1" "lddmc --lace-workers=2 --lddmc-tablesize=18 --lddmc-maxtablesize=18 --lddmc-cachesize=18 --lddmc-maxcachesize=18"}
+dict set backends sym params "--vset=" {"ldd --lace-workers=1" "fdd --lace-workers=1" "ldd64 --lace-workers=1" "lddmc --lace-workers=2 --sylvan-tablesize=18 --sylvan-maxtablesize=18 --sylvan-cachesize=18 --sylvan-maxcachesize=18"}
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 

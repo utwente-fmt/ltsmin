@@ -14,7 +14,7 @@ dict set backends mc options {"-z6" "--no-ref" "--perm=rr" "--perm=dynamic" ""}
 dict set backends sym params "--order=" {bfs-prev bfs chain-prev chain par par-prev}
 dict set backends sym params "--saturation=" {none sat-like sat-loop sat-fix sat}
 # internal and BuDDy
-dict set backends sym params "--vset=" {"ldd --lace-workers=1" "fdd --lace-workers=1" "ldd64 --lace-workers=1" "lddmc --lace-workers=2 --lddmc-tablesize=18 --lddmc-maxtablesize=18 --lddmc-cachesize=18 --lddmc-maxcachesize=18" "sylvan --lace-workers=2 --sylvan-bits=32 --sylvan-tablesize=18 --sylvan-maxtablesize=18 --sylvan-cachesize=18 --sylvan-maxcachesize=18"}
+dict set backends sym params "--vset=" {"ldd --lace-workers=1" "fdd --lace-workers=1" "ldd64 --lace-workers=1" "lddmc --lace-workers=2 --sylvan-tablesize=18 --sylvan-maxtablesize=18 --sylvan-cachesize=18 --sylvan-maxcachesize=18" "sylvan --lace-workers=2 --sylvan-bits=32 --sylvan-tablesize=18 --sylvan-maxtablesize=18 --sylvan-cachesize=18 --sylvan-maxcachesize=18"}
 dict set backends sym options {"-g" "-rga" "-g -rga" ""}
 
 # 1 row for every param and a list of possible values
