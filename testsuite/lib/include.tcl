@@ -238,7 +238,7 @@ proc compile_promela { prom_models } {
 
     foreach prom_model $prom_models {
         puts "Executing precommand: '$binpaths(spins) $EXAMPLES_PATH/$prom_model'"
-        set rc [catch { exec $binpaths(spins) $EXAMPLES_PATH/$prom_model } msg ]
+        set rc [catch { exec $binpaths(spins) -o $EXAMPLES_PATH/$prom_model } msg ]
 
         if { $rc != 0 } {
             fail "Failed executing precommand"
