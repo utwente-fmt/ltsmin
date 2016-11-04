@@ -196,7 +196,7 @@ script:
   - ./ltsminreconf &&
     ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop $CONFIGURE_WITH
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make; fi
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make LDFLAGS="-Wl,--no-export-dynamic -lltdl -lnuma -llzma -all-static"; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make; fi
   - if [ "x$RELEASE_BUILD" != "xyes" ]; then make check -j1; fi
   - if [ "x$RELEASE_BUILD" != "xyes" ]; then cat testsuite/*.log || true; fi
   - if [ "x$RELEASE_BUILD" = "xyes" ]; then 
