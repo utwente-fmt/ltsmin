@@ -319,6 +319,8 @@ PromLoadGreyboxModel(model_t model, const char *filename)
 
     int guard_type = lts_type_add_type (ltstype, "guard", NULL);
     lts_type_set_format (ltstype, guard_type, LTStypeTrilean);
+    int bool_type = lts_type_add_type (ltstype, "bool", NULL);
+    lts_type_set_format (ltstype, bool_type, LTStypeBool);
 
     lts_type_set_state_length(ltstype, state_length);
 
