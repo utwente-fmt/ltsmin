@@ -600,7 +600,18 @@ void vrel_add(vrel_t rel,const int* src, const int* dst){
 	rel->dom->shared.rel_add(rel,src,dst);
 }
 
+static void
+default_rel_add_cpy(vrel_t rel, const int* src, const int* dst, const int* cpy) {
+    rel->dom->shared.rel_add(rel, src, dst);
+    (void) cpy;
+}
+
 void vrel_add_cpy(vrel_t rel,const int* src, const int* dst, const int* cpy){
+    if (rel->dom->shared.rel_add_cpy == NULL) {
+        if (!vdom_separates_rw(rel->dom)) {
+            rel->dom->shared.rel_add_cpy = default_rel_add_cpy;
+        } else HREassert(false, "vset should implement vrel_add_cpy");
+    }
     rel->dom->shared.rel_add_cpy(rel,src,dst,cpy);
 }
 
