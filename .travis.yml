@@ -8,7 +8,7 @@ os:
 - linux
 - osx
 
-dist: trusty
+dist: precise
 
 osx_image: xcode7.2
 
@@ -50,20 +50,16 @@ env:
 addons:
   apt:
     sources:
-      - ubuntu-toolchain-r-test # for gcc 4.9
-      - kubuntu-backports       # for cmake 2.8.12
-      - boost-latest            # for boost > 1.46
       - hvr-ghc                 # for GHC dynamic packages
+      - ubuntu-toolchain-r-test # for gcc 4.9
     packages:
       - gcc-4.9
       - g++-4.9
-      - cmake
-      - libyaml-dev
       - libpopt-dev
       - asciidoc
       - xmlto
       - doxygen
-      - libboost1.55-dev
+      - libboost-dev
       - ghc-7.10.3
       - ghc-7.10.3-dyn
       - happy-1.19.5
