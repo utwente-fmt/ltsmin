@@ -177,9 +177,9 @@ proc runmytest { test_name command_line exp_output} {
             return
         }
 
-	-re $exp_output {
-	    pass "Expected output $exp_output found"
-	}
+        -re $exp_output {
+            pass "Expected output $exp_output found"
+        }
 	    
         full_buffer {
             puts "\n full buffer hit"
@@ -211,7 +211,6 @@ proc runmytest { test_name command_line exp_output} {
         255 { fail  "$test_name: Program exited with LTSMIN_EXIT_ERROR" }
         default { fail "$test_name: Program exited with a unknown exit code: $exit_code" }
     }
-    wait
 }
 
 # create a list with for every bin the path
