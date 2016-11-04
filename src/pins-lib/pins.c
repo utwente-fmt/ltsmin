@@ -339,8 +339,8 @@ static int
 groups_of_edge_default(model_t model, int edgeno, int index, int** groups)
 {
     (void) edgeno; (void) index;
-    groups = RTmalloc(sizeof(int) * pins_get_group_count(model));
-    memset(groups, 1, sizeof(int) * pins_get_group_count(model));
+    *groups = RTmalloc(sizeof(int) * pins_get_group_count(model));
+    for (size_t i = 0; i < pins_get_group_count(model); i++) (*groups)[i] = i;
 
     return pins_get_group_count(model);
 }
