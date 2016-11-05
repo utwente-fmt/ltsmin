@@ -406,7 +406,7 @@ fi
 
 AM_PATH_XML2(,[have_xml2="yes"],[AC_MSG_WARN([No acceptable libxml2 installation found.])])
 
-AC_ARG_WITH([prob],[AS_HELP_STRING([--with-prob],[Compile ProB front-end])],[],[with_prob=yes])
+AC_ARG_ENABLE([prob],[AS_HELP_STRING([--enable-prob],[Compile ProB front-end])],[],[with_prob=yes])
 AS_IF([test x"$with_prob" = "xyes"],[AX_ZMQ([3.0.0])])
 AS_IF([test x"$HAVE_ZMQ" = "x1"],[AX_CZMQ(,[
     acx_prob=yes
