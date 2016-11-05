@@ -407,16 +407,18 @@ fi
 AM_PATH_XML2(,[have_xml2="yes"],[AC_MSG_WARN([No acceptable libxml2 installation found.])])
 
 AC_ARG_ENABLE([prob],[AS_HELP_STRING([--enable-prob],[Compile ProB front-end])],[],[with_prob=yes])
-AS_IF([test x"$with_prob" = "xyes"],[AX_ZMQ([3.0.0])])
-AS_IF([test x"$HAVE_ZMQ" = "x1"],[AX_CZMQ(,[
-    acx_prob=yes
-    PROB_CPPFLAGS="$CZMQ_CPPFLAGS $ZMQ_CPPFLAGS"
-    PROB_LDFLAGS="$CZMQ_LDFLAGS $ZMQ_LDFLAGS"
-    PROB_LIBS="$CZMQ_LIBS $ZMQ_LIBS"
-    AC_SUBST(PROB_CPPFLAGS)
-    AC_SUBST(PROB_LDFLAGS)
-    AC_SUBST(PROB_LIBS)
-])])
+AS_IF([test x"$with_prob" = "xyes"],[
+    PKG_CHECK_MODULES([CZMQ], [libczmq],[
+        acx_prob=yes
+        PROB_CFLAGS="$CZMQ_CFLAGS"
+        PROB_LDFLAGS="$CZMQ_LDFLAGS"
+        PROB_LIBS="$CZMQ_LIBS"
+        AC_SUBST(PROB_CFLAGS)
+        AC_SUBST(PROB_LDFLAGS)
+        AC_SUBST(PROB_LIBS)],
+        [AC_MSG_WARN(libczmq is not installed. Not building ProB front-end)
+    ])
+])
 
 AC_ARG_ENABLE([werror],
     [AS_HELP_STRING([--enable-werror], [Use -Werror @<:@no@:>@])],
@@ -604,6 +606,6 @@ Configuration:
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
     PNML     = ${have_xml2:-NO, not building pnml (Petri net) front-end}
-    PROB     = ${acx_prob:-NO, either ProB was disabled or ZMQ/CZMQ could not be found}
+    PROB     = ${acx_prob:-NO, either ProB was disabled or CZMQ could not be found}
 ======================================================================
 EOM
