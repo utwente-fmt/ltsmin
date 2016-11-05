@@ -7,6 +7,7 @@
 #include <ltsmin-lib/ltsmin-lexer.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-tl.h>
+#include <ltsmin-lib/ltsmin-type-system.h>
 #include <util-lib/chunk_support.h>
 #include <util-lib/dynamic-array.h>
 
@@ -16,6 +17,7 @@ S_NAME(ltsmin_expr_case s)
     switch (s) {
     case S_TRUE:             return "true";
     case S_FALSE:            return "false";
+    case S_MAYBE:            return "maybe";
     case S_NOT:              return "!";
     case S_LT:               return "<";
     case S_LEQ:              return "<=";
@@ -132,182 +134,12 @@ fill_env (ltsmin_parse_env_t env, lts_type_t ltstype)
     }
 }
 
-static inline int
-type_check_get_type(lts_type_t lts_type, const char* type, ltsmin_expr_t e, ltsmin_parse_env_t env)
-{
-    const int typeno = lts_type_find_type(lts_type, type);
-    if (typeno == -1) {
-        const char* ex = LTSminPrintExpr(e, env);
-        Abort("Expression with type \"%s\" can only be used if the language front-end defines it: \"%s\"", type, ex);
-    } else return typeno;
-}
-
-static inline void
-type_check_require_type(lts_type_t lts_type, int typeno, const char* type, ltsmin_expr_t e, ltsmin_parse_env_t env)
-{
-    const char* name = lts_type_get_type(lts_type, typeno);
-    HREassert(name != NULL);
-    
-    if (strcmp(name, type) != 0) {
-        const char* ex = LTSminPrintExpr(e, env);
-        Abort("Expression, with type \"%s\" is not of required type \"%s\": \"%s\"", name, type, ex);
-    }
-}
-
-static inline void
-type_check_require_format(lts_type_t lts_type, int type, const data_format_t required[], int n, ltsmin_expr_t e, ltsmin_parse_env_t env, const char* msg)
-{
-    /* chunks for numeric types could be implemented with the bignum interface. */
-
-    const data_format_t format = lts_type_get_format(lts_type, type);
-    HREassert(type >= 0 && type < lts_type_get_type_count(lts_type));
-
-    for (int i = 0; i < n; i++) {
-        if (format == required[i]) return;
-    }
-    const char* ex = LTSminPrintExpr(e, env);
-    Abort("Only %s type formats are supported: \"%s\"", msg, ex);
-}
-
-static inline void
-type_check_equal_format(lts_type_t lts_type, int left, int right, ltsmin_expr_t e, ltsmin_parse_env_t env)
-{
-    if (lts_type_get_format(lts_type, left) != lts_type_get_format(lts_type, right)) {
-        const char* ex = LTSminPrintExpr(e, env);
-        Abort("LHS and RHS do not have the same type format: \"%s\"", ex);
-    }
-}
-
-static inline void
-type_check_equal_type(lts_type_t lts_type, int left, int right, ltsmin_expr_t e, ltsmin_parse_env_t env)
-{
-    if (left != right) {
-        const char* ex = LTSminPrintExpr(e, env);
-        Abort("LHS (%s) and RHS (%s) are not of the same type: \"%s\"",
-                lts_type_get_type(lts_type, left),
-                lts_type_get_type(lts_type, right),
-                ex);
-    }
-}
-
-int
-ltsmin_expr_type_check(const ltsmin_expr_t e, const ltsmin_parse_env_t env, const lts_type_t lts_type)
-{
-    switch (e->token) {
-        case SVAR: {
-            const int N = lts_type_get_state_length(lts_type);
-            if (e->idx < N) { // state variable
-                return lts_type_get_state_typeno(lts_type, e->idx);
-            } else {
-                return lts_type_get_state_label_typeno(lts_type, e->idx - N);
-            }
-        }
-        case EVAR: {
-            const ltsmin_expr_t other = LTSminExprSibling(e);
-            if (other->token != CHUNK) {
-                LTSminLogExpr (error, "An edge should be paired with a chunk: ", e, env);
-                HREabort (LTSMIN_EXIT_FAILURE);
-            }
-            return lts_type_get_edge_label_typeno(lts_type, e->idx);
-        }
-        case INT:
-            return type_check_get_type(lts_type, LTSMIN_TYPE_NUMERIC, e, env);
-        case CHUNK: {
-            const ltsmin_expr_t other = LTSminExprSibling(e);
-            if (other == NULL) {
-                LTSminLogExpr(error, "Unbound chunk: ", e, env);
-                HREabort(LTSMIN_EXIT_FAILURE);
-            }
-            return ltsmin_expr_type_check(other, env, lts_type);
-        }
-        case S_FALSE: case S_TRUE:
-            return type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-        case VAR:
-            return -1;
-        case S_LT: case S_LEQ: case S_GT: case S_GEQ: {
-            const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
-            type_check_require_type(lts_type, left, LTSMIN_TYPE_NUMERIC, e->arg1, env);
-            const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
-            type_check_require_type(lts_type, right, LTSMIN_TYPE_NUMERIC, e->arg2, env);
-
-            type_check_equal_format(lts_type, left, right, e, env);
-
-            return type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-        }
-        case S_EN: {
-            if (e->arg1->token != EVAR && e->arg2->token != EVAR) {                
-                LTSminLogExpr(error, "LHS or RHS should be an edge variable: ", e, env);
-                HREabort(LTSMIN_EXIT_FAILURE);
-            }
-        }
-        case S_EQ: case S_NEQ: {
-            const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
-            const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
-
-            type_check_equal_type(lts_type, left, right, e, env);
-            type_check_equal_format(lts_type, left, right, e, env);
-
-            return type_check_get_type(lts_type, LTSMIN_TYPE_BOOL, e, env);
-        }
-        case S_OR: case S_AND: case S_EQUIV: case S_IMPLY: {
-            const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
-            const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
-
-            type_check_require_type(lts_type, left, LTSMIN_TYPE_BOOL, e->arg1, env);
-            type_check_require_type(lts_type, right, LTSMIN_TYPE_BOOL, e->arg2, env);
-
-            type_check_equal_format(lts_type, left, right, e, env);
-
-            return left;
-        }
-        case S_MULT: case S_DIV: case S_REM: case S_ADD: case S_SUB: {
-            const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
-            const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
-            
-            type_check_require_type(lts_type, left, LTSMIN_TYPE_NUMERIC, e->arg1, env);
-            type_check_require_type(lts_type, right, LTSMIN_TYPE_NUMERIC, e->arg2, env);
-
-            type_check_equal_format(lts_type, left, right, e, env);
-
-            return left;
-        }
-        case S_NOT: case MU_FIX: case NU_FIX: case EXISTS_STEP: case FORALL_STEP: case EDGE_EXIST: case EDGE_ALL: {
-            const int child = ltsmin_expr_type_check(e->arg1, env, lts_type);
-
-            type_check_require_type(lts_type, child, LTSMIN_TYPE_BOOL, e->arg1, env);
-
-            return child;
-        }
-        default: {
-            switch (e->node_type) {
-                case BINARY_OP: {
-                    const int left = ltsmin_expr_type_check(e->arg1, env, lts_type);
-                    const int right = ltsmin_expr_type_check(e->arg2, env, lts_type);
-
-                    type_check_equal_type(lts_type, left, right, e, env);
-                    type_check_equal_format(lts_type, left, right, e, env);
-
-                    return left;
-                }
-                case UNARY_OP: {
-                    const int child = ltsmin_expr_type_check(e->arg1, env, lts_type);
-                    
-                    return child;
-                }
-                default: {
-                    LTSminLogExpr(error, "Unsupported expression: ", e, env);
-                    HREabort(LTSMIN_EXIT_FAILURE);
-                }
-            }
-        }
-    }
-}
-
 static void
 create_pred_env(ltsmin_parse_env_t env)
 {
     LTSminConstant      (env, PRED_FALSE,  PRED_NAME(PRED_FALSE));
     LTSminConstant      (env, PRED_TRUE,   PRED_NAME(PRED_TRUE));
+    LTSminConstant      (env, PRED_MAYBE,  PRED_NAME(PRED_MAYBE));
 
     LTSminBinaryOperator(env, PRED_MULT,   PRED_NAME(PRED_MULT), 1);
     LTSminBinaryOperator(env, PRED_DIV,    PRED_NAME(PRED_DIV), 1);
@@ -345,9 +177,9 @@ pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t lts_type)
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
-    const int type = ltsmin_expr_type_check(env->expr, env, lts_type);
+    data_format_t df = check_type_format_pred(env->expr, env, lts_type);
 
-    type_check_require_type(lts_type, type, LTSMIN_TYPE_BOOL, env->expr, env);
+    get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
     
     return env->expr;
 }
@@ -357,6 +189,7 @@ create_ltl_env(ltsmin_parse_env_t env)
 {
     LTSminConstant      (env, LTL_FALSE,        LTL_NAME(LTL_FALSE));
     LTSminConstant      (env, LTL_TRUE,         LTL_NAME(LTL_TRUE));
+    LTSminConstant      (env, LTL_MAYBE,        LTL_NAME(LTL_MAYBE));
 
     LTSminBinaryOperator(env, LTL_MULT,         LTL_NAME(LTL_MULT), 1);
     LTSminBinaryOperator(env, LTL_DIV,          LTL_NAME(LTL_DIV), 1);
@@ -452,9 +285,9 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
-    const int type = ltsmin_expr_type_check(env->expr, env, ltstype);
+    data_format_t df = check_type_format_LTL(env->expr, env, ltstype);
 
-    type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
+    get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
 
     env->expr = ltl_tree_walker(env->expr);
 
@@ -466,6 +299,7 @@ create_ctl_env(ltsmin_parse_env_t env)
 {
     LTSminConstant      (env, CTL_FALSE,        CTL_NAME(CTL_FALSE));
     LTSminConstant      (env, CTL_TRUE,         CTL_NAME(CTL_TRUE));
+    LTSminConstant      (env, CTL_MAYBE,        CTL_NAME(CTL_MAYBE));
     
     LTSminBinaryOperator(env, CTL_MULT,         CTL_NAME(CTL_MULT), 1);
     LTSminBinaryOperator(env, CTL_DIV,          CTL_NAME(CTL_DIV), 1);
@@ -530,9 +364,9 @@ ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
-    const int type = ltsmin_expr_type_check(env->expr, env, ltstype);
+    data_format_t df = check_type_format_CTL(env->expr, env, ltstype);
 
-    type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
+    get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
 
     return env->expr;
 }
@@ -542,6 +376,7 @@ create_mu_env(ltsmin_parse_env_t env)
 {
     LTSminConstant(env, MU_FALSE, MU_NAME(MU_FALSE));
     LTSminConstant(env, MU_TRUE, MU_NAME(MU_TRUE));
+    LTSminConstant(env, MU_MAYBE, MU_NAME(MU_MAYBE));
 
     LTSminKeyword(env, MU_MU, MU_NAME(MU_MU));
     LTSminKeyword(env, MU_NU, MU_NAME(MU_NU));
@@ -595,9 +430,9 @@ mu_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
-    const int type = ltsmin_expr_type_check(env->expr, env, ltstype);
+    data_format_t df = check_type_format_MU(env->expr, env, ltstype);
 
-    type_check_require_type(ltstype, type, LTSMIN_TYPE_BOOL, env->expr, env);
+    get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
 
     return env->expr;
 }
@@ -622,6 +457,7 @@ ltsmin_expr_t ltl_to_ctl_star_1(ltsmin_expr_t in)
         case LTL_NEQ:       res->token = CTL_NEQ;       break;
         case LTL_TRUE:      res->token = CTL_TRUE;      break;
         case LTL_FALSE:     res->token = CTL_FALSE;     break;
+        case LTL_MAYBE:     res->token = CTL_MAYBE;     break;
         case LTL_OR:        res->token = CTL_OR;        break;
         case LTL_AND:       res->token = CTL_AND;       break;
         case LTL_NOT:       res->token = CTL_NOT;       break;
@@ -713,6 +549,7 @@ MU ctl2mu_token(CTL token) { // precondition: token is not a path operator (A,E)
         case CTL_VAR:       return MU_VAR;
         case CTL_TRUE:      return MU_TRUE;
         case CTL_FALSE:     return MU_FALSE;
+        case CTL_MAYBE:     return MU_MAYBE;
         case CTL_OR:        return MU_OR;
         case CTL_AND:       return MU_AND;
         case CTL_NOT:       return MU_NOT;
@@ -1057,6 +894,7 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
         case CTL_NEXT: sprintf(buf, "X "); break;
         case CTL_UNTIL: sprintf(buf, " U "); break;
         case CTL_FALSE: sprintf(buf, "false"); break;
+        case CTL_MAYBE: sprintf(buf, "maybe"); break;
         case CTL_AND: sprintf(buf, " and "); break;
         case CTL_EQUIV: sprintf(buf, " <-> "); break;
         case CTL_IMPLY: sprintf(buf, " -> "); break;
@@ -1889,6 +1727,7 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
         case MU_NOT: sprintf(buf, "!"); break;
         case MU_NEXT: sprintf(buf, "X "); break;
         case MU_FALSE: sprintf(buf, "false"); break;
+        case MU_MAYBE: sprintf(buf, "maybe"); break;
         case MU_AND: sprintf(buf, " /\\ "); break;
         case MU_EN: sprintf(buf, " ?? "); break;
         //case MU_EQUIV: sprintf(buf, " <-> "); break;

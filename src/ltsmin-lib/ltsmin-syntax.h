@@ -76,6 +76,7 @@ typedef enum {
     S_NEQ,
     S_TRUE,
     S_FALSE,
+    S_MAYBE,
     S_NOT,
     S_OR,
     S_AND,

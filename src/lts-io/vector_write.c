@@ -196,13 +196,12 @@ static void write_chunk_tables(lts_file_t file){
         value_table_t values=lts_file_get_table(file,i);
         switch(lts_type_get_format(ltstype,i)){
         case LTStypeDirect:
-            if (values && VTgetCount(values)!=0) {
-                Print(error,"direct type %s has table",type_name);
-            }
-            break;
         case LTStypeRange:
-            if (values) {
-                Print(error,"ranged type %s has table",type_name);
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
+            if (values && VTgetCount(values)!=0) {
+                Print(error,"non-chunk type %s has table",type_name);
             }
             break;
         case LTStypeChunk:
@@ -346,6 +345,9 @@ static void write_header(lts_file_t file){
         switch(lts_type_get_format(ltstype,i)){
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             DSwriteU32(fs,0);
             break;
         case LTStypeChunk:

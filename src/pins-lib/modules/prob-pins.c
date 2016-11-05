@@ -267,7 +267,8 @@ prob_load_model(model_t model)
     // init state labels
     const int sl_size = 0;
     lts_type_set_state_label_count(ltstype, sl_size);
-    int bool_is_new, bool_type = lts_type_add_type(ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
+    const int bool_type = lts_type_add_type(ltstype, "Boolean", NULL);
+    lts_type_set_format(ltstype, bool_type, LTStypeBool);
 
     ctx->num_vars = init.variables.size;
 
@@ -308,11 +309,6 @@ prob_load_model(model_t model)
 
     // make sure to set the lts-type before anything else in the GB
     GBsetLTStype(model, ltstype);
-
-    if (bool_is_new) {
-        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE ), 1);
-    }
 
     const int num_groups = init.transition_groups.size;
 

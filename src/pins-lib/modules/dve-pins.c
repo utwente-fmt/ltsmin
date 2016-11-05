@@ -344,11 +344,8 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
              lts_type_set_format (ltstype, i, LTStypeEnum);
         }
     }
-    int guard_is_new, guard_type = lts_type_add_type (ltstype, LTSMIN_TYPE_GUARD, &guard_is_new);
-    lts_type_set_format (ltstype, guard_type, LTStypeEnum);
-
-    int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
-    lts_type_set_format (ltstype, bool_type, LTStypeEnum);
+    int guard_type = lts_type_add_type (ltstype, "guard", NULL);
+    lts_type_set_format (ltstype, guard_type, LTStypeTrilean);
 
     lts_type_set_state_length(ltstype, state_length);
 
@@ -393,17 +390,6 @@ DVE2loadGreyboxModel(model_t model, const char *filename)
             const char* type_value = get_state_variable_type_value(i, j);
             pins_chunk_put_at (model, i, chunk_str((char*)type_value), j);
         }
-    }
-
-    if (guard_is_new) {
-        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE), 1);
-        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
-    }
-
-    if (bool_is_new) {
-        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
     }
 
     lts_type_validate(ltstype);

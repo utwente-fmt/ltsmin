@@ -317,8 +317,8 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         }
     }
 
-    int guard_is_new;
-    int guard_type = lts_type_add_type (ltstype, LTSMIN_TYPE_GUARD, &guard_is_new);
+    int guard_type = lts_type_add_type (ltstype, "guard", NULL);
+    lts_type_set_format (ltstype, guard_type, LTStypeTrilean);
 
     lts_type_set_state_length(ltstype, state_length);
 
@@ -352,12 +352,6 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     GBsetNextStateAll  (model, prom_get_successor_all);
     GBsetNextStateLong (model, prom_get_successor);
     GBsetActionsLong (model, prom_get_actions);
-
-    if (guard_is_new) {
-        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE ), 1);
-        pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
-    }
 
     // setting values for types
     for(int i=0; i < ntypes; i++) {

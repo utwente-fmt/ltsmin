@@ -81,6 +81,7 @@ trace_get_type_str(lts_t trace, int typeno, int type_idx, size_t dst_size, char*
     switch(lts_type_get_format(trace->ltstype,typeno)){
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeSInt32:
             snprintf(dst, dst_size, "%d", type_idx);
             break;
         case LTStypeChunk:
@@ -90,6 +91,29 @@ trace_get_type_str(lts_t trace, int typeno, int type_idx, size_t dst_size, char*
             chunk2string(c,dst_size,dst);
             }
             break;
+        case LTStypeBool:
+        case LTStypeTrilean: {
+            char* value = NULL;
+            switch (type_idx) {
+                case 0: {
+                    value = "false";
+                    break;
+                }
+                case 1: {
+                    value = "true";
+                    break;
+                }
+                case 2: {
+                    value = "maybe";
+                    break;
+                }
+                default: {
+                    Abort("Invalid value: %d", type_idx);
+                }
+            }
+            snprintf(dst, dst_size, "%s", value);
+            break;
+        }
     }
 }
 

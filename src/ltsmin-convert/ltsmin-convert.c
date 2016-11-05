@@ -79,6 +79,9 @@ int main(int argc, char *argv[]){
                 switch(lts_type_get_format(ltstype,i)){
                 case LTStypeDirect:
                 case LTStypeRange:
+                case LTStypeBool:
+                case LTStypeTrilean:
+                case LTStypeSInt32:
                     Debug("integer type %s does not use tables",name);
                     break;
                 case LTStypeChunk:
@@ -139,6 +142,9 @@ int main(int argc, char *argv[]){
                 switch(lts_type_get_format(ltstype,i)){
                 case LTStypeDirect:
                 case LTStypeRange:
+                case LTStypeBool:
+                case LTStypeTrilean:
+                case LTStypeSInt32:
                     Debug("integer type %s does not use tables",name);
                     break;
                 case LTStypeChunk:

@@ -697,8 +697,8 @@ GBaddLTL (model_t model)
     }
 
     /* State labels */
-    int bool_is_new;
-    int bool_type = lts_type_add_type (ltstype_new, LTSMIN_TYPE_BOOL, &bool_is_new);
+    int bool_type = lts_type_add_type (ltstype_new, "LTL_bool", NULL);
+    lts_type_set_format(ltstype_new, bool_type, LTStypeBool);
 
     matrix_t       *p_sl = GBgetStateLabelInfo (model);
     int             sl_count = dm_nrows (p_sl);
@@ -759,11 +759,6 @@ GBaddLTL (model_t model)
 
     // extend the chunk maps
     GBgrowChunkMaps(ltlmodel, type_count);
-
-    if (bool_is_new) {
-        pins_chunk_put_at (ltlmodel, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        pins_chunk_put_at (ltlmodel, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
-    }
 
     /* Fix matrixes */
     matrix_t       *p_new_dm = (matrix_t*) RTmalloc(sizeof(matrix_t));

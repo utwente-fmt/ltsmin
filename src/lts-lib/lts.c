@@ -229,6 +229,9 @@ void lts_set_sig(lts_t lts,lts_type_t type){
         switch(lts_type_get_format(type,i)){
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             values[i]=NULL;
             break;
         case LTStypeChunk:
@@ -578,17 +581,41 @@ lts_t lts_encode_edge(lts_t lts){
             TreeUnfold(lts->state_db,i,vector);
             for(int j=0;j<V;j++){
                 switch(format[j]){
-                case LTStypeDirect:
-                case LTStypeRange:
-                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
-                    break;
-                case LTStypeChunk:
-                case LTStypeEnum:
-                    {
-                    chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
-                    char label_s[label_c.len*2+6];
-                    chunk2string(label_c,sizeof label_s,label_s);
-                    current+=snprintf(current,BUFLEN,"|%s",label_s);
+                    case LTStypeDirect:
+                    case LTStypeRange:
+                    case LTStypeSInt32:
+                        current+=snprintf(current,BUFLEN,"|%d",vector[j]);
+                        break;
+                    case LTStypeChunk:
+                    case LTStypeEnum:
+                        {
+                        chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
+                        char label_s[label_c.len*2+6];
+                        chunk2string(label_c,sizeof label_s,label_s);
+                        current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        }
+                    case LTStypeBool:
+                    case LTStypeTrilean: {
+                        char* value = NULL;
+                        switch (vector[j]) {
+                            case 0: {
+                                value = "false";
+                                break;
+                            }
+                            case 1: {
+                                value = "true";
+                                break;
+                            }
+                            case 2: {
+                                value = "maybe";
+                                break;
+                            }
+                            default: {
+                                Abort("Invalid value: %d", vector[j]);
+                            }
+                        }
+                        current+=snprintf(current,BUFLEN,"|%s",value);
+                        break;
                     }
                 }
             }
@@ -617,17 +644,41 @@ lts_t lts_encode_edge(lts_t lts){
             }
             for(int j=0;j<N;j++){
                 switch(format[j]){
-                case LTStypeDirect:
-                case LTStypeRange:
-                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
-                    break;
-                case LTStypeChunk:
-                case LTStypeEnum:
-                    {
-                    chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
-                    char label_s[label_c.len*2+6];
-                    chunk2string(label_c,sizeof label_s,label_s);
-                    current+=snprintf(current,BUFLEN,"|%s",label_s);
+                    case LTStypeDirect:
+                    case LTStypeRange:
+                    case LTStypeSInt32:
+                        current+=snprintf(current,BUFLEN,"|%d",vector[j]);
+                        break;
+                    case LTStypeChunk:
+                    case LTStypeEnum:
+                        {
+                        chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
+                        char label_s[label_c.len*2+6];
+                        chunk2string(label_c,sizeof label_s,label_s);
+                        current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        }
+                    case LTStypeBool:
+                    case LTStypeTrilean: {
+                        char* value = NULL;
+                        switch (vector[j]) {
+                            case 0: {
+                                value = "false";
+                                break;
+                            }
+                            case 1: {
+                                value = "true";
+                                break;
+                            }
+                            case 2: {
+                                value = "maybe";
+                                break;
+                            }
+                            default: {
+                                Abort("Invalid value: %d", vector[j]);
+                            }
+                        }
+                        current+=snprintf(current,BUFLEN,"|%s",value);
+                        break;
                     }
                 }
             }
@@ -656,17 +707,41 @@ lts_t lts_encode_edge(lts_t lts){
             }
             for(int j=0;j<K;j++){
                 switch(format[j]){
-                case LTStypeDirect:
-                case LTStypeRange:
-                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
-                    break;
-                case LTStypeChunk:
-                case LTStypeEnum:
-                    {
-                    chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
-                    char label_s[label_c.len*2+6];
-                    chunk2string(label_c,sizeof label_s,label_s);
-                    current+=snprintf(current,BUFLEN,"|%s",label_s);
+                    case LTStypeDirect:
+                    case LTStypeRange:
+                    case LTStypeSInt32:
+                        current+=snprintf(current,BUFLEN,"|%d",vector[j]);
+                        break;
+                    case LTStypeChunk:
+                    case LTStypeEnum:
+                        {
+                        chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
+                        char label_s[label_c.len*2+6];
+                        chunk2string(label_c,sizeof label_s,label_s);
+                        current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        }
+                    case LTStypeBool:
+                    case LTStypeTrilean: {
+                        char* value = NULL;
+                        switch (vector[j]) {
+                            case 0: {
+                                value = "false";
+                                break;
+                            }
+                            case 1: {
+                                value = "true";
+                                break;
+                            }
+                            case 2: {
+                                value = "maybe";
+                                break;
+                            }
+                            default: {
+                                Abort("Invalid value: %d", vector[j]);
+                            }
+                        }
+                        current+=snprintf(current,BUFLEN,"|%s",value);
+                        break;
                     }
                 }
             }

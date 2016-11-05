@@ -477,7 +477,8 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
     HREassert (lattice_type_is_new, "Lattice type was already present");
     lts_type_set_format (ltstype, ctx->lattice_type, LTStypeEnum);
 
-    int bool_is_new, bool_type = lts_type_add_type (ltstype, LTSMIN_TYPE_BOOL, &bool_is_new);
+    int bool_type = lts_type_add_type (ltstype, "Boolean", NULL);
+    lts_type_set_format(ltstype, bool_type, LTStypeBool);
 
     lts_type_set_state_length(ltstype, state_length);
 
@@ -528,11 +529,6 @@ opaalLoadGreyboxModel(model_t model, const char *filename)
             const char* type_value = get_state_variable_type_value(i, j);
             pins_chunk_put_at (model, i, chunk_str((char*)type_value), j);
         }
-    }
-
-    if (bool_is_new) {
-        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-        pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
     }
 
     lts_type_validate(ltstype);

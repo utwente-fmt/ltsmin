@@ -49,8 +49,39 @@ An enumerated type is a finite chunk type.
 It is not allowed to remove values and it is not allowed to change the
 numbering.
 */
-LTStypeEnum
+LTStypeEnum,
+
+/**
+The Boolean type.
+
+Only two values allowed 0, and 1.
+*/
+LTStypeBool,
+
+/**
+The trilean type.
+
+Only three values allowed 0, 1, and 2.
+Where 0 and 1 are Boolean values and 2 indicates maybe.
+*/
+LTStypeTrilean,
+
+/**
+The signed 32 bit integer type.
+
+Allows arithmetic operators.
+*/
+LTStypeSInt32,
+
 } data_format_t;
+
+#define DATA_FORMAT_SIZE LTStypeSInt32 - LTStypeDirect + 1
+
+/// Return the string representation of the data format of \p typeno.
+extern const char* data_format_string(lts_type_t  t,int typeno);
+
+/// Return the string representation of \p format.
+extern const char* data_format_string_generic(data_format_t format);
 
 /// Create a new empty lts type.
 extern lts_type_t lts_type_create();

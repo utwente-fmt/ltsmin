@@ -792,10 +792,10 @@ PNMLloadGreyboxModel(model_t model, const char *name)
     ltstype = lts_type_create();
 
     // adding types
-    int int_type = lts_type_add_type(ltstype, LTSMIN_TYPE_NUMERIC, NULL);
+    int int_type = lts_type_add_type(ltstype, "place", NULL);
     int act_type = lts_type_add_type(ltstype, "action", NULL);
 
-    lts_type_set_format (ltstype, int_type, LTStypeDirect);
+    lts_type_set_format (ltstype, int_type, LTStypeSInt32);
     lts_type_set_format (ltstype, act_type, LTStypeEnum);
 
     lts_type_set_state_length (ltstype, NUM_PLACES);
@@ -806,12 +806,9 @@ PNMLloadGreyboxModel(model_t model, const char *name)
     lts_type_set_edge_label_type (ltstype, 0, "action");
     lts_type_set_edge_label_typeno (ltstype, 0, act_type);
 
-    const int guard_type = lts_type_add_type(ltstype, LTSMIN_TYPE_GUARD, NULL);
-    lts_type_set_format (ltstype, guard_type, LTStypeEnum);
+    const int guard_type = lts_type_add_type(ltstype, "guard", NULL);
+    lts_type_set_format (ltstype, guard_type, LTStypeBool);
     
-    const int bool_type = lts_type_add_type(ltstype, LTSMIN_TYPE_BOOL, NULL);
-    lts_type_set_format (ltstype, bool_type, LTStypeEnum);
-
     for (int i = 0; i < NUM_PLACES; ++i) {
         lts_type_set_state_typeno(ltstype, i, int_type);
         lts_type_set_state_name(ltstype, i, "tmp");
@@ -819,14 +816,6 @@ PNMLloadGreyboxModel(model_t model, const char *name)
 
     GBsetLTStype (model, ltstype); // must set ltstype before setting initial state
                                   // creates tables for types!
-
-    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE), 1);
-    pins_chunk_put_at (model, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
-    
-    // add bool type for LTSmin language expressions
-    pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_FALSE), 0);
-    pins_chunk_put_at (model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE), 1);
 
     dm_create (dm_info, NUM_TRANSS, NUM_PLACES);
     dm_create (dm_read_info, NUM_TRANSS, NUM_PLACES);

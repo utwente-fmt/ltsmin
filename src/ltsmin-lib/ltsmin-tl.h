@@ -23,6 +23,7 @@ typedef enum {
     PRED_NEQ   = S_NEQ,
     PRED_TRUE  = S_TRUE,
     PRED_FALSE = S_FALSE,
+    PRED_MAYBE = S_MAYBE,
     PRED_NOT   = S_NOT,
     PRED_OR    = S_OR,
     PRED_AND   = S_AND,
@@ -47,6 +48,7 @@ typedef enum {
     LTL_VAR   = VAR,
     LTL_TRUE  = PRED_TRUE,
     LTL_FALSE = PRED_FALSE,
+    LTL_MAYBE = PRED_MAYBE,
     LTL_LT    = PRED_LT,
     LTL_LEQ   = PRED_LEQ,
     LTL_GT    = PRED_GT,
@@ -86,6 +88,7 @@ typedef enum {
     CTL_VAR   = VAR,
     CTL_TRUE  = PRED_TRUE,
     CTL_FALSE = PRED_FALSE,
+    CTL_MAYBE = PRED_MAYBE,
     CTL_LT    = PRED_LT,
     CTL_LEQ   = PRED_LEQ,
     CTL_GT    = PRED_GT,
@@ -132,6 +135,7 @@ typedef enum {
     MU_NEQ                  = PRED_NEQ,
     MU_TRUE                 = PRED_TRUE,
     MU_FALSE                = PRED_FALSE,
+    MU_MAYBE                = PRED_MAYBE,
     MU_NOT                  = PRED_NOT,
     MU_MULT                 = PRED_MULT,
     MU_DIV                  = PRED_DIV,
@@ -171,8 +175,6 @@ extern ltsmin_expr_t ctl_to_mu(ltsmin_expr_t, ltsmin_parse_env_t, lts_type_t);
 extern ltsmin_expr_t ltl_to_mu(ltsmin_expr_t);
 extern char* ltsmin_expr_print_ctl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_mu(ltsmin_expr_t, char*);
-
-extern int ltsmin_expr_type_check(const ltsmin_expr_t, const ltsmin_parse_env_t, const lts_type_t);
 
 /* ctl* to mu conversion
  *

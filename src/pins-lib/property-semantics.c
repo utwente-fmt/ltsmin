@@ -8,6 +8,7 @@
 
 #include <stdbool.h>
 
+#include <ltsmin-lib/ltsmin-type-system.h>
 #include <pins-lib/property-semantics.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/por/pins2pins-por.h>
@@ -74,9 +75,12 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
             break;
         }
         case CHUNK: {
+            const ltsmin_expr_t other = LTSminExprSibling(e);
+            HREassert(other != NULL);
+            const int type = get_typeno(other, GBgetLTStype(model));
             chunk c;
             c.data = SIgetC(env->values, e->idx, (int*) &c.len);
-            e->chunk_cache = pins_chunk_put(model, ltsmin_expr_type_check(LTSminExprSibling(e), env, GBgetLTStype(model)), c);
+            e->chunk_cache = pins_chunk_put(model, type, c);
             break;
         }
         default:
@@ -143,6 +147,10 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
             } else return -1;
         }
         case PRED_CHUNK: {
+#ifndef NDEBUG
+            const ltsmin_expr_t other = LTSminExprSibling(e);
+            HREassert(other != NULL && (other->token == SVAR || other->token == EVAR));
+#endif
             return e->chunk_cache;
         }
         case PRED_NOT:

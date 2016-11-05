@@ -3625,13 +3625,14 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
         c = RTmalloc(sizeof(struct inv_info_s));
         e->destroy_context = inv_svar_destroy;
         if (e->idx < N) { // state variable
-            const int bool_type = lts_type_find_type(ltstype, LTSMIN_TYPE_BOOL);
             // make sure the state variable is a Boolean
-            assert(lts_type_get_state_typeno(ltstype, e->idx) == bool_type);
+            assert(lts_type_get_format(
+                ltstype,
+                lts_type_get_state_typeno(ltstype, e->idx)) == LTStypeBool);
             /* create vset_t where this state variable is true. */
             int proj[1] = { e->idx };
             c->work = vset_create(domain, 1, proj);
-            int t[1] = { pins_chunk_put(model, bool_type, chunk_str(LTSMIN_VALUE_BOOL_TRUE)) };
+            int t[1] = { 1 };
             vset_add(c->work, t);
         } else if (!inv_bin_par) { // state label
             /* create vset_t because we can not directly project

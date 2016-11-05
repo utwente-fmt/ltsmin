@@ -498,7 +498,8 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
         lts_type_set_edge_label_type(ltstype, i, pins->data_type(pins->edge_label_type(i)).name().c_str());
     }
 #ifdef MCRL2_GUARDS
-    int guard_is_new, guard_type = lts_type_add_type (ltstype, LTSMIN_TYPE_GUARD, &guard_is_new);
+    int guard_type = lts_type_add_type (ltstype, "guard", NULL);
+    lts_type_set_format(ltstype, guard_type, LTStypeTrilean);
 #endif
 
     GBsetLTStype(m,ltstype);
@@ -557,12 +558,6 @@ MCRL2loadGreyboxModel (model_t m, const char *model_name)
     }
 
 #ifdef MCRL2_GUARDS
-
-    if (guard_is_new) {
-        pins_chunk_put_at(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_FALSE), 0);
-        pins_chunk_put_at(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_TRUE),  1);
-        pins_chunk_put_at(m, guard_type, chunk_str(LTSMIN_VALUE_GUARD_MAYBE), 2);
-    }
 
     // init state labels
     int nguards = pins->guard_count();

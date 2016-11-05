@@ -172,6 +172,9 @@ static value_table_t set_table(lts_file_t file,int type_no,value_table_t table){
     switch(lts_type_get_format(ltstype,type_no)){
     case LTStypeDirect:
     case LTStypeRange:
+    case LTStypeBool:
+    case LTStypeTrilean:
+    case LTStypeSInt32:
         Abort("attempt to set table for an integer type");
         break;
     case LTStypeChunk:
