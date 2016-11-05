@@ -111,6 +111,9 @@ int main()
     AC_MSG_FAILURE([No POSIX support found.])])
 AC_LANG_RESTORE
 
+PKG_PROG_PKG_CONFIG
+m4_pattern_forbid([^PKG_[A-Z_]+$], [missing some pkg-config macros (pkg-config package)])
+
 dnl Checks for programs.
 ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
