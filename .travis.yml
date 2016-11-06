@@ -211,7 +211,7 @@ script:
   - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS=-all-static; fi
   - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" != "xyes" ]; then make; fi
   - if [ "x$RELEASE_BUILD" != "xyes" ]; then make check -j1; fi
-  - if [ "x$RELEASE_BUILD" != "xyes" ]; then cat testsuite/*.log || true; fi
+  - if [ "x$RELEASE_BUILD" != "xyes" -a $? -ne 0 ]; then cat testsuite/*.log || true; fi
   - if [ "x$RELEASE_BUILD" = "xyes" ]; then 
     make dist &&
     export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
