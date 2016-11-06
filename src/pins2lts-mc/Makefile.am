@@ -66,9 +66,6 @@ pins2lts_mc_SOURCES   = $(mc_sources)
 pins2lts_mc_SOURCES  += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
 pins2lts_mc_LDADD     = $(MC_LIBS) 
 pins2lts_mc_CPPFLAGS  = -DPINS_DLL $(MC_CPPFLAGS)
-if !BUILD_OS_IS_DARWIN
-pins2lts_mc_LDFLAGS  = -Wl,-E
-endif
 nodist_EXTRA_pins2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 ## lpo2lts-mc

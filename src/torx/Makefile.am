@@ -19,9 +19,6 @@ bin_PROGRAMS += pins2torx
 pins2torx_SOURCES  = spec2torx.c
 pins2torx_SOURCES += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
 pins2torx_LDADD    = $(PINS_LIBS)
-if !BUILD_OS_IS_DARWIN
-pins2torx_LDFLAGS   = -Wl,-E $(AM_LDFLAGS)
-endif
 pins2torx_CPPFLAGS = -DPINS_DLL $(TORX_CPPFLAGS) $(AM_CPPFLAGS)
 nodist_EXTRA_pins2torx_SOURCES = ../automake-force-linker.cxx # required by Boost & ViennaCL
 

@@ -48,9 +48,6 @@ pins2lts_seq_SOURCES  += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/d
 pins2lts_seq_LDADD     = $(HRE_LIB) $(PINS_LIBS)
 pins2lts_seq_LDADD    += $(VSET_LIBS)
 pins2lts_seq_CPPFLAGS  = -DPINS_DLL $(SEQ_CPPFLAGS)
-if !BUILD_OS_IS_DARWIN
-pins2lts_seq_LDFLAGS   = -Wl,-E
-endif
 nodist_EXTRA_pins2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 

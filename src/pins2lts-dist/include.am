@@ -64,9 +64,6 @@ pins2lts_dist_SOURCES   = ../pins2lts-dist.c
 pins2lts_dist_SOURCES  += ../../pins-lib/modules/dlopen-pins.c ../../pins-lib/modules/dlopen-pins.h
 pins2lts_dist_LDADD     = $(PINS_LIBS)
 pins2lts_dist_CPPFLAGS  = -DPINS_DLL $(DIST_CPPFLAGS)
-if !BUILD_OS_IS_DARWIN
-pins2lts_dist_LDFLAGS   = -Wl,-E
-endif
 nodist_EXTRA_pins2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # lpo2lts-dist
