@@ -86,6 +86,7 @@ before_install:
     export DDD_URL="http://ddd.lip6.fr/download/$DDD_VERSION.tar.gz" &&
     export MCRL2_NAME="mCRL2.tar.gz" &&
     export MCRL2_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/$TRAVIS_OS_NAME/$MCRL2_NAME"
+    export PKG_CONFIG_PATH="$HOME/ltsmin-deps/lib/pkgconfig"
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then        
         export PROB_NAME="ProB.linux64.tar.gz" &&
         export PROB_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/linux/$PROB_NAME" &&        
@@ -94,7 +95,8 @@ before_install:
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then  
         export PROB_NAME="ProB.mac_os.10.12.x86_64.tar.gz" &&
         export PROB_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/osx/$PROB_NAME" &&
-        export MAKEFLAGS=-j1; fi
+        export MAKEFLAGS=-j1 &&
+        export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/usr/local/Cellar/libxml2/$(brew list --versions libxml2 | cut -d' ' -f2)/lib/pkgconfig"; fi
 
 install:  
   # update brew
