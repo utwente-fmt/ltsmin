@@ -1,6 +1,5 @@
 #include <hre/config.h>
 
-#include <ltl2ba.h>
 #undef Debug
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
@@ -22,9 +21,6 @@ static  struct poptOption options[] = {
     POPT_TABLEEND
 };
 
-// XXX move to include file
-void ltsmin_ltl2ba(ltsmin_expr_t);
-
 int main(int argc, char *argv[]){
     char* file_name;
     HREinitBegin(argv[0]);
@@ -41,16 +37,16 @@ int main(int argc, char *argv[]){
     lts_type_set_edge_label_count(ltstype,1);
     lts_type_set_edge_label_name(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
     lts_type_set_edge_label_type(ltstype,0,LTSMIN_EDGE_TYPE_ACTION_PREFIX);
-    model_t model = GBcreateBase();
-    GBsetLTStype(model, ltstype);
     switch(parse_mode) {
         case PARSE_MU: {
-            parse_file(file_name, mu_parse_file, model);
+            ltsmin_parse_env_t env = LTSminParseEnvCreate();
+            mu_parse_file(file_name, env, ltstype);
             } break;
         case PARSE_LTL: {
-            ltsmin_expr_t ltl = parse_file(file_name, ltl_parse_file, model);
-            ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
-            ltsmin_ltl2ba(notltl);
+            ltsmin_parse_env_t env = LTSminParseEnvCreate();
+            ltl_parse_file(file_name, env, ltstype);
+            //ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
+            //ltsmin_ltl2ba(notltl);
             /*
             print_expr(ltl);
             ltsmin_expr_t ctl = ltl_to_ctl_star(ltl);
@@ -60,11 +56,13 @@ int main(int argc, char *argv[]){
             */
             } break;
         case PARSE_CTL: {
-            ltsmin_expr_t ctl = parse_file(file_name, ctl_parse_file, model);
+            ltsmin_parse_env_t env = LTSminParseEnvCreate();
+            ltsmin_expr_t ctl = ctl_parse_file(file_name, env, ltstype);
             (void)ctl;
             } break;
         case PARSE_CTL_S: {
-            ltsmin_expr_t ctl = parse_file(file_name, ctl_parse_file, model);
+            ltsmin_parse_env_t env = LTSminParseEnvCreate();
+            ltsmin_expr_t ctl = ctl_parse_file(file_name, env, ltstype);
             ltsmin_expr_t mu = ctl_star_to_mu(ctl);
             (void)mu;
             } break;
