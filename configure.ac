@@ -404,7 +404,9 @@ else
     AC_MSG_WARN([no acceptable ViennaCL installation found.])
 fi
 
-AM_PATH_XML2(,[have_xml2="yes"],[AC_MSG_WARN([No acceptable libxml2 installation found.])])
+PKG_CHECK_MODULES([XML], [libxml-2.0], [have_xml2=yes],[
+    AC_MSG_WARN(libxml2 is not installed. Not building PNML front-end)
+])
 
 AC_ARG_ENABLE([prob],[AS_HELP_STRING([--enable-prob],[Compile ProB front-end])],[],[with_prob=yes])
 AS_IF([test x"$with_prob" = "xyes"],[

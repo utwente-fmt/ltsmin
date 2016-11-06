@@ -108,7 +108,8 @@ nodist_EXTRA_prom2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 pnml2lts_seq_SOURCES   = pins2lts-seq.c
 pnml2lts_seq_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
 pnml2lts_seq_LDADD     = $(XML_LIBS) $(VSET_LIBS) $(HRE_LIB) $(PINS_LIBS)
-pnml2lts_seq_CPPFLAGS  = -DPNML $(XML_CPPFLAGS) $(SEQ_CPPFLAGS)
+pnml2lts_seq_CPPFLAGS  = -DPNML $(SEQ_CPPFLAGS)
+pnml2lts_seq_CFLAGS    = $(XML_CFLAGS)
 nodist_EXTRA_pnml2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prob2lts-seq
