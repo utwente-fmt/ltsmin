@@ -191,12 +191,25 @@ before_script:
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then 
     export DYLD_LIBRARY_PATH="$HOME/ltsmin-deps/lib:$HOME/ProB/lib:$DYLD_LIBRARY_PATH" &&
     export LDFLAGS="-L$HOME/ltsmin-deps/lib"; fi
+  # Move static libraries to a special folder (osx).
+  # This is necessary, because ld on OSX always prefers .dylibs over .a's.
+  # <rant> this is a retarted policy (don't tell me how to link!?) </rant>
+  # During make we can force ld to look in this directory first.
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
+    mkdir "$HOME/static-libs" &&
+    cp "$HOME/ltsmin-deps/lib/libzmq.a" "$HOME/static-libs" &&
+    cp "$HOME/ltsmin-deps/lib/libczmq.a" "$HOME/static-libs" &&
+    cp /usr/local/lib/libgmp.a "$HOME/static-libs" &&
+    cp /usr/local/lib/libpopt.a "$HOME/static-libs" &&
+    cp "/usr/local/Cellar/libxml2/$(brew list --versions libxml2 | cut -d' ' -f2)/lib/libxml2.a" "$HOME/static-libs"; fi
 
 script:
   - ./ltsminreconf &&
     ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop $CONFIGURE_WITH
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then make; fi
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then make; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS="-Wl,-search_paths_first -L$HOME/static-libs -weak-liconv"; fi # libiconv is necessary for libpopt
+  - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" != "xyes" ]; then make; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS=-all-static; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" != "xyes" ]; then make; fi
   - if [ "x$RELEASE_BUILD" != "xyes" ]; then make check -j1; fi
   - if [ "x$RELEASE_BUILD" != "xyes" ]; then cat testsuite/*.log || true; fi
   - if [ "x$RELEASE_BUILD" = "xyes" ]; then 
