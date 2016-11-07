@@ -35,20 +35,36 @@ env:
     - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror --disable-test-all"
       CFLAGS="-DNDEBUG"
       RELEASE_BUILD="yes"
+    - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror --disable-test-all"
+      DISTCHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-unit             --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-DVE              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-ETF              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-Promela          --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-LPS                              --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-PBES                             --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-PNML             --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-ProB             --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-LTL              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-safety           --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-POR              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-DFS-FIFO         --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-SCC              --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-LTS-generation                   --disable-doxygen-doc --disable-dependency-tracking"
+      CHECK="yes"
     
 addons:
   apt:
@@ -212,13 +228,12 @@ script:
   - ./ltsminreconf &&
     ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop $CONFIGURE_WITH
   - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS="-Wl,-search_paths_first -L$HOME/static-libs -weak-liconv"; fi # libiconv is necessary for libpopt
-  - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" != "xyes" ]; then make; fi
   - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS=-all-static; fi
-  - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" != "xyes" ]; then make; fi
-  - if [ "x$RELEASE_BUILD" != "xyes" ]; then make check -j1; fi
-  - if [ "x$RELEASE_BUILD" != "xyes" -a $? -ne 0 ]; then cat testsuite/*.log || true; fi
-  - if [ "x$RELEASE_BUILD" = "xyes" ]; then 
-    make dist &&
+  - if [ "x$CHECK" = "xyes" ]; then make; fi
+  - if [ "x$CHECK" = "xyes" ]; then make check -j1; fi
+  - if [ "x$CHECK" = "xyes" -a $? -ne 0 ]; then cat testsuite/*.log || true; fi
+  - if [ "x$DISTCHECK" = "xyes" ]; then 
+    make distcheck DISTCHECK_CONFIGURE_FLAGS="-with-viennacl=$HOME/ltsmin-deps/include --without-scoop $CONFIGURE_WITH" &&
     export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
     mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TRAVIS_TAG-source.tgz"; fi
   - if [ -n $TRAVIS_TAG -a "x$RELEASE_BUILD" = "xyes" ]; then
