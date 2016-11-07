@@ -29,8 +29,10 @@ matrix:
       os: osx
       
 # Trigger different builds for different front-ends, to speed up testing (with dejagnu).
+# --disable-dependency-tracking is necessary due to a bug in automake 1.14 i.c.w. make distclean, see:
+# https://stackoverflow.com/questions/21609580/autotools-build-fails-due-to-subdir-objects-option-in-am-init-automake
 env:
-    - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror"
+    - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror --disable-test-all"
       CFLAGS="-DNDEBUG"
       RELEASE_BUILD="yes"
     - CONFIGURE_WITH="--disable-test-all --enable-test-unit             --without-mcrl2 --disable-doxygen-doc --disable-dependency-tracking"

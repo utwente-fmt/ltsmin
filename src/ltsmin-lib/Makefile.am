@@ -69,6 +69,8 @@ MAINTAINERCLEANFILES =
 MAINTAINERCLEANFILES += ltsmin-tokens.c ltsmin-tokens.h
 LEMON_FLAGS = -s
 
+.NOTPARALLEL:
+
 %.c %.h: %.lemon lempar.c
 	cd $(top_builddir)/lemon && $(MAKE) $(AM_MAKEFLAGS) lemon$(EXEEXT)
 	$(top_builddir)/lemon/lemon$(EXEEXT) $(LEMON_FLAGS) $<

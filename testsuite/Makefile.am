@@ -1,10 +1,27 @@
 AUTOMAKE_OPTIONS = dejagnu
 #RUNTESTDEFAULTFLAGS = -v -v
 
-EXTRA_DIST = \
-			 ltsmin.exp \
-			 lib/*.tcl \
-			 */*.exp
+EXTRA_DIST =	ltsmin.exp \
+		lib/backends.tcl \
+		lib/include.tcl \
+		lib/default.exp \
+		lib/unix.exp \
+		alg_backends_dve/test1.exp \
+		alg_backends_etf/test1.exp \
+		alg_backends_lpo/test1.exp \
+		alg_backends_lps/test1.exp \
+		alg_backends_mapa/test1.exp \
+		alg_backends_opaal/test1.exp \
+		alg_backends_pbes/test1.exp \
+		alg_backends_pnml/test1.exp \
+		alg_backends_prob/test1.exp \
+		alg_backends_prom/test1.exp \
+		dfs_fifo/test1.exp \
+		ltl_model_checking/test1.exp \
+		lts_generation/test1.exp \
+		partial_order_reduction/test1.exp \
+		safety_model_checking/test1.exp \
+		scc/test1.exp
 
 CLEANFILES = out/* *.log *.sum
 
