@@ -228,7 +228,7 @@ script:
   - ./ltsminreconf &&
     ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop $CONFIGURE_WITH
   - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS="-Wl,-search_paths_first -L$HOME/static-libs -weak-liconv"; fi # libiconv is necessary for libpopt
-  - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS=-all-static; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS="-Wl,--no-export-dynamic -all-static"; fi
   - if [ "x$CHECK" = "xyes" ]; then make; fi
   - if [ "x$CHECK" = "xyes" ]; then make check -j1; fi
   - if [ "x$CHECK" = "xyes" -a $? -ne 0 ]; then cat testsuite/*.log || true; fi
