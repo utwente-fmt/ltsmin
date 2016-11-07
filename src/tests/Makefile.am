@@ -24,7 +24,7 @@ endif
 check_PROGRAMS  =
 check_PROGRAMS += test-bitset
 check_PROGRAMS += test-dfs-stack
-check_PROGRAMS += test-dbs
+#check_PROGRAMS += test-dbs
 check_PROGRAMS += test-dm
 check_PROGRAMS += test-hre
 check_PROGRAMS += test-is-balloc
@@ -48,10 +48,10 @@ test_is_balloc_LDADD   		= $(MC_LIB) $(PINS_LIBS) $(AM_LDFLAGS)
 test_is_balloc_CPPFLAGS 	= $(AM_CPPFLAGS)
 
 # test-dbs
-test_dbs_SOURCES 				= test-dbs.c
-test_dbs_LDADD   				= $(PINS_LIBS) $(MC_LIB) $(DM_LIBS) $(HRE_LIB) $(AM_LDFLAGS)
-test_dbs_CPPFLAGS 				= $(AM_CPPFLAGS)
-nodist_EXTRA_test_dbs_SOURCES	= automake-force-linker.cxx # required by Boost & ViennaCL
+#test_dbs_SOURCES 				= test-dbs.c
+#test_dbs_LDADD   				= $(PINS_LIBS) $(MC_LIB) $(DM_LIBS) $(HRE_LIB) $(AM_LDFLAGS)
+#test_dbs_CPPFLAGS 				= $(AM_CPPFLAGS)
+#nodist_EXTRA_test_dbs_SOURCES	= automake-force-linker.cxx # required by Boost & ViennaCL
 
 # test-dfs-stack
 test_dfs_stack_SOURCES 		= test-dfs-stack.c

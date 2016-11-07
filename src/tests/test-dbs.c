@@ -68,7 +68,7 @@ void readfile(const size_t i) {
     stream_read(s[i], vt[i], size);
     stream_close(&s[i]);
     NUM+=n[i];
-    char *fname = rindex(filename, '/');
+    char *fname = strrchr(filename, '/');
     Warning(info, "Read %s into memory (%zu x %zu)", fname==NULL? filename : fname+1, ARRAY_SIZE, n[i]);
     return;
 }
@@ -117,7 +117,7 @@ pthread_key_t *thread_id_key;
 static size_t dones = 0;
 
 void *fill(void *c) {
-    set_label(program);
+    set_label(program, "");
     context_t ctx = c;
     size_t id = ctx->id;
     DBS_T dbs = ctx->db;
