@@ -233,9 +233,7 @@ script:
   - if [ "x$CHECK" = "xyes" ]; then make check -j1; fi
   - if [ "x$CHECK" = "xyes" -a $? -ne 0 ]; then cat testsuite/*.log || true; fi
   - if [ "x$DISTCHECK" = "xyes" ]; then 
-    make distcheck DISTCHECK_CONFIGURE_FLAGS="-with-viennacl=$HOME/ltsmin-deps/include --without-scoop $CONFIGURE_WITH" &&
-    export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
-    mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TRAVIS_TAG-source.tgz"; fi
+    make distcheck DISTCHECK_CONFIGURE_FLAGS="-with-viennacl=$HOME/ltsmin-deps/include --without-scoop $CONFIGURE_WITH"; fi
   - if [ -n $TRAVIS_TAG -a "x$RELEASE_BUILD" = "xyes" ]; then
     make install &&
     cp "$HOME/ltsmin-deps/bin/divine" /tmp/dist/bin &&
@@ -244,7 +242,10 @@ script:
     export distname="ltsmin-$TRAVIS_TAG-$TRAVIS_OS_NAME-$CC" &&
     pushd /tmp/dist &&
     tar cfz "$distname.tgz" * &&
-    popd; fi
+    popd &&
+    make dist &&
+    export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | cut -d\" -f2) &&
+    mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TRAVIS_TAG-source.tgz"; fi
   
 notifications:
   email: false
