@@ -116,7 +116,7 @@ struct ltsmin_expr_s {
     void                (*destroy_context)(void* c);
 };
 
-extern void   LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env);
+extern void   LTSminLogExpr(log_t log,const char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env);
 extern size_t LTSminSPrintExpr(char *buf, size_t max_buf,ltsmin_expr_t expr,ltsmin_parse_env_t env);
 extern char  *LTSminPrintExpr(ltsmin_expr_t expr,ltsmin_parse_env_t env);
 

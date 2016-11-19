@@ -369,7 +369,7 @@ LTSminPrintExpr(ltsmin_expr_t expr, ltsmin_parse_env_t env)
 }
 
 void
-LTSminLogExpr(log_t log,char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env)
+LTSminLogExpr(log_t log,const char*msg,ltsmin_expr_t expr,ltsmin_parse_env_t env)
 {
     // get the length of the to-be-printed expression (+ nullbyte)
     size_t len = LTSminSPrintExpr(NULL, 0, expr, env) + 1;

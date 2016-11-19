@@ -140,7 +140,7 @@ pins2prob_state(model_t model, int* pins)
     prob.size = ctx->num_vars;
     prob.chunks = RTmalloc(sizeof(ProBChunk) * prob.size);
 
-    Debugf("pins2prob state (%d): ", ctx->num_vars);
+    Debugf("pins2prob state (%zu): ", ctx->num_vars);
     for (size_t i = 0; i < ctx->num_vars; i++) {
         chunk c = pins_chunk_get (model, ctx->var_type[i], pins[i]);
 

@@ -128,6 +128,9 @@ public:
         switch (format) {
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             return idx;
         case LTStypeChunk:
         case LTStypeEnum:
@@ -153,6 +156,9 @@ public:
         switch (format){
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             return idx;
         case LTStypeChunk:
         case LTStypeEnum:
@@ -186,6 +192,9 @@ public:
         switch (format) {
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             return idx;
         case LTStypeChunk:
         case LTStypeEnum:
@@ -222,6 +231,9 @@ public:
         switch (lts_type_get_format (GBgetLTStype (model_), pt)) {
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             return; // Direct and range types are automatically prefilled
         case LTStypeChunk:
             return; // Chunk types cannot be prefilled
