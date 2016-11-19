@@ -17,7 +17,7 @@
       of the node table, number of GCs etc.
     - Add option --mu-opt that enables a faster mu-calculus model checker.
 
-- Improvements w.r.t. static variable ordering:
+- Improvements to the static variable ordering:
     - Invert the permutation of rows/columns (transition groups/state variables)
       using options --regroup=hf --regroup=vf respectively.
     - Transformations on the dependency matrix ignore read dependencies,
@@ -47,8 +47,32 @@
 
 - The mCRL2 front-end now accepts files with .txt extension.
 
+- Added support for SPOT's LTL to Buechi translation [5]
+
+- Improvements to the multi-core backend (*2lts-mc):
+    - Added a parallel Strongly Connected Components algorithm [4]
+      (--strategy=ufscc).
+    - Added Renault's parallel SCC algorithm (--strategy=renault).
+    - Added support for transition-based general buechi automata (TGBAs)
+      via UFSCC/Renault and SPOT.
+    - Added Bosnacki's closed-set proviso to preserve safety under POR.
+    - Support for weak LTS formulae in DFS-FIFO. Simply combine --ltl with
+     --strategy=dfsfifo to benefit from this highly scalable algorithm
+     (if the property is not weak, an error is raised).
+    - Support for tracing in DFS-FIFO and all new SCC algorithms.
+
 - Improvements to the PINS interface:
+    - A new PINS2PINS layer is added that checks the validity of
+      dependency matrices. The option --check activates the layer.
+      By default, all read/write matrices are checked. When partial-order
+      reduction (--por) is used, then the POR matrices are checked as well
+      via an expensive reachability over the unreduced state space
+      (because commutativity should hold in all futures).
+    - Added experimental support for leaping partial-order reduction.
+     Leap sets sequentially combine multiple disjoint POR sets to
+     'leap' through the state space (--leap in combination with --por).
     - Add GBExit function that is called before a back-end exits.
+    - Factored out chunk tables and other functionality from pins.c.
     - Add functions GB<set|get>VarPerm and GB<set|get>GroupPerm that allows
       language front-ends to provide permutations. This is useful when
       front-ends have language specific algorithms for static variable reordering.
@@ -60,13 +84,19 @@
     - Major refactor to the PINS regrouping layer, simplifying its use for
       developers.
     - LTSmin now uses Travis CI.
+    - LTSmin now fully supports the Windows platform, since CygWin is available
+      in 64 bit.
 
  1. Bandwidth and Wavefront Reduction for Static Variable Ordering in Symbolic Reachability Analysis -
      http://dx.doi.org/10.1007/978-3-319-40648-0_20
- 1. Complete Results for the 2016 Edition of the Model Checking Contest -
+ 2. Complete Results for the 2016 Edition of the Model Checking Contest -
      http://mcc.lip6.fr/
- 1. Symbolic Reachability Analysis of B Through ProB and LTSmin -
+ 3. Symbolic Reachability Analysis of B Through ProB and LTSmin -
      http://dx.doi.org/10.1007/978-3-319-33693-0_18
+ 4. Multi-Core On-The-Fly SCC Decomposition -
+     http://eprints.eemcs.utwente.nl/26873/
+ 5. Multi-core SCC-Based LTL Model Checking
+     http://dx.doi.org/10.1007/978-3-319-49052-6_2
 
 # January 23, 2015 - Release 2.1 of the LTSmin toolset
 
