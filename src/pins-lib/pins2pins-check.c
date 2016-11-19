@@ -338,6 +338,9 @@ type_min (check_ctx_t *ctx, int idx)
         case LTStypeDirect:
         case LTStypeEnum:
         case LTStypeChunk:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             return 0;
         default: HREassert(false);
     }
@@ -365,6 +368,12 @@ type_max (check_ctx_t *ctx, int idx)
         case LTStypeChunk:
             c = pins_chunk_count (model, typeno);
             return c == 0 ? 1 : c;
+        case LTStypeBool:
+            return 1;
+        case LTStypeTrilean:
+            return 2;
+        case LTStypeSInt32:
+            return 1UL<<31-1;
         default: HREassert(false);
     }
 }
