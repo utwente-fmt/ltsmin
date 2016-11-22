@@ -653,7 +653,8 @@ PORwrapper (model_t model)
                     // is even dependent? Front-end might miss it.
                     for (int k = 0; k < ctx->nslots; k++) {
                         if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
-                            (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ) {
+                            (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ||
+                            (dm_is_set( p_dm_w, i, k) && dm_is_set(p_dm_w, j, k))) {
                             dm_set( not_left_accords, i, j );
                             break;
                         }
