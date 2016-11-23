@@ -24,7 +24,7 @@ struct poptOption timed_options[] = {
      "For the best performance set this to: cache line size (usually 64) divided by lattice size of 8 byte.", NULL},
     {"update", 'u', POPT_ARG_INT | POPT_ARGFLAG_SHOW_DEFAULT, &UPDATE,
       0,"cover update strategy: 0 = simple, 1 = update waiting, 2 = update passed (may break traces)", NULL},
-    {"non-blocking", 'n', POPT_ARG_VAL, &NONBLOCKING, 1, "Non-blocking TA reachability", NULL},
+    {"non-blocking", 0, POPT_ARG_VAL, &NONBLOCKING, 1, "Non-blocking TA reachability", NULL},
     POPT_TABLEEND
 };
 
@@ -229,7 +229,7 @@ grab_waiting (wctx_t *ctx, raw_data_t state_data)
     ta_alg_shared_t    *shared = (ta_alg_shared_t *) ctx->run->shared;
     ta_alg_global_t    *sm = (ta_alg_global_t *) ctx->global;
     state_info_deserialize (ctx->state, state_data);
-    if ((TA_UPDATE_NONE == UPDATE) && !NONBLOCKING)
+    if ((UPDATE == TA_UPDATE_NONE) && !NONBLOCKING)
         return 1; // we don't need to update the global waiting info
     return lm_cas_update(shared->lmap, sm->lloc, ctx->state->lattice, TA_WAITING,
                                                  ctx->state->lattice, TA_PASSED);
@@ -441,7 +441,7 @@ timed_run (run_t *run, wctx_t *ctx)
     if (0 == ctx->id) { // only w1 receives load, as it is propagated later
         if ( Strat_PBFS & strategy[0] ) {
             if (ctx->local->lts != NULL) {
-                state_data_t        initial = state_info_state(ctx->initial);
+                state_data_t    initial = state_info_state(ctx->initial);
                 int             src_owner = ref_hash(ctx->initial->ref) % W;
                 lts_write_init (ctx->local->lts, src_owner, initial);
             }
