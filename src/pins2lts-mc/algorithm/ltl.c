@@ -75,7 +75,7 @@ ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
 {
     global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
     /* Stop other workers, exit if some other worker was first here */
-    if ( !run_stop(run) )
+    if ( no_exit || !run_stop(run) )
         return;
     size_t              level = dfs_stack_nframes (stack) + 1;
     Warning (info, " ");

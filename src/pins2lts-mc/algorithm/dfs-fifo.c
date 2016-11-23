@@ -73,6 +73,8 @@ construct_np_lasso (wctx_t* ctx, state_info_t* successor)
     Warning (info, "Non-progress cycle FOUND at depth %zu!", cnt->level_cur);
     Warning (info, " ");
 
+    if (!trc_output) return;
+
     trace = trc_find_trace (successor->ref, level, shared->parent_ref,
                             ctx->initial->ref, &length);
     dfs_stack_t s = dfs_stack_create (state_info_serialize_int_size (ctx->state));
@@ -120,7 +122,7 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     if (!is_progress && seen && ecd_has_state(loc->cyan, successor)) {
         global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
-        if (run_stop(ctx->run) && trc_output) {
+        if (run_stop(ctx->run)) {
             construct_np_lasso (ctx, successor);
         }
     }
