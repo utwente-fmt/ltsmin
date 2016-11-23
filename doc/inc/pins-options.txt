@@ -104,8 +104,26 @@ ltsmin;;
     to progress independently.
 endif::ltl[]
 
-*--por*::
-    Activate partial order reduction
+*--por*='heur|del'::
+    Activate partial-order reduction
 +
-Partial Order Reduction can reduce the state space when searching
+Partial-Order Reduction (POR) can reduce the state space when searching
 for deadlocks (+-d+) or accepting cycles (+--ltl+).
+Two POR algorithms are available:
+
+heur;;
+    Uses a cost-based heuristic beam-search to find the smallest stubborn set
+
+del;;
+    Uses Valmari's deletion algorithm to find the smallest stubborn set by
+    iteratively removing transitions while maintaining the constraints. 
+
+
+*--weak*::
+    Use weak commutativity in partial-order reduction. Possibly yielding better
+    reductions.
+    
+ 
+*--leap*::
+    Use leaping partial-order reduction, by combining several disjoint
+    stubborn sets sequentially.

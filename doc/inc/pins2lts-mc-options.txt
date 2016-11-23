@@ -67,6 +67,12 @@ ufscc;;
   The UFSCC SCC algorithm.
   Multi-Core On-The-Fly SCC Decomposition (Bloemen, Laarman, van de Pol).
 
+dfsfifo;;
+  DFS-FIFO detect non-progress cycles if the front-end provides a progress
+  state or transitions label.
+  Additionally, it verifies weak LTL properties with superior scalability
+  to the *NDFS algorithms. LTSmin automatically identifies weak LTL
+  formulae when provided with a property (via the --ltl option).
 
 *--perm*='TYPE'::
         Select the transition permutation, which is used to guide
@@ -155,11 +161,20 @@ cleary-tree;;
         Maximum search depth.
 
 
+*--progress-states*::
+    Forcess DFS-FIFO to use progress state labels, even if progress transition
+    labels are present.
+
+
+*--strict*::
+    Forces DFS-FIFO to use strict BFS ordering for finding shorter lassos.
+    
+
 *--proviso*='PROVISO'::
     Change the proviso implementation for partial order reduction in presence
     of safety properties or liveness properties. Parallel LTL is only supported
     with the cndfs proviso in the cndfs search strategy. Sequentially, LTL is
-    also supported the stack proviso in the ndfs search strategy.
+    also supported with the stack proviso in the ndfs search strategy.
     PROVISO can be either:
 
 force-none;;
