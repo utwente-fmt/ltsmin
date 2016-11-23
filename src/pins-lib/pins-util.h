@@ -135,4 +135,11 @@ extern int pins_chunk_put (model_t model, int type_no, const chunk c);
 */
 extern chunk pins_chunk_get (model_t model, int type_no, int index);
 
+/**
+\brief Checks whether a transition group has guards
+ This method is used for partial order reduction
+*/
+extern int pins_has_guards (model_t model);
+
+
 #endif // PINS_UTIL

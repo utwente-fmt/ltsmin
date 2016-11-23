@@ -800,7 +800,7 @@ loadTraceGCF(char * file){
 		        //             fprintf(opf, "edge_lbls[%d]: %d\n", j, edge_lbls[j]);
 		        //             chunk c = chunk_str(tmp);
     						// int act_index = GBchunkPut(model, typeno, c);
-    						// if (GBhasGuardsInfo(model)){
+    						// if (pins_has_guards(model)){
 	    					// 	int labels[189];
 	    					// 	for (int k = 0; k < 189; k++)
 	        	// 					labels[k] = edge_lbls[j] == k ? act_index : -1;

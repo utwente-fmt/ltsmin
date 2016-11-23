@@ -510,12 +510,6 @@ extern void GBsetLTStype(model_t model, lts_type_t info);
 extern void GBsetStateLabelInfo(model_t model, matrix_t *sl_info);
 
 /**
-\brief Checks whether a transition group has guards
- This method is used for partial order reduction
-*/
-extern int GBhasGuardsInfo(model_t model);
-
-/**
 \brief Set the guard array for a model
 */
 extern void GBsetGuardsInfo(model_t model, guard_t** guard);
