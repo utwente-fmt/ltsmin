@@ -926,8 +926,6 @@ void GBsetStateLabelGroupInfo(model_t model, sl_group_enum_t group, sl_group_t* 
     model->sl_groups[group] = group_info;
 }
 
-int GBhasGuardsInfo(model_t model) { return model->guards != NULL; }
-
 void GBsetGuardsInfo(model_t model, guard_t** guards) {
     model->guards = guards;
 }
@@ -1138,7 +1136,7 @@ void GBprintStateLabelInfo(FILE* file, model_t model) {
 }
 
 void GBprintStateLabelGroupInfo(FILE* file, model_t model) {
-    if (GBhasGuardsInfo(model))
+    if (pins_has_guards(model))
     {
         int nGroups = dm_nrows (GBgetDMInfo (model));
         Printf(info, "State label group info:\n");

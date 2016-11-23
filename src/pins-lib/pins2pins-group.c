@@ -1063,7 +1063,7 @@ str2vec(const int max_size, const char *perm, int *vec)
 model_t
 GBregroup (model_t model)
 {
-    if (!GBhasGuardsInfo(model)) {
+    if (!pins_has_guards(model)) {
         if (PINS_USE_GUARDS)
             Warning (info, "Ignoring option " USE_GUARDS_OPTION " for lack of guards!");
         PINS_USE_GUARDS = 0;

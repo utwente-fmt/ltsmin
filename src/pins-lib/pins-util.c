@@ -201,3 +201,10 @@ pins_chunk_iterator (model_t model,int type_no)
     value_table_t map = GBgetChunkMap (model, type_no);
     return VTiterator (map);
 }
+
+int
+pins_has_guards (model_t model)
+{
+    return GBgetGuardsInfo(model) != NULL;
+}
+
