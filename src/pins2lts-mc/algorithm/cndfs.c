@@ -157,7 +157,7 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
     size_t             *level;
     onstack = ctx->state->ref == loc->seed->ref;
     if (!onstack) {
-        onstack = fset_find (cloc->fset, NULL, &successor->ref, (void**)&level, false);
+        onstack = fset_find (cloc->pink, NULL, &successor->ref, (void**)&level, false);
         HREassert (onstack != FSET_FULL);
     }
 
@@ -195,7 +195,7 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
     cndfs_alg_local_t  *cloc = (cndfs_alg_local_t *) ctx->local;
 
     size_t             *level;
-    int onstack = fset_find (cloc->fset, NULL, &successor->ref, (void**)&level, false);
+    int onstack = fset_find (cloc->pink, NULL, &successor->ref, (void**)&level, false);
     HREassert (onstack != FSET_FULL);
 
     /**
@@ -330,7 +330,7 @@ accepting_down (wctx_t* ctx, state_info_t *state, int accepting)
     alg_local_t            *loc = ctx->local;
     cndfs_alg_local_t      *cloc = (cndfs_alg_local_t *) ctx->local;
     size_t                 *depth = NULL;
-    int success = fset_delete_get_data (cloc->fset, NULL, &state->ref, (void**)&depth);
+    int success = fset_delete_get_data (cloc->pink, NULL, &state->ref, (void**)&depth);
     Debug ("Delled state %zu %s with depth %zu.\t\tCurrent accepting depth: %zu",
            state->ref, (accepting ? "(accepting)" : ""), *depth, cloc->accepting_depth);
     HREassert (success, "Not cyan: %zu??", loc->seed->ref);
@@ -347,7 +347,7 @@ on_stack_accepting_up (wctx_t *ctx, int *accepting)
     cndfs_alg_local_t      *cloc = (cndfs_alg_local_t *) ctx->local;
     size_t                 *depth;
     int                     on_stack;
-    on_stack = fset_find (cloc->fset, NULL, &ctx->state->ref, (void**)&depth, true);
+    on_stack = fset_find (cloc->pink, NULL, &ctx->state->ref, (void**)&depth, true);
     HREassert (on_stack != FSET_FULL);
     if (!on_stack) {
         *accepting = pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) != 0;
@@ -368,7 +368,7 @@ endfs_red (wctx_t *ctx)
     size_t              seed_level = dfs_stack_nframes (loc->stack);
     int                 accepting = 0;
     int                 on_stack;
-    size_t              count = fset_count(cloc->fset);
+    size_t              count = fset_count(cloc->pink);
 
     size_t               *level;
     while ( !run_is_stopped(ctx->run) ) {
@@ -379,7 +379,7 @@ endfs_red (wctx_t *ctx)
             // seed is only state on both cyan and pink stack
             on_stack = ctx->state->ref == loc->seed->ref;
             if (!on_stack) {
-                on_stack = fset_find (cloc->fset, NULL, &ctx->state->ref, (void**)&level, false);
+                on_stack = fset_find (cloc->pink, NULL, &ctx->state->ref, (void**)&level, false);
                 HREassert (on_stack != FSET_FULL);
             }
 
@@ -418,7 +418,7 @@ endfs_red (wctx_t *ctx)
         }
     }
     if (!run_is_stopped(ctx->run)) {
-        HREassert (fset_count(cloc->fset) == count);
+        HREassert (fset_count(cloc->pink) == count);
     }
 }
 
@@ -506,7 +506,7 @@ endfs_blue (run_t *run, wctx_t *ctx)
         }
     }
 
-    HREassert (run_is_stopped(ctx->run) || fset_count(cloc->fset) == 0);
+    HREassert (run_is_stopped(ctx->run) || fset_count(cloc->pink) == 0);
 
     // if the recursive strategy uses global bits (global pruning)
     // then do simple load balancing (only for the top-level strategy)
@@ -566,6 +566,8 @@ cndfs_local_setup   (run_t *run, wctx_t *ctx)
     cloc->in_stack = dfs_stack_create (len);
     cloc->out_stack = dfs_stack_create (len);
 
+    cloc->pink = fset_create (sizeof(ref_t), sizeof(size_t), FSET_MIN_SIZE, 24);
+
     if (get_strategy(run->alg) & Strat_CNDFS) return;
 
     if (run->shared->rec == NULL) {
@@ -593,9 +595,6 @@ cndfs_local_init   (run_t *run, wctx_t *ctx)
     ctx->local = loc;
 
     cndfs_local_setup (run, ctx);
-
-    cndfs_alg_local_t  *cloc = (cndfs_alg_local_t *) ctx->local;
-    cloc->fset = fset_create (sizeof(ref_t), sizeof(size_t), 4, 24);
 }
 
 void
@@ -612,6 +611,7 @@ cndfs_local_deinit   (run_t *run, wctx_t *ctx)
     dfs_stack_destroy (cloc->out_stack);
     RTdeleteTimer (cloc->timer);
     ndfs_local_deinit (run, ctx);
+    fset_free (cloc->pink);
 }
 
 void
@@ -668,12 +668,12 @@ cndfs_reduce  (run_t *run, wctx_t *ctx)
     float                   waittime = RTrealTime(cloc->timer);
     reduced->waittime   += waittime;
     reduced->rec        += cloc->counters.rec;
-    reduced->max_load   += fset_max_load (cloc->fset);
+    reduced->max_load   += fset_max_load (cloc->pink);
 
     ndfs_reduce (run, ctx);
 
     if (log_active(infoLong)) {
-        fset_print_statistics (cloc->fset, "Stack set: ");
+        fset_print_statistics (cloc->pink, "Pink stack set:");
     }
 
     if (run->shared->rec != NULL) {
@@ -690,7 +690,7 @@ cndfs_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
 
     void               *level;
     if (!seen) {
-        seen = fset_find (cloc->fset, NULL, &ref, &level, false);
+        seen = fset_find (cloc->pink, NULL, &ref, &level, false);
         HREassert (seen != FSET_FULL);
     }
     if (seen) return 1;
