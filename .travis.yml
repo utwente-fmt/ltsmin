@@ -206,10 +206,10 @@ before_script:
   # include    
   - export C_INCLUDE_PATH="$HOME/ltsmin-deps/include:$C_INCLUDE_PATH"
   # lib (linux)
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then 
+  - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" != "xyes" ]; then
     export LD_LIBRARY_PATH="$HOME/ltsmin-deps/lib:$HOME/ProB/lib:$LD_LIBRARY_PATH"; fi
   # lib (osx)
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then 
+  - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" != "xyes" ]; then
     export DYLD_LIBRARY_PATH="$HOME/ltsmin-deps/lib:$HOME/ProB/lib:$DYLD_LIBRARY_PATH" &&
     export LDFLAGS="-L$HOME/ltsmin-deps/lib"; fi
   # Move static libraries to a special folder (osx).
@@ -223,12 +223,23 @@ before_script:
     cp /usr/local/lib/libgmp.a "$HOME/static-libs" &&
     cp /usr/local/lib/libpopt.a "$HOME/static-libs" &&
     cp "/usr/local/Cellar/libxml2/$(brew list --versions libxml2 | cut -d' ' -f2)/lib/libxml2.a" "$HOME/static-libs"; fi
+  # Now do the same on Linux.
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
+    mkdir "$HOME/static-libs" &&
+    cp "$HOME/ltsmin-deps/lib/libzmq.a" "$HOME/static-libs" &&
+    cp "$HOME/ltsmin-deps/lib/libczmq.a" "$HOME/static-libs" &&
+    cp /usr/lib/libnuma.a "$HOME/static-libs" &&
+    cp /usr/lib/x86_64-linux-gnu/libpopt.a "$HOME/static-libs" &&
+    cp /usr/lib/x86_64-linux-gnu/libgmp.a "$HOME/static-libs" &&
+    cp /usr/lib/x86_64-linux-gnu/libltdl.a "$HOME/static-libs" &&
+    cp /usr/lib/x86_64-linux-gnu/libxml2.a "$HOME/static-libs" &&
+    cp /usr/lib/x86_64-linux-gnu/libz.a "$HOME/static-libs"; fi
 
 script:
   - ./ltsminreconf &&
     ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop $CONFIGURE_WITH
   - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS="-Wl,-search_paths_first -L$HOME/static-libs -weak-liconv"; fi # libiconv is necessary for libpopt
-  - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS="-Wl,--no-export-dynamic -all-static"; fi
+  - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS="-L$HOME/static-libs -static-libgcc -static-libstdc++"; fi
   - if [ "x$CHECK" = "xyes" ]; then make; fi
   - if [ "x$CHECK" = "xyes" ]; then make check -j1; fi
   - if [ "x$CHECK" = "xyes" -a $? -ne 0 ]; then cat testsuite/*.log || true; fi
