@@ -12,7 +12,7 @@ hint_binary(const format_table_t f[DATA_FORMAT_SIZE][DATA_FORMAT_SIZE], char *ms
     for (int i = 0; i < DATA_FORMAT_SIZE; i++) {
         for (int j = 0; j < DATA_FORMAT_SIZE; j++) {
             if (f[i][j].error != -1) {
-                l += snprintf(msg + (msg?l:0), size - l, "%s(%s, %s)", l == 0 ? "" : ", ",
+                l += snprintf(msg ? msg + l : 0, msg ? size - l : 0, "%s(%s, %s)", l == 0 ? "" : ", ",
                     data_format_string_generic(i), data_format_string_generic(j));
             }
         }
@@ -42,7 +42,7 @@ hint_unary(const format_table_t f[DATA_FORMAT_SIZE], char *msg, size_t size)
     int l = 0;
     for (int i = 0; i < DATA_FORMAT_SIZE; i++) {
         if (f[i].error != -1) {
-            l += snprintf(msg + (msg?l:0), size - l, "%s%s", l == 0 ? "" : ", ",
+            l += snprintf(msg ? msg + l : 0, msg ? size - l : 0, "%s%s", l == 0 ? "" : ", ",
                 data_format_string_generic(i));
         }
     }
