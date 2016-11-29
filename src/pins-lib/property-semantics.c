@@ -105,7 +105,8 @@ evar_cb(void *context, transition_info_t *ti, int *dst, int *cpy)
 long
 eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_labels, ltsmin_parse_env_t env)
 {
-    const int N = lts_type_get_state_length(GBgetLTStype(model));
+    const lts_type_t lts_type = GBgetLTStype(model);
+    const int N = lts_type_get_state_length(lts_type);
 
     switch (e->token) {
         case PRED_TRUE:
@@ -116,8 +117,18 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
             return e->idx;
         case PRED_SVAR:
             if (e->idx < N) { // state variable
+#ifndef NDEBUG
+                // check that we never have a "maybe" value (must be guaranteed by back-end).
+                const data_format_t df = lts_type_get_format(lts_type, lts_type_get_state_typeno(lts_type, e->idx));
+                HREassert(df != LTStypeTrilean || state[e->idx] != 2);
+#endif
                 return state[e->idx];
             } else { // state label
+#ifndef NDEBUG
+                // check that we never have a "maybe" value (must be guaranteed by back-end).
+                const data_format_t df = lts_type_get_format(lts_type, lts_type_get_state_label_typeno(lts_type, e->idx - N));
+                HREassert(df != LTStypeTrilean || GBgetStateLabelLong(model, e->idx - N, state) != 2);
+#endif
                 return GBgetStateLabelLong(model, e->idx - N, state);
             }
         case PRED_EVAR: {
@@ -140,6 +151,11 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
                 } else return -1;
             } else if (edge_labels != NULL) {
                 HREassert(edge_labels[0] != -1, "transition checking on state predicates");
+#ifndef NDEBUG
+                // check that we never have a "maybe" value (must be guaranteed by back-end).
+                const data_format_t df = lts_type_get_format(lts_type, lts_type_get_edge_label_typeno(lts_type, e->idx));
+                HREassert(df != LTStypeTrilean || edge_labels[e->idx] != 2);
+#endif
                 return edge_labels[e->idx];
             } else return -1;
         }
