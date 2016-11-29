@@ -139,10 +139,7 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
                     return ctx.exists ? ctx.num : -1;
                 } else return -1;
             } else if (edge_labels != NULL) {
-                if (edge_labels[0] == -1) { // error, we may not use trans!
-                    LTSminLogExpr (error, "transition checking on state predicates: ", e, env);
-                    HREabort(LTSMIN_EXIT_FAILURE);
-                }
+                HREassert(edge_labels[0] != -1, "transition checking on state predicates");
                 return edge_labels[e->idx];
             } else return -1;
         }
