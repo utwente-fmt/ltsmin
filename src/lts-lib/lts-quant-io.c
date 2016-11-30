@@ -131,7 +131,7 @@ void lts_read_tra(const char*tra_name,lts_t lts){
             for(entry=buffer;entry;entry=next){
                 next=strchr(entry,' ');
                 if(next) { *next=0; next++; }
-                sscanf(entry,"%d=%s",&no,(char*)&name);
+                sscanf(entry,"%d=%4096s",&no,(char*)&name);
                 if (no<0) Abort("negative label");
                 name[strlen(name)-1]=0;
                 Print(infoShort,"label %d is %s",no,name+1);
