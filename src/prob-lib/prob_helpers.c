@@ -59,7 +59,8 @@ ProBState prob_get_state(zmsg_t *msg) {
 }
 
 ProBInitialResponse prob_get_init_response(zmsg_t *msg) {
-    ProBInitialResponse res = {0};
+    ProBInitialResponse res;
+    memset(&res, 0, sizeof(res));
     drop_frame(msg); // message type
     drop_frame(msg); // ID
 

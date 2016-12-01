@@ -70,7 +70,6 @@ typedef struct ProBInitialResponse {
     ProBMatrix ltl_labels; // exactly like state_labels
 } ProBInitialResponse;
 
-
 ProBState prob_get_state(zmsg_t *msg);
 ProBMatrix prob_get_matrix(zmsg_t *msg);
 ProBInitialResponse prob_get_init_response(zmsg_t *msg);
