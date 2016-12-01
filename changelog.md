@@ -16,6 +16,7 @@
     - It is now possible to output all Sylvan statistics, such as the size
       of the node table, number of GCs etc.
     - Add option --mu-opt that enables a faster mu-calculus model checker.
+    - Sylvan's LDDmc is now the default decision diagram package.
 
 - Improvements to the static variable ordering:
     - Invert the permutation of rows/columns (transition groups/state variables)
