@@ -34,12 +34,17 @@ init_state_info (void *arg, void *old_array, int old_size, void *new_array,
     (void)arg;(void)old_array;
 }
 
+typedef struct label_data {
+    int is_cached;
+    int val;
+} label_data_t;
+
 static void
 init_label_cache (void *arg, void *old_array, int old_size, void *new_array,
                   int new_size) {
-    int                *array = (int *) new_array;
+    label_data_t        *array = (label_data_t *) new_array;
     while (old_size < new_size) {
-        array[old_size] = -1;
+        array[old_size].is_cached = 0;
         old_size++;
     }
     (void)arg;(void)old_array;
@@ -70,12 +75,12 @@ typedef struct group_cache {
 } group_cache_t;
 
 typedef struct label_cache {
-    size_t              len;  // number of chunks touched
-    size_t              size; // len * sizeof(int), since chunks are indexed via ints?
+    size_t              len;  // length of the short vector
+    size_t              size; // length of the short vector in bytes
     string_index_t      idx;  // mapping of short state -> index
 
     array_manager_t     label_val_man;
-    int                *label_val; // TODO: we could probably even use bytes for this
+    label_data_t       *label_cache;
 } label_cache_t;
 
 typedef struct cache_context {
@@ -114,9 +119,24 @@ add_cache_entry (void *context, transition_info_t *ti, int *dst, int *cpy)
     (void) cpy;
 }
 
+static int
+cached_label_short (model_t self, int label, int *src) {
+    cache_context_t    *ctx = (cache_context_t *)GBgetContext (self);
+    label_cache_t      *cache = &(ctx->cache_labels[label]);
+
+    int                 idx = SIputC (cache->idx, (char *)src, cache->size);
+    ensure_access (cache->label_val_man, idx);
+
+    if (cache->label_cache[idx].is_cached == 0) {
+        cache->label_cache[idx].val = GBgetStateLabelShort (GBgetParent(self), label, src);
+        cache->label_cache[idx].is_cached = 1;
+    }
+
+    return cache->label_cache[idx].val;
+}
+
 static void
 get_label_group_cached(model_t model, sl_group_enum_t group, int *src, int *label) {
-    cache_context_t    *ctx = (cache_context_t *)GBgetContext (model);
 
     sl_group_t         *label_group = GBgetStateLabelGroupInfo(model, group);
     int                 N_labels = label_group->count;
@@ -129,33 +149,8 @@ get_label_group_cached(model_t model, sl_group_enum_t group, int *src, int *labe
         int             short_state[short_len];
         dm_project_vector(label_info, nth_label, src, short_state);
 
-        // lookup in cache
-        label_cache_t  *cache = &(ctx->cache_labels[nth_label]);
-        int idx = SIputC (cache->idx, (char *)short_state, cache->size);
-        ensure_access (cache->label_val_man, idx);
-
-        if (cache->label_val[idx] == -1) {
-            // cache miss
-            // FIXME: should this be the Short or Long version of this function?
-            cache->label_val[idx] = GBgetStateLabelShort(GBgetParent(model), nth_label, short_state);
-        }
-        label[i] = cache->label_val[idx];
+        label[i] = cached_label_short(model, nth_label, short_state);
     }
-}
-
-static int
-cached_label_short (model_t self, int label, int *src) {
-    cache_context_t    *ctx = (cache_context_t *)GBgetContext (self);
-    label_cache_t      *cache = &(ctx->cache_labels[label]);
-
-    int                 idx = SIputC (cache->idx, (char *)src, cache->size);
-    ensure_access (cache->label_val_man, idx);
-
-    if (cache->label_val[idx] == -1) {
-        cache->label_val[idx] = GBgetStateLabelShort (GBgetParent(self), label, src);
-    }
-    
-    return cache->label_val[idx];
 }
 
 static int
@@ -236,8 +231,8 @@ GBaddCache (model_t model)
         label_cache[i].size = sizeof(int[len]);
         label_cache[i].idx = SIcreate ();
         label_cache[i].label_val_man = create_manager (256);
-        label_cache[i].label_val = NULL;
-        ADD_ARRAY_CB(label_cache[i].label_val_man, label_cache[i].label_val, int, init_label_cache, NULL);
+        label_cache[i].label_cache = NULL;
+        ADD_ARRAY_CB(label_cache[i].label_val_man, label_cache[i].label_cache, label_data_t, init_label_cache, NULL);
     }
 
 
