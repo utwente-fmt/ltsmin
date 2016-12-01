@@ -1458,7 +1458,10 @@ gsea_setup_default()
 
     // invariant violation detection?
     if (opt.inv_detect) {
-        assert (!gc.post_state_next);
+        if (gc.post_state_next) {
+            Abort("Deadlock detection and invariant violation detection"
+                    " not possible simultaneously.");
+        }
         gc.post_state_next = gsea_invariant_check;
     }
 
