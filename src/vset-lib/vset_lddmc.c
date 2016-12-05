@@ -494,7 +494,7 @@ set_next_union(vset_t dst, vset_t src, vrel_t rel, vset_t uni)
 {
     LACE_ME;
     assert(dst->size == src->size && uni->size == dst->size);
-    if (dst == src) {
+    if (dst == src || dst == uni) {
         MDD old = dst->mdd;
         dst->mdd = lddmc_ref(lddmc_relprod_union(src->mdd, rel->mdd, rel->meta, uni->mdd));
         lddmc_deref(old);
@@ -510,7 +510,7 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t universe)
     LACE_ME;
     assert(dst->size == src->size);
     assert(dst->size == universe->size);
-    if (dst == src) {
+    if (dst == src || dst == universe) {
         MDD old = dst->mdd;
         dst->mdd = lddmc_ref(lddmc_relprev(src->mdd, rel->mdd, rel->meta, universe->mdd));
         lddmc_deref(old);
