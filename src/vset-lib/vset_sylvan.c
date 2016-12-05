@@ -581,11 +581,14 @@ set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
     assert(dst->state_variables == src->state_variables);
 
     if (dst == univ) {
-        Abort("Do not call set_prev with dst == univ");
+        BDD tmp = sylvan_relprev(rel->bdd, src->bdd, rel->all_variables);
+        bdd_refs_push(tmp);
+        dst->bdd = sylvan_and(tmp, univ->bdd);
+        bdd_refs_pop(1);
+    } else {
+        dst->bdd = sylvan_relprev(rel->bdd, src->bdd, rel->all_variables);
+        dst->bdd = sylvan_and(dst->bdd, univ->bdd);
     }
-
-    dst->bdd = sylvan_relprev(rel->bdd, src->bdd, rel->all_variables);
-    set_intersect(dst, univ);
 }
 
 /**
