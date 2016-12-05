@@ -71,10 +71,10 @@ typedef struct search_context {
     int             visible_nds;    // set of visible NDSs included
 } search_context_t;
 
-typedef struct beam_s {
+struct beam_s {
     int              beam_used;     // number of search contexts in use
     search_context_t**search;       // search contexts
-} beam_t;
+};
 
 static inline void
 incr_ns_update (por_context *ctx, int group, int new_group_score)
