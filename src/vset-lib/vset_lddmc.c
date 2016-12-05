@@ -160,8 +160,8 @@ rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const in
 {
     int i=0, j=0, k=0;
 
-    uint32_t vec[rel->size];
-    int cpy_vec[rel->size];
+    uint32_t vec[rel->size + 1];
+    int cpy_vec[rel->size + 1];
 
     MDD meta = rel->meta;
     for (;;) {
