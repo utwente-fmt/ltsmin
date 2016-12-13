@@ -475,6 +475,58 @@ print_ltsmin_buchi_helper (const ltsmin_buchi_t *ba, ltsmin_parse_env_t env,
     return n;
 }
 
+
+static size_t
+print_ltsmin_rabin_helper (const ltsmin_buchi_t *ba, ltsmin_parse_env_t env,
+                           char *buf, size_t max_buf)
+{
+    size_t n = 0;
+
+    for (int pair_i = 0; pair_i < ba->rabin->n_pairs; pair_i ++) {
+        n += snprintf(buf + (buf?n:0), max_buf, "(");
+        if (ba->rabin->pairs[pair_i].fin_set != 0) {
+            // figure out the acceptance marks
+            n += snprintf(buf + (buf?n:0), max_buf, "Fin(");
+            int first = 1;
+            for (int p=0; p<32; p++) {
+                if ( ba->rabin->pairs[pair_i].fin_set & (1 << p) ) {
+                    //n += snprintf(buf + (buf?n:0), max_buf, " %d",p);
+                    if (first) {
+                        n += snprintf(buf + (buf?n:0), max_buf, "%d",p);
+                        first = false;
+                    } else {
+                        n += snprintf(buf + (buf?n:0), max_buf, ",%d",p);
+                    }
+                }
+            }
+            n += snprintf(buf + (buf?n:0), max_buf, "),");
+        } else n += snprintf(buf + (buf?n:0), max_buf, "-,");
+        if (ba->rabin->pairs[pair_i].inf_set != 0) {
+            // figure out the acceptance marks
+            n += snprintf(buf + (buf?n:0), max_buf, "Inf(");
+            int first = 1;
+            for (int p=0; p<32; p++) {
+                if ( ba->rabin->pairs[pair_i].inf_set & (1 << p) ) {
+                    if (first) {
+                        n += snprintf(buf + (buf?n:0), max_buf, "%d",p);
+                        first = false;
+                    } else {
+                        n += snprintf(buf + (buf?n:0), max_buf, ",%d",p);
+                    }
+                }
+            }
+            n += snprintf(buf + (buf?n:0), max_buf, ")");
+        } else n += snprintf(buf + (buf?n:0), max_buf, "-");
+        // separator for next pair
+        n += snprintf(buf + (buf?n:0), max_buf, ")");
+        if (pair_i+1 < ba->rabin->n_pairs) {
+            n += snprintf(buf + (buf?n:0), max_buf, " | ");
+        }
+    }
+
+    return n;
+}
+
 void
 print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 {
@@ -483,18 +535,31 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
     if (log_active(infoLong)) {
         int is_hoa = ba->acceptance_set;
         if (is_hoa) { // HOA acceptance
-            char *buf = NULL;
-            for (int p=0; p<32; p++) {
-                if ( ba->acceptance_set & (1 << p) ) {
-                    // print two times, first to obtain the size (+ nullbyte)
-                    size_t n = snprintf(NULL, 0, " %d", p) + 1;
-                    buf = RTmalloc (sizeof (char) * n);
-                    // and the second time for the actual print
-                    snprintf(buf, n, " %d", p);
+            int is_tgba = (ba->rabin == NULL);
+            if (is_tgba) { // TGBA acceptance
+                char *buf = NULL;
+                for (int p=0; p<32; p++) {
+                    if ( ba->acceptance_set & (1 << p) ) {
+                        // print two times, first to obtain the size (+ nullbyte)
+                        size_t n = snprintf(NULL, 0, " %d", p) + 1;
+                        buf = RTmalloc (sizeof (char) * n);
+                        // and the second time for the actual print
+                        snprintf(buf, n, " %d", p);
+                    }
                 }
+                Warning(infoLong, "Acceptance set: {%s }", buf);
+                RTfree(buf);
+            } else { // Rabin acceptance
+
+                // print two times, first to obtain the size (+ nullbyte)
+                size_t n = print_ltsmin_rabin_helper (ba, env, NULL, 0) + 1;
+                char *buf = RTmalloc (sizeof (char) * n);
+                // and the second time for the actual print
+                print_ltsmin_rabin_helper (ba, env, buf, n);
+
+                Warning(infoLong, "Rabin acceptance (%d): %s", ba->rabin->n_pairs, buf);
+                RTfree(buf);
             }
-            Warning(infoLong, "Acceptance set: {%s }", buf);
-            RTfree(buf);
         }
         for(int i=0; i < ba->state_count; i++) {
             if (is_hoa) {
@@ -554,6 +619,11 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
             PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
             ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env);
+
+            char command[50];
+            strcpy( command, "ls -l" );
+            system(command);
+
             ba = ltsmin_hoa_buchi(env);
         } else {
 #endif
