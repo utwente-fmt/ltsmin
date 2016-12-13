@@ -619,11 +619,6 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
             PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
             ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env);
-
-            char command[50];
-            strcpy( command, "ls -l" );
-            system(command);
-
             ba = ltsmin_hoa_buchi(env);
         } else {
 #endif
