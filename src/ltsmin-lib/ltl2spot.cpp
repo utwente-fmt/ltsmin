@@ -188,6 +188,9 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
   ltsmin_buchi_t *ba = NULL;
   ba = (ltsmin_buchi_t*) RTmalloc(sizeof(ltsmin_buchi_t) + aut->num_states() * 
     sizeof(ltsmin_buchi_state_t*));
+
+  // initialize rabin to NULL; it's only used for Rabin automata
+  ba->rabin = NULL;
   
   ba->state_count     = aut->num_states();
   ba->predicate_count = aut->ap().size();
