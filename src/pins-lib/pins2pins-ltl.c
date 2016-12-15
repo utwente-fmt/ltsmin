@@ -46,6 +46,7 @@ static si_map_entry db_ltl_semantics[]={
 static si_map_entry db_buchi_type[]={
     {"ba",      PINS_BUCHI_TYPE_BA},
     {"tgba",    PINS_BUCHI_TYPE_TGBA},
+    {"rabin",   PINS_BUCHI_TYPE_RABIN},
     {"spotba",  PINS_BUCHI_TYPE_SPOTBA},
     {NULL, 0}
 };
@@ -98,7 +99,7 @@ struct poptOption ltl_options[] = {
     {"ltl-semantics", 0, POPT_ARG_STRING, &ltl_semantics_name, 0,
      "LTL semantics", "<spin|textbook|ltsmin> (default: \"spin\")"},
     {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
-     "Buchi automaton type", "<ba|tgba|spotba>"},
+     "Buchi automaton type", "<ba|tgba|spotba|rabin>"},
     POPT_TABLEEND
 };
 
@@ -209,7 +210,7 @@ void ltl_ltsmin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
         HREassert (ctx->edge_labels_old == ctx->el_idx_accept_set);
         memcpy (ctx->labels, ti->labels, sizeof(int[ctx->edge_labels_old]));
         ti->labels = ctx->labels; // inline because por_proviso is passed up
@@ -222,7 +223,7 @@ void ltl_ltsmin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
             dst_buchi[ctx->ltl_idx] = ctx->ba->states[i]->transitions[j].to_state;
 
             // allocate the edge labels and write the TGBA acceptance set
-            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
                 ti->labels[ctx->el_idx_accept_set] =
                                 ctx->ba->states[i]->transitions[j].acc_set;
             }
@@ -283,7 +284,7 @@ void ltl_spin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
 
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
         HREassert (ctx->edge_labels_old == ctx->el_idx_accept_set);
         memcpy (ctx->labels, ti->labels, sizeof(int[ctx->edge_labels_old]));
         ti->labels = ctx->labels; // inline because por_proviso is passed up
@@ -296,7 +297,7 @@ void ltl_spin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
             dst_buchi[ctx->ltl_idx] = ctx->ba->states[i]->transitions[j].to_state;
 
             // allocate the edge labels and write the TGBA acceptance set
-            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
                 ti->labels[ctx->el_idx_accept_set] =
                                 ctx->ba->states[i]->transitions[j].acc_set;
             }
@@ -353,7 +354,7 @@ ltl_spin_all (model_t self, int *src, TransitionCB cb,
                            group, ctx->groups, ctx->ba->states[i]->transitions[j].index);
 
                 // set the edge label for the TGBA acceptance set
-                if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+                if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
                     ctx->labels[ctx->el_idx_accept_set] =
                                     ctx->ba->states[i]->transitions[j].acc_set;
                 }
@@ -384,7 +385,7 @@ void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
     int i = infoctx->src[ctx->ltl_idx];
     if (i == -1) { i=0; } /* textbook: extra initial state */
     HREassert (i < ctx->ba->state_count );
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
         HREassert (ctx->edge_labels_old == ctx->el_idx_accept_set);
         memcpy (ctx->labels, ti->labels, sizeof(int[ctx->edge_labels_old]));
         ti->labels = ctx->labels; // inline because por_proviso is passed up
@@ -397,7 +398,7 @@ void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
             dst_buchi[ctx->ltl_idx] = ctx->ba->states[i]->transitions[j].to_state;
 
             // allocate the edge labels and write the TGBA acceptance set
-            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
                 ti->labels[ctx->el_idx_accept_set] =
                                 ctx->ba->states[i]->transitions[j].acc_set;
             }
@@ -478,8 +479,7 @@ print_ltsmin_buchi_helper (const ltsmin_buchi_t *ba, ltsmin_parse_env_t env,
 
 
 static size_t
-print_ltsmin_rabin_helper (const ltsmin_buchi_t *ba, ltsmin_parse_env_t env,
-                           char *buf, size_t max_buf)
+print_ltsmin_rabin_helper (const ltsmin_buchi_t *ba, char *buf, size_t max_buf)
 {
     size_t n = 0;
 
@@ -553,10 +553,10 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
             } else { // Rabin acceptance
 
                 // print two times, first to obtain the size (+ nullbyte)
-                size_t n = print_ltsmin_rabin_helper (ba, env, NULL, 0) + 1;
+                size_t n = print_ltsmin_rabin_helper (ba, NULL, 0) + 1;
                 char *buf = RTmalloc (sizeof (char) * n);
                 // and the second time for the actual print
-                print_ltsmin_rabin_helper (ba, env, buf, n);
+                print_ltsmin_rabin_helper (ba, buf, n);
 
                 Warning(infoLong, "Rabin acceptance (%d): %s", ba->rabin->n_pairs, buf);
                 RTfree(buf);
@@ -618,8 +618,10 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         ltsmin_buchi_t *ba;
 #ifdef HAVE_SPOT
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
-            PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
-            ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env);
+            PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA || 
+            PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
+
+            ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE, env);
             ba = ltsmin_hoa_buchi(env);
         } else {
 #endif
@@ -811,7 +813,7 @@ GBaddLTL (model_t model)
                                          lts_type_get_state_label_typeno(ltstype,i));
     }
 
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
         /* Edge labels */
         int acc_set_type = lts_type_add_type (ltstype_new, LTSMIN_EDGE_TYPE_ACCEPTING_SET, NULL);
 
