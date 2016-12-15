@@ -19,7 +19,7 @@
 
 // hoa parser libraries
 #include <cpphoafparser/parser/hoa_parser.hh>
-#include <cpphoafparser/consumer/hoa_consumer_print.hh>
+#include <cpphoafparser/consumer/hoa_consumer_ltsmin.hh>
 
 using namespace cpphoafparser;
 
@@ -168,6 +168,7 @@ check_edgevar(ltsmin_expr_t e, ltsmin_parse_env_t env)
 
 spot::twa_graph_ptr spot_automaton;
 bool isTGBA;
+HOAConsumerLTSmin *cons;
 
 static int 
 get_predicate_index(std::vector<std::string> pred_vec, std::string predicate) 
@@ -344,8 +345,28 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
 }
 
 
+static ltsmin_buchi_t *
+create_ltsmin_rabin(std::istream& hoa_input) {
+
+  cons = new HOAConsumerLTSmin();
+
+  HOAConsumer::ptr consumer(cons);
+  
+  try {
+
+    HOAParser::parse(hoa_input, consumer);
+
+  } catch (std::exception& e) {
+    std::cerr << e.what() << std::endl;
+    Abort("Could not read tmp.hoa");
+  }
+
+
+  return NULL;
+}
+
 void 
-ltsmin_ltl2spot(ltsmin_expr_t e, pins_buchi_type_t buchi_type, ltsmin_parse_env_t env) 
+ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env) 
 {
   // construct the LTL formula and store the predicates
   char *buff = ltl_to_store(e, env);
@@ -353,7 +374,7 @@ ltsmin_ltl2spot(ltsmin_expr_t e, pins_buchi_type_t buchi_type, ltsmin_parse_env_
 
   // modify #(a1 == "S")#  to  "(a1 == 'S')"
   replace( ltl.begin(), ltl.end(), '"', '\'');
-  if (buchi_type != PINS_BUCHI_TYPE_RABIN) {
+  if (PINS_BUCHI_TYPE != PINS_BUCHI_TYPE_RABIN) {
     replace( ltl.begin(), ltl.end(), '#', '\"');
   }
 
@@ -363,48 +384,37 @@ ltsmin_ltl2spot(ltsmin_expr_t e, pins_buchi_type_t buchi_type, ltsmin_parse_env_
     Warning(infoLong, msg.c_str(), 0);
   }
 
-  if (buchi_type == PINS_BUCHI_TYPE_RABIN) {
+  if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
     // use a system call to get the Rabin automaton from the LTL formula
     std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > tmp.ltl"
     + " && ltldo '/home/vincent/code/ltl3dra-0.2.3/ltl3dra' -F tmp.ltl > tmp.hoa";
-    std::cout << "command: " << command << std::endl;
+    std::cout << "system command: " << command << std::endl;
     if (system(command.c_str())) {
       Abort("Could not use system command");
     }
 
     // read HOA output
-    HOAConsumer::ptr consumer(new HOAConsumerPrint(std::cout));
-
     std::ifstream hoa_file ("tmp.hoa");
+    create_ltsmin_rabin(hoa_file);
 
-    try {
+  } else {
 
-      HOAParser::parse(hoa_file, consumer);
+    // use Spot to parse the LTL and create an automata
+    spot::parsed_formula f = spot::parse_infix_psl(ltl);
+    bool parse_errors = f.format_errors(std::cerr);
+    HREassert(!parse_errors, "Parse errors found in conversion of LTL to Spot formula. LTL = %s", buff);
 
-    } catch (std::exception& e) {
-      std::cerr << e.what() << std::endl;
-      Abort("Could not read tmp.hoa");
-    }
+    spot::translator trans;
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+      isTGBA = true;
+      trans.set_type(spot::postprocessor::TGBA);
+    } else if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA)
+      trans.set_type(spot::postprocessor::BA);
+    trans.set_pref(spot::postprocessor::Deterministic);
 
-    Abort("Ending program");
+    // create the automaton
+    spot_automaton = trans.run(f.f);
   }
-
-  // use Spot to parse the LTL and create an automata
-  spot::parsed_formula f = spot::parse_infix_psl(ltl);
-  bool parse_errors = f.format_errors(std::cerr);
-  HREassert(!parse_errors, "Parse errors found in conversion of LTL to Spot formula. LTL = %s", buff);
-
-  spot::translator trans;
-  if (buchi_type == PINS_BUCHI_TYPE_TGBA) {
-    isTGBA = true;
-    trans.set_type(spot::postprocessor::TGBA);
-  } else if (buchi_type == PINS_BUCHI_TYPE_SPOTBA)
-    trans.set_type(spot::postprocessor::BA);
-  trans.set_pref(spot::postprocessor::Deterministic);
-
-  // create the automaton
-  spot_automaton = trans.run(f.f);
-
   // free
   RTfree(buff);
 }
@@ -413,8 +423,11 @@ ltsmin_ltl2spot(ltsmin_expr_t e, pins_buchi_type_t buchi_type, ltsmin_parse_env_
 ltsmin_buchi_t *
 ltsmin_hoa_buchi(ltsmin_parse_env_t env) 
 {
-  ltsmin_buchi_t *ret = create_ltsmin_buchi(spot_automaton, env);
-  return ret;
+  if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
+    return cons->get_ltsmin_buchi();
+  } else {
+    return create_ltsmin_buchi(spot_automaton, env);
+  }
 }
 
 void
