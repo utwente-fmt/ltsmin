@@ -44,6 +44,10 @@ public:
     return ba;
   }
 
+  void set_ltsmin_expr_list(ltsmin_expr_list_t *list) {
+    le_list = list;
+  }
+
   virtual bool parserResolvesAliases() override {
     return false;
   }
@@ -72,58 +76,93 @@ public:
   }
 
   virtual void setAPs(const std::vector<std::string>& aps) override {
-    return; // TODO: fix 
-    /*
     ba->predicate_count = aps.size();
     ba->predicates = (ltsmin_expr_t*) RTmalloc(ba->predicate_count * sizeof(ltsmin_expr_t));
     int i = 0;
 
     //std::cout << "found predicates: " << std::endl;
     for (const std::string& ap : aps) {
-      //std::cout << "ap: " << ap << std::endl;
+      std::string ap_name = ap;
+      replace( ap_name.begin(), ap_name.end(), '\'', '\"');
 
-      ltsmin_expr_t e = ltsmin_expr_lookup(NULL, (char*) ap.c_str(), &le_list);
+      ltsmin_expr_t e = ltsmin_expr_lookup(NULL, (char*) ap_name.c_str(), &le_list);
 
       HREassert(e, "Empty LTL expression");
 
-      //char buffer[2048];
-      //memset(buffer, 0, sizeof(buffer));
-      //ltsmin_expr_print_ltl(e, buffer); 
-      //std::cout << "ap expr: " << buffer << std::endl;
-
       ba->predicates[i] = e;
       i++;
-    }*/
-
-    (void) aps;
+    }
   }
 
   /* recursive auxiliary function to derive the acceptance conditions */
-  void recurAcceptance(acceptance_expr::ptr accExpr) {
+  void recurAcceptance(acceptance_expr::ptr accExpr, int pair_id) {
     if (accExpr->isAND()) {
-      recurAcceptance(accExpr->getLeft());
-      recurAcceptance(accExpr->getRight());
+      // rabin pair = FIN & INF & INF & INF ...
+      recurAcceptance(accExpr->getLeft(), pair_id);
+      //std::cout << " AND ";
+      recurAcceptance(accExpr->getRight(), pair_id);
+    }
+    else if (accExpr->isOR()) {
+      // new rabin pair
+      recurAcceptance(accExpr->getLeft(), pair_id);
+      //std::cout << " OR ";
+      recurAcceptance(accExpr->getRight(), pair_id+1);
     }
     else {
-      return;
       HREassert(accExpr->isAtom(), "Unknown acceptance condition"); // we only allow AND and Atoms
       AtomAcceptance atom = accExpr->getAtom();
       HREassert(!atom.isNegated(), "We don't allow negated atoms"); // we don't allow negated atoms yet
-      HREassert(atom.getType() == AtomAcceptance::AtomType::TEMPORAL_INF, "We only allow 'Inf(x)' acceptance condtitions"); // type must be Inf()
-      ba->acceptance_set |= ( 1 << ((uint32_t) atom.getAcceptanceSet()));
-      //std::cout << "atom: " << atom.getAcceptanceSet() << " acceptance_set: " << ba->acceptance_set << std::endl;
+      
+      // decide if its FIN or INF
+      uint32_t acc_mark = ( 1 << ((uint32_t) atom.getAcceptanceSet()));
+      if (atom.getType() == AtomAcceptance::AtomType::TEMPORAL_FIN) {
+        //std::cout << " FIN:" << acc_mark << " ";
+        ba->rabin->pairs[pair_id].fin_set |= acc_mark;
+        ba->acceptance_set |= acc_mark;
+        
+      }
+      else if (atom.getType() == AtomAcceptance::AtomType::TEMPORAL_INF) {
+        //std::cout << " INF:" << acc_mark << " ";
+        ba->rabin->pairs[pair_id].inf_set |= acc_mark;
+        ba->acceptance_set |= acc_mark;
+      }
+      else {
+        HREassert(false, "We don't support acceptance atoms other than Fin or Inf"); 
+      }
     }
   }
 
   virtual void setAcceptanceCondition(unsigned int numberOfSets, acceptance_expr::ptr accExpr) override {
-    // Currently we only allow: Inf(a_1) & Inf(a_2) & ... & Inf(a_k)
-    recurAcceptance(accExpr);
+    // We assume generalized rabin acceptance
+    //std::cout << "Acceptance: " << numberOfSets << " " << *accExpr << std::endl;
+    
+    recurAcceptance(accExpr,0);
+    //std::cout << std::endl;
     (void) numberOfSets;
   }
 
   virtual void provideAcceptanceName(const std::string& name, const std::vector<IntOrString>& extraInfo) override {
-    (void) name;
-    (void) extraInfo;
+    std::string rabin ("Rabin");
+    std::string gra ("generalized-Rabin");
+    if (gra.compare(name) != 0 && rabin.compare(name) != 0)
+      HREassert(false, "We only accept Rabin or Generalized Rabin automata"); 
+    
+    // get the number of rabin pairs
+    HREassert(extraInfo.size() > 0, "Info on the number of pairs is not available in the HOA"); 
+    HREassert(extraInfo[0].isInteger(), "First extra element for generalized rabin should indicate the number of pairs"); 
+
+    //std::cout << "Number of pairs: " << extraInfo[0].getInteger() << std::endl;
+    int n_pairs = extraInfo[0].getInteger();
+
+    ba->rabin = (rabin_t*) RTmalloc(sizeof(rabin_t) + n_pairs * sizeof(rabin_pair_t) );
+    ba->rabin->n_pairs = n_pairs;
+
+    // initialize to 0
+    for (int i=0; i<n_pairs; i++) {
+      ba->rabin->pairs[i].fin_set = 0;
+      ba->rabin->pairs[i].inf_set = 0;
+    }
+    ba->acceptance_set = 0;
   }
 
   virtual void setName(const std::string& name) override {
@@ -274,6 +313,7 @@ public:
 private:
   int tmp_pos, tmp_neg;
   ltsmin_buchi_t *ba = NULL;
+  ltsmin_expr_list_t *le_list = NULL;
   uint32_t s_acc = 0;
   int transition_count = 0;
   int state_index = 0;

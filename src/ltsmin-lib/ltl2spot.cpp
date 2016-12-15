@@ -349,6 +349,7 @@ static ltsmin_buchi_t *
 create_ltsmin_rabin(std::istream& hoa_input) {
 
   cons = new HOAConsumerLTSmin();
+  cons->set_ltsmin_expr_list(le_list);
 
   HOAConsumer::ptr consumer(cons);
   
@@ -387,7 +388,7 @@ ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env)
   if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
     // use a system call to get the Rabin automaton from the LTL formula
     std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > tmp.ltl"
-    + " && ltldo '/home/vincent/code/ltl3dra-0.2.3/ltl3dra' -F tmp.ltl > tmp.hoa";
+    + " && ltldo '$HOME/code/ltl3dra-0.2.3/ltl3dra' -F tmp.ltl > tmp.hoa";
     std::cout << "system command: " << command << std::endl;
     if (system(command.c_str())) {
       Abort("Could not use system command");

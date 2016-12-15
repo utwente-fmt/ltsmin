@@ -530,7 +530,7 @@ print_ltsmin_rabin_helper (const ltsmin_buchi_t *ba, char *buf, size_t max_buf)
 void
 print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 {
-    Warning(info, "buchi has %d states", ba->state_count);
+    Warning(info, "automaton has %d states", ba->state_count);
 
     if (log_active(infoLong)) {
         int is_hoa = ba->acceptance_set;
