@@ -337,12 +337,8 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
 }
 
 
-const int AUT_BA = 0;
-const int AUT_TGBA = 1;
-const int AUT_RABIN = 2;
-
 void 
-ltsmin_ltl2spot(ltsmin_expr_t e, int automata_type, ltsmin_parse_env_t env) 
+ltsmin_ltl2spot(ltsmin_expr_t e, pins_buchi_type_t buchi_type, ltsmin_parse_env_t env) 
 {
   // construct the LTL formula and store the predicates
   char *buff = ltl_to_store(e, env);
@@ -350,7 +346,7 @@ ltsmin_ltl2spot(ltsmin_expr_t e, int automata_type, ltsmin_parse_env_t env)
 
   // modify #(a1 == "S")#  to  "(a1 == 'S')"
   replace( ltl.begin(), ltl.end(), '"', '\'');
-  if (automata_type != AUT_RABIN) {
+  if (buchi_type != PINS_BUCHI_TYPE_RABIN) {
     replace( ltl.begin(), ltl.end(), '#', '\"');
   }
 
@@ -360,7 +356,7 @@ ltsmin_ltl2spot(ltsmin_expr_t e, int automata_type, ltsmin_parse_env_t env)
     Warning(infoLong, msg.c_str(), 0);
   }
 
-  if (automata_type == AUT_RABIN) {
+  if (buchi_type == PINS_BUCHI_TYPE_RABIN) {
     // use a system call to get the Rabin automaton from the LTL formula
     std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > tmp.ltl"
     + " && ltldo '/home/vincent/code/ltl3dra-0.2.3/ltl3dra' -F tmp.ltl > tmp.hoa";
@@ -378,10 +374,10 @@ ltsmin_ltl2spot(ltsmin_expr_t e, int automata_type, ltsmin_parse_env_t env)
   HREassert(!parse_errors, "Parse errors found in conversion of LTL to Spot formula. LTL = %s", buff);
 
   spot::translator trans;
-  if (automata_type == AUT_TGBA) {
+  if (buchi_type == PINS_BUCHI_TYPE_TGBA) {
     isTGBA = true;
     trans.set_type(spot::postprocessor::TGBA);
-  } else if (automata_type == AUT_BA)
+  } else if (buchi_type == PINS_BUCHI_TYPE_SPOTBA)
     trans.set_type(spot::postprocessor::BA);
   trans.set_pref(spot::postprocessor::Deterministic);
 

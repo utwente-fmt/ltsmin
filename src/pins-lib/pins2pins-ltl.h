@@ -36,12 +36,16 @@ PINS_BUCHI_TYPE_BA refers to the (state-based) Buchi Automaton obtained
 from ltl2ba.
 PINS_BUCHI_TYPE_TGBA refers to the Transition Based Generalized Buchi
 Automaton obtained from Spot (via ltl2spot).
+PINS_BUCHI_TYPE_RABIN refers to the Transition-Based Generalized Rabin
+Automaton.
+obtained from Spot (via ltl2spot).
 PINS_BUCHI_TYPE_SPOTBA refers to the (state-based) Buchi Automaton
 obtained from Spot (via ltl2spot).
 */
 typedef enum {
     PINS_BUCHI_TYPE_BA,
     PINS_BUCHI_TYPE_TGBA,
+    PINS_BUCHI_TYPE_RABIN,
     PINS_BUCHI_TYPE_SPOTBA,
 } pins_buchi_type_t;
 
