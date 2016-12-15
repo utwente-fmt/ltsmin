@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <fstream>
 
 // spot libraries
 #include <bddx.h>
@@ -15,6 +16,12 @@
 #include <spot/twaalgos/translate.hh>
 #include <spot/twaalgos/isdet.hh>
 #include <spot/twaalgos/hoa.hh>
+
+// hoa parser libraries
+#include <cpphoafparser/parser/hoa_parser.hh>
+#include <cpphoafparser/consumer/hoa_consumer_print.hh>
+
+using namespace cpphoafparser;
 
 extern "C" {
 
@@ -363,6 +370,20 @@ ltsmin_ltl2spot(ltsmin_expr_t e, pins_buchi_type_t buchi_type, ltsmin_parse_env_
     std::cout << "command: " << command << std::endl;
     if (system(command.c_str())) {
       Abort("Could not use system command");
+    }
+
+    // read HOA output
+    HOAConsumer::ptr consumer(new HOAConsumerPrint(std::cout));
+
+    std::ifstream hoa_file ("tmp.hoa");
+
+    try {
+
+      HOAParser::parse(hoa_file, consumer);
+
+    } catch (std::exception& e) {
+      std::cerr << e.what() << std::endl;
+      Abort("Could not read tmp.hoa");
     }
 
     Abort("Ending program");
