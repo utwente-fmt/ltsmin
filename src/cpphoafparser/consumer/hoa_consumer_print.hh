@@ -180,6 +180,7 @@ public:
       out << "}";
     }
     out << std::endl;
+    (void) stateId;
   }
 
   virtual void addEdgeWithLabel(unsigned int stateId,
@@ -208,10 +209,12 @@ public:
       out << "}";
     }
     out << std::endl;
+    (void) stateId;
   }
 
   virtual void notifyEndOfState(unsigned int stateId) override {
     // nothing to do
+    (void) stateId;
   }
 
   virtual void notifyEnd() override {
