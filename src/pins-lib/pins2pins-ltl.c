@@ -620,8 +620,15 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
             PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA || 
             PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
 
-            ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE, env);
+            ltsmin_ltl2spot(notltl, env);
             ba = ltsmin_hoa_buchi(env);
+
+            if (ba != NULL)
+                print_ltsmin_buchi(ba, env);
+            else 
+                Abort("BA = NULL");
+
+            Abort("Ending program!");
         } else {
 #endif
             HREassert(PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_BA, 
