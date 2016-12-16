@@ -20,9 +20,6 @@
 #include <gperftools/profiler.h>
 #endif
 
-
-// TODO: move +1's and -1's inside the UF structure!
-
 /**
  * local counters
  */
@@ -227,10 +224,11 @@ favoid_init  (wctx_t *ctx)
     size_t              transitions;
     raw_data_t          state_data;
 
+    // make sure that state -> initial doesn't get recognized as a self loop
+    ctx->state->ref = ctx->initial->ref + 1;
     favoid_handle (ctx, ctx->initial, &ti, 0);
     claim = uf_make_claim (shared->uf, ctx->initial->ref + 1, ctx->id);
     
-    // explore the initial state
     state_data = dfs_stack_top (loc->search_stack);
     state_info_deserialize (ctx->state, state_data); // search_stack TOP
     transitions = explore_state(ctx);
@@ -457,17 +455,14 @@ backtrack (wctx_t *ctx)
 }
 
 
-void
-favoid_run  (run_t *run, wctx_t *ctx)
+static bool
+favoid_check_pair(wctx_t *ctx, run_t *run, int pair_id)
 {
+    Warning(info, "checking pair %d", pair_id);
+    // GBgetRabinPairFin(i), GBgetRabinPairInf(i)
+
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
-
-#if HAVE_PROFILER
-    if (ctx->id == 0)
-        Warning (info, "Using the profiler");
-    ProfilerStart ("ufscc.perf");
-#endif
 
     favoid_init (ctx);
 
@@ -494,19 +489,66 @@ favoid_run  (run_t *run, wctx_t *ctx)
             backtrack (ctx);
         }
     }
+    return false;
+}
 
-#if HAVE_PROFILER
-    if (ctx->id == 0)
-        Warning(info, "Done profiling");
-    ProfilerStop();
-#endif
 
-    if (trc_output && run_is_stopped(run) &&
-            global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
-        report_lasso (ctx, DUMMY_IDX); // aid other thread in counter-example reconstruction
+/**
+ * Get rabin info and check only one pair at the time
+ */
+void
+favoid_run  (run_t *run, wctx_t *ctx)
+{
+    alg_local_t            *loc = ctx->local;
+    raw_data_t              state_data;
+    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
+    counter_t              *cnt     = &loc->cnt;
+
+
+    int number_of_pairs = GBgetRabinNPairs();
+    int start_pair = ctx->id % number_of_pairs;
+
+    for (int i=0; i<number_of_pairs; i++) {
+        if (favoid_check_pair(ctx, run, (start_pair + i) % number_of_pairs)) {
+            Abort("Found Accepting Rabin cycle");
+        }
+        // prepare for next iteration: reset structure
+        if (i+1 < number_of_pairs) {
+            // print info for the current round:
+            Warning(info, "total scc count:            %d", cnt->scc_count);
+            Warning(info, "unique states count:        %d", cnt->unique_states);
+            Warning(info, "unique transitions count:   %d", cnt->unique_trans);
+            Warning(info, "- self-loop count:          %d", cnt->selfloop);
+            Warning(info, "- claim dead count:         %d", cnt->claimdead);
+            Warning(info, "- claim found count:        %d", cnt->claimfound);
+            Warning(info, "- claim success count:      %d", cnt->claimsuccess);
+            Warning(info, "- cum. max stack depth:     %zu", ctx->counters->level_max);
+            Warning(info, " ");
+
+            // and reset the values
+            ctx->local->cnt.scc_count               = 0;
+            ctx->local->cnt.unique_states           = 0;
+            ctx->local->cnt.unique_trans            = 0;
+            ctx->local->cnt.selfloop                = 0;
+            ctx->local->cnt.claimdead               = 0;
+            ctx->local->cnt.claimfound              = 0;
+            ctx->local->cnt.claimsuccess            = 0;
+            ctx->local->cnt.cum_max_stack           = 0;
+
+            dfs_stack_clear (loc->search_stack);
+            dfs_stack_clear (loc->search_stack);
+            uf_clear(shared->uf);
+        }
     }
+    //Abort("No Accepting Rabin cycle found");
+
+    // TODO: add profiler info
+    // TODO: add counterexample construction
+    // TODO: what to do when one thread is finished?
 
     (void) run;
+    (void) state_data;
+    (void) loc;
 }
 
 

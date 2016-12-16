@@ -29,6 +29,8 @@
 
 
 uint32_t                HOA_ACCEPTING_SET = 0;
+int                     RABIN_N_PAIRS = 0;
+rabin_t                *RABIN_PAIRS = NULL;
 static char            *ltl_file = NULL;
 static const char      *ltl_semantics_name = "none";
 static const char      *buchi_type = "ba";
@@ -55,6 +57,27 @@ uint32_t
 GBgetAcceptingSet ()
 {
     return HOA_ACCEPTING_SET;
+}
+
+int
+GBgetRabinNPairs ()
+{
+    return RABIN_N_PAIRS;
+}
+
+uint32_t
+GBgetRabinPairFin (int pair_id)
+{
+    HREassert(pair_id < RABIN_N_PAIRS, "Requested Rabin pair %d, while there are only %d pairs", pair_id, RABIN_N_PAIRS);
+    return RABIN_PAIRS->pairs[pair_id].fin_set;
+}
+
+
+uint32_t
+GBgetRabinPairInf (int pair_id)
+{
+    HREassert(pair_id < RABIN_N_PAIRS, "Requested Rabin pair %d, while there are only %d pairs", pair_id, RABIN_N_PAIRS);
+    return RABIN_PAIRS->pairs[pair_id].inf_set;
 }
 
 static void
@@ -830,6 +853,8 @@ GBaddLTL (model_t model)
         lts_type_set_edge_label_typeno (ltstype_new, edge_labels, acc_set_type);
         lts_type_set_format (ltstype_new, acc_set_type, LTStypeDirect);
         HOA_ACCEPTING_SET = ba->acceptance_set;
+        RABIN_N_PAIRS     = ba->rabin->n_pairs;
+        RABIN_PAIRS       = ba->rabin;
 
         ctx->el_idx_accept_set = edge_labels;
     }
