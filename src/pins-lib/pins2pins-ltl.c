@@ -623,12 +623,10 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
             ltsmin_ltl2spot(notltl, env);
             ba = ltsmin_hoa_buchi(env);
 
-            if (ba != NULL)
-                print_ltsmin_buchi(ba, env);
-            else 
-                Abort("BA = NULL");
-
-            Abort("Ending program!");
+            // debug
+            HREassert(ba != NULL, "Buchi automata is NULL");
+            print_ltsmin_buchi(ba, env);
+        
         } else {
 #endif
             HREassert(PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_BA, 
