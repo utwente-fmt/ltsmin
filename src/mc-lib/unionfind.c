@@ -74,6 +74,13 @@ uf_create ()
     return uf;
 }
 
+void
+uf_clear(uf_t *uf)
+{
+    // NB: might not be thread-safe
+    uf->array              = RTalignZero (sizeof(int[8]),
+                             sizeof (uf_state_t) * ( (1ULL << dbs_size) + 1 ) );
+}
 
 /* **************************** list operations **************************** */
 

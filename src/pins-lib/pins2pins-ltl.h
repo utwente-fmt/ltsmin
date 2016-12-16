@@ -61,6 +61,12 @@ extern model_t GBaddLTL(model_t model);
 
 extern uint32_t GBgetAcceptingSet ();
 
+extern int GBgetRabinNPairs ();
+
+extern uint32_t GBgetRabinPairFin (int pair_id);
+
+extern uint32_t GBgetRabinPairInf (int pair_id);
+
 extern struct poptOption ltl_options[];
 
 

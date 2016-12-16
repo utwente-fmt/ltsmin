@@ -31,6 +31,8 @@ typedef enum pick_result {
 
 extern uf_t     *uf_create ();
 
+extern void      uf_clear (uf_t *uf);
+
 /* **************************** list operations **************************** */
 
 extern bool      uf_is_in_list (const uf_t *uf, ref_t state);
