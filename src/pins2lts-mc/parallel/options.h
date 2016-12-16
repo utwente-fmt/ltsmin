@@ -37,6 +37,7 @@ typedef enum {
     Strat_TARJAN = 8192,
     Strat_UFSCC  = 16384,
     Strat_RENAULT= 32768,
+    Strat_FAVOID = 65536,
     Strat_TA_SBFS= Strat_SBFS | Strat_TA,
     Strat_TA_BFS = Strat_BFS | Strat_TA,
     Strat_TA_DFS = Strat_DFS | Strat_TA,
@@ -46,7 +47,8 @@ typedef enum {
     Strat_LTLG   = Strat_LNDFS | Strat_ENDFS | Strat_CNDFS,
     Strat_SCC    = Strat_TARJAN | Strat_UFSCC | Strat_RENAULT,
     Strat_LTL    = Strat_NDFS | Strat_LTLG | Strat_OWCTY | Strat_DFSFIFO | Strat_SCC,
-    Strat_Reach  = Strat_BFS | Strat_SBFS | Strat_DFS | Strat_PBFS
+    Strat_Reach  = Strat_BFS | Strat_SBFS | Strat_DFS | Strat_PBFS,
+    Strat_Rabin  = Strat_FAVOID
 } strategy_t;
 
 extern si_map_entry strategies[];
