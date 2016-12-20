@@ -197,14 +197,8 @@ install:
     wget "$MCRL2_URL" -P "$HOME/ltsmin-deps" &&    
     tar -xf "$HOME/ltsmin-deps/$MCRL2_NAME" -C "$HOME/ltsmin-deps"; fi
     
-  # install ProB  
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
-    export PROB_NAME="$PROB_NAME" &&
-    export PROB_URL="$PROB_URL"; fi
-  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then
-    export PROB_NAME="$PROB_NAME" &&
-    export PROB_URL="$PROB_URL"; fi
-  - if [ ! -f "$HOME/ProB/probcli" ]; then 
+  # install ProB
+  - if [ ! -f "$HOME/ProB/probcli" ]; then
     mkdir -p "$HOME/ProB" &&
     wget "$PROB_URL" -P /tmp && 
     tar -xf "/tmp/$PROB_NAME" -C "$HOME/ProB"; fi
