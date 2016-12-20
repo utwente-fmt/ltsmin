@@ -1583,7 +1583,7 @@ gsea_setup(const char *output)
             gc.closed_insert = bfs_vset_closed_insert;
 
             gc.context = RTmalloc(sizeof(int) * global.N);
-            gc.store.vset.domain = vdom_create_domain (global.N, VSET_IMPL_AUTOSELECT);
+            gc.store.vset.domain = vdom_create_domain (global.N, VSET_ListDD);
             gc.store.vset.closed_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.store.vset.next_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.store.vset.current_set = vset_create(gc.store.vset.domain, -1, NULL);
@@ -1660,7 +1660,7 @@ gsea_setup(const char *output)
             gc.queue.filo.state_to_stack = dfs_vset_state_to_stack;
 
             gc.context = RTmalloc(sizeof(int) * global.N);
-            gc.store.vset.domain = vdom_create_domain (global.N, VSET_IMPL_AUTOSELECT);
+            gc.store.vset.domain = vdom_create_domain (global.N, VSET_ListDD);
             gc.store.vset.closed_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.store.vset.next_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.store.vset.current_set = vset_create(gc.store.vset.domain, -1, NULL);
