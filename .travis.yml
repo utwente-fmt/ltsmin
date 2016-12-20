@@ -199,9 +199,8 @@ install:
     
   # install ProB
   - if [ ! -f "$HOME/ProB/probcli" ]; then
-    mkdir -p "$HOME/ProB" &&
     wget "$PROB_URL" -P /tmp && 
-    tar -xf "/tmp/$PROB_NAME" -C "$HOME/ProB"; fi
+    tar -xf "/tmp/$PROB_NAME" -C "$HOME"; fi
 
   # install Divine2
   - if [ ! -f "$HOME/ltsmin-deps/bin/divine" ]; then
