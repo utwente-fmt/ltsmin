@@ -133,7 +133,6 @@ install:
     asciidoc
     xmlto
     viennacl
-    cmake
     ant
     ghc
     cabal-install
