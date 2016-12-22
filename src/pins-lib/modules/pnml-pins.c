@@ -147,7 +147,7 @@ get_successor_long(void *model, int t, int *in, TransitionCB cb, void *arg)
         }
     }
 
-    HREassert (!overflown, "max token count exceeded");
+    if (overflown) Abort ("max token count exceeded");
     update_max (max);
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
@@ -199,7 +199,7 @@ get_successor_short(void *model, int t, int *in, TransitionCB cb, void *arg)
         if (arc->place != (arc + 1)->place) place++;
     }
 
-    HREassert (!overflown, "max token count exceeded");
+    if (overflown) Abort ("max token count exceeded");
     update_max (max);
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
@@ -248,7 +248,7 @@ get_update_long(void *model, int t, int *in, TransitionCB cb, void *arg)
         }
     }
 
-    HREassert (!overflown, "max token count exceeded");
+    if (overflown) Abort ("max token count exceeded");
     update_max (max);
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
@@ -304,7 +304,7 @@ get_update_short(void *model, int t, int *in, void
         if (arc->place != (arc + 1)->place) place++;
     }
 
-    HREassert (!overflown, "max token count exceeded");
+    if (overflown) Abort ("max token count exceeded");
     update_max (max);
 
     transition_info_t transition_info = { (int[1]) { t }, t, 0 };
