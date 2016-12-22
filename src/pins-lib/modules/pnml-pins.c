@@ -380,6 +380,9 @@ find_ids(xmlNode *a_node, pnml_context_t *context)
                     xmlStrcmp(type, (const xmlChar*) "http://www.pnml.org/version-2009/grammar/ptnet") == 0)) {
                     Abort("pnml type \"%s\" is not supported", type);
                 }
+            } else if (xmlStrcmp(node->name, (const xmlChar*) "finalmarkings") == 0) {
+                Warning(info, "WARNING: ignoring \"finalmarkings\"");
+                continue;
             }
         }
         find_ids(node->children, context);
