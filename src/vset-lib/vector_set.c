@@ -35,7 +35,7 @@ extern vdom_t vdom_create_lddmc(int n);
 extern vdom_t vdom_create_lddmc_from_file(FILE *f);
 #endif
 
-vset_implementation_t vset_default_domain = VSET_IMPL_AUTOSELECT;
+vset_implementation_t vset_default_domain = VSET_LDDmc;
 
 int vset_cache_diff = 0;
 
@@ -108,11 +108,8 @@ struct poptOption vset_options[]={
 vdom_t
 vdom_create_domain(int n, vset_implementation_t impl)
 {
-    if (impl == VSET_IMPL_AUTOSELECT)
-        impl = vset_default_domain;
+    if (impl == VSET_IMPL_AUTOSELECT) impl = vset_default_domain;
     switch(impl){
-    case VSET_IMPL_AUTOSELECT:
-        /* fall-through */
     case VSET_LDDmc: return vdom_create_lddmc(n);
     case VSET_ListDD64: return vdom_create_list64_native(n);
     case VSET_ListDD: return vdom_create_list_native(n);
@@ -132,12 +129,11 @@ vdom_create_domain(int n, vset_implementation_t impl)
 vdom_t
 vdom_create_domain_from_file(FILE *f, vset_implementation_t impl)
 {
-    if (impl == VSET_IMPL_AUTOSELECT)
-        impl = vset_default_domain;
+    if (impl == VSET_IMPL_AUTOSELECT) impl = vset_default_domain;
     switch(impl) {
 #ifdef HAVE_SYLVAN
-    case VSET_Sylvan: return vdom_create_sylvan_from_file(f);
     case VSET_LDDmc: return vdom_create_lddmc_from_file(f);
+    case VSET_Sylvan: return vdom_create_sylvan_from_file(f);
 #endif // HAVE_SYLVAN
     default: return NULL;
     }
