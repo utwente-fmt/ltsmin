@@ -120,7 +120,7 @@ before_install:
         export PATH=/opt/ghc/$GHCVER/bin:/opt/happy/$HAPPYVER/bin:$PATH &&
         export MAKEFLAGS=-j2; fi
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then  
-        export PROB_NAME="ProB.mac_os.10.12.x86_64.tar.gz" &&
+        export PROB_NAME="ProB.mac_os.x86_64.tar.gz" &&
         export PROB_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/osx/$PROB_NAME" &&
         export MAKEFLAGS=-j1 &&
         export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/usr/local/Cellar/libxml2/$(brew list --versions libxml2 | cut -d' ' -f2)/lib/pkgconfig"; fi
