@@ -365,13 +365,15 @@ find_ids(xmlNode *a_node, pnml_context_t *context)
             if (xmlStrcmp(node->name, (const xmlChar*) "place") == 0) {
                 const xmlChar *id = xmlGetProp(node, (const xmlChar*) "id");
                 if (SIput(context->pnml_places, (char*) id) == SI_INDEX_FAILED) Abort("duplicate place");
-            } else if(xmlStrcmp(node->name, (const xmlChar*) "transition") == 0) {
+            } else if (xmlStrcmp(node->name, (const xmlChar*) "transition") == 0) {
                 const xmlChar *id = xmlGetProp(node, (const xmlChar*) "id");
                 if (SIput(context->pnml_transs, (char*) id) == SI_INDEX_FAILED) Abort("duplicate transition");
-            } else if(xmlStrcmp(node->name, (const xmlChar*) "arc") == 0) {
+            } else if (xmlStrcmp(node->name, (const xmlChar*) "arc") == 0) {
                 const xmlChar *id = xmlGetProp(node, (const xmlChar*) "id");
                 if (SIput(context->pnml_arcs, (char*) id) == SI_INDEX_FAILED) Abort("duplicate arc");
-            } else if(context->toolspecific == NULL && xmlStrcmp(node->name, (const xmlChar*) "toolspecific") == 0) context->toolspecific = node;
+            } else if (context->toolspecific == NULL && xmlStrcmp(node->name, (const xmlChar*) "toolspecific") == 0){
+                context->toolspecific = node;
+            }
         }
         find_ids(node->children, context);
     }
