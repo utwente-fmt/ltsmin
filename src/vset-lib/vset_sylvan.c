@@ -710,7 +710,7 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
 
     // Some custom code to create the BDD representing the dst+cpy structure
     BDD dst_bdd = sylvan_true;
-    for (int i=rel->w_k; i>=0; i--) {
+    for (int i=rel->w_k-1; i>=0; i--) {
         int k = rel->w_proj[i];
         if (cpy && cpy[i]) {
             // take copy of read
@@ -730,7 +730,6 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
             }
         }
     }
-    sylvan_test_isbdd(dst_bdd);
     bdd_refs_push(dst_bdd);
 
     // concatenate src and dst
