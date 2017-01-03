@@ -1,0 +1,42 @@
+/**
+ * Thread-safe set structure with iteration and removal 
+ * This is a simplification of the union-find structure, used for checking
+ * Generalized Rabin Pairs.
+ *
+ */
+
+#ifndef ITERSET_H
+#define ITERSET_H
+
+#include <pins2lts-mc/algorithm/algorithm.h>
+
+typedef struct iterset_s        iterset_t;
+typedef struct iterset_state_s  iterset_state_t;
+
+typedef enum is_pick_result {
+    IS_PICK_DEAD         = 1,
+    IS_PICK_SUCCESS      = 2,
+    IS_PICK_MARK_DEAD    = 3,
+} is_pick_e;
+
+extern iterset_t  *iterset_create ();
+
+extern void        iterset_clear (iterset_t *is);
+
+/* ******************************* operations ****************************** */
+
+extern bool        iterset_is_in_set (const iterset_t *is, ref_t state);
+
+extern is_pick_e   iterset_pick_state (const iterset_t *is, ref_t *ret);
+
+extern bool        iterset_add_state (const iterset_t *is, ref_t state);
+
+extern bool        iterset_remove_state (const iterset_t *is, ref_t state);
+
+extern bool        iterset_is_empty (const iterset_t *is);
+
+/* ******************************** testing ******************************** */
+
+extern ref_t       iterset_debug (const iterset_t *is, ref_t state);
+
+#endif /* ITERSET_H */
