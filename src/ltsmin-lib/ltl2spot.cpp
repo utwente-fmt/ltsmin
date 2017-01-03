@@ -385,17 +385,18 @@ ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env)
     Warning(infoLong, msg.c_str(), 0);
   }
 
+  // TODO: Replace system calls
   if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
     // use a system call to get the Rabin automaton from the LTL formula
-    std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > tmp.ltl"
-    + " && ltldo '$HOME/code/ltl3dra-0.2.3/ltl3dra' -F tmp.ltl > tmp.hoa";
+    std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > /tmp/tmp.ltl"
+    + " && ltldo '$HOME/code/ltl3dra-0.2.3/ltl3dra' -F /tmp/tmp.ltl > /tmp/tmp.hoa";
     std::cout << "system command: " << command << std::endl;
     if (system(command.c_str())) {
       Abort("Could not use system command");
     }
 
     // read HOA output
-    std::ifstream hoa_file ("tmp.hoa");
+    std::ifstream hoa_file ("/tmp/tmp.hoa");
     create_ltsmin_rabin(hoa_file);
 
   } else {

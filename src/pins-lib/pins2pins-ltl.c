@@ -849,8 +849,14 @@ GBaddLTL (model_t model)
         lts_type_set_edge_label_typeno (ltstype_new, edge_labels, acc_set_type);
         lts_type_set_format (ltstype_new, acc_set_type, LTStypeDirect);
         HOA_ACCEPTING_SET = ba->acceptance_set;
-        RABIN_N_PAIRS     = ba->rabin->n_pairs;
-        RABIN_PAIRS       = ba->rabin;
+        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
+            RABIN_N_PAIRS     = ba->rabin->n_pairs;
+            RABIN_PAIRS       = ba->rabin;
+        }
+        else {
+            RABIN_N_PAIRS     = 0;
+            RABIN_PAIRS       = NULL;
+        }
 
         ctx->el_idx_accept_set = edge_labels;
     }
