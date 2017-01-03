@@ -32,6 +32,8 @@ typedef struct counter_s {
     uint32_t            claimfound;
     uint32_t            claimsuccess;
     uint32_t            cum_max_stack;
+    uint32_t            ftrans;
+    uint32_t            itrans;
 } counter_t;
 
 /**
@@ -41,6 +43,7 @@ struct alg_local_s {
     dfs_stack_t         search_stack;         // search stack (D)
     dfs_stack_t         roots_stack;          // roots stack (R)
     uint32_t            acc_mark;             // acceptance mark
+    uint32_t            rabin_pair_id;        // Rabin Pair identifier
     counter_t           cnt;
     state_info_t       *target;               // auxiliary state
     state_info_t       *root;                 // auxiliary state
@@ -102,6 +105,8 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->search_stack = dfs_stack_create (len);
     ctx->local->roots_stack  = dfs_stack_create (len);
 
+    ctx->local->rabin_pair_id               = 0;
+
     ctx->local->cnt.scc_count               = 0;
     ctx->local->cnt.unique_states           = 0;
     ctx->local->cnt.unique_trans            = 0;
@@ -110,6 +115,8 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.claimfound              = 0;
     ctx->local->cnt.claimsuccess            = 0;
     ctx->local->cnt.cum_max_stack           = 0;
+    ctx->local->cnt.ftrans                  = 0;
+    ctx->local->cnt.itrans                  = 0;
 
     shared->ltl = pins_get_accepting_state_label_index(ctx->model) != -1;
 
@@ -145,8 +152,14 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     uint32_t            acc_set   = 0;
 
     // TGBA acceptance
-    if (ti->labels != NULL && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
+    if (ti->labels != NULL && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
         acc_set = ti->labels[pins_get_accepting_set_edge_label_index(ctx->model)];
+        if (GBgetRabinPairFin(loc->rabin_pair_id) & acc_set) {
+            loc->cnt.ftrans ++;
+        }
+        if (GBgetRabinPairInf(loc->rabin_pair_id) & acc_set) {
+            loc->cnt.itrans ++;
+        }
     }
 
     ctx->counters->trans++;
@@ -456,14 +469,14 @@ backtrack (wctx_t *ctx)
 
 
 static bool
-favoid_check_pair(wctx_t *ctx, run_t *run, int pair_id)
+favoid_check_pair(wctx_t *ctx, run_t *run)
 {
-    Warning(info, "checking pair %d", pair_id);
-    // GBgetRabinPairFin(i), GBgetRabinPairInf(i)
-
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
 
+    Warning(info, "checking pair %d", loc->rabin_pair_id);
+    // GBgetRabinPairFin(i), GBgetRabinPairInf(i)
+    
     favoid_init (ctx);
 
     // continue until we are done exploring the graph or interrupted
@@ -499,6 +512,10 @@ favoid_check_pair(wctx_t *ctx, run_t *run, int pair_id)
 void
 favoid_run  (run_t *run, wctx_t *ctx)
 {
+    Warning(info, " ");
+    Warning(info, "Starting Rabin checking algorithm");
+    Warning(info, " ");
+
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
     uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
@@ -509,11 +526,15 @@ favoid_run  (run_t *run, wctx_t *ctx)
     int start_pair = ctx->id % number_of_pairs;
 
     for (int i=0; i<number_of_pairs; i++) {
-        if (favoid_check_pair(ctx, run, (start_pair + i) % number_of_pairs)) {
+
+        // set the current pair id
+        loc->rabin_pair_id = (start_pair + i) % number_of_pairs;
+
+        if (favoid_check_pair(ctx, run)) {
             Abort("Found Accepting Rabin cycle");
         }
         // prepare for next iteration: reset structure
-        if (i+1 < number_of_pairs) {
+        //if (i+1 < number_of_pairs) {
             // print info for the current round:
             Warning(info, "total scc count:            %d", cnt->scc_count);
             Warning(info, "unique states count:        %d", cnt->unique_states);
@@ -523,6 +544,9 @@ favoid_run  (run_t *run, wctx_t *ctx)
             Warning(info, "- claim found count:        %d", cnt->claimfound);
             Warning(info, "- claim success count:      %d", cnt->claimsuccess);
             Warning(info, "- cum. max stack depth:     %zu", ctx->counters->level_max);
+            Warning(info, " ");
+            Warning(info, "- F transition count:       %d", cnt->ftrans);
+            Warning(info, "- I transition count:       %d", cnt->itrans);
             Warning(info, " ");
 
             // and reset the values
@@ -534,11 +558,13 @@ favoid_run  (run_t *run, wctx_t *ctx)
             ctx->local->cnt.claimfound              = 0;
             ctx->local->cnt.claimsuccess            = 0;
             ctx->local->cnt.cum_max_stack           = 0;
+            ctx->local->cnt.ftrans                  = 0;
+            ctx->local->cnt.itrans                  = 0;
 
             dfs_stack_clear (loc->search_stack);
             dfs_stack_clear (loc->search_stack);
             uf_clear(shared->uf);
-        }
+        //}
     }
     //Abort("No Accepting Rabin cycle found");
 
@@ -574,8 +600,9 @@ favoid_reduce (run_t *run, wctx_t *ctx)
 void
 favoid_print_stats   (run_t *run, wctx_t *ctx)
 {
-    counter_t              *reduced = (counter_t *) run->reduced;
+    /*counter_t              *reduced = (counter_t *) run->reduced;
 
+    
     // SCC statistics
     Warning(info, "total scc count:            %d", reduced->scc_count);
     Warning(info, "unique states count:        %d", reduced->unique_states);
@@ -586,6 +613,7 @@ favoid_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info, "- claim success count:      %d", reduced->claimsuccess);
     Warning(info, "- cum. max stack depth:     %d", reduced->cum_max_stack);
     Warning(info, " ");
+    */
 
     run_report_total (run);
 
