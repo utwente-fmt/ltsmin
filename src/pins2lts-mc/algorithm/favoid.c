@@ -6,6 +6,7 @@
 
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/unionfind.h>
+#include <mc-lib/iterset.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins.h>
 #include <pins2lts-mc/algorithm/ltl.h>
@@ -44,6 +45,8 @@ struct alg_local_s {
     dfs_stack_t         roots_stack;          // roots stack (R)
     uint32_t            acc_mark;             // acceptance mark
     uint32_t            rabin_pair_id;        // Rabin Pair identifier
+    uint32_t            rabin_pair_f;         // F fragment of rabin pair
+    uint32_t            rabin_pair_i;         // I fragment of rabin pair
     counter_t           cnt;
     state_info_t       *target;               // auxiliary state
     state_info_t       *root;                 // auxiliary state
@@ -106,6 +109,8 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->roots_stack  = dfs_stack_create (len);
 
     ctx->local->rabin_pair_id               = 0;
+    ctx->local->rabin_pair_f                = 0;
+    ctx->local->rabin_pair_i                = 0;
 
     ctx->local->cnt.scc_count               = 0;
     ctx->local->cnt.unique_states           = 0;
@@ -141,6 +146,8 @@ favoid_local_deinit   (run_t *run, wctx_t *ctx)
 }
 
 
+int keep_logging = 0; // DEBUG: print the first x cases
+
 static void
 favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
               int seen)
@@ -153,11 +160,24 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     // TGBA acceptance
     if (ti->labels != NULL && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
+
         acc_set = ti->labels[pins_get_accepting_set_edge_label_index(ctx->model)];
-        if (GBgetRabinPairFin(loc->rabin_pair_id) & acc_set) {
-            loc->cnt.ftrans ++;
+
+        if (keep_logging) { // DEBUG
+            if (loc->rabin_pair_f & acc_set) {
+                printf("A%zu -> A%zu [label=F];\n",ctx->state->ref, successor->ref);
+                keep_logging --;
+            }
+            else {
+                printf("A%zu -> A%zu;\n",ctx->state->ref, successor->ref);
+            }
         }
-        if (GBgetRabinPairInf(loc->rabin_pair_id) & acc_set) {
+
+        if (loc->rabin_pair_f & acc_set) {
+            loc->cnt.ftrans ++;
+            return; // avoid for now, TODO add to iterset
+        }
+        if (loc->rabin_pair_i & acc_set) {
             loc->cnt.itrans ++;
         }
     }
@@ -529,26 +549,30 @@ favoid_run  (run_t *run, wctx_t *ctx)
 
         // set the current pair id
         loc->rabin_pair_id = (start_pair + i) % number_of_pairs;
+        loc->rabin_pair_f  = GBgetRabinPairFin(loc->rabin_pair_id);
+        loc->rabin_pair_i  = GBgetRabinPairInf(loc->rabin_pair_id);
 
         if (favoid_check_pair(ctx, run)) {
             Abort("Found Accepting Rabin cycle");
         }
-        // prepare for next iteration: reset structure
-        //if (i+1 < number_of_pairs) {
-            // print info for the current round:
-            Warning(info, "total scc count:            %d", cnt->scc_count);
-            Warning(info, "unique states count:        %d", cnt->unique_states);
-            Warning(info, "unique transitions count:   %d", cnt->unique_trans);
-            Warning(info, "- self-loop count:          %d", cnt->selfloop);
-            Warning(info, "- claim dead count:         %d", cnt->claimdead);
-            Warning(info, "- claim found count:        %d", cnt->claimfound);
-            Warning(info, "- claim success count:      %d", cnt->claimsuccess);
-            Warning(info, "- cum. max stack depth:     %zu", ctx->counters->level_max);
-            Warning(info, " ");
-            Warning(info, "- F transition count:       %d", cnt->ftrans);
-            Warning(info, "- I transition count:       %d", cnt->itrans);
-            Warning(info, " ");
+        
+        // print info for the current round:
+        Warning(info, "total scc count:            %d", cnt->scc_count);
+        Warning(info, "unique states count:        %d", cnt->unique_states);
+        Warning(info, "unique transitions count:   %d", cnt->unique_trans);
+        Warning(info, "- self-loop count:          %d", cnt->selfloop);
+        Warning(info, "- claim dead count:         %d", cnt->claimdead);
+        Warning(info, "- claim found count:        %d", cnt->claimfound);
+        Warning(info, "- claim success count:      %d", cnt->claimsuccess);
+        Warning(info, "- cum. max stack depth:     %zu", ctx->counters->level_max);
+        Warning(info, " ");
+        Warning(info, "- F transition count:       %d", cnt->ftrans);
+        Warning(info, "- I transition count:       %d", cnt->itrans);
+        Warning(info, " ");
 
+        keep_logging = 0; // DEBUG
+
+        if (i+1 < number_of_pairs) {
             // and reset the values
             ctx->local->cnt.scc_count               = 0;
             ctx->local->cnt.unique_states           = 0;
@@ -564,7 +588,7 @@ favoid_run  (run_t *run, wctx_t *ctx)
             dfs_stack_clear (loc->search_stack);
             dfs_stack_clear (loc->search_stack);
             uf_clear(shared->uf);
-        //}
+        }
     }
     //Abort("No Accepting Rabin cycle found");
 
