@@ -37,6 +37,9 @@ struct iterset_s {
 };
 
 
+static bool      iterset_lock_list (const iterset_t *is, ref_t a, ref_t *a_l);
+static void      iterset_unlock_list (const iterset_t *is, ref_t a_l);
+
 /**
  * initializer for the iterstate array
  */
@@ -75,31 +78,211 @@ iterstate_is_in_set (const iterset_t *is, ref_t state)
 
 
 is_pick_e
-iterset_pick_state (const iterset_t *is, ref_t *ret)
+iterset_pick_state_aux (iterset_t *is, ref_t state, ref_t *ret)
 {
-    return IS_PICK_SUCCESS;
+    // invariant: every consecutive non-LOCK state is in the same set
+    ref_t               a, b, c;
+    list_status         a_status, b_status;
+
+    a = state;
+
+    while ( 1 ) {
+        HREassert ( a != 0 );
+
+        // if we exit this loop, a.status == TOMB or we returned a LIVE state
+        while ( 1 ) {
+            a_status = atomic_read (&is->array[a].list_status);
+
+            // return directly if a is LIVE
+            if (a_status == LIST_LIVE) {
+                *ret = a;
+                return IS_PICK_SUCCESS;
+            }
+
+            // otherwise wait until a is TOMB (it might be LOCK now)
+            else if (a_status == LIST_TOMB)
+                break;
+        }
+
+        // find next state: a --> b
+        b = atomic_read (&is->array[a].list_next);
+
+        HREassert ( b != 0 );
+
+        // if a is TOMB and only element, then the SCC is DEAD
+        if (a == b) {
+            atomic_write (&is->current, 0);
+            return IS_PICK_DEAD;
+        }
+
+        // if we exit this loop, b.status == TOMB or we returned a LIVE state
+        while ( 1 ) {
+            b_status = atomic_read (&is->array[b].list_status);
+
+            // return directly if b is LIVE
+            if (b_status == LIST_LIVE) {
+                *ret = b;
+                return IS_PICK_SUCCESS;
+            }
+
+            // otherwise wait until b is TOMB (it might be LOCK now)
+            else if (b_status == LIST_TOMB)
+                break;
+        }
+
+        // a --> b --> c
+        c = atomic_read (&is->array[b].list_next);
+
+        HREassert ( c != 0 );
+
+        // make the list shorter (a --> c)
+        atomic_write (&is->array[a].list_next, c);
+
+        a = c; // continue searching from c
+    }
+}
+
+
+is_pick_e
+iterset_pick_state (iterset_t *is, ref_t *ret)
+{
+    // also asserts that is->current != 0
+    HREassert(!iterset_is_empty(is), "We can't pick from an empty list");
+    
+    // starting position for picking a state
+    ref_t state = atomic_read (&is->current);
+
+    // update current to point to the next one (might not be optimal)
+    ref_t next = atomic_read (&is->array[state].list_next);
+    atomic_write (&is->current, next);
+    
+    return iterset_pick_state_aux(is, state, ret);
 }
 
 
 bool
-iterset_add_state (const iterset_t *is, ref_t state)
+iterset_add_state (iterset_t *is, ref_t state)
 {
-    return false;
+    // ensure that list next pointer is never 0 for LIVE or TOMB states
+
+    // check if the state is already in the list
+    ref_t next = atomic_read (&is->array[state].list_next);
+    list_status status =  atomic_read (&is->array[state].list_status);
+    if (next != 0 || status == LIST_LOCK) {
+        // wait until the list is not locked
+        while (status == LIST_LOCK) {
+            status =  atomic_read (&is->array[state].list_status);
+        }
+        next = atomic_read (&is->array[state].list_next);
+        HReassert (next != 0);
+        return false; // already added
+    }
+
+    // Otherwise: Lock state
+    if (!cas(&is->array[state].list_status, LIST_LIVE, LIST_LOCK)) {
+        // CAS failed, we should start over
+        return iterset_add_state (is, state);
+    }
+
+    // the state is locked now
+
+    // check again if the next pointer was updated before the CAS
+    next = atomic_read (&is->array[state].list_next);
+    if (next != 0) {
+        // next pointer is already updated, we should unlock the state
+        iterset_unlock_list (is, state);
+        return false; // already added
+    }
+
+    // state is locked and next = 0 at this point
+
+    ref_t current = atomic_read (&is->current);
+
+    // first state to be added ([state]->[state])
+    if (current == 0) {
+
+        // status = LIST_LIVE
+        atomic_write (&is->array[state].list_next, state);
+        if (cas(&is->current, 0, state)) {
+            iterset_unlock_list (is, state);
+            return true;
+        }
+
+        // someone else has updated is->current: normal procedure
+        current = atomic_read (&is->current);
+        HREassert (current != 0);
+    }
+
+    // Try to lock current (we want [current_l]->[state]->[current_l->next])
+    ref_t current_l;
+    HREassert(iterset_lock_list (is, current, &current_l));
+
+    // update the next pointer of state
+    ref_t cur_l_next = atomic_read (&is->array[current_l].list_next);
+    atomic_write (&is->array[state].list_next, cur_l_next);
+
+    // update the next pointer of current_l
+    atomic_write (&is->array[current_l].list_next, state);
+
+    // unlock current_l and state
+    iterset_unlock_list (is, current_l);
+    iterset_unlock_list (is, state);
+
+    atomic_write (&is->current, current_l); // update current, because why not?
+
+    return true;
 }
 
 
 bool
-iterset_remove_state (const iterset_t *is, ref_t state)
+iterset_remove_state (iterset_t *is, ref_t state)
 {
-    return false;
+    list_status         list_s;
+
+    // only remove list item if it is LIVE , otherwise (LIST_LOCK) wait
+    while ( true ) {
+        list_s = atomic_read (&is->array[state].list_status);
+        if (list_s == LIST_LIVE) {
+            if (cas (&is->array[state].list_status, LIST_LIVE, LIST_TOMB) )
+                return 1;
+        } else if (list_s == LIST_TOMB)
+            return 0;
+    }
 }
 
 
 bool
 iterset_is_empty (const iterset_t *is)
 {
-    return false;
+    if (atomic_read (&is->current) == 0) return true;
+    ref_t dummy;
+    return (iterset_pick_state_aux (is, is->current, &dummy) != IS_PICK_SUCCESS);
 }
+
+
+/* ******************************** locking ******************************** */
+
+static bool
+iterset_lock_list (const iterset_t *is, ref_t a, ref_t *a_l)
+{
+    char pick;
+
+    while ( 1 ) {
+        pick = iterset_pick_state_aux (is, a, a_l);
+        if ( pick != IS_PICK_SUCCESS )
+            return 0;
+        if (cas (&is->array[*a_l].list_status, LIST_LIVE, LIST_LOCK) )
+            return 1;
+    }
+}
+
+
+static void
+iterset_unlock_list (const iterset_t *is, ref_t a_l)
+{
+    atomic_write (&is->array[a_l].list_status, LIST_LIVE);
+}
+
 
 
 /* ******************************** testing ******************************** */

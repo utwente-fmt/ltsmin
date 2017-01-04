@@ -3,6 +3,8 @@
  * This is a simplification of the union-find structure, used for checking
  * Generalized Rabin Pairs.
  *
+ * NB: the structure doesn't allow states with value 0 (not checked expl.)
+ *
  */
 
 #ifndef ITERSET_H
@@ -27,11 +29,11 @@ extern void        iterset_clear (iterset_t *is);
 
 extern bool        iterset_is_in_set (const iterset_t *is, ref_t state);
 
-extern is_pick_e   iterset_pick_state (const iterset_t *is, ref_t *ret);
+extern is_pick_e   iterset_pick_state (iterset_t *is, ref_t *ret);
 
-extern bool        iterset_add_state (const iterset_t *is, ref_t state);
+extern bool        iterset_add_state (iterset_t *is, ref_t state);
 
-extern bool        iterset_remove_state (const iterset_t *is, ref_t state);
+extern bool        iterset_remove_state (iterset_t *is, ref_t state);
 
 extern bool        iterset_is_empty (const iterset_t *is);
 
