@@ -373,6 +373,13 @@ find_ids(xmlNode *a_node, pnml_context_t *context)
                 if (SIput(context->pnml_arcs, (char*) id) == SI_INDEX_FAILED) Abort("duplicate arc");
             } else if (context->toolspecific == NULL && xmlStrcmp(node->name, (const xmlChar*) "toolspecific") == 0){
                 context->toolspecific = node;
+            } else if (xmlStrcmp(node->name, (const xmlChar*) "net") == 0) {
+                const xmlChar *type = xmlGetProp(node, (const xmlChar*) "type");
+                if (!(
+                    xmlStrcmp(type, (const xmlChar*) "http://www.pnml.org/version-2009/grammar/pnmlcoremodel") == 0 ||
+                    xmlStrcmp(type, (const xmlChar*) "http://www.pnml.org/version-2009/grammar/ptnet") == 0)) {
+                    Abort("pnml type \"%s\" is not supported", type);
+                }
             }
         }
         find_ids(node->children, context);
