@@ -37,7 +37,7 @@ struct iterset_s {
 };
 
 
-static bool      iterset_lock_list (const iterset_t *is, ref_t a, ref_t *a_l);
+static bool      iterset_lock_list (iterset_t *is, ref_t a, ref_t *a_l);
 static void      iterset_unlock_list (const iterset_t *is, ref_t a_l);
 
 /**
@@ -59,7 +59,7 @@ iterset_create ()
 }
 
 void
-iterstate_clear(iterset_t *is)
+iterset_clear (iterset_t *is)
 {
     // NB: might not be thread-safe
     is->array              = RTalignZero (sizeof(char[16]),
@@ -71,9 +71,9 @@ iterstate_clear(iterset_t *is)
 
 
 bool
-iterstate_is_in_set (const iterset_t *is, ref_t state)
+iterset_is_in_set (const iterset_t *is, ref_t state)
 {
-    return (atomic_read (&is->array[state].list_status) != LIST_TOMB);
+    return (atomic_read (&is->array[state].list_next) != 0);
 }
 
 
@@ -87,7 +87,7 @@ iterset_pick_state_aux (iterset_t *is, ref_t state, ref_t *ret)
     a = state;
 
     while ( 1 ) {
-        HREassert ( a != 0 );
+        HREassert ( a != 0 ); // TODO: This has triggered once, but could not replicate
 
         // if we exit this loop, a.status == TOMB or we returned a LIVE state
         while ( 1 ) {
@@ -146,15 +146,18 @@ iterset_pick_state_aux (iterset_t *is, ref_t state, ref_t *ret)
 is_pick_e
 iterset_pick_state (iterset_t *is, ref_t *ret)
 {
-    // also asserts that is->current != 0
-    HREassert(!iterset_is_empty(is), "We can't pick from an empty list");
-    
     // starting position for picking a state
     ref_t state = atomic_read (&is->current);
 
+    if (state == 0) {
+        return IS_PICK_DEAD;
+    }
+
     // update current to point to the next one (might not be optimal)
     ref_t next = atomic_read (&is->array[state].list_next);
-    atomic_write (&is->current, next);
+    if (next != 0) {
+        atomic_write (&is->current, next);
+    }
     
     return iterset_pick_state_aux(is, state, ret);
 }
@@ -174,7 +177,7 @@ iterset_add_state (iterset_t *is, ref_t state)
             status =  atomic_read (&is->array[state].list_status);
         }
         next = atomic_read (&is->array[state].list_next);
-        HReassert (next != 0);
+        HREassert (next != 0);
         return false; // already added
     }
 
@@ -252,7 +255,7 @@ iterset_remove_state (iterset_t *is, ref_t state)
 
 
 bool
-iterset_is_empty (const iterset_t *is)
+iterset_is_empty (iterset_t *is)
 {
     if (atomic_read (&is->current) == 0) return true;
     ref_t dummy;
@@ -263,7 +266,7 @@ iterset_is_empty (const iterset_t *is)
 /* ******************************** locking ******************************** */
 
 static bool
-iterset_lock_list (const iterset_t *is, ref_t a, ref_t *a_l)
+iterset_lock_list (iterset_t *is, ref_t a, ref_t *a_l)
 {
     char pick;
 
@@ -301,8 +304,8 @@ iterset_print_list_status (list_status ls)
 static void
 iterset_debug_list_aux (const iterset_t *is, ref_t start, ref_t state, int depth)
 {
-    if (depth == 50) {
-        Warning (info, "\x1B[40mreached depth 50\x1B[0m");
+    if (depth == 25) {
+        Warning (info, "\x1B[40mreached depth 25\x1B[0m");
         return;
     }
     if (depth == 0) {
@@ -320,17 +323,17 @@ iterset_debug_list_aux (const iterset_t *is, ref_t start, ref_t state, int depth
              iterset_print_list_status (atomic_read(&is->array[state].list_status)),
              atomic_read (&is->array[state].list_next));
 
-    if (atomic_read (&is->array[state].list_next) != start ||
-        atomic_read (&is->array[state].list_next) != state ||
-        atomic_read (&is->array[state].list_next) != 0) {
+    if (atomic_read (&is->array[state].list_next) != start &&
+        atomic_read (&is->array[state].list_next) != state) {
         iterset_debug_list_aux (is, start, is->array[state].list_next, depth+1);
     }
 }
 
 
 ref_t
-iterset_debug (const iterset_t *is, ref_t state)
+iterset_debug (const iterset_t *is)
 {
-    iterset_debug_list_aux (is, state, state, 0);
-    return state;
+    ref_t current = atomic_read (&is->current);
+    iterset_debug_list_aux (is, current, current, 0);
+    return current;
 }
