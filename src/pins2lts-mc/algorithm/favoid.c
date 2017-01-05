@@ -76,6 +76,8 @@ typedef struct uf_alg_shared_s {
 } favoid_shared_t;
 
 
+static void report_counterexample (wctx_t *ctx);
+
 void
 favoid_global_init (run_t *run, wctx_t *ctx)
 {
@@ -192,7 +194,7 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         loc->cnt[pair_id].selfloop ++;
         uint32_t acc = uf_add_acc (shared->pairs[pair_id].uf, successor->ref + 1, acc_set);
         if (loc->rabin_pair_i == acc) {
-            Debug("Found Accepting Rabin cycle");
+            report_counterexample (ctx);
         }
         return;
     } else if (EXPECT_FALSE(trc_output && !seen && ti != &GB_NO_TRANSITION)) {
@@ -337,7 +339,7 @@ successor (wctx_t *ctx)
             // add transition acceptance set
             uint32_t acc = uf_add_acc (shared->pairs[pair_id].uf, ctx->state->ref + 1, loc->state_acc);
             if (loc->rabin_pair_i == acc) {
-                Debug("Found Accepting Rabin cycle");
+                report_counterexample (ctx);
             }
             dfs_stack_pop (loc->search_stack);
             return; // also no chance of new accepting cycle
@@ -372,7 +374,7 @@ successor (wctx_t *ctx)
         // after uniting SCC, report lasso
         acc_set = uf_get_acc (shared->pairs[pair_id].uf, ctx->state->ref + 1);
         if (loc->rabin_pair_i == acc_set) {
-            Debug("Found Accepting Rabin cycle");
+            report_counterexample (ctx);
         }
 
         // cycle is now merged (and DFS stack is unchanged)
@@ -588,7 +590,7 @@ favoid_run  (run_t *run, wctx_t *ctx)
         loc->rabin_pair_i  = GBgetRabinPairInf(loc->rabin_pair_id);
 
         if (favoid_check_pair(ctx, run)) {
-            Debug("Found Accepting Rabin cycle");
+            report_counterexample (ctx);
         }
 
         keep_logging = 0; // DEBUG
@@ -600,9 +602,7 @@ favoid_run  (run_t *run, wctx_t *ctx)
         }
     }
 
-    // TODO: add profiler info
     // TODO: add counterexample construction
-    // TODO: what to do when one thread is finished?
 
     (void) run;
     (void) state_data;
@@ -704,4 +704,17 @@ favoid_shared_init   (run_t *run)
         shared->pairs[i].uf = uf_create();
         shared->pairs[i].is = iterset_create();
     }
+}
+
+
+static void 
+report_counterexample   (wctx_t *ctx)
+{
+    int master = run_stop (ctx->run);
+    if (master) {
+        Warning (info, " ");
+        Warning (info, "Accepting cycle FOUND!")
+        Warning (info, " ");
+    }
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
 }
