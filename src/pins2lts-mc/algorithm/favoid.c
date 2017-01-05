@@ -21,6 +21,9 @@
 #include <gperftools/profiler.h>
 #endif
 
+int keep_logging = 0; // DEBUG: print the first x cases
+int log_again = 0;    // DEBUG: print more log info for new searches
+
 /**
  * local counters
  */
@@ -62,6 +65,7 @@ struct alg_local_s {
  */
 typedef struct uf_alg_shared_s {
     uf_t               *uf;             // shared union-find structure
+    iterset_t          *is;             // shared iteration set structure
     ref_t               lasso_acc;      // SCC root for trace construction
     ref_t               lasso_end;      // last on lasso (to iterate backwards from)
     ref_t               lasso_root;     // last on lasso (to iterate backwards from)
@@ -146,8 +150,6 @@ favoid_local_deinit   (run_t *run, wctx_t *ctx)
 }
 
 
-int keep_logging = 0; // DEBUG: print the first x cases
-
 static void
 favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
               int seen)
@@ -165,6 +167,7 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
         if (keep_logging) { // DEBUG
             if (loc->rabin_pair_f & acc_set) {
+                printf ("A%zu [color=salmon,style=filled];\n", successor->ref);
                 printf("A%zu -> A%zu [label=F];\n",ctx->state->ref, successor->ref);
                 keep_logging --;
             }
@@ -175,7 +178,9 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
         if (loc->rabin_pair_f & acc_set) {
             loc->cnt.ftrans ++;
-            return; // avoid for now, TODO add to iterset
+            // add state to iterset
+            iterset_add_state (shared->is, successor->ref+1);
+            return;
         }
         if (loc->rabin_pair_i & acc_set) {
             loc->cnt.itrans ++;
@@ -489,13 +494,10 @@ backtrack (wctx_t *ctx)
 
 
 static bool
-favoid_check_pair(wctx_t *ctx, run_t *run)
+favoid_check_pair_aux (wctx_t *ctx, run_t *run)
 {
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
-
-    Warning(info, "checking pair %d", loc->rabin_pair_id);
-    // GBgetRabinPairFin(i), GBgetRabinPairInf(i)
     
     favoid_init (ctx);
 
@@ -522,7 +524,59 @@ favoid_check_pair(wctx_t *ctx, run_t *run)
             backtrack (ctx);
         }
     }
+
     return false;
+}
+
+
+static bool
+favoid_check_pair (wctx_t *ctx, run_t *run)
+{
+    alg_local_t            *loc = ctx->local;
+    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
+
+    Warning(info, "checking pair %d", loc->rabin_pair_id);
+
+    if (keep_logging) {
+        printf ("A%zu [color=green,style=filled];\n", ctx->initial->ref);
+    }
+
+    // search from the initial state
+    //Warning (info, "Starting initial search from %zu", ctx->initial->ref);
+    if (favoid_check_pair_aux (ctx, run)) return true;
+
+
+    // check all states that we have avoided
+    while (!iterset_is_empty (shared->is)) {
+        ref_t new_init;
+        iterset_pick_state (shared->is, &new_init);
+        new_init --; // iterset uses ref_t + 1
+
+        if (uf_is_dead (shared->uf, new_init+1)) {
+            //Warning (info, "F state %zu is dead, disregard", new_init);
+            continue;
+        }
+
+        // set initial state
+        state_info_set (ctx->initial, new_init, LM_NULL_LATTICE);
+
+        //Warning (info, "Starting new search from %zu", ctx->initial->ref);
+
+        if (log_again) {
+            printf ("A%zu [color=lightblue,style=filled];\n", ctx->initial->ref);
+            keep_logging = 10000;
+            log_again --;
+        } else {
+            keep_logging = 0;
+        }
+
+        if (favoid_check_pair_aux (ctx, run)) return true;
+
+        iterset_remove_state (shared->is, new_init+1);
+    }
+
+    return false;
+
 }
 
 
@@ -532,6 +586,10 @@ favoid_check_pair(wctx_t *ctx, run_t *run)
 void
 favoid_run  (run_t *run, wctx_t *ctx)
 {
+    if (keep_logging) {
+        printf ("digraph g {\n");// DEBUG
+    }
+
     Warning(info, " ");
     Warning(info, "Starting Rabin checking algorithm");
     Warning(info, " ");
@@ -543,7 +601,7 @@ favoid_run  (run_t *run, wctx_t *ctx)
 
 
     int number_of_pairs = GBgetRabinNPairs();
-    int start_pair = ctx->id % number_of_pairs;
+    int start_pair = 0;//ctx->id % number_of_pairs; // TODO: multiple shared structures
 
     for (int i=0; i<number_of_pairs; i++) {
 
@@ -572,7 +630,7 @@ favoid_run  (run_t *run, wctx_t *ctx)
 
         keep_logging = 0; // DEBUG
 
-        if (i+1 < number_of_pairs) {
+        /*if (i+1 < number_of_pairs) {
             // and reset the values
             ctx->local->cnt.scc_count               = 0;
             ctx->local->cnt.unique_states           = 0;
@@ -588,7 +646,9 @@ favoid_run  (run_t *run, wctx_t *ctx)
             dfs_stack_clear (loc->search_stack);
             dfs_stack_clear (loc->search_stack);
             uf_clear(shared->uf);
-        }
+        }*/
+
+        break; //TODO
     }
     //Abort("No Accepting Rabin cycle found");
 
@@ -599,6 +659,10 @@ favoid_run  (run_t *run, wctx_t *ctx)
     (void) run;
     (void) state_data;
     (void) loc;
+    
+    if (keep_logging) {
+        printf ("\n}\n");// DEBUG
+    }
 }
 
 
@@ -624,7 +688,7 @@ favoid_reduce (run_t *run, wctx_t *ctx)
 void
 favoid_print_stats   (run_t *run, wctx_t *ctx)
 {
-    /*counter_t              *reduced = (counter_t *) run->reduced;
+    counter_t              *reduced = (counter_t *) run->reduced;
 
     
     // SCC statistics
@@ -637,7 +701,7 @@ favoid_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info, "- claim success count:      %d", reduced->claimsuccess);
     Warning(info, "- cum. max stack depth:     %d", reduced->cum_max_stack);
     Warning(info, " ");
-    */
+    
 
     run_report_total (run);
 
@@ -673,6 +737,7 @@ favoid_shared_init   (run_t *run)
     run->shared = RTmallocZero (sizeof (uf_alg_shared_t));
     shared      = (uf_alg_shared_t*) run->shared;
     shared->uf  = uf_create();
+    shared->is  = iterset_create();
 
     if (trc_output) {
         // Prepare parallel reachability (should be done in shared, .i.e. global and once)

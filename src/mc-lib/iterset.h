@@ -35,10 +35,10 @@ extern bool        iterset_add_state (iterset_t *is, ref_t state);
 
 extern bool        iterset_remove_state (iterset_t *is, ref_t state);
 
-extern bool        iterset_is_empty (const iterset_t *is);
+extern bool        iterset_is_empty (iterset_t *is);
 
 /* ******************************** testing ******************************** */
 
-extern ref_t       iterset_debug (const iterset_t *is, ref_t state);
+extern ref_t       iterset_debug (const iterset_t *is);
 
 #endif /* ITERSET_H */
