@@ -472,6 +472,7 @@ parse_net(xmlNode *a_node, model_t model, int *init_state[])
 
                 const xmlChar *source = xmlGetProp(node, (const xmlChar*) "source");
                 const xmlChar *target = xmlGetProp(node, (const xmlChar*) "target");
+                if (source == NULL || target == NULL) Abort("invalid arc at line: %d", node->line)
                 int source_num;
                 int target_num;
                 if ((source_num = SIlookup(context->pnml_places, (char*) source)) != SI_INDEX_FAILED &&
