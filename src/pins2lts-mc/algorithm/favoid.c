@@ -66,16 +66,8 @@ struct alg_local_s {
 typedef struct uf_alg_shared_s {
     uf_t               *uf;             // shared union-find structure
     iterset_t          *is;             // shared iteration set structure
-    ref_t               lasso_acc;      // SCC root for trace construction
-    ref_t               lasso_end;      // last on lasso (to iterate backwards from)
-    ref_t               lasso_root;     // last on lasso (to iterate backwards from)
-    run_t              *reach_run;      // parallel reachability object
-    bool                ltl;            // LTL property present?
 } uf_alg_shared_t;
 
-extern void report_lasso (wctx_t *ctx, ref_t accepting);
-extern int reach_scc_seen (void *ext_ctx, transition_info_t *ti,
-                           ref_t ref, int seen);
 
 void
 favoid_global_init (run_t *run, wctx_t *ctx)
@@ -95,12 +87,11 @@ void
 favoid_local_init (run_t *run, wctx_t *ctx)
 {
     ctx->local = RTmallocZero (sizeof (alg_local_t) );
-    uf_alg_shared_t    *shared = (uf_alg_shared_t*) ctx->run->shared;
-
+    
     ctx->local->target = state_info_create ();
     ctx->local->root   = state_info_create ();
 
-    // extend state with TGBA acceptance marks information
+    // extend state with acceptance marks information
     state_info_add_simple (ctx->state, sizeof (uint32_t),
                           &ctx->local->state_acc);
     state_info_add_simple (ctx->local->target, sizeof (uint32_t),
@@ -126,13 +117,6 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.cum_max_stack           = 0;
     ctx->local->cnt.ftrans                  = 0;
     ctx->local->cnt.itrans                  = 0;
-
-    shared->ltl = pins_get_accepting_state_label_index(ctx->model) != -1;
-
-    if (shared->ltl && trc_output) {
-        ctx->local->rctx = run_init (shared->reach_run, ctx->model);
-        ctx->local->rctx->parent = ctx;
-    }
 
     (void) run; 
 }
@@ -160,8 +144,8 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     raw_data_t          stack_loc;
     uint32_t            acc_set   = 0;
 
-    // TGBA acceptance
-    if (ti->labels != NULL && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
+    // acceptance
+    if (ti->labels != NULL) {
 
         acc_set = ti->labels[pins_get_accepting_set_edge_label_index(ctx->model)];
 
@@ -176,12 +160,14 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             }
         }
 
+        // avoid and store successors of F transitions
         if (loc->rabin_pair_f & acc_set) {
             loc->cnt.ftrans ++;
             // add state to iterset
             iterset_add_state (shared->is, successor->ref+1);
             return;
         }
+        // continue normally with I transitions
         if (loc->rabin_pair_i & acc_set) {
             loc->cnt.itrans ++;
         }
@@ -192,15 +178,9 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     // self-loop
     if (ctx->state->ref == successor->ref) {
         loc->cnt.selfloop ++;
-        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            uint32_t acc = uf_add_acc (shared->uf, successor->ref + 1, acc_set);
-            if (GBgetAcceptingSet() == acc) {
-                report_lasso (ctx, ctx->state->ref);
-            }
-        } else if (shared->ltl) { // BA
-            if (pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) ) {
-                report_lasso (ctx, ctx->state->ref);
-            }
+        uint32_t acc = uf_add_acc (shared->uf, successor->ref + 1, acc_set);
+        if (loc->rabin_pair_i == acc) {
+            Abort("Found Accepting Rabin cycle");
         }
         return;
     } else if (EXPECT_FALSE(trc_output && !seen && ti != &GB_NO_TRANSITION)) {
@@ -213,11 +193,9 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     state_info_serialize (successor, stack_loc);
 
     // add acceptance set to the state
-    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
-        state_info_deserialize (loc->target, stack_loc); // search_stack TOP
-        loc->target_acc = acc_set;
-        state_info_serialize (loc->target, stack_loc);
-    }
+    state_info_deserialize (loc->target, stack_loc); // search_stack TOP
+    loc->target_acc = acc_set;
+    state_info_serialize (loc->target, stack_loc);
 
     (void) ti;
 }
@@ -340,11 +318,9 @@ successor (wctx_t *ctx)
 
         if (uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1)) {
             // add transition acceptance set
-            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-                uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref + 1, loc->state_acc);
-                if (GBgetAcceptingSet() == acc) {
-                    report_lasso (ctx, ctx->state->ref);
-                }
+            uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref + 1, loc->state_acc);
+            if (loc->rabin_pair_i == acc) {
+                Abort("Found Accepting Rabin cycle");
             }
             dfs_stack_pop (loc->search_stack);
             return; // also no chance of new accepting cycle
@@ -359,21 +335,16 @@ successor (wctx_t *ctx)
         // while ( not sameset (FROM, TO) )
         //   Union (R.POP(), FROM)
         // R.PUSH (TO')
-        ref_t               accepting = DUMMY_IDX;
         uint32_t            acc_set   = loc->state_acc;
         do {
             root_data = dfs_stack_pop (loc->roots_stack); // UF Stack POP
             state_info_deserialize (loc->root, root_data); // roots_stack TOP
 
-            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-                // add the acceptance set from the previous root, not the current one
-                // otherwise we could add the acceptance set for the edge
-                // betweem two SCCs (which cannot be part of a cycle)
-                uf_add_acc (shared->uf, loc->root->ref + 1, acc_set);
-                acc_set = loc->root_acc;
-            } else if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(loc->root))) {
-                accepting = loc->root->ref;
-            }
+            // add the acceptance set from the previous root, not the current one
+            // otherwise we could add the acceptance set for the edge
+            // betweem two SCCs (which cannot be part of a cycle)
+            uf_add_acc (shared->uf, loc->root->ref + 1, acc_set);
+            acc_set = loc->root_acc;
             Debug ("Uniting: %zu and %zu", loc->root->ref, loc->target->ref);
 
             uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
@@ -382,13 +353,9 @@ successor (wctx_t *ctx)
         dfs_stack_push (loc->roots_stack, root_data);
 
         // after uniting SCC, report lasso
-        if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
-            acc_set = uf_get_acc (shared->uf, ctx->state->ref + 1);
-            if (GBgetAcceptingSet() == acc_set) {
-                report_lasso (ctx, ctx->state->ref);
-            }
-        } else if (accepting != DUMMY_IDX) {
-            report_lasso (ctx, accepting);
+        acc_set = uf_get_acc (shared->uf, ctx->state->ref + 1);
+        if (loc->rabin_pair_i == acc_set) {
+            Abort("Found Accepting Rabin cycle");
         }
 
         // cycle is now merged (and DFS stack is unchanged)
@@ -630,7 +597,7 @@ favoid_run  (run_t *run, wctx_t *ctx)
 
         keep_logging = 0; // DEBUG
 
-        /*if (i+1 < number_of_pairs) {
+        if (i+1 < number_of_pairs) {
             // and reset the values
             ctx->local->cnt.scc_count               = 0;
             ctx->local->cnt.unique_states           = 0;
@@ -646,11 +613,12 @@ favoid_run  (run_t *run, wctx_t *ctx)
             dfs_stack_clear (loc->search_stack);
             dfs_stack_clear (loc->search_stack);
             uf_clear(shared->uf);
-        }*/
+        }
 
-        break; //TODO
+        // wait until all workers are done
+
+        //break; //TODO
     }
-    //Abort("No Accepting Rabin cycle found");
 
     // TODO: add profiler info
     // TODO: add counterexample construction
@@ -723,6 +691,8 @@ favoid_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
 void
 favoid_shared_init   (run_t *run)
 {
+    HREassert (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN, "The F avoidance algorithm can only be used for Rabin automata");
+
     uf_alg_shared_t    *shared;
 
     set_alg_local_init    (run->alg, favoid_local_init);
@@ -734,16 +704,11 @@ favoid_shared_init   (run_t *run)
     set_alg_reduce        (run->alg, favoid_reduce);
     set_alg_state_seen    (run->alg, favoid_state_seen);
 
+
+    Warning (info, "Number of Rabin pairs: %d", GBgetRabinNPairs());
+
     run->shared = RTmallocZero (sizeof (uf_alg_shared_t));
     shared      = (uf_alg_shared_t*) run->shared;
     shared->uf  = uf_create();
     shared->is  = iterset_create();
-
-    if (trc_output) {
-        // Prepare parallel reachability (should be done in shared, .i.e. global and once)
-        if (strategy[1] == Strat_None) strategy[1] = Strat_DFS;
-        shared->reach_run = run_create (false);
-        alg_shared_init_strategy (shared->reach_run, strategy[1]);
-        set_alg_state_seen (shared->reach_run->alg, reach_scc_seen);
-    }
 }
