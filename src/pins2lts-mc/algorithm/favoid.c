@@ -36,8 +36,7 @@ typedef struct counter_s {
     uint32_t            claimfound;
     uint32_t            claimsuccess;
     uint32_t            cum_max_stack;
-    uint32_t            ftrans;
-    uint32_t            itrans;
+    uint32_t            fstates;
 } counter_t;
 
 /**
@@ -50,7 +49,7 @@ struct alg_local_s {
     uint32_t            rabin_pair_id;        // Rabin Pair identifier
     uint32_t            rabin_pair_f;         // F fragment of rabin pair
     uint32_t            rabin_pair_i;         // I fragment of rabin pair
-    counter_t           cnt;
+    counter_t          *cnt;                  // local counter per rabin pair
     state_info_t       *target;               // auxiliary state
     state_info_t       *root;                 // auxiliary state
     uint32_t            state_acc;            // acceptance info for ctx->state
@@ -61,12 +60,20 @@ struct alg_local_s {
 
 
 /**
+ * shared SCC information per Rabin pair (between workers)
+ */
+typedef struct uf_alg_shared_pair_s {
+    uf_t               *uf;             // shared union-find structure
+    iterset_t          *is;             // shared iteration set structure
+} favoid_shared_pair_t;
+
+
+/**
  * shared SCC information (between workers)
  */
 typedef struct uf_alg_shared_s {
-    uf_t               *uf;             // shared union-find structure
-    iterset_t          *is;             // shared iteration set structure
-} uf_alg_shared_t;
+    favoid_shared_pair_t  *pairs;       // Shared structure per Rabin pair
+} favoid_shared_t;
 
 
 void
@@ -91,6 +98,7 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->target = state_info_create ();
     ctx->local->root   = state_info_create ();
 
+
     // extend state with acceptance marks information
     state_info_add_simple (ctx->state, sizeof (uint32_t),
                           &ctx->local->state_acc);
@@ -107,16 +115,19 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->rabin_pair_f                = 0;
     ctx->local->rabin_pair_i                = 0;
 
-    ctx->local->cnt.scc_count               = 0;
-    ctx->local->cnt.unique_states           = 0;
-    ctx->local->cnt.unique_trans            = 0;
-    ctx->local->cnt.selfloop                = 0;
-    ctx->local->cnt.claimdead               = 0;
-    ctx->local->cnt.claimfound              = 0;
-    ctx->local->cnt.claimsuccess            = 0;
-    ctx->local->cnt.cum_max_stack           = 0;
-    ctx->local->cnt.ftrans                  = 0;
-    ctx->local->cnt.itrans                  = 0;
+    int n_pairs = GBgetRabinNPairs();
+    ctx->local->cnt    = RTmalloc (sizeof (counter_t) * n_pairs );
+    for (int i=0; i<n_pairs; i++) {
+        ctx->local->cnt[i].scc_count               = 0;
+        ctx->local->cnt[i].unique_states           = 0;
+        ctx->local->cnt[i].unique_trans            = 0;
+        ctx->local->cnt[i].selfloop                = 0;
+        ctx->local->cnt[i].claimdead               = 0;
+        ctx->local->cnt[i].claimfound              = 0;
+        ctx->local->cnt[i].claimsuccess            = 0;
+        ctx->local->cnt[i].cum_max_stack           = 0;
+        ctx->local->cnt[i].fstates                 = 0;
+    }
 
     (void) run; 
 }
@@ -139,10 +150,11 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
               int seen)
 {
     wctx_t             *ctx       = (wctx_t *) arg;
-    uf_alg_shared_t    *shared    = (uf_alg_shared_t*) ctx->run->shared;
+    favoid_shared_t    *shared    = (favoid_shared_t*) ctx->run->shared;
     alg_local_t        *loc       = ctx->local;
     raw_data_t          stack_loc;
     uint32_t            acc_set   = 0;
+    int                 pair_id   = loc->rabin_pair_id;
 
     // acceptance
     if (ti->labels != NULL) {
@@ -162,14 +174,14 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
         // avoid and store successors of F transitions
         if (loc->rabin_pair_f & acc_set) {
-            loc->cnt.ftrans ++;
             // add state to iterset
-            iterset_add_state (shared->is, successor->ref+1);
+            if (iterset_add_state (shared->pairs[pair_id].is, successor->ref+1)) {
+                loc->cnt[pair_id].fstates ++; // count only if newly added
+            }
             return;
         }
         // continue normally with I transitions
         if (loc->rabin_pair_i & acc_set) {
-            loc->cnt.itrans ++;
         }
     }
 
@@ -177,10 +189,10 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     // self-loop
     if (ctx->state->ref == successor->ref) {
-        loc->cnt.selfloop ++;
-        uint32_t acc = uf_add_acc (shared->uf, successor->ref + 1, acc_set);
+        loc->cnt[pair_id].selfloop ++;
+        uint32_t acc = uf_add_acc (shared->pairs[pair_id].uf, successor->ref + 1, acc_set);
         if (loc->rabin_pair_i == acc) {
-            Abort("Found Accepting Rabin cycle");
+            Debug("Found Accepting Rabin cycle");
         }
         return;
     } else if (EXPECT_FALSE(trc_output && !seen && ti != &GB_NO_TRANSITION)) {
@@ -231,28 +243,32 @@ explore_state (wctx_t *ctx)
 
 
 static void
-favoid_init  (wctx_t *ctx)
+favoid_init  (wctx_t *ctx, ref_t init_state)
 {
     alg_local_t        *loc    = ctx->local;
-    uf_alg_shared_t    *shared = (uf_alg_shared_t*) ctx->run->shared;
+    favoid_shared_t    *shared = (favoid_shared_t*) ctx->run->shared;
     transition_info_t   ti     = GB_NO_TRANSITION;
     char                claim;
     size_t              transitions;
     raw_data_t          state_data;
+    int                 pair_id   = loc->rabin_pair_id;
+
+    // set initial state
+    state_info_set (loc->target, init_state, LM_NULL_LATTICE);
 
     // make sure that state -> initial doesn't get recognized as a self loop
-    ctx->state->ref = ctx->initial->ref + 1;
-    favoid_handle (ctx, ctx->initial, &ti, 0);
-    claim = uf_make_claim (shared->uf, ctx->initial->ref + 1, ctx->id);
+    ctx->state->ref = init_state + 1;
+    favoid_handle (ctx, loc->target, &ti, 0);
+    claim = uf_make_claim (shared->pairs[pair_id].uf, init_state + 1, ctx->id);
     
     state_data = dfs_stack_top (loc->search_stack);
     state_info_deserialize (ctx->state, state_data); // search_stack TOP
     transitions = explore_state(ctx);
 
-    loc->cnt.claimsuccess ++;
+    loc->cnt[pair_id].claimsuccess ++;
     if (claim == CLAIM_FIRST) {
-        loc->cnt.unique_states ++;
-        loc->cnt.unique_trans += transitions;
+        loc->cnt[pair_id].unique_states ++;
+        loc->cnt[pair_id].unique_trans += transitions;
     }
 }
 
@@ -264,10 +280,11 @@ static inline void
 successor (wctx_t *ctx)
 {
     alg_local_t        *loc        = ctx->local;
-    uf_alg_shared_t    *shared     = (uf_alg_shared_t*) ctx->run->shared;
+    favoid_shared_t    *shared     = (favoid_shared_t*) ctx->run->shared;
     raw_data_t          state_data, root_data;
     char                claim;
     size_t              trans;
+    int                 pair_id   = loc->rabin_pair_id;
 
     // get the parent state from the search_stack
     state_data = dfs_stack_peek_top (loc->search_stack, 1);
@@ -278,7 +295,7 @@ successor (wctx_t *ctx)
     // TO   = successor = ctx->state
 
     // early backtrack if parent is explored ==> all its children are explored
-    if ( !uf_is_in_list (shared->uf, loc->target->ref + 1) ) {
+    if ( !uf_is_in_list (shared->pairs[pair_id].uf, loc->target->ref + 1) ) {
         dfs_stack_pop (loc->search_stack);
         return;
     }
@@ -288,39 +305,39 @@ successor (wctx_t *ctx)
     // - CLAIM_SUCCESS (LIVE state and we have NOT yet visited its SCC)
     // - CLAIM_FOUND   (LIVE state and we have visited its SCC before)
     // - CLAIM_DEAD    (DEAD state)
-    claim = uf_make_claim (shared->uf, ctx->state->ref + 1, ctx->id);
+    claim = uf_make_claim (shared->pairs[pair_id].uf, ctx->state->ref + 1, ctx->id);
 
     if (claim == CLAIM_DEAD) {
         // (TO == DEAD) ==> get next successor
-        loc->cnt.claimdead ++;
+        loc->cnt[pair_id].claimdead ++;
         dfs_stack_pop (loc->search_stack);
         return;
     }
 
     else if (claim == CLAIM_SUCCESS || claim == CLAIM_FIRST) {
         // (TO == 'new' state) ==> 'recursively' explore
-        loc->cnt.claimsuccess ++;
+        loc->cnt[pair_id].claimsuccess ++;
 
         trans = explore_state (ctx);
 
         if (claim == CLAIM_FIRST) {
-            loc->cnt.unique_states ++;
-            loc->cnt.unique_trans += trans;
+            loc->cnt[pair_id].unique_states ++;
+            loc->cnt[pair_id].unique_trans += trans;
         }
         return;
     }
 
     else  { // result == CLAIM_FOUND
         // (TO == state in previously visited SCC) ==> cycle found
-        loc->cnt.claimfound ++;
+        loc->cnt[pair_id].claimfound ++;
 
         Debug ("cycle: %zu  --> %zu", loc->target->ref, ctx->state->ref);
 
-        if (uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1)) {
+        if (uf_sameset (shared->pairs[pair_id].uf, loc->target->ref + 1, ctx->state->ref + 1)) {
             // add transition acceptance set
-            uint32_t acc = uf_add_acc (shared->uf, ctx->state->ref + 1, loc->state_acc);
+            uint32_t acc = uf_add_acc (shared->pairs[pair_id].uf, ctx->state->ref + 1, loc->state_acc);
             if (loc->rabin_pair_i == acc) {
-                Abort("Found Accepting Rabin cycle");
+                Debug("Found Accepting Rabin cycle");
             }
             dfs_stack_pop (loc->search_stack);
             return; // also no chance of new accepting cycle
@@ -343,19 +360,19 @@ successor (wctx_t *ctx)
             // add the acceptance set from the previous root, not the current one
             // otherwise we could add the acceptance set for the edge
             // betweem two SCCs (which cannot be part of a cycle)
-            uf_add_acc (shared->uf, loc->root->ref + 1, acc_set);
+            uf_add_acc (shared->pairs[pair_id].uf, loc->root->ref + 1, acc_set);
             acc_set = loc->root_acc;
             Debug ("Uniting: %zu and %zu", loc->root->ref, loc->target->ref);
 
-            uf_union (shared->uf, loc->root->ref + 1, loc->target->ref + 1);
+            uf_union (shared->pairs[pair_id].uf, loc->root->ref + 1, loc->target->ref + 1);
 
-        } while ( !uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) );
+        } while ( !uf_sameset (shared->pairs[pair_id].uf, loc->target->ref + 1, ctx->state->ref + 1) );
         dfs_stack_push (loc->roots_stack, root_data);
 
         // after uniting SCC, report lasso
-        acc_set = uf_get_acc (shared->uf, ctx->state->ref + 1);
+        acc_set = uf_get_acc (shared->pairs[pair_id].uf, ctx->state->ref + 1);
         if (loc->rabin_pair_i == acc_set) {
-            Abort("Found Accepting Rabin cycle");
+            Debug("Found Accepting Rabin cycle");
         }
 
         // cycle is now merged (and DFS stack is unchanged)
@@ -378,12 +395,13 @@ static inline void
 backtrack (wctx_t *ctx)
 {
     alg_local_t        *loc           = ctx->local;
-    uf_alg_shared_t    *shared        = (uf_alg_shared_t*) ctx->run->shared;
+    favoid_shared_t    *shared        = (favoid_shared_t*) ctx->run->shared;
     raw_data_t          state_data;
     bool                is_last_state;
     ref_t               state_picked;
     char                pick;
     raw_data_t          root_data;
+    int                 pair_id   = loc->rabin_pair_id;
 
     // leave the stackframe
     dfs_stack_leave (loc->search_stack);
@@ -398,7 +416,7 @@ backtrack (wctx_t *ctx)
 
     // remove ctx->state from the list
     // (no other workers have to explore this state anymore)
-    uf_remove_from_list (shared->uf, ctx->state->ref + 1);
+    uf_remove_from_list (shared->pairs[pair_id].uf, ctx->state->ref + 1);
 
     // store the previous state (from the removed one) in loc->target
     is_last_state = (0 == dfs_stack_nframes (loc->search_stack) );
@@ -411,20 +429,20 @@ backtrack (wctx_t *ctx)
     // - if so: standard backtrack (we don't need to report an SCC)
     // - else:  use pick_from_list to determine if the SCC is completed
     if ( !is_last_state
-         && uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) ) {
+         && uf_sameset (shared->pairs[pair_id].uf, loc->target->ref + 1, ctx->state->ref + 1) ) {
         return; // backtrack in same set
     }
 
     // ctx->state is the last KNOWN state in its SCC (according to this worker)
     // ==> check if we can find another one with pick_from_list
-    pick = uf_pick_from_list (shared->uf, ctx->state->ref + 1, &state_picked);
+    pick = uf_pick_from_list (shared->pairs[pair_id].uf, ctx->state->ref + 1, &state_picked);
 
     if (pick != PICK_SUCCESS) {
         // list is empty ==> SCC is completely explored
 
         // were we the one that marked it dead?
         if (pick == PICK_MARK_DEAD) {
-            loc->cnt.scc_count ++;
+            loc->cnt[pair_id].scc_count ++;
         }
 
         // the SCC of the initial state has been marked DEAD ==> we are done!
@@ -433,7 +451,7 @@ backtrack (wctx_t *ctx)
         }
 
         // we may still have states on the stack of this SCC
-        if ( uf_sameset (shared->uf, loc->target->ref + 1, ctx->state->ref + 1) ) {
+        if ( uf_sameset (shared->pairs[pair_id].uf, loc->target->ref + 1, ctx->state->ref + 1) ) {
             return; // backtrack in same set 
             // (the state got marked dead AFTER the previous sameset check)
         }
@@ -443,7 +461,7 @@ backtrack (wctx_t *ctx)
         root_data = dfs_stack_top (loc->roots_stack);
         state_info_deserialize (loc->root, root_data); // R.TOP
         // pop from Roots
-        while (uf_sameset (shared->uf, ctx->state->ref + 1, loc->root->ref + 1) ) {
+        while (uf_sameset (shared->pairs[pair_id].uf, ctx->state->ref + 1, loc->root->ref + 1) ) {
             dfs_stack_pop (loc->roots_stack); // R.POP
             root_data = dfs_stack_top (loc->roots_stack);
             state_info_deserialize (loc->root, root_data); // R.TOP
@@ -461,12 +479,12 @@ backtrack (wctx_t *ctx)
 
 
 static bool
-favoid_check_pair_aux (wctx_t *ctx, run_t *run)
+favoid_check_pair_aux (wctx_t *ctx, run_t *run, ref_t init_state)
 {
-    alg_local_t            *loc = ctx->local;
-    raw_data_t              state_data;
+    alg_local_t        *loc       = ctx->local;
+    raw_data_t          state_data;
     
-    favoid_init (ctx);
+    favoid_init (ctx, init_state);
 
     // continue until we are done exploring the graph or interrupted
     while ( !run_is_stopped(run) ) {
@@ -499,8 +517,10 @@ favoid_check_pair_aux (wctx_t *ctx, run_t *run)
 static bool
 favoid_check_pair (wctx_t *ctx, run_t *run)
 {
-    alg_local_t            *loc = ctx->local;
-    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
+    alg_local_t            *loc       = ctx->local;
+    favoid_shared_t        *shared    = (favoid_shared_t*) ctx->run->shared;
+    int                     pair_id   = loc->rabin_pair_id;
+    ref_t                   init_state = ctx->initial->ref;
 
     Warning(info, "checking pair %d", loc->rabin_pair_id);
 
@@ -510,40 +530,36 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
 
     // search from the initial state
     //Warning (info, "Starting initial search from %zu", ctx->initial->ref);
-    if (favoid_check_pair_aux (ctx, run)) return true;
+    if (favoid_check_pair_aux (ctx, run, init_state)) return true;
 
 
     // check all states that we have avoided
-    while (!iterset_is_empty (shared->is)) {
+    while (!iterset_is_empty (shared->pairs[pair_id].is)) {
         ref_t new_init;
-        iterset_pick_state (shared->is, &new_init);
+        iterset_pick_state (shared->pairs[pair_id].is, &new_init);
         new_init --; // iterset uses ref_t + 1
 
-        if (uf_is_dead (shared->uf, new_init+1)) {
+        if (uf_is_dead (shared->pairs[pair_id].uf, new_init+1)) {
             //Warning (info, "F state %zu is dead, disregard", new_init);
             continue;
         }
 
-        // set initial state
-        state_info_set (ctx->initial, new_init, LM_NULL_LATTICE);
-
-        //Warning (info, "Starting new search from %zu", ctx->initial->ref);
+        //Warning (info, "Starting new search from %zu", new_init);
 
         if (log_again) {
-            printf ("A%zu [color=lightblue,style=filled];\n", ctx->initial->ref);
+            printf ("A%zu [color=lightblue,style=filled];\n", new_init);
             keep_logging = 10000;
             log_again --;
         } else {
             keep_logging = 0;
         }
 
-        if (favoid_check_pair_aux (ctx, run)) return true;
+        if (favoid_check_pair_aux (ctx, run, new_init)) return true;
 
-        iterset_remove_state (shared->is, new_init+1);
+        iterset_remove_state (shared->pairs[pair_id].is, new_init+1);
     }
 
     return false;
-
 }
 
 
@@ -563,12 +579,10 @@ favoid_run  (run_t *run, wctx_t *ctx)
 
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
-    uf_alg_shared_t        *shared = (uf_alg_shared_t*) ctx->run->shared;
-    counter_t              *cnt     = &loc->cnt;
 
 
     int number_of_pairs = GBgetRabinNPairs();
-    int start_pair = 0;//ctx->id % number_of_pairs; // TODO: multiple shared structures
+    int start_pair = ctx->id % number_of_pairs;
 
     for (int i=0; i<number_of_pairs; i++) {
 
@@ -578,46 +592,16 @@ favoid_run  (run_t *run, wctx_t *ctx)
         loc->rabin_pair_i  = GBgetRabinPairInf(loc->rabin_pair_id);
 
         if (favoid_check_pair(ctx, run)) {
-            Abort("Found Accepting Rabin cycle");
+            Debug("Found Accepting Rabin cycle");
         }
-        
-        // print info for the current round:
-        Warning(info, "total scc count:            %d", cnt->scc_count);
-        Warning(info, "unique states count:        %d", cnt->unique_states);
-        Warning(info, "unique transitions count:   %d", cnt->unique_trans);
-        Warning(info, "- self-loop count:          %d", cnt->selfloop);
-        Warning(info, "- claim dead count:         %d", cnt->claimdead);
-        Warning(info, "- claim found count:        %d", cnt->claimfound);
-        Warning(info, "- claim success count:      %d", cnt->claimsuccess);
-        Warning(info, "- cum. max stack depth:     %zu", ctx->counters->level_max);
-        Warning(info, " ");
-        Warning(info, "- F transition count:       %d", cnt->ftrans);
-        Warning(info, "- I transition count:       %d", cnt->itrans);
-        Warning(info, " ");
 
         keep_logging = 0; // DEBUG
 
         if (i+1 < number_of_pairs) {
-            // and reset the values
-            ctx->local->cnt.scc_count               = 0;
-            ctx->local->cnt.unique_states           = 0;
-            ctx->local->cnt.unique_trans            = 0;
-            ctx->local->cnt.selfloop                = 0;
-            ctx->local->cnt.claimdead               = 0;
-            ctx->local->cnt.claimfound              = 0;
-            ctx->local->cnt.claimsuccess            = 0;
-            ctx->local->cnt.cum_max_stack           = 0;
-            ctx->local->cnt.ftrans                  = 0;
-            ctx->local->cnt.itrans                  = 0;
-
+            // reset the local stacks
             dfs_stack_clear (loc->search_stack);
-            dfs_stack_clear (loc->search_stack);
-            uf_clear(shared->uf);
+            dfs_stack_clear (loc->roots_stack);
         }
-
-        // wait until all workers are done
-
-        //break; //TODO
     }
 
     // TODO: add profiler info
@@ -640,16 +624,18 @@ favoid_reduce (run_t *run, wctx_t *ctx)
     if (run->reduced == NULL) {
         run->reduced = RTmallocZero (sizeof (counter_t));
     }
-    counter_t          *reduced = (counter_t *) run->reduced;
-    counter_t          *cnt     = &ctx->local->cnt;
+    counter_t          *reduced   = (counter_t *) run->reduced;
+    alg_local_t        *loc       = ctx->local;
+    int                 pair_id   = 1; //loc->rabin_pair_id;
 
-    reduced->unique_trans           += cnt->unique_trans;
-    reduced->unique_states          += cnt->unique_states;
-    reduced->scc_count              += cnt->scc_count;
-    reduced->selfloop               += cnt->selfloop;
-    reduced->claimdead              += cnt->claimdead;
-    reduced->claimfound             += cnt->claimfound;
-    reduced->claimsuccess           += cnt->claimsuccess;
+    reduced->unique_trans           += loc->cnt[pair_id].unique_trans;
+    reduced->unique_states          += loc->cnt[pair_id].unique_states;
+    reduced->scc_count              += loc->cnt[pair_id].scc_count;
+    reduced->selfloop               += loc->cnt[pair_id].selfloop;
+    reduced->claimdead              += loc->cnt[pair_id].claimdead;
+    reduced->claimfound             += loc->cnt[pair_id].claimfound;
+    reduced->claimsuccess           += loc->cnt[pair_id].claimsuccess;
+    reduced->fstates                += loc->cnt[pair_id].fstates;
     reduced->cum_max_stack          += ctx->counters->level_max;
 }
 
@@ -668,6 +654,7 @@ favoid_print_stats   (run_t *run, wctx_t *ctx)
     Warning(info, "- claim found count:        %d", reduced->claimfound);
     Warning(info, "- claim success count:      %d", reduced->claimsuccess);
     Warning(info, "- cum. max stack depth:     %d", reduced->cum_max_stack);
+    Warning(info, "F states count:             %d", reduced->fstates);
     Warning(info, " ");
     
 
@@ -680,10 +667,12 @@ favoid_print_stats   (run_t *run, wctx_t *ctx)
 int
 favoid_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
 {
-    wctx_t             *ctx    = (wctx_t *) ptr;
-    uf_alg_shared_t    *shared = (uf_alg_shared_t*) ctx->run->shared;
+    wctx_t             *ctx       = (wctx_t *) ptr;
+    favoid_shared_t    *shared    = (favoid_shared_t*) ctx->run->shared;
+    alg_local_t        *loc       = ctx->local;
+    int                 pair_id   = loc->rabin_pair_id;
 
-    return uf_owner (shared->uf, ref + 1, ctx->id);
+    return uf_owner (shared->pairs[pair_id].uf, ref + 1, ctx->id);
     (void) seen; (void) ti;
 }
 
@@ -691,9 +680,10 @@ favoid_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
 void
 favoid_shared_init   (run_t *run)
 {
-    HREassert (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN, "The F avoidance algorithm can only be used for Rabin automata");
+    HREassert (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN, 
+        "The F avoidance algorithm can only be used for Rabin automata");
 
-    uf_alg_shared_t    *shared;
+    favoid_shared_t    *shared;
 
     set_alg_local_init    (run->alg, favoid_local_init);
     set_alg_global_init   (run->alg, favoid_global_init);
@@ -705,10 +695,14 @@ favoid_shared_init   (run_t *run)
     set_alg_state_seen    (run->alg, favoid_state_seen);
 
 
-    Warning (info, "Number of Rabin pairs: %d", GBgetRabinNPairs());
+    int n_pairs = GBgetRabinNPairs();
 
-    run->shared = RTmallocZero (sizeof (uf_alg_shared_t));
-    shared      = (uf_alg_shared_t*) run->shared;
-    shared->uf  = uf_create();
-    shared->is  = iterset_create();
+    run->shared   = RTmallocZero (sizeof (favoid_shared_t));
+    shared        = (favoid_shared_t*) run->shared;
+    shared->pairs = RTmalloc (sizeof (favoid_shared_pair_t) * n_pairs);
+
+    for (int i=0; i<n_pairs; i++) {
+        shared->pairs[i].uf = uf_create();
+        shared->pairs[i].is = iterset_create();
+    }
 }
