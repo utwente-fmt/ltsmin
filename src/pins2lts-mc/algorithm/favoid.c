@@ -522,7 +522,7 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
     int                     pair_id   = loc->rabin_pair_id;
     ref_t                   init_state = ctx->initial->ref;
 
-    Warning(info, "checking pair %d", loc->rabin_pair_id);
+    //Warning(info, "checking pair %d", loc->rabin_pair_id);
 
     if (keep_logging) {
         printf ("A%zu [color=green,style=filled];\n", ctx->initial->ref);
@@ -573,10 +573,6 @@ favoid_run  (run_t *run, wctx_t *ctx)
         printf ("digraph g {\n");// DEBUG
     }
 
-    Warning(info, " ");
-    Warning(info, "Starting Rabin checking algorithm");
-    Warning(info, " ");
-
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
 
@@ -621,41 +617,44 @@ favoid_run  (run_t *run, wctx_t *ctx)
 void
 favoid_reduce (run_t *run, wctx_t *ctx)
 {
+    int n_pairs = GBgetRabinNPairs();
     if (run->reduced == NULL) {
-        run->reduced = RTmallocZero (sizeof (counter_t));
+        run->reduced = RTmallocZero (sizeof (counter_t) * n_pairs);
     }
     counter_t          *reduced   = (counter_t *) run->reduced;
     alg_local_t        *loc       = ctx->local;
-    int                 pair_id   = 1; //loc->rabin_pair_id;
 
-    reduced->unique_trans           += loc->cnt[pair_id].unique_trans;
-    reduced->unique_states          += loc->cnt[pair_id].unique_states;
-    reduced->scc_count              += loc->cnt[pair_id].scc_count;
-    reduced->selfloop               += loc->cnt[pair_id].selfloop;
-    reduced->claimdead              += loc->cnt[pair_id].claimdead;
-    reduced->claimfound             += loc->cnt[pair_id].claimfound;
-    reduced->claimsuccess           += loc->cnt[pair_id].claimsuccess;
-    reduced->fstates                += loc->cnt[pair_id].fstates;
-    reduced->cum_max_stack          += ctx->counters->level_max;
+    for (int pair_id=0; pair_id<n_pairs; pair_id++) {
+        reduced[pair_id].unique_trans           += loc->cnt[pair_id].unique_trans;
+        reduced[pair_id].unique_states          += loc->cnt[pair_id].unique_states;
+        reduced[pair_id].scc_count              += loc->cnt[pair_id].scc_count;
+        reduced[pair_id].selfloop               += loc->cnt[pair_id].selfloop;
+        reduced[pair_id].claimdead              += loc->cnt[pair_id].claimdead;
+        reduced[pair_id].claimfound             += loc->cnt[pair_id].claimfound;
+        reduced[pair_id].claimsuccess           += loc->cnt[pair_id].claimsuccess;
+        reduced[pair_id].fstates                += loc->cnt[pair_id].fstates;
+        reduced[pair_id].cum_max_stack          += ctx->counters->level_max;
+    }
 }
 
 void
 favoid_print_stats   (run_t *run, wctx_t *ctx)
 {
     counter_t              *reduced = (counter_t *) run->reduced;
+    int n_pairs = GBgetRabinNPairs();
 
-    
-    // SCC statistics
-    Warning(info, "total scc count:            %d", reduced->scc_count);
-    Warning(info, "unique states count:        %d", reduced->unique_states);
-    Warning(info, "unique transitions count:   %d", reduced->unique_trans);
-    Warning(info, "- self-loop count:          %d", reduced->selfloop);
-    Warning(info, "- claim dead count:         %d", reduced->claimdead);
-    Warning(info, "- claim found count:        %d", reduced->claimfound);
-    Warning(info, "- claim success count:      %d", reduced->claimsuccess);
-    Warning(info, "- cum. max stack depth:     %d", reduced->cum_max_stack);
-    Warning(info, "F states count:             %d", reduced->fstates);
-    Warning(info, " ");
+    for (int i=0; i<n_pairs; i++) {
+        Warning(info, "[%d] total scc count:            %d", i, reduced[i].scc_count);
+        Warning(info, "[%d] unique states count:        %d", i, reduced[i].unique_states);
+        Warning(info, "[%d] unique transitions count:   %d", i, reduced[i].unique_trans);
+        Warning(info, "[%d] - self-loop count:          %d", i, reduced[i].selfloop);
+        Warning(info, "[%d] - claim dead count:         %d", i, reduced[i].claimdead);
+        Warning(info, "[%d] - claim found count:        %d", i, reduced[i].claimfound);
+        Warning(info, "[%d] - claim success count:      %d", i, reduced[i].claimsuccess);
+        Warning(info, "[%d] - cum. max stack depth:     %d", i, reduced[i].cum_max_stack);
+        Warning(info, "[%d] F states count:             %d", i, reduced[i].fstates);
+        Warning(info, " ");
+    }
     
 
     run_report_total (run);
