@@ -31,7 +31,7 @@ matrix:
 # https://stackoverflow.com/questions/21609580/autotools-build-fails-due-to-subdir-objects-option-in-am-init-automake
 env:
     - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror --disable-test-all"
-      CFLAGS="-DNDEBUG"
+      CFLAGS="-DNDEBUG -O2"
       RELEASE_BUILD="yes"
     - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror --disable-test-all"
       DISTCHECK="yes"
