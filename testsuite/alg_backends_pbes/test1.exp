@@ -33,7 +33,7 @@ run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
 dict set langs pbes exp_output "state space has 10548"
-dict set backends sym options {"-g -rr2+,w2+,W2+" "-rr2+,w2+,W2+,ga" "-g -rr2+,w2+,W2+,ga" "-rr2+,w2+,W2+"}
+dict set backends sym options {"-rr2+,w2+,W2+,ga" "-rr2+,w2+,W2+"}
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
