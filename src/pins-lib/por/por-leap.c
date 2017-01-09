@@ -198,7 +198,7 @@ leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
         stubborn = leap->next_por (self, src, leap_cb, leap);
         por_exclude (ctx, NULL);
 
-        HREassert (!stubborn == 0 || leap->round == 0);
+        HREassert (stubborn != 0 || leap->round == 0);
         if (stubborn == 0) return 0;
 
         disjoint = conjoin_lists (leap, groups);
