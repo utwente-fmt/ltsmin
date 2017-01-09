@@ -92,6 +92,8 @@ ProBcreateZocket(model_t model, const char* file)
                 "Consult the manpage \"man prob2lts-mc\" for further information. "
                 "If you don't need parallelism, you can also supply the --procs=1 option.");
         }
+        // wait for the warning to be printed
+        HREbarrier(HREglobal());
         HREabort(LTSMIN_EXIT_FAILURE);
     }
     prob_context_t* ctx = create_context(model);
