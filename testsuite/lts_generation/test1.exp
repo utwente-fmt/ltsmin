@@ -54,7 +54,7 @@ dict set commands test10_sym exp "deadlock found"
 set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs" "ufscc"}
 
 foreach s $strategies {
-    dict set commands test_trace_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=4 \
+    dict set commands test_trace_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=2 \
 	-s22  --trace=a.gcf --strategy=$s $EXAMPLES_PATH/iprotocol.2.prop4.dve"
     dict set commands test_trace_dve_mc_$s exp "Accepting cycle FOUND"
 }
