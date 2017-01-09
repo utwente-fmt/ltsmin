@@ -16,14 +16,21 @@ puts   "----------------------------------------------\n"
 
 
 # the number of threads to use in multithreaded backends
-set num_threads 2
+set num_threads 1
 
 # Language ProB-frontends:
 # -------------------
+
+set prob_model "MutexSimple.mch"
+set PID [ start_ProB $prob_model ]
+
 set langs [dict create]
 # a model per language
-dict set langs prob model "MutexSimple.mch" 
-dict set langs prob options mc "--threads=$num_threads"
+dict set langs prob model "/tmp/ltsmin.probz" 
+dict set langs prob options mc "--threads=$num_threads --no-close"
+
+dict set backends seq options "--no-close"
+dict set backends dist options "--no-close"
 
 dict set langs prob exp_output "10 states 23 transitions"
 set alg_be [ find_alg_backends "{seq,dist,mc}" ]
@@ -31,11 +38,12 @@ run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
 dict set langs prob exp_output "state space has 10"
-dict set backends sym params "--order=" {bfs-prev}
-dict set backends sym params "--saturation=" {none}
-dict set backends sym params "--vset=" {"lddmc --lace-workers=2 --sylvan-tablesize=20 --sylvan-maxtablesize=20 --sylvan-cachesize=20 --sylvan-maxcachesize=20"}
-dict set backends sym options {""}
+dict set backends sym options "--no-close"
+
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
+
+exec kill -9 $PID
+exec rm /tmp/ltsmin.probz
 
 cd ".."

@@ -264,3 +264,15 @@ proc compile_DVE { DVE_models } {
     }
     return true
 }
+
+proc start_ProB { model } {
+    global EXAMPLES_PATH
+
+    puts "Executing precommand: 'probcli $EXAMPLES_PATH/$model -ltsmin'"
+    set PID [exec probcli $EXAMPLES_PATH/$model -ltsmin &]
+
+    while { ! [file exists /tmp/ltsmin.probz] } {
+        sleep 1
+    }
+    return $PID
+}
