@@ -268,6 +268,19 @@ state_to_cube(const int* state, size_t state_length, uint8_t *arr)
     }
 }
 
+static void
+state_from_cube(int* vec, size_t vec_len, const uint8_t *arr)
+{
+    for (size_t i=0; i<vec_len; i++) {
+        *vec = 0;
+        for (int j=0; j<statebits; j++) {
+            *vec <<= 1;
+            if (*arr++) *vec |= 1;
+        }
+        vec++;
+    }
+}
+
 /**
  * Adds e to set
  */
@@ -373,54 +386,68 @@ set_copy(vset_t dst, vset_t src)
 }
 
 /**
- * This is the internal execution of set_enum
- * <levels> contains k BDDLEVEL levels.
- * 0 <= n < k
- */
-static void
-set_enum_do(BDD root, const BDD variables, int *vec, int n, vset_element_cb cb, void* context)
-{
-    if (root == sylvan_false) return;
-    if (sylvan_set_isempty(variables)) {
-        // Make sure that there are no variables left
-        assert(root == sylvan_true);
-        // We have one satisfying assignment!
-        cb(context, vec);
-    } else {
-        BDDVAR var = sylvan_var(variables);
-        BDD variables_next = sylvan_set_next(variables);
-
-        int i = n / statebits;        // which slot in the state vector
-        int j = n % statebits;        // which bit?
-
-        uint32_t bitmask = 1 << (statebits-1-j);
-
-        if (root == sylvan_true || var != sylvan_var(root)) {
-            // n is skipped, take both
-            vec[i] |= bitmask;
-            set_enum_do(root, variables_next, vec, n+1, cb, context);
-            vec[i] &= ~bitmask;
-            set_enum_do(root, variables_next, vec, n+1, cb, context);
-        } else {
-            vec[i] |= bitmask;
-            set_enum_do((sylvan_high(root)), variables_next, vec, n+1, cb, context);
-            vec[i] &= ~bitmask;
-            set_enum_do((sylvan_low(root)), variables_next, vec, n+1, cb, context);
-        }
-    }
-}
-
-/**
- * Enumerate all elements of the set. Calls cb(context, const int* ELEMENT) 
- * for every found element. Elements are projected, meaning not the full 
+ * Enumerate all elements of the set. Calls cb(context, const int* ELEMENT)
+ * for every found element. Elements are projected, meaning not the full
  * state vector is returned, but only the selected bytes.
  */
 static void
 set_enum(vset_t set, vset_element_cb cb, void* context)
 {
     int vec[set->vector_size];
-    memset(vec, 0, sizeof(int)*set->vector_size);
-    set_enum_do(set->bdd, set->state_variables, vec, 0, cb, context);
+    uint8_t arr[statebits * set->vector_size];
+    MTBDD res = mtbdd_enum_all_first(set->bdd, set->state_variables, arr, NULL);
+    while (res != mtbdd_false) {
+        state_from_cube(vec, set->vector_size, arr);
+        cb(context, vec);
+        res = mtbdd_enum_all_next(set->bdd, set->state_variables, arr, NULL);
+    }
+}
+
+/**
+ * Context struct for set_update
+ */
+struct set_update_context
+{
+    vset_t set;
+    vset_update_cb cb;
+    void* context;
+};
+
+/**
+ * Callback implementation for set_update
+ */
+TASK_2(BDD, bdd_set_updater, void*, _ctx, uint8_t*, arr)
+{
+    struct set_update_context *ctx = (struct set_update_context*)_ctx;
+    size_t vec_len = ctx->set->vector_size;
+    int vec[vec_len];
+    state_from_cube(vec, vec_len, arr);
+
+    struct vector_set dummyset;
+    dummyset.dom = ctx->set->dom;
+    dummyset.vector_size = ctx->set->vector_size;
+    dummyset.state_variables = ctx->set->state_variables;
+    dummyset.projection = ctx->set->projection;
+    dummyset.bdd = sylvan_false;
+
+    sylvan_protect(&dummyset.bdd);
+    ctx->cb(&dummyset, ctx->context, (int*)vec);
+    sylvan_unprotect(&dummyset.bdd);
+    return dummyset.bdd;
+}
+
+/**
+ * Combination of enumeration and set union of the result
+ */
+static void
+set_update(vset_t dst, vset_t src, vset_update_cb cb, void* context)
+{
+    LACE_ME;
+    struct set_update_context ctx = (struct set_update_context){dst, cb, context};
+    BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_set_updater), (void*)&ctx);
+    bdd_refs_push(result);
+    dst->bdd = sylvan_or(dst->bdd, result);
+    bdd_refs_pop(1);
 }
 
 /**
@@ -469,11 +496,17 @@ set_enum_match(vset_t set, int p_len, int* proj, int* match, vset_element_cb cb,
     match_bdd = sylvan_and(match_bdd, set->bdd);
     bdd_refs_pop(1);
 
-    int vec[set->vector_size];
-    memset(vec, 0, sizeof(int)*set->vector_size);
-
     bdd_refs_push(match_bdd);
-    set_enum_do(match_bdd, set->state_variables, vec, 0, cb, context);
+
+    int vec[set->vector_size];
+    uint8_t arr[statebits * set->vector_size];
+    MTBDD res = mtbdd_enum_all_first(match_bdd, set->state_variables, arr, NULL);
+    while (res != mtbdd_false) {
+        state_from_cube(vec, set->vector_size, arr);
+        cb(context, vec);
+        res = mtbdd_enum_all_next(match_bdd, set->state_variables, arr, NULL);
+    }
+
     bdd_refs_pop(1);
 }
 
@@ -755,6 +788,52 @@ rel_add(vrel_t rel, const int *src, const int *dst)
     return rel_add_cpy(rel, src, dst, 0);
 }
 
+/**
+ * Context struct for rel_update
+ */
+struct rel_update_context
+{
+    vrel_t rel;
+    size_t vec_len;
+    vrel_update_cb cb;
+    void* context;
+};
+
+/**
+ * Callback implementation for rel_update
+ */
+TASK_2(BDD, bdd_rel_updater, void*, _ctx, uint8_t*, arr)
+{
+    struct rel_update_context *ctx = (struct rel_update_context*)_ctx;
+    size_t vec_len = ctx->vec_len;
+    int vec[vec_len];
+    state_from_cube(vec, vec_len, arr);
+
+    struct vector_relation dummyrel;
+    memcpy(&dummyrel, ctx->rel, sizeof(struct vector_relation));
+    dummyrel.bdd = sylvan_false;
+
+    sylvan_protect(&dummyrel.bdd);
+    ctx->cb(&dummyrel, ctx->context, (int*)vec);
+    sylvan_unprotect(&dummyrel.bdd);
+
+    return dummyrel.bdd;
+}
+
+/**
+ * Combination of enumeration and set union of the result
+ */
+static void
+rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
+{
+    LACE_ME;
+    struct rel_update_context ctx = (struct rel_update_context){dst, src->vector_size, cb, context};
+    BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_rel_updater), (void*)&ctx);
+    bdd_refs_push(result);
+    dst->bdd = sylvan_or(dst->bdd, result);
+    bdd_refs_pop(1);
+}
+
 static void
 set_reorder()
 {
@@ -897,6 +976,7 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.set_create=set_create;
     dom->shared.set_destroy=set_destroy;
     dom->shared.set_add=set_add; 
+    dom->shared.set_update=set_update;
     dom->shared.set_member=set_member; 
     dom->shared.set_is_empty=set_is_empty; 
     dom->shared.set_equal=set_equal;
@@ -918,6 +998,7 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.rel_add_act=rel_add_act;
     dom->shared.rel_add_cpy=rel_add_cpy;
     dom->shared.rel_add=rel_add;
+    dom->shared.rel_update=rel_update;
     dom->shared.rel_count=rel_count;
     dom->shared.set_next=set_next;
     dom->shared.set_prev=set_prev;
