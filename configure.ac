@@ -357,27 +357,11 @@ have_opaal="yes"
 #    [have_opaal="yes"],
 #    AC_MSG_WARN([TBB malloc library not found.]))
 
-AC_ARG_WITH([sylvan],[AS_HELP_STRING([--with-sylvan],[Compile sylvan])],
-            [],[AC_RUN_IFELSE([AC_LANG_PROGRAM([], [dnl
-return sizeof(void*) == 8 ? 0 : 1;
-                              ])],
-                              [with_sylvan=yes],
-                              [with_sylvan=no])])
-
-if test "x$with_sylvan" == xyes; then
-    AC_CONFIG_SUBDIRS([sylvan])
-    [have_sylvan="yes"]
-fi
-
 if test "x$have_libspg" == xyes; then
     AC_DEFINE([HAVE_LIBSPG], [], [Defined if the SPG lib has been compiled.])
 fi
 
 AC_SUBST(AM_CPPFLAGS,['-I${top_srcdir}/src -I${top_builddir}/src'])
-
-AC_SUBST([SYLVAN_LIBS],['${top_builddir}/sylvan/src/libsylvan.la'])
-AC_SUBST([SYLVAN_CPPFLAGS],['-I${top_srcdir}/sylvan/src'])
-AC_SUBST([SYLVAN_LDFLAGS])
 
 AC_CHECK_PROGS(OPAAL_LTSMIN,[opaal_ltsmin])
 
@@ -427,6 +411,15 @@ AC_ARG_ENABLE([werror],
     [:],
     [enable_werror=no])
 AS_IF([test x"$enable_werror" = "xyes"], [AC_SUBST([AM_CFLAGS], [-Werror])])
+
+PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.1],[
+    have_sylvan=yes
+    SYLVAN_CPPFLAGS="$SYLVAN_CFLAGS"
+    AC_SUBST(SYLVAN_CFLAGS)
+    AC_SUBST(SYLVAN_CPPFLAGS)
+    AC_SUBST(SYLVAN_LDFLAGS)
+    AC_SUBST(SYLVAN_LIBS)],
+    [AC_MSG_FAILURE(Sylvan is not installed.)])
 
 #AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
@@ -603,7 +596,6 @@ Configuration:
     SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc/happy/ghc-pkg/hashmap/deepseq could not be found}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
     SPOT     = ${acx_spot:-NO, Spot not found (override with --with-spot)}
-    SYLVAN   = ${have_sylvan:-NO, building without Sylvan/LDD-MC support}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}

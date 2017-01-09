@@ -7,9 +7,6 @@
 [submodule "ltl2ba"]
 	path = ltl2ba
 	url = http://fmt.cs.utwente.nl/tools/scm/ltl2ba.git
-[submodule "sylvan"]
-	path = sylvan
-	url = https://github.com/utwente-fmt/sylvan.git
 [submodule "scoop"]
 	path = scoop
 	url = https://github.com/utwente-fmt/scoop.git
