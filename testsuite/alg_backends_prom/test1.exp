@@ -21,18 +21,18 @@ set langs [dict create]
 # Language frontends:
 # -------------------
 
-set prom_model "fgs.promela"
+set prom_model "p117.pml"
 compile_promela $prom_model
 
 # prom:
 dict set langs prom model [subst "$prom_model.spins"]
 dict set langs prom options mc "--threads=$num_threads"
-dict set langs prom exp_output "242 states 3388 transitions"
+dict set langs prom exp_output "354 states 828 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
-dict set langs prom exp_output "state space has 242"
+dict set langs prom exp_output "state space has 354"
 dict set backends sym params "--vset=" {"ldd --lace-workers=1"}
 # BuDDy is too slow for this test 
 set alg_be [ find_alg_backends "{sym}" ]
