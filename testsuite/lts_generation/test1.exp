@@ -71,8 +71,9 @@ dict set commands test11_bcg cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLE
 dict set commands test11_bcg exp ""
 #"1760 states 6583 transitions"
 
-dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.aut --mcrl2-rewriter=jitty"
-dict set commands test11_aut exp ""
+# can not write state labels to .aut
+#dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.aut --mcrl2-rewriter=jitty"
+#dict set commands test11_aut exp ""
 #"1760 states 6583 transitions"
 
 dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_PATH/ieee-11073.lps model.dir --mcrl2-rewriter=jitty"
@@ -90,9 +91,8 @@ dict set commands test11_fsm exp ""
 dict set commands test11_check1 cmd "$binpaths(ltsmin-compare) -b model.gcf model.bcg"
 dict set commands test11_check1 exp "LTSs are equivalent"
 
-# dict set commands test11_check2 cmd "$binpaths(ltsmin-compare) -b model.gcf model.aut"
-# dict set commands test11_check2 exp "LTSs are equivalent"
-# AUT file does not support state labels
+dict set commands test11_check2 cmd "$binpaths(ltsmin-compare) -b model.gcf model.aut"
+dict set commands test11_check2 exp "LTSs are equivalent"
 
 #dict set commands test11_check3 cmd "$binpaths(ltsmin-compare) -b model.gcf model.fsm"
 #dict set commands test11_check3 exp "LTSs are equivalent"
