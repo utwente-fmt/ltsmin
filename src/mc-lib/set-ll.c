@@ -18,7 +18,6 @@
 
 
 #define MAX_WORKERS 64
-#define SLABS_RATIO 2
 
 typedef struct set_ll_slab_s {
     void               *mem;
@@ -45,7 +44,11 @@ set_ll_init_allocator (bool shared)
     } else {
         region_size = RTmemSize();
     }
-    size_t              size = region_size / SLABS_RATIO / workers;
+
+    const char         *ge = getenv("SLABS_RATIO");
+    const long int      sr = ge != NULL ? strtol(ge, NULL, 10) : 2;
+
+    size_t              size = region_size / sr / workers;
 
     RTswitchAlloc (shared); // global allocation of allocator?
     set_ll_allocator_t *alloc = RTmalloc (sizeof(set_ll_allocator_t));
