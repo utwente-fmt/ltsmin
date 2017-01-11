@@ -518,7 +518,8 @@ VOID_TASK_1(actual_main, void*, arg)
     if (f == NULL) Abort("Cannot open file '%s'!", files[0]);
 
     // Init Sylvan
-    sylvan_init_package(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
+    sylvan_set_sizes(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
+    sylvan_init_package();
     sylvan_init_ldd();
     sylvan_init_mtbdd();
     sylvan_gc_hook_pregc(TASK(gc_start));
