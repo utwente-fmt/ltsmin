@@ -1080,7 +1080,8 @@ ltsmin_initialize_sylvan()
     Warning(info, "Initial nodes table and operation cache requires %s.", buf);
 
     // Call initializator of library (if needed)
-    sylvan_init_package(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
+    sylvan_set_sizes(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
+    sylvan_init_package();
     sylvan_set_granularity(granularity);
     sylvan_gc_hook_pregc(TASK(gc_start));
     sylvan_gc_hook_postgc(TASK(gc_end));

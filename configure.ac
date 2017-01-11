@@ -454,14 +454,14 @@ AC_ARG_WITH([sylvan],
     [AS_HELP_STRING([--without-sylvan], [do not include Sylvan's multi-core decision diagram packages])])
 
 AS_IF([test "x$with_sylvan" != "xno"], [
-    PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.1 sylvan < 1.2],[
+    PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.3.2 sylvan < 1.4],[
         have_sylvan=yes
         SYLVAN_CPPFLAGS="$SYLVAN_CFLAGS"
         AC_SUBST(SYLVAN_CFLAGS)
         AC_SUBST(SYLVAN_CPPFLAGS)
         AC_SUBST(SYLVAN_LDFLAGS)
         AC_SUBST(SYLVAN_LIBS)],
-        [AC_MSG_WARN([Sylvan >= 1.1, < 1.2 is not installed.])])
+        [AC_MSG_WARN([Sylvan >= 1.3.2, < 1.4 is not installed.])])
 ])
 
 #AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
