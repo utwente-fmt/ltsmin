@@ -1,8 +1,7 @@
 LTSmin [![Build Status](https://travis-ci.org/utwente-fmt/ltsmin.svg?branch=master)](https://travis-ci.org/utwente-fmt/ltsmin) ![FMT](http://fmt.cs.utwente.nl/images/fmt-logo.png)
 ===
 
-Model Checking and Minimization of Labelled Transition Systems 
----
+# Model Checking and Minimization of Labelled Transition Systems
 
 LTSmin started out as a generic toolset for manipulating labelled
 transition systems. Meanwhile the toolset was extended to a
@@ -41,8 +40,7 @@ matrix regrouping (which can drastically reduce run-time and memory
 consumption of symbolic algorithms), partial order reduction and
 linear temporal logic.
 
-Supported Systems
----
+## Supported Systems
 
  - GNU/Linux (tested on Arch Linux, Ubuntu, Debian,
     OpenSuSE 11.2 and Red Hat Enterprise Linux 6)
@@ -55,8 +53,7 @@ Supported Systems
 For the use of the multi-core BDD package Sylvan and the multi-core
 reachability algorithms (`*2lts-mc`), we further recommend using a 64-bit OS.
 
-Installation Instructions
----
+## Installation Instructions
 
 If you are building the software from a Git repository rather than a
 release tarball, refer to Section "Building from a Git Repository" for
@@ -126,8 +123,7 @@ The following additional make targets are supported:
         Builds Doxygen documentation for the source code.
 
 
-Build Dependencies
----
+## Build Dependencies
 
 We list the external libraries and tools which are required to build
 this software.
@@ -343,8 +339,7 @@ Download libtool (>= 2.2.6) from
 
 See above.
 
-Contact
----
+## Contact
 
  - For support/questions, email: <ltsmin-support@lists.utwente.nl>.
  - For bug reports and feature suggestions, visit: <https://github.com/utwente-fmt/ltsmin/issues>.
