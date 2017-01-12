@@ -264,7 +264,7 @@ script:
     cp "$HOME/ltsmin-deps/bin/divine" /tmp/dist/bin &&
     cp "$HOME/ltsmin-deps/bin/txt2lps" /tmp/dist/bin &&
     cp "$HOME/ltsmin-deps/bin/txt2pbes" /tmp/dist/bin &&
-    export distname="ltsmin-$TRAVIS_TAG-$TRAVIS_OS_NAME-$CC" &&
+    export distname="ltsmin-$TRAVIS_TAG-$TRAVIS_OS_NAME" &&
     pushd /tmp/dist &&
     tar cfz "$distname.tgz" * &&
     popd &&
