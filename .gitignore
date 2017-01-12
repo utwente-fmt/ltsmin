@@ -35,5 +35,5 @@ include/
 /src/ltsmin-lib/mucalc-lexer.c
 /src/ltsmin-lib/mucalc-lexer.h
 /examples/*.lps
-/examples/brp.pbes
+/examples/abp.pbes
 nbproject

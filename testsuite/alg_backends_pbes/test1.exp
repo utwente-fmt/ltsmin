@@ -22,18 +22,17 @@ set langs [dict create]
 # -------------------
 
 # pbes:
-dict set langs pbes model "brp.pbes"
+dict set langs pbes model "abp.pbes"
 dict set langs pbes options mc "--procs=$num_threads --mcrl2-rewriter=jitty"
 dict set langs pbes options dist "--mcrl2-rewriter=jitty"
 dict set langs pbes options seq "--mcrl2-rewriter=jitty"
 dict set langs pbes options sym "--mcrl2-rewriter=jitty"
-dict set langs pbes exp_output "10548 states 12168 transitions"
+dict set langs pbes exp_output "74 states 92 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 
 # different output for symbolic tool:
-dict set langs pbes exp_output "state space has 10548"
-dict set backends sym options {"-rr2+,w2+,W2+,ga" "-rr2+,w2+,W2+"}
+dict set langs pbes exp_output "state space has 74"
 set alg_be [ find_alg_backends "{sym}" ]
 run_test_for_alg_backends $alg_be $langs $backends
 

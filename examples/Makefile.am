@@ -22,24 +22,24 @@ EXTRA_DIST  =	gear.1.etf \
 		iprotocol.2.ltl \
 		nodeadlock.mu \
 		Philosophers-5.pnml \
-		brp.mcrl2 \
+		abp.mcrl2 \
 		fgs.promela \
 		zune.pml
 
 if HAVE_LIBMCRL2
-EXTRA_DIST += brp.lps
-EXTRA_DIST += brp.pbes
+EXTRA_DIST += abp.lps
+EXTRA_DIST += abp.pbes
 EXTRA_DIST += ieee-11073.lps
 
 BUILT_SOURCES =
-BUILT_SOURCES += brp.lps
-BUILT_SOURCES += brp.pbes
+BUILT_SOURCES += abp.lps
+BUILT_SOURCES += abp.pbes
 BUILT_SOURCES += ieee-11073.lps
 endif
 
 CLEANFILES =
-CLEANFILES += brp.lps
-CLEANFILES += brp.pbes
+CLEANFILES += abp.lps
+CLEANFILES += abp.pbes
 CLEANFILES += ieee-11073.lps
 
 %.lps: %.mcrl2
