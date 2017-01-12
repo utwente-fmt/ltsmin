@@ -1,1 +1,6 @@
 theme: jekyll-theme-cayman
+title: LTSmin
+description: "LTSmin: Model Checking and Minimization of Labelled Transition Systems"
+show_downloads: true
+version: 3.0
+

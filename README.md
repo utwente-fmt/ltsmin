@@ -1,4 +1,4 @@
-LTSmin [![Build Status](https://travis-ci.org/utwente-fmt/ltsmin.svg?branch=master)](https://travis-ci.org/utwente-fmt/ltsmin)
+LTSmin [![Build Status](https://travis-ci.org/utwente-fmt/ltsmin.svg?branch=master)](https://travis-ci.org/utwente-fmt/ltsmin) ![FMT](http://fmt.cs.utwente.nl/images/fmt-logo.png)
 ===
 
 Model Checking and Minimization of Labelled Transition Systems 
