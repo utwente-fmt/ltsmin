@@ -7,10 +7,17 @@
     <meta name="theme-color" content="#157878">
     <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" href="{{ '/assets/css/style.css?v=' | append: site.github.build_revision | relative_url }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="{{ '/assets/js/main.js' | relative_url }}"></script>
   </head>
   <body>
+      <div class="navigation">
+        <nav>
+          <ul><li class="tag-h1"><a href="#top">LTSmin</a></li></ul>
+        </nav>
+      </div>
     <section class="page-header">
-      <h1 class="project-name">{{ site.title | default: site.github.repository_name }}</h1>
+      <h1 id="top" class="project-name">{{ site.title | default: site.github.repository_name }}</h1>
       <h2 class="project-tagline">{{ site.description | default: site.github.project_tagline }}</h2>
       {% if site.github.is_project_page %}
         <a href="{{ site.github.repository_url }}" class="btn">View on GitHub</a>
@@ -24,9 +31,6 @@
       </h4>
       {% endif %}
     </section>
-      <nav>
-        <ul></ul>
-      </nav>
 
     <section class="main-content">
       {{ content }}
