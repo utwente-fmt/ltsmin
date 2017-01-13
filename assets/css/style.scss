@@ -36,7 +36,7 @@ img[alt=PINS-interface] {height: 200px; padding-left: 100px;}
   position: fixed;
   top: 570px;
   left:50%;
-  margin-left:-720px;
+  margin-left:-710px;
   display: inline-block;
   padding-right: 20px;
   border-radius: 0.3rem;
@@ -88,7 +88,7 @@ nav {
   }
 }
 
-@media print, screen and (max-height: 780px) {
+@media print, screen and (max-height: 480px) {
   nav {
     display: none;
   }
