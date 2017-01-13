@@ -82,7 +82,7 @@ The PINS interface divides our model checking tools cleanly into the two indepen
 * [regrouping](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/dve2lts-sym.html#_pins_options) speeds up the symbolic algorithms by optimizing dependencies, and
 * [partial order reduction](http://essay.utwente.nl/61036/) reduces the state space by dropping irrelevant transitions.
 
-![PINS-interface](/assets/img/pins_modern.png)
+![PINS-interface](assets/img/pins_modern.png)
 
 Furthermore, we implement linear temporal logic (LTL) as a PINS2PINS module, which is automatically turned on when an LTL formula is supplied and transforms the state space on-the-fly by calculating the cross product with the formula.
 
