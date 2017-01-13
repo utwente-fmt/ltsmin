@@ -6,10 +6,19 @@ $(document).ready(function(){
   });
 
   $("nav ul li").on("click", "a", function(event) {
-    var position = $($(this).attr("href")).offset().top - 190;
+    var position = $($(this).attr("href")).offset().top;
     $("html, body").animate({scrollTop: position}, 400);
     $("nav ul li a").parent().removeClass("active");
     $(this).parent().addClass("active");
     event.preventDefault();
   });
+});
+
+$(window).scroll(function(){
+	var doc = document.documentElement;
+	var top = (window.pageYOffset || doc.scrollTop)  - (doc.clientTop || 0);
+        //begin to scroll
+        $("div.navigation").css("top", Math.max((570 - top),30) + "px");
+$("div.navigation").attr("id", Math.max((570 - top), 30) + "px");
+    
 });
