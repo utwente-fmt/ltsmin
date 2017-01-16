@@ -212,6 +212,14 @@ dynamic linker/loader (see, e.g., "man ld.so" or "man dyld").
 See `./configure --help` for the list of available variables,
 and file INSTALL for further details.
 
+##### Static Linking
+
+If you want to configure LTSmin to statically link binaries,
+LTSmin needs to run `pkg-config` with the `--static` flag.
+This will resolve additional flags required for static linking, e.g.:
+
+    $ ./configure PKG_CONFIG="$(which pkg-config) --static"
+
 #### make targets
 
 The following additional make targets are supported:
