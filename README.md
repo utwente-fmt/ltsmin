@@ -163,6 +163,11 @@ in Section [Build Dependencies](#build-dependencies) below.
     # Configure
     $ ./configure --disable-dependency-tracking --prefix /path/
 
+If you have installed `pkgconf` in a non-standard location, you may
+need to specify the location of the pkg-config utility, e.g.:
+
+    $ ./configure --disable-dependency-tracking --prefix /path/ PKG_CONFIG="/path/to/pkg-config"
+
 It is a good idea to check the output of ./configure, to see whether
 all dependencies were found.
 
@@ -252,6 +257,10 @@ JavaCC task support for Ant.
 #### Sylvan
 
 Download Sylvan from <https://github.com/trolando/sylvan>.
+
+#### pkgconf
+
+Download pkgconf from <https://github.com/pkgconf/pkgconf>.
 
 ### Optional Dependencies
 
@@ -419,6 +428,13 @@ have to be executed in the top-level source directory:
 
     $ git submodule update --init
     $ ./ltsminreconf
+
+However, if you have installed `pkgconf` in a non-standard location you may need
+to specify the location to `pkg.m4` using the `ACLOCAL_PATH`
+variable manually, before running `ltsminreconf`. Assuming
+the path to `pkg.m4` is `~/.local/share/aclocal/pkg.m4`, run:
+
+    $ ACLOCAL_PATH=~/.local/share/aclocal ./ltsminreconf
 
 ### Dependencies
 
