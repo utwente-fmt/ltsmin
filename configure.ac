@@ -112,7 +112,9 @@ int main()
 AC_LANG_RESTORE
 
 PKG_PROG_PKG_CONFIG
-m4_pattern_forbid([^PKG_[A-Z_]+$], [missing some pkg-config macros (pkg-config package)])
+m4_pattern_forbid([^PKG_[A-Z_]+$], [missing some pkgconf macros (pkgconf package)])
+
+AS_IF([test x"$PKG_CONFIG" = x], [AC_MSG_FAILURE([Please install pkgconf])])
 
 dnl Checks for programs.
 ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
