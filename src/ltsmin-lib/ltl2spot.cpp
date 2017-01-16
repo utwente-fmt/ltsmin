@@ -66,6 +66,11 @@ ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, in
       case LTL_EQUIV:     n += snprintf(at + (at?n:0), max_buffer, " <-> "); break;
       case LTL_IMPLY:     n += snprintf(at + (at?n:0), max_buffer, " -> "); break;
       case LTL_EN:
+      case LTL_NEQ:
+      case LTL_LT:
+      case LTL_LEQ:
+      case LTL_GT:
+      case LTL_GEQ:
       case LTL_EQ:{
         char *buffer = LTSminPrintExpr(le->lin_expr[i], env);
         // store the predicate (only once)
@@ -77,11 +82,6 @@ ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, in
       }
       case LTL_SVAR:
       case LTL_VAR:
-      case LTL_NEQ:
-      case LTL_LT:
-      case LTL_LEQ:
-      case LTL_GT:
-      case LTL_GEQ:
       case LTL_MULT:
       case LTL_DIV:
       case LTL_REM:
