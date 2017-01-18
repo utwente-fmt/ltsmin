@@ -212,14 +212,44 @@ public:
   }
 
 
+  void addTransition(const int_list& conjSuccessors,
+                     std::shared_ptr<int_list> accSignature) {
+
+    uint32_t t_acc = 0;
+    if (accSignature) {
+      for (unsigned int acc : *accSignature) {
+        t_acc |= (1 << acc);
+      }
+    } 
+
+    transitions.push_back(tmp_pos);
+    transitions.push_back(tmp_neg);
+    transitions.push_back(conjSuccessors.front());
+    transitions.push_back(t_acc);
+
+    transition_count ++;
+  }
+
   // parses the predicate that is assigned to a transition
-  void parsePredicate(label_expr::ptr labelExpr, bool negated) {
+  void parsePredicate(label_expr::ptr labelExpr, bool negated, 
+                      const int_list& conjSuccessors,
+                      std::shared_ptr<int_list> accSignature) {
     if (labelExpr->isAND()) {
-      parsePredicate(labelExpr->getLeft(), false);
-      parsePredicate(labelExpr->getRight(), false);
+      parsePredicate(labelExpr->getLeft(), false, conjSuccessors, accSignature);
+      parsePredicate(labelExpr->getRight(), false, conjSuccessors, accSignature);
+    }
+    else if (labelExpr->isOR()) {
+      parsePredicate(labelExpr->getLeft(), false, conjSuccessors, accSignature);
+
+      // add the transition and reset
+      addTransition (conjSuccessors, accSignature);
+      tmp_pos = 0; 
+      tmp_neg = 0;
+
+      parsePredicate(labelExpr->getRight(), false, conjSuccessors, accSignature);
     }
     else if (labelExpr->isNOT()) {
-      parsePredicate(labelExpr->getLeft(), !negated);
+      parsePredicate(labelExpr->getLeft(), !negated, conjSuccessors, accSignature);
     }
     else if (labelExpr->isTRUE()) {
       HREassert(!negated, "True predicate should not be negated") 
@@ -245,28 +275,16 @@ public:
                                 const int_list& conjSuccessors,
                                 std::shared_ptr<int_list> accSignature) override {
 
-    tmp_pos = 0; 
-    tmp_neg = 0;
-    if (labelExpr) {
-      parsePredicate(labelExpr, false);
-    }
-
     // we can only handle deterministic successors
     HREassert(conjSuccessors.size()==1, "Nondeterministic choice of successors"); 
 
-    uint32_t t_acc = 0;
-    if (accSignature) {
-      for (unsigned int acc : *accSignature) {
-        t_acc |= (1 << acc);
-      }
-    } 
+    tmp_pos = 0; 
+    tmp_neg = 0;
+    if (labelExpr) {
+      parsePredicate(labelExpr, false, conjSuccessors, accSignature);
+    }
 
-    transitions.push_back(tmp_pos);
-    transitions.push_back(tmp_neg);
-    transitions.push_back(conjSuccessors.front());
-    transitions.push_back(t_acc);
-
-    transition_count ++;
+    addTransition(conjSuccessors, accSignature);
 
     (void) stateId;
   }
