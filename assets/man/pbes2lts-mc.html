@@ -1,0 +1,1979 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
+<meta name="generator" content="AsciiDoc 8.6.6" />
+<title>pbes2lts-mc(1)</title>
+<style type="text/css">
+/* Shared CSS for AsciiDoc xhtml11 and html5 backends */
+
+/* Default font. */
+body {
+  font-family: Georgia,serif;
+}
+
+/* Title font. */
+h1, h2, h3, h4, h5, h6,
+div.title, caption.title,
+thead, p.table.header,
+#toctitle,
+#author, #revnumber, #revdate, #revremark,
+#footer {
+  font-family: Arial,Helvetica,sans-serif;
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+  color: navy;
+}
+
+strong {
+  font-weight: bold;
+  color: #083194;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+h5 {
+  font-size: 1.0em;
+}
+
+div.sectionbody {
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
+}
+ul > li     { color: #aaa; }
+ul > li > * { color: black; }
+
+pre {
+  padding: 0;
+  margin: 0;
+}
+
+#author {
+  color: #527bbd;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+#email {
+}
+#revnumber, #revdate, #revremark {
+}
+
+#footer {
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+#preamble {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.0em;
+  margin-bottom: 2.0em;
+  margin-right: 10%;
+  color: #606060;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  color: #527bbd;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid #dddddd;
+  border-left: 4px solid #f0f0f0;
+  padding: 0.5em;
+}
+
+div.listingblock > div.content {
+  border: 1px solid #dddddd;
+  border-left: 5px solid #f0f0f0;
+  background: #f8f8f8;
+  padding: 0.5em;
+}
+
+div.quoteblock, div.verseblock {
+  padding-left: 1.0em;
+  margin-left: 1.0em;
+  margin-right: 10%;
+  border-left: 5px solid #f0f0f0;
+  color: #888;
+}
+
+div.quoteblock > div.attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock > pre.content {
+  font-family: inherit;
+  font-size: inherit;
+}
+div.verseblock > div.attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+/* DEPRECATED: Pre version 8.2.7 verse style literal block. */
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 3px solid #dddddd;
+}
+
+div.exampleblock > div.content {
+  border-left: 3px solid #dddddd;
+  padding-left: 0.5em;
+}
+
+div.imageblock div.content { padding-left: 0; }
+span.image img { border-style: none; }
+a.image:visited { color: white; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: normal;
+  color: navy;
+}
+dd > *:first-child {
+  margin-top: 0.1em;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+ol.arabic {
+  list-style-type: decimal;
+}
+ol.loweralpha {
+  list-style-type: lower-alpha;
+}
+ol.upperalpha {
+  list-style-type: upper-alpha;
+}
+ol.lowerroman {
+  list-style-type: lower-roman;
+}
+ol.upperroman {
+  list-style-type: upper-roman;
+}
+
+div.compact ul, div.compact ol,
+div.compact p, div.compact p,
+div.compact div, div.compact div {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+
+tfoot {
+  font-weight: bold;
+}
+td > div.verse {
+  white-space: pre;
+}
+
+div.hdlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hdlist tr {
+  padding-bottom: 15px;
+}
+dt.hdlist1.strong, td.hdlist1.strong {
+  font-weight: bold;
+}
+td.hdlist1 {
+  vertical-align: top;
+  font-style: normal;
+  padding-right: 0.8em;
+  color: navy;
+}
+td.hdlist2 {
+  vertical-align: top;
+}
+div.hdlist.compact tr {
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.comment {
+  background: yellow;
+}
+
+.footnote, .footnoteref {
+  font-size: 0.8em;
+}
+
+span.footnote, span.footnoteref {
+  vertical-align: super;
+}
+
+#footnotes {
+  margin: 20px 0 20px 0;
+  padding: 7px 0 0 0;
+}
+
+#footnotes div.footnote {
+  margin: 0 0 5px 0;
+}
+
+#footnotes hr {
+  border: none;
+  border-top: 1px solid silver;
+  height: 1px;
+  text-align: left;
+  margin-left: 0;
+  width: 20%;
+  min-width: 100px;
+}
+
+div.colist td {
+  padding-right: 0.5em;
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+div.colist td img {
+  margin-top: 0.3em;
+}
+
+@media print {
+  #footer-badges { display: none; }
+}
+
+#toc {
+  margin-bottom: 2.5em;
+}
+
+#toctitle {
+  color: #527bbd;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+
+span.aqua { color: aqua; }
+span.black { color: black; }
+span.blue { color: blue; }
+span.fuchsia { color: fuchsia; }
+span.gray { color: gray; }
+span.green { color: green; }
+span.lime { color: lime; }
+span.maroon { color: maroon; }
+span.navy { color: navy; }
+span.olive { color: olive; }
+span.purple { color: purple; }
+span.red { color: red; }
+span.silver { color: silver; }
+span.teal { color: teal; }
+span.white { color: white; }
+span.yellow { color: yellow; }
+
+span.aqua-background { background: aqua; }
+span.black-background { background: black; }
+span.blue-background { background: blue; }
+span.fuchsia-background { background: fuchsia; }
+span.gray-background { background: gray; }
+span.green-background { background: green; }
+span.lime-background { background: lime; }
+span.maroon-background { background: maroon; }
+span.navy-background { background: navy; }
+span.olive-background { background: olive; }
+span.purple-background { background: purple; }
+span.red-background { background: red; }
+span.silver-background { background: silver; }
+span.teal-background { background: teal; }
+span.white-background { background: white; }
+span.yellow-background { background: yellow; }
+
+span.big { font-size: 2em; }
+span.small { font-size: 0.6em; }
+
+span.underline { text-decoration: underline; }
+span.overline { text-decoration: overline; }
+span.line-through { text-decoration: line-through; }
+
+
+/*
+ * xhtml11 specific
+ *
+ * */
+
+tt {
+  font-family: monospace;
+  font-size: inherit;
+  color: navy;
+}
+
+div.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead, p.table.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.table {
+  margin-top: 0;
+}
+/* Because the table frame attribute is overriden by CSS in most browsers. */
+div.tableblock > table[frame="void"] {
+  border-style: none;
+}
+div.tableblock > table[frame="hsides"] {
+  border-left-style: none;
+  border-right-style: none;
+}
+div.tableblock > table[frame="vsides"] {
+  border-top-style: none;
+  border-bottom-style: none;
+}
+
+
+/*
+ * html5 specific
+ *
+ * */
+
+.monospaced {
+  font-family: monospace;
+  font-size: inherit;
+  color: navy;
+}
+
+table.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+thead, p.tableblock.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.tableblock {
+  margin-top: 0;
+}
+table.tableblock {
+  border-width: 3px;
+  border-spacing: 0px;
+  border-style: solid;
+  border-color: #527bbd;
+  border-collapse: collapse;
+}
+th.tableblock, td.tableblock {
+  border-width: 1px;
+  padding: 4px;
+  border-style: solid;
+  border-color: #527bbd;
+}
+
+table.tableblock.frame-topbot {
+  border-left-style: hidden;
+  border-right-style: hidden;
+}
+table.tableblock.frame-sides {
+  border-top-style: hidden;
+  border-bottom-style: hidden;
+}
+table.tableblock.frame-none {
+  border-style: hidden;
+}
+
+th.tableblock.halign-left, td.tableblock.halign-left {
+  text-align: left;
+}
+th.tableblock.halign-center, td.tableblock.halign-center {
+  text-align: center;
+}
+th.tableblock.halign-right, td.tableblock.halign-right {
+  text-align: right;
+}
+
+th.tableblock.valign-top, td.tableblock.valign-top {
+  vertical-align: top;
+}
+th.tableblock.valign-middle, td.tableblock.valign-middle {
+  vertical-align: middle;
+}
+th.tableblock.valign-bottom, td.tableblock.valign-bottom {
+  vertical-align: bottom;
+}
+
+
+/*
+ * manpage specific
+ *
+ * */
+
+body.manpage h1 {
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  border-top: 2px solid silver;
+  border-bottom: 2px solid silver;
+}
+body.manpage h2 {
+  border-style: none;
+}
+body.manpage div.sectionbody {
+  margin-left: 3em;
+}
+
+@media print {
+  body.manpage div#toc { display: none; }
+}
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+var asciidoc = {  // Namespace.
+
+/////////////////////////////////////////////////////////////////////
+// Table Of Contents generator
+/////////////////////////////////////////////////////////////////////
+
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, 2006, 2009. License: GPL */
+
+// toclevels = 1..4.
+toc: function (toclevels) {
+
+  function getText(el) {
+    var text = "";
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+        text += i.data;
+      else if (i.firstChild != null)
+        text += getText(i);
+    }
+    return text;
+  }
+
+  function TocEntry(el, text, toclevel) {
+    this.element = el;
+    this.text = text;
+    this.toclevel = toclevel;
+  }
+
+  function tocEntries(el, toclevels) {
+    var result = new Array;
+    var re = new RegExp('[hH]([2-'+(toclevels+1)+'])');
+    // Function that scans the DOM tree for header elements (the DOM2
+    // nodeIterator API would be a better technique but not supported by all
+    // browsers).
+    var iterate = function (el) {
+      for (var i = el.firstChild; i != null; i = i.nextSibling) {
+        if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+          var mo = re.exec(i.tagName);
+          if (mo && (i.getAttribute("class") || i.getAttribute("className")) != "float") {
+            result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+          }
+          iterate(i);
+        }
+      }
+    }
+    iterate(el);
+    return result;
+  }
+
+  var toc = document.getElementById("toc");
+  if (!toc) {
+    return;
+  }
+
+  // Delete existing TOC entries in case we're reloading the TOC.
+  var tocEntriesToRemove = [];
+  var i;
+  for (i = 0; i < toc.childNodes.length; i++) {
+    var entry = toc.childNodes[i];
+    if (entry.nodeName == 'div'
+     && entry.getAttribute("class")
+     && entry.getAttribute("class").match(/^toclevel/))
+      tocEntriesToRemove.push(entry);
+  }
+  for (i = 0; i < tocEntriesToRemove.length; i++) {
+    toc.removeChild(tocEntriesToRemove[i]);
+  }
+
+  // Rebuild TOC entries.
+  var entries = tocEntries(document.getElementById("content"), toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "_toc_" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+  if (entries.length == 0)
+    toc.parentNode.removeChild(toc);
+},
+
+
+/////////////////////////////////////////////////////////////////////
+// Footnotes generator
+/////////////////////////////////////////////////////////////////////
+
+/* Based on footnote generation code from:
+ * http://www.brandspankingnew.net/archive/2005/07/format_footnote.html
+ */
+
+footnotes: function () {
+  // Delete existing footnote entries in case we're reloading the footnodes.
+  var i;
+  var noteholder = document.getElementById("footnotes");
+  if (!noteholder) {
+    return;
+  }
+  var entriesToRemove = [];
+  for (i = 0; i < noteholder.childNodes.length; i++) {
+    var entry = noteholder.childNodes[i];
+    if (entry.nodeName == 'div' && entry.getAttribute("class") == "footnote")
+      entriesToRemove.push(entry);
+  }
+  for (i = 0; i < entriesToRemove.length; i++) {
+    noteholder.removeChild(entriesToRemove[i]);
+  }
+
+  // Rebuild footnote entries.
+  var cont = document.getElementById("content");
+  var spans = cont.getElementsByTagName("span");
+  var refs = {};
+  var n = 0;
+  for (i=0; i<spans.length; i++) {
+    if (spans[i].className == "footnote") {
+      n++;
+      var note = spans[i].getAttribute("data-note");
+      if (!note) {
+        // Use [\s\S] in place of . so multi-line matches work.
+        // Because JavaScript has no s (dotall) regex flag.
+        note = spans[i].innerHTML.match(/\s*\[([\s\S]*)]\s*/)[1];
+        spans[i].innerHTML =
+          "[<a id='_footnoteref_" + n + "' href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+        spans[i].setAttribute("data-note", note);
+      }
+      noteholder.innerHTML +=
+        "<div class='footnote' id='_footnote_" + n + "'>" +
+        "<a href='#_footnoteref_" + n + "' title='Return to text'>" +
+        n + "</a>. " + note + "</div>";
+      var id =spans[i].getAttribute("id");
+      if (id != null) refs["#"+id] = n;
+    }
+  }
+  if (n == 0)
+    noteholder.parentNode.removeChild(noteholder);
+  else {
+    // Process footnoterefs.
+    for (i=0; i<spans.length; i++) {
+      if (spans[i].className == "footnoteref") {
+        var href = spans[i].getElementsByTagName("a")[0].getAttribute("href");
+        href = href.match(/#.*/)[0];  // Because IE return full URL.
+        n = refs[href];
+        spans[i].innerHTML =
+          "[<a href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+      }
+    }
+  }
+},
+
+install: function(toclevels) {
+  var timerId;
+
+  function reinstall() {
+    asciidoc.footnotes();
+    if (toclevels) {
+      asciidoc.toc(toclevels);
+    }
+  }
+
+  function reinstallAndRemoveTimer() {
+    clearInterval(timerId);
+    reinstall();
+  }
+
+  timerId = setInterval(reinstall, 500);
+  if (document.addEventListener)
+    document.addEventListener("DOMContentLoaded", reinstallAndRemoveTimer, false);
+  else
+    window.onload = reinstallAndRemoveTimer;
+}
+
+}
+asciidoc.install();
+/*]]>*/
+</script>
+</head>
+<body class="manpage">
+<div id="header">
+<h1>
+pbes2lts-mc(1) Manual Page
+</h1>
+<h2>NAME</h2>
+<div class="sectionbody">
+<p>pbes2lts-mc -
+   Concurrent state space generator for PBES models.
+</p>
+</div>
+</div>
+<div id="content">
+<div class="sect1">
+<h2 id="_synopsis">SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="paragraph"><p><strong>pbes2lts-mc</strong> [OPTION]&#8230; <em>input.pbes</em></p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_description">DESCRIPTION</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>pbes2lts-mc performs multi-core reachability and LTL model checking on the
+labelled transition system from a compiled
+specification provided in <em>input.pbes</em>.  Specifications are in <em>pbes</em> format
+and are commonly generated by <a href="lps2pbes.html">lps2pbes(1)</a>.
+Because the pbes depends on libraries that are not thread-safe, this tool
+uses processes instead of threads (<strong>--procs</strong>).
+LTS output is not supported by this tool, use the distributed tools instead.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_options">OPTIONS</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--threads</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Number of threads to use for state space exploration
+        (default: NUMBER=NUM_CORES). Maximum is 64.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--strategy</strong>=<em>TYPE</em>
+</dt>
+<dd>
+<p>
+        Select an exploration strategy. Two kinds of algorithms
+        are available: LTL model checking and reachability.
+        The multi-core LTL algorithms (Nested DFS) are implemented
+        in a swarmed fashion, however with a shared state storage.
+        On top of that, MCNDFS and ENDFS offer work sharing between threads
+        and can deliver speedups for some models.
+        Note that the LTL algorithms require buchi automata as input.
+        Such a model can be provided directly by the language frontend,
+        i.e., DiVinE property models are supported, or by the LTL
+        layer (see --ltl).
+        Note finally that strict reachability exploration orders
+        are not guaranteed by all multi-core search strategies.
+        <em>TYPE</em> can be one of the following options:
+</p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+bfs
+</dt>
+<dd>
+<p>
+  explore state space in breadth-first order (default).
+</p>
+</dd>
+<dt class="hdlist1">
+sbfs
+</dt>
+<dd>
+<p>
+  explore state space in strict breadth-first order (default).
+</p>
+</dd>
+<dt class="hdlist1">
+dfs
+</dt>
+<dd>
+<p>
+  explore state space in relaxed depth-first order. Relaxed meaning that
+  the inclusion check on the set of visited states is executed immediately
+  after generating a state. This saves stack space and improves performance
+  of the parallel reachability analysis.
+</p>
+</dd>
+<dt class="hdlist1">
+ndfs
+</dt>
+<dd>
+<p>
+  multi-core swarmed Nested Depth-First Search (Courcoubetis et al.).
+</p>
+</dd>
+<dt class="hdlist1">
+nndfs
+</dt>
+<dd>
+<p>
+  multi-core swarmed New Nested Depth-First Search (Schwoon, Esparza).
+</p>
+</dd>
+<dt class="hdlist1">
+ldfs
+</dt>
+<dd>
+<p>
+  Multi-Core Nested Depth-First Search (Laarman, Langerak, van de Pol, Weber, Wijs).
+</p>
+</dd>
+<dt class="hdlist1">
+endfs
+</dt>
+<dd>
+<p>
+  Multi-Core Nested Depth-First Search by Evangelista et al. The algorithm has
+  been adapted with the cyan color encoding and early cycle detection, as
+  described in "Variations on Multi-Core Nested Depth-First Search"
+  (Laarman, van de Pol).
+  Note that ENDFS requires a repair procedure, NNDFS is chosen by default.
+  Alternatives can be chosen by  providing a list of strategies, for example:
+  "endfs,mcndfs", yields the NMC-NDFS algorithm as described in the Variations
+  paper (with load balancing).
+  Finally, we also allow multiple levels of ENDFS to be combined:
+  "endfs,endfs,nndfs".
+</p>
+</dd>
+<dt class="hdlist1">
+cndfs
+</dt>
+<dd>
+<p>
+  New CNDFS algorithm.
+  Multi-Core Nested Depth-First Search (Evangelista, Laarman, Petrucci, van de Pol).
+</p>
+</dd>
+<dt class="hdlist1">
+tarjan
+</dt>
+<dd>
+<p>
+  Tarjan&#8217;s sequential SCC algorithm.
+  Depth-First Search and Linear Graph Algorithms (Tarjan).
+</p>
+</dd>
+<dt class="hdlist1">
+renault
+</dt>
+<dd>
+<p>
+  Renault&#8217;s SCC algorithm.
+  Parallel Explicit Model Checking for Generalized Büchi Automata (Renault et al.).
+</p>
+</dd>
+<dt class="hdlist1">
+ufscc
+</dt>
+<dd>
+<p>
+  The UFSCC SCC algorithm.
+  Multi-Core On-The-Fly SCC Decomposition (Bloemen, Laarman, van de Pol).
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>--perm</strong>=<em>TYPE</em>
+</dt>
+<dd>
+<p>
+        Select the transition permutation, which is used to guide
+        different threads to different parts of the state space.
+        A good permutation can significantly speed up bug hunting.
+        <em>TYPE</em> can be one of the following options, each has
+        different properties in terms of performance and effectiveness
+        summarized as (perf./eff.) :
+</p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+dynamic
+</dt>
+<dd>
+<p>
+    use "fresh successor heuristics" described in
+    "Variations on Multi-Core Nested Depth-First Search" (Laarman, van de Pol).
+    (decent/very good for bug hunting). Default for LTL.
+</p>
+</dd>
+<dt class="hdlist1">
+sort
+</dt>
+<dd>
+<p>
+    sort on the unique id of the successor state (decent/good)
+</p>
+</dd>
+<dt class="hdlist1">
+random
+</dt>
+<dd>
+<p>
+    use multiple fixed random permutation schemes per worker (decent/good).
+</p>
+</dd>
+<dt class="hdlist1">
+rr
+</dt>
+<dd>
+<p>
+        randomized using a full random sort order on the states. This is more random
+        than the previous option, but requires more pre-computation time for the
+        random array (decent/almost perfect).
+</p>
+</dd>
+<dt class="hdlist1">
+shift
+</dt>
+<dd>
+<p>
+   shift the order of transitions by a fixed value per worker (fast/decent).
+</p>
+</dd>
+<dt class="hdlist1">
+otf
+</dt>
+<dd>
+<p>
+    sort according to a dynamic permutation scheme (slow/perfect).
+</p>
+</dd>
+<dt class="hdlist1">
+none
+</dt>
+<dd>
+<p>
+    use the same exploration order for all workers. Default for reachability.
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>--state</strong>=<em>TYPE</em>
+</dt>
+<dd>
+<p>
+        Select type of data structure for storing visited states.
+        <em>TYPE</em> can be one of the following options:
+</p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+table
+</dt>
+<dd>
+<p>
+  use a lockless hash table.
+</p>
+</dd>
+<dt class="hdlist1">
+tree
+</dt>
+<dd>
+<p>
+  use a lockless tree-compressed table. In many cases the tree
+  can compress states to two integers regardless of their length. To efficiently
+  accommodate more than 4*10^9 states, the table is split in a root and a leaf
+  table whose respective size can be adjusted using the --ratio option
+  (default).
+</p>
+</dd>
+<dt class="hdlist1">
+cleary-tree
+</dt>
+<dd>
+<p>
+  use a lockless tree-compressed hash table with a parallel Cleary table to
+  store roots. The compressed size of a state can approach one integer
+  with this approach. The leafs table is stored as a standard tree table (two
+  integers per subtree), which typically can be much smaller (up to the
+  square root of the root table size). To control the respective size of the
+  leaf table use the --ratio option.
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>--ratio</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Log_2 ratio between root and leaf table in tree compression. The ratio
+        can theoretically be as low as the square root of the root table size
+        (see --size). This will however only work if the state vectors are
+        perfectly combinatorial wrt their variable values. In most cases
+        the leaf table will grow larger, but find found that a factor four
+        (--ratio=2) works well for over 75% of the BEEM models.
+        (default: NUMBER=2).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--size</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Log_2 hash table size in elements (default: NUMBER=24).
+        This is also used for the internal node table of the tree.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--zobrist</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Save time by using zobrist incremental state hashing.
+        NUMBER defines the (log_2) size of the random number table
+        (default: 0=OFF). Large tables mean better hash distributions,
+        but more cache misses due to memory size.
+        Experiments have shown that small tables (2^6) suffice for
+        good distributions (equal or better than Jenkin&#8217;s hash).
+        Improvements are only noticable for fast state generators, like
+        DiVinE 2.2 (<a href="dve22lts-mc.html">dve22lts-mc(1)</a>).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--max</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Maximum search depth.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--proviso</strong>=<em>PROVISO</em>
+</dt>
+<dd>
+<p>
+    Change the proviso implementation for partial order reduction in presence
+    of safety properties or liveness properties. Parallel LTL is only supported
+    with the cndfs proviso in the cndfs search strategy. Sequentially, LTL is
+    also supported the stack proviso in the ndfs search strategy.
+    PROVISO can be either:
+</p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+force-none
+</dt>
+<dd>
+<p>
+    Disables the ignoring proviso check (only useful for benchmarking or
+    bug hunting).
+</p>
+</dd>
+<dt class="hdlist1">
+closed-set
+</dt>
+<dd>
+<p>
+    The closed set proviso is the default proviso which requires
+    almost no extra work/memory. It might however result in less
+    reduction than the <em>stack</em> proviso. It works with both
+    the dfs and (p/s)bfs exploration strategies.
+</p>
+</dd>
+<dt class="hdlist1">
+stack
+</dt>
+<dd>
+<p>
+    The stack proviso is the proviso used for example by the spin
+    model checker. It requires some extra work/memory but may
+    result in a better reduction than <em>closedset</em>. It works only
+    for a dfs or ndfs search strategy (for resp. safety or LTL properties).
+</p>
+</dd>
+<dt class="hdlist1">
+cndfs
+</dt>
+<dd>
+<p>
+    A special parallel cycle proviso is used to enable POR with multi-core
+    LTL model checking using the cndfs search strategy.
+</p>
+</dd>
+</dl></div>
+</dd>
+</dl></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>-n</strong>, <strong>--no-exit</strong>
+</dt>
+<dd>
+<p>
+      Do not exit when an error is found. Just count errors. Error counts are
+      printed with <tt>-v</tt>.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-d</strong>, <strong>--deadlock</strong>
+</dt>
+<dd>
+<p>
+      Find state with no outgoing transitions. Returns with exit code 1 if
+      a deadlock is found, 0 or 255 (error) otherwise.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-i</strong>, <strong>--invariant</strong>=<em>PREDFILE|PREDEXPRESSION</em>
+</dt>
+<dd>
+<p>
+      Find state where the invariant is violated. The file <em>PREDFILE</em>
+      contains an expression in a simple predicate language (see
+      <a href="ltsmin-pred.html">ltsmin-pred(5)</a>). Its contents can also be entered directly as
+      a <em>PREDEXPRESSION</em>. Returns with exit code 1 if
+      a violation is found, 0 or 255 (error) otherwise.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-a</strong>, <strong>--action</strong>=<em>STRING</em>
+</dt>
+<dd>
+<p>
+      Find state with an outgoing transition of type <em>STRING</em>. Returns with exit
+      code 1 if the action is found, 0 or 255 (error) otherwise.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--trace</strong>='FILE'<em>.gcf</em>
+</dt>
+<dd>
+<p>
+      When finding a deadlock state or a transition labelled with a certain
+      action, write a trace to 'FILE'<em>.gcf</em>, beginning from the initial state.
+      Traces can be pretty-printed with <a href="ltsmin-printtrace.html">ltsmin-printtrace(1)</a>.
+</p>
+</dd>
+</dl></div>
+<div class="sect2">
+<h3 id="_pins_options">PINS Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--labels</strong>
+</dt>
+<dd>
+<p>
+        Print state variable, type and value names, and state and action labels.
+        Then exit.
+        Useful for writing predicate (<tt>--invariant</tt>), LTL (<tt>--ltl</tt>),
+        CTL/CTL* (<tt>--ctl</tt>), and mu-calculus (<tt>--mu</tt>) expressions.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--matrix</strong>
+</dt>
+<dd>
+<p>
+        Print the dependency matrix and exit.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-c</strong>, <strong>--cache</strong>
+</dt>
+<dd>
+<p>
+    Enable caching of greybox calls.
+</p>
+<div class="paragraph"><p>If this option is used, the state space generator makes calls to the
+short version of the greybox next-state function and memoizes the
+results. If the next-state function is expensive this will yield
+substantial speedups.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--pins-guards</strong>
+</dt>
+<dd>
+<p>
+    Use guards in combination with the long next-state function to speed up the next-state function.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-r</strong>, <strong>--regroup</strong>=<em>SPEC</em>
+</dt>
+<dd>
+<p>
+    Enable regrouping optimizations on the dependency matrix.
+</p>
+<div class="paragraph"><p><em>SPEC</em> is a comma-separated sequence of transformations
+<em>&lt;(<em>T</em>,)+&gt;</em> which are applied in this order to the
+dependency matrix.  The following transformations <em>T</em> are available:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+gs
+</dt>
+<dd>
+<p>
+  Group Safely; macro for "<strong>gc</strong>,<strong>gr</strong>,<strong>cw</strong>,<strong>rs</strong>"; almost
+  always a win.
+</p>
+</dd>
+<dt class="hdlist1">
+ga
+</dt>
+<dd>
+<p>
+  Group Aggressively (row subsumption); macro for
+  "<strong>gc</strong>,<strong>rs</strong>,<strong>ru</strong>,<strong>cw</strong>,<strong>rs</strong>"; can be a huge win, but in some
+  cases causes slower state space generation.
+</p>
+</dd>
+<dt class="hdlist1">
+gsa
+</dt>
+<dd>
+<p>
+  Group Simulated Annealing; macro for "<strong>gc</strong>,<strong>gr</strong>,<strong>csa</strong>,<strong>rs</strong>"; almost
+  always a win; usually better than <strong>gs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+gc
+</dt>
+<dd>
+<p>
+  Group Columns; macro for "<strong>cs</strong>,<strong>cn</strong>".
+</p>
+</dd>
+<dt class="hdlist1">
+gr
+</dt>
+<dd>
+<p>
+  Group Rows; macro for "<strong>rs</strong>,<strong>rn</strong>".
+</p>
+</dd>
+<dt class="hdlist1">
+cs
+</dt>
+<dd>
+<p>
+  Column Sort; sort columns lexicographically.
+</p>
+</dd>
+<dt class="hdlist1">
+cn
+</dt>
+<dd>
+<p>
+  Column Nub; (temporarily) group duplicate columns, thereby making
+  <em>ca</em> more tractable.  Requires <strong>cs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+cw
+</dt>
+<dd>
+<p>
+  Column sWap; minimize distance between columns by swapping them
+  heuristically.  This reordering improves performance of the symbolic
+  data structures.
+</p>
+</dd>
+<dt class="hdlist1">
+ca
+</dt>
+<dd>
+<p>
+  Column All permutations; try to find the column permutation with the
+  best cost metric.  Potentially, this is an expensive operation.
+</p>
+</dd>
+<dt class="hdlist1">
+csa
+</dt>
+<dd>
+<p>
+  Column Simulated Annealing; minimize distance between columns by
+  swapping them using simulated annealing.
+</p>
+</dd>
+<dt class="hdlist1">
+rs
+</dt>
+<dd>
+<p>
+  Row Sort; sort rows lexicographically.
+</p>
+</dd>
+<dt class="hdlist1">
+rn
+</dt>
+<dd>
+<p>
+  Row Nub; remove duplicate rows from the dependency matrix.  This is
+  always a win.  Requires <strong>rs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+ru
+</dt>
+<dd>
+<p>
+  Row sUbsume; try to remove more rows than nubbing, thereby trading
+  speed for memory.  Requires <strong>rs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+w2W
+</dt>
+<dd>
+<p>
+  Over-approximate all must-write to may-write. May-write supports the copy (-) dependency.
+</p>
+</dd>
+<dt class="hdlist1">
+r2+
+</dt>
+<dd>
+<p>
+  Over-approximate read to read+write. Allows read dependencies to also subsume write dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+w2+
+</dt>
+<dd>
+<p>
+  Over-approximate must-write to read+write. Allows must-write dependencies to also subsume read dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+W2+
+</dt>
+<dd>
+<p>
+  Over-approximate may-write to read+write. Allows must-write dependencies to also subsume read dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+-2r
+</dt>
+<dd>
+<p>
+  Over-approximate copy to read. May be useful for testing whether the dependency matrix is correct.
+</p>
+</dd>
+<dt class="hdlist1">
+rb4w
+</dt>
+<dd>
+<p>
+  Use special heuristics to move read dependencies before write dependences. Often a win in symbolic state space generation.
+</p>
+</dd>
+<dt class="hdlist1">
+mm
+</dt>
+<dd>
+<p>
+  Writes metrics of the selected (<strong>sr</strong>, <strong>sw</strong>, <strong>sc</strong>) matrix to stdout. The following metrics are printed:
+</p>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+Event span: the total distance between the minimum and maximum column of rows.
+</p>
+</li>
+<li>
+<p>
+Normalized event span: the event span divided by the size of the matrix (rows x columns).
+</p>
+</li>
+<li>
+<p>
+Weighted event span: the weighted event span, the event span, including a moment signifying the location of the span. See, Siminiceanu et al., we use moment 1.
+</p>
+</li>
+<li>
+<p>
+Normalized weighted event span: the weighted event span divided by the size of the matrix (rows x column).
+</p>
+</li>
+</ol></div>
+</dd>
+<dt class="hdlist1">
+sr
+</dt>
+<dd>
+<p>
+ Select the read matrix for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+sw
+</dt>
+<dd>
+<p>
+ Select the write matrix (default) for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+ The write matrix is the default selection, because only write dependencies can create new nodes in decision diagrams.
+ A bad variable order in the write matrix thus leads to a large number of peak nodes during reachability analysis.
+ A bad variable order in the read matrix can also lead to a slow reachability analysis, but typically
+ not as severe as a bad variable order in the write matrix. Slow reachability analysis due to a bad variable order
+ in the read matrix causes many recursive calls to the relational product operation. Typically it is best that read
+ dependencies are moved to the top DD level, thus left most in the read matrix.
+</p>
+</dd>
+<dt class="hdlist1">
+sc
+</dt>
+<dd>
+<p>
+ Select the combined matrix for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+ The combined matrix is the logical or of the read and write matrix.
+</p>
+</dd>
+<dt class="hdlist1">
+bg
+</dt>
+<dd>
+<p>
+  Use a bipartite graph (default) for <strong>bcm</strong>, <strong>bk</strong>, <strong>bs</strong>, <strong>vcm</strong>, <strong>vacm</strong> and <strong>vgps</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+tg
+</dt>
+<dd>
+<p>
+  Create a total graph of the bipartite graph for <strong>bcm</strong>, <strong>bk</strong>, <strong>bs</strong>, <strong>vcm</strong>, <strong>vacm</strong> and <strong>vgps</strong>.
+  This adds more vertices and edges thus increasing computation time, but sometimes provides a better ordering.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p>Below, the sparse matrix algorithms prefixed with <strong>b</strong> are only available when LTSmin is compiled with Boost.
+Algorithms prefixed with <strong>v</strong> are only available when LTSmin is compiled with ViennaCL.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+bcm
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+bk
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s King ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+bs
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s Sloan ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vcm
+</dt>
+<dd>
+<p>
+  Apply ViennaCL&#8217;s Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vacm
+</dt>
+<dd>
+<p>
+  Apply ViennaCL&#8217;s advanced Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vgps
+</dt>
+<dd>
+<p>
+  Apply ViennaCl&#8217;s Gibbs-Poole-Stockmeyer ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+f
+</dt>
+<dd>
+<p>
+  Apply FORCE ordering.
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>--row-perm</strong>=<em>PERM</em>
+</dt>
+<dd>
+<p>
+    Apply row permutation <em>PERM</em>, where <em>PERM</em> is a sequence of row numbers, separated by a comma.
+    E.g. the vector 2,1,0 will swap row 2 with row 0.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--col-perm</strong>=<em>PERM</em>
+</dt>
+<dd>
+<p>
+    Apply column permutation <em>PERM</em>, where <em>PERM</em> is a sequence of column numbers, separated by a comma.
+    E.g. the vector 2,1,0 will swap column 2 with column 0.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--col-ins</strong>=<em>PAIRS</em>
+</dt>
+<dd>
+<p>
+    Insert columns before other columns in the dependency matrix.
+</p>
+<div class="paragraph"><p><em>PAIRS</em> is a comma-separated sequence of pairs <em>&lt;(C.C</em>,)+&gt;'.
+E.g. <strong>--col-ins=1.0</strong> will insert column <strong>1</strong> before column <strong>0</strong>.
+Each pair contains a source column <strong>C</strong> and a target column <strong>C'</strong>. During the application of the whole
+sequence, <strong>C</strong> will always be the column number that corresponds with the column before the application of the whole sequence.
+The column number <strong>C'</strong> will always be the column during the application of the whole sequence. This means that
+in for example <strong>--col-ins=2.0,1.0</strong>, first column <strong>2</strong> is inserted at position <strong>0</strong>, then column <strong>1</strong> is inserted at position <strong>0</strong>.
+The result will be that the original column <strong>2</strong> will be at position <strong>1</strong>.
+Another important detail is that when <strong>--col-ins</strong> is used, all source columns will temporarily be "removed"
+during reordering from the dependency matrix, i.e. when the <strong>-r</strong>,<strong>--regroup</strong> option is given. After reordering
+is done, the columns will be inserted at the desired target position. In other words, reordering algorithms
+given by the option <strong>-r</strong>,<strong>--regroup</strong>, will only be applied on the dependency matrix with source columns removed.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--graph-metrics</strong>
+</dt>
+<dd>
+<p>
+    Print Boost&#8217;s and ViennaCL&#8217;s graph metrics (only available when LTSmin is compiled with Boost or ViennaCL).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--regroup-exit</strong>
+</dt>
+<dd>
+<p>
+    Exit with 0 when regrouping is done.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--regroup-time</strong>
+</dt>
+<dd>
+<p>
+    Print timing information of each transformation, given in sequence <strong>--regroup</strong> (<strong>-r</strong>).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--mucalc</strong>=<em>FILE</em>|<em>FORMULA</em>
+</dt>
+<dd>
+<p>
+    Compute a parity game for the mu-calculus formula.
+</p>
+<div class="paragraph"><p>The mu-calculus formula is provided in the file <em>FILE</em> or directly
+as a string <em>FORMULA</em>. The syntax and tool support are described in
+<a href="ltsmin-mucalc.html">ltsmin-mucalc(5)</a>.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--ltl</strong>=<em>LTLFILE|LTLFORMULA</em>
+</dt>
+<dd>
+<p>
+    Compute cross-product of a Buchi automaton and the specification
+</p>
+<div class="paragraph"><p><em>LTLFILE</em> is a file containing an Linear Temporal Logic formula (see
+<a href="ltsmin-ltl.html">ltsmin-ltl(5)</a>).  Which content can also be provided directly as
+<em>LTLFORMULA</em>.  This formula will be converted to a Buchi
+automaton.  Then the synchronous cross product with the original
+specification is computed on-the-fly.  A state label is added to
+encode accepting states.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--ltl-semantics</strong>=<em>spin|textbook|ltsmin</em>
+</dt>
+<dd>
+<p>
+    Change the semantics of the crossproduct generated using <em>--ltl</em>
+</p>
+<div class="paragraph"><p>Three options are available, the default is <em>spin</em>.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+spin
+</dt>
+<dd>
+<p>
+    Use semantics equal to the spin model checker. From the <em>source</em>
+    state all transitions are generated. Then, state predicates
+    are evaluated on the <em>source</em> state. The Buchi automaton now
+    moves according to these predicates.
+    Deadlocks in the LTS cause the Buchi to progress independently.
+</p>
+</dd>
+<dt class="hdlist1">
+textbook
+</dt>
+<dd>
+<p>
+    Use textbook semantics. A new initial state is generated with an
+    outgoing transition to the initial state. Now, predicates
+    are evaluated on the <em>target</em> state and the Buchi automaton
+    moves according to these predicates.
+    Deadlocks in the LTS do NOT cause the Buchi to progress independently.
+</p>
+</dd>
+<dt class="hdlist1">
+ltsmin
+</dt>
+<dd>
+<p>
+    Same as spin semantics, but now deadlocks in the LTS do NOT cause the Buchi
+    to progress independently.
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>--por</strong>
+</dt>
+<dd>
+<p>
+    Activate partial order reduction
+</p>
+<div class="paragraph"><p>Partial Order Reduction can reduce the state space when searching
+for deadlocks (<tt>-d</tt>) or accepting cycles (<tt>--ltl</tt>).</p></div>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_development_options">Development Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--grey</strong>
+</dt>
+<dd>
+<p>
+        Make use of <tt>GetTransitionsLong</tt> calls.
+</p>
+<div class="paragraph"><p>A language module can have three next state calls:
+<tt>GetTransitionsAll</tt>, <tt>GetTransitionsLong</tt> and <tt>GetTransitionsShort</tt>. The first call is used by default,
+the second call is used when this flag is passed and the third form is used if <strong>--cache</strong> is enabled.
+This allows all three calls in a language module to be tested.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--write-state</strong>
+</dt>
+<dd>
+<p>
+        Write the full state vector.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_general_options">General Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>-v</strong>
+</dt>
+<dd>
+<p>
+        Increase the level of verbosity
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-q</strong>
+</dt>
+<dd>
+<p>
+        Be quiet; do not print anything to the terminal.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--debug=&lt;file.c&gt;</strong>
+</dt>
+<dd>
+<p>
+        Enable debugging output for file.c (option allowed multiple times).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--version</strong>
+</dt>
+<dd>
+<p>
+        Print version string of this tool.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-h</strong>, <strong>--help</strong>
+</dt>
+<dd>
+<p>
+        Print help text
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--usage</strong>
+</dt>
+<dd>
+<p>
+        Print short usage summary.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_file_formats">File Formats</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The following file formats are supported:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Directory format (<em>&#42;.dir</em>, <em>&#42;.dz</em> and <em>&#42;.gcf</em>)
+</p>
+</li>
+<li>
+<p>
+Vector format (<em>&#42;.dir</em>, <em>&#42;.gcd</em>, <em>&#42;.gcf</em>)
+</p>
+</li>
+<li>
+<p>
+Binary Coded Graphs (<em>&#42;.bcg</em>)
+</p>
+</li>
+<li>
+<p>
+Aldebaran Format (<em>&#42;.aut</em>)
+</p>
+</li>
+<li>
+<p>
+FSM Format (<em>&#42;.fsm</em>)
+</p>
+</li>
+<li>
+<p>
+MRMC/Prism (<em>&#42;.tra</em>+<em>&#42;.lab</em>)
+</p>
+</li>
+<li>
+<p>
+PGSolver format (<em>&#42;.pg</em>)
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>If a tool operates in streaming mode then support for file formats is limited,
+as can be seen in the following table:</p></div>
+<div class="tableblock">
+<table rules="all"
+width="80%"
+frame="hsides"
+cellspacing="0" cellpadding="4">
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+<thead>
+<tr>
+<th align="left" valign="top">Format </th>
+<th align="left" valign="top">Streaming mode </th>
+<th align="left" valign="top">Load/Store mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top"><p class="table">DIR</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">VEC</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">BCG</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">AUT</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">FSM</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">TRA</p></td>
+<td align="left" valign="top"><p class="table">-</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">PG</p></td>
+<td align="left" valign="top"><p class="table">-</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="paragraph"><p>The directory format uses multiple files to store an LTS.
+The various extension explain how these files are stored in the underlying file system.
+The <em>&#42;.dir</em> format uses multiple files in a directory without compression.
+If the LTS has one edge label, no state labels and does not store state vectors then
+these files are backwards compatible. Neither the <em>&#42;.dz</em> nor the <em>&#42;.gcf</em>
+formats are backwards compatible. Both formats use compression. The first uses a directory for the files,
+second interleaves files into a single file.</p></div>
+<div class="paragraph"><p>If you try to open a <em>&#42;.dir</em> with the old mCRL tools and
+you get the error message:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>wrong file version: 0</tt></pre>
+</div></div>
+<div class="paragraph"><p>then the directory is probably compressed.
+If that happens then you may convert the directory by typing the command:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><tt>ltsmin-convert bad.dir good.dir</tt></pre>
+</div></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_ltl_model_checking">LTL MODEL CHECKING</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>LTL model checking requires a Buchi cross product with accepting states marked
+with accepting state labels, and a search strategy which takes these
+labels into account (see ndfs / scc strategies of the sequential and multi-core
+tools).</p></div>
+<div class="paragraph"><p>For generating a cross product, the following options are supported:</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+The input specification is already combined with a Buchi automaton,
+  and states are appropriately marked with accepting labels.  Currently two
+  frontends support this functionality: SpinS (see documentation on <tt>prom</tt>
+  tools), and DiVinE (see documentation on <tt>dve</tt> tools).
+</p>
+</li>
+<li>
+<p>
+LTSmin tools can build the cross product of input specification and
+  Buchi automaton (through a PINS2PINS layer enabled with the --ltl option)
+  themselves, and will annotate cross-product states appropriately when they
+  are accepting. See also <tt>--labels</tt> option in the PINS tools.
+</p>
+</li>
+</ol></div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">Combination with the Partial Order Reduction PINS2PINS layer (--por)
+requires the latter option.</td>
+</tr></table>
+</div>
+<div class="admonitionblock">
+<table><tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">As of LTSmin release 1.9, our default LTL semantics mimics those of
+SPIN/DiVinE. Before that, LTSmin implemented textbook semantics. See
+the documentation on the enumerative tools for more information.</td>
+</tr></table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_exit_status">EXIT STATUS</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>0</strong>
+</dt>
+<dd>
+<p>
+        Successful termination.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>1</strong>
+</dt>
+<dd>
+<p>
+        Counter example found.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>255</strong>
+</dt>
+<dd>
+<p>
+        Some error occurred.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_support">SUPPORT</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Send questions, bug reports, comments and feature suggestions to the
+<a href="mailto:ltsmin-support@lists.utwente.nl">LTSmin Support Team</a>.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_see_also">SEE ALSO</h2>
+<div class="sectionbody">
+<div class="paragraph"><p><a href="ltsmin.html">ltsmin(7)</a>,
+<a href="ltsmin-printtrace.html">ltsmin-printtrace(1)</a>,
+<a href="ltsmin-mucalc.html">ltsmin-mucalc(5)</a>,
+<a href="etf.html">etf(5)</a>,
+<a href="http://divine.fi.muni.cz/">DiVinE-2.2</a>,
+<a href="https://code.launchpad.net/~opaal-developers/opaal/opaal-ltsmin-succgen">opaal</a>,
+<a href="http://www.uppaal.org">uppaal</a>, and
+<a href="http://eprints.eemcs.utwente.nl/22042/">prom</a>.</p></div>
+</div>
+</div>
+</div>
+<div id="footnotes"><hr /></div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2016-11-25 16:16:33 UTC
+</div>
+</div>
+</body>
+</html>

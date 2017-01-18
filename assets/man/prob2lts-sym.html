@@ -1,0 +1,1953 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
+<meta name="generator" content="AsciiDoc 8.6.6" />
+<title>prob2lts-sym(1)</title>
+<style type="text/css">
+/* Shared CSS for AsciiDoc xhtml11 and html5 backends */
+
+/* Default font. */
+body {
+  font-family: Georgia,serif;
+}
+
+/* Title font. */
+h1, h2, h3, h4, h5, h6,
+div.title, caption.title,
+thead, p.table.header,
+#toctitle,
+#author, #revnumber, #revdate, #revremark,
+#footer {
+  font-family: Arial,Helvetica,sans-serif;
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+  color: navy;
+}
+
+strong {
+  font-weight: bold;
+  color: #083194;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+h5 {
+  font-size: 1.0em;
+}
+
+div.sectionbody {
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
+}
+ul > li     { color: #aaa; }
+ul > li > * { color: black; }
+
+pre {
+  padding: 0;
+  margin: 0;
+}
+
+#author {
+  color: #527bbd;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+#email {
+}
+#revnumber, #revdate, #revremark {
+}
+
+#footer {
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+#preamble {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.0em;
+  margin-bottom: 2.0em;
+  margin-right: 10%;
+  color: #606060;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  color: #527bbd;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid #dddddd;
+  border-left: 4px solid #f0f0f0;
+  padding: 0.5em;
+}
+
+div.listingblock > div.content {
+  border: 1px solid #dddddd;
+  border-left: 5px solid #f0f0f0;
+  background: #f8f8f8;
+  padding: 0.5em;
+}
+
+div.quoteblock, div.verseblock {
+  padding-left: 1.0em;
+  margin-left: 1.0em;
+  margin-right: 10%;
+  border-left: 5px solid #f0f0f0;
+  color: #888;
+}
+
+div.quoteblock > div.attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock > pre.content {
+  font-family: inherit;
+  font-size: inherit;
+}
+div.verseblock > div.attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+/* DEPRECATED: Pre version 8.2.7 verse style literal block. */
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 3px solid #dddddd;
+}
+
+div.exampleblock > div.content {
+  border-left: 3px solid #dddddd;
+  padding-left: 0.5em;
+}
+
+div.imageblock div.content { padding-left: 0; }
+span.image img { border-style: none; }
+a.image:visited { color: white; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: normal;
+  color: navy;
+}
+dd > *:first-child {
+  margin-top: 0.1em;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+ol.arabic {
+  list-style-type: decimal;
+}
+ol.loweralpha {
+  list-style-type: lower-alpha;
+}
+ol.upperalpha {
+  list-style-type: upper-alpha;
+}
+ol.lowerroman {
+  list-style-type: lower-roman;
+}
+ol.upperroman {
+  list-style-type: upper-roman;
+}
+
+div.compact ul, div.compact ol,
+div.compact p, div.compact p,
+div.compact div, div.compact div {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+
+tfoot {
+  font-weight: bold;
+}
+td > div.verse {
+  white-space: pre;
+}
+
+div.hdlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hdlist tr {
+  padding-bottom: 15px;
+}
+dt.hdlist1.strong, td.hdlist1.strong {
+  font-weight: bold;
+}
+td.hdlist1 {
+  vertical-align: top;
+  font-style: normal;
+  padding-right: 0.8em;
+  color: navy;
+}
+td.hdlist2 {
+  vertical-align: top;
+}
+div.hdlist.compact tr {
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.comment {
+  background: yellow;
+}
+
+.footnote, .footnoteref {
+  font-size: 0.8em;
+}
+
+span.footnote, span.footnoteref {
+  vertical-align: super;
+}
+
+#footnotes {
+  margin: 20px 0 20px 0;
+  padding: 7px 0 0 0;
+}
+
+#footnotes div.footnote {
+  margin: 0 0 5px 0;
+}
+
+#footnotes hr {
+  border: none;
+  border-top: 1px solid silver;
+  height: 1px;
+  text-align: left;
+  margin-left: 0;
+  width: 20%;
+  min-width: 100px;
+}
+
+div.colist td {
+  padding-right: 0.5em;
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+div.colist td img {
+  margin-top: 0.3em;
+}
+
+@media print {
+  #footer-badges { display: none; }
+}
+
+#toc {
+  margin-bottom: 2.5em;
+}
+
+#toctitle {
+  color: #527bbd;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+
+span.aqua { color: aqua; }
+span.black { color: black; }
+span.blue { color: blue; }
+span.fuchsia { color: fuchsia; }
+span.gray { color: gray; }
+span.green { color: green; }
+span.lime { color: lime; }
+span.maroon { color: maroon; }
+span.navy { color: navy; }
+span.olive { color: olive; }
+span.purple { color: purple; }
+span.red { color: red; }
+span.silver { color: silver; }
+span.teal { color: teal; }
+span.white { color: white; }
+span.yellow { color: yellow; }
+
+span.aqua-background { background: aqua; }
+span.black-background { background: black; }
+span.blue-background { background: blue; }
+span.fuchsia-background { background: fuchsia; }
+span.gray-background { background: gray; }
+span.green-background { background: green; }
+span.lime-background { background: lime; }
+span.maroon-background { background: maroon; }
+span.navy-background { background: navy; }
+span.olive-background { background: olive; }
+span.purple-background { background: purple; }
+span.red-background { background: red; }
+span.silver-background { background: silver; }
+span.teal-background { background: teal; }
+span.white-background { background: white; }
+span.yellow-background { background: yellow; }
+
+span.big { font-size: 2em; }
+span.small { font-size: 0.6em; }
+
+span.underline { text-decoration: underline; }
+span.overline { text-decoration: overline; }
+span.line-through { text-decoration: line-through; }
+
+
+/*
+ * xhtml11 specific
+ *
+ * */
+
+tt {
+  font-family: monospace;
+  font-size: inherit;
+  color: navy;
+}
+
+div.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead, p.table.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.table {
+  margin-top: 0;
+}
+/* Because the table frame attribute is overriden by CSS in most browsers. */
+div.tableblock > table[frame="void"] {
+  border-style: none;
+}
+div.tableblock > table[frame="hsides"] {
+  border-left-style: none;
+  border-right-style: none;
+}
+div.tableblock > table[frame="vsides"] {
+  border-top-style: none;
+  border-bottom-style: none;
+}
+
+
+/*
+ * html5 specific
+ *
+ * */
+
+.monospaced {
+  font-family: monospace;
+  font-size: inherit;
+  color: navy;
+}
+
+table.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+thead, p.tableblock.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.tableblock {
+  margin-top: 0;
+}
+table.tableblock {
+  border-width: 3px;
+  border-spacing: 0px;
+  border-style: solid;
+  border-color: #527bbd;
+  border-collapse: collapse;
+}
+th.tableblock, td.tableblock {
+  border-width: 1px;
+  padding: 4px;
+  border-style: solid;
+  border-color: #527bbd;
+}
+
+table.tableblock.frame-topbot {
+  border-left-style: hidden;
+  border-right-style: hidden;
+}
+table.tableblock.frame-sides {
+  border-top-style: hidden;
+  border-bottom-style: hidden;
+}
+table.tableblock.frame-none {
+  border-style: hidden;
+}
+
+th.tableblock.halign-left, td.tableblock.halign-left {
+  text-align: left;
+}
+th.tableblock.halign-center, td.tableblock.halign-center {
+  text-align: center;
+}
+th.tableblock.halign-right, td.tableblock.halign-right {
+  text-align: right;
+}
+
+th.tableblock.valign-top, td.tableblock.valign-top {
+  vertical-align: top;
+}
+th.tableblock.valign-middle, td.tableblock.valign-middle {
+  vertical-align: middle;
+}
+th.tableblock.valign-bottom, td.tableblock.valign-bottom {
+  vertical-align: bottom;
+}
+
+
+/*
+ * manpage specific
+ *
+ * */
+
+body.manpage h1 {
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  border-top: 2px solid silver;
+  border-bottom: 2px solid silver;
+}
+body.manpage h2 {
+  border-style: none;
+}
+body.manpage div.sectionbody {
+  margin-left: 3em;
+}
+
+@media print {
+  body.manpage div#toc { display: none; }
+}
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+var asciidoc = {  // Namespace.
+
+/////////////////////////////////////////////////////////////////////
+// Table Of Contents generator
+/////////////////////////////////////////////////////////////////////
+
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, 2006, 2009. License: GPL */
+
+// toclevels = 1..4.
+toc: function (toclevels) {
+
+  function getText(el) {
+    var text = "";
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+        text += i.data;
+      else if (i.firstChild != null)
+        text += getText(i);
+    }
+    return text;
+  }
+
+  function TocEntry(el, text, toclevel) {
+    this.element = el;
+    this.text = text;
+    this.toclevel = toclevel;
+  }
+
+  function tocEntries(el, toclevels) {
+    var result = new Array;
+    var re = new RegExp('[hH]([2-'+(toclevels+1)+'])');
+    // Function that scans the DOM tree for header elements (the DOM2
+    // nodeIterator API would be a better technique but not supported by all
+    // browsers).
+    var iterate = function (el) {
+      for (var i = el.firstChild; i != null; i = i.nextSibling) {
+        if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+          var mo = re.exec(i.tagName);
+          if (mo && (i.getAttribute("class") || i.getAttribute("className")) != "float") {
+            result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+          }
+          iterate(i);
+        }
+      }
+    }
+    iterate(el);
+    return result;
+  }
+
+  var toc = document.getElementById("toc");
+  if (!toc) {
+    return;
+  }
+
+  // Delete existing TOC entries in case we're reloading the TOC.
+  var tocEntriesToRemove = [];
+  var i;
+  for (i = 0; i < toc.childNodes.length; i++) {
+    var entry = toc.childNodes[i];
+    if (entry.nodeName == 'div'
+     && entry.getAttribute("class")
+     && entry.getAttribute("class").match(/^toclevel/))
+      tocEntriesToRemove.push(entry);
+  }
+  for (i = 0; i < tocEntriesToRemove.length; i++) {
+    toc.removeChild(tocEntriesToRemove[i]);
+  }
+
+  // Rebuild TOC entries.
+  var entries = tocEntries(document.getElementById("content"), toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "_toc_" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+  if (entries.length == 0)
+    toc.parentNode.removeChild(toc);
+},
+
+
+/////////////////////////////////////////////////////////////////////
+// Footnotes generator
+/////////////////////////////////////////////////////////////////////
+
+/* Based on footnote generation code from:
+ * http://www.brandspankingnew.net/archive/2005/07/format_footnote.html
+ */
+
+footnotes: function () {
+  // Delete existing footnote entries in case we're reloading the footnodes.
+  var i;
+  var noteholder = document.getElementById("footnotes");
+  if (!noteholder) {
+    return;
+  }
+  var entriesToRemove = [];
+  for (i = 0; i < noteholder.childNodes.length; i++) {
+    var entry = noteholder.childNodes[i];
+    if (entry.nodeName == 'div' && entry.getAttribute("class") == "footnote")
+      entriesToRemove.push(entry);
+  }
+  for (i = 0; i < entriesToRemove.length; i++) {
+    noteholder.removeChild(entriesToRemove[i]);
+  }
+
+  // Rebuild footnote entries.
+  var cont = document.getElementById("content");
+  var spans = cont.getElementsByTagName("span");
+  var refs = {};
+  var n = 0;
+  for (i=0; i<spans.length; i++) {
+    if (spans[i].className == "footnote") {
+      n++;
+      var note = spans[i].getAttribute("data-note");
+      if (!note) {
+        // Use [\s\S] in place of . so multi-line matches work.
+        // Because JavaScript has no s (dotall) regex flag.
+        note = spans[i].innerHTML.match(/\s*\[([\s\S]*)]\s*/)[1];
+        spans[i].innerHTML =
+          "[<a id='_footnoteref_" + n + "' href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+        spans[i].setAttribute("data-note", note);
+      }
+      noteholder.innerHTML +=
+        "<div class='footnote' id='_footnote_" + n + "'>" +
+        "<a href='#_footnoteref_" + n + "' title='Return to text'>" +
+        n + "</a>. " + note + "</div>";
+      var id =spans[i].getAttribute("id");
+      if (id != null) refs["#"+id] = n;
+    }
+  }
+  if (n == 0)
+    noteholder.parentNode.removeChild(noteholder);
+  else {
+    // Process footnoterefs.
+    for (i=0; i<spans.length; i++) {
+      if (spans[i].className == "footnoteref") {
+        var href = spans[i].getElementsByTagName("a")[0].getAttribute("href");
+        href = href.match(/#.*/)[0];  // Because IE return full URL.
+        n = refs[href];
+        spans[i].innerHTML =
+          "[<a href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+      }
+    }
+  }
+},
+
+install: function(toclevels) {
+  var timerId;
+
+  function reinstall() {
+    asciidoc.footnotes();
+    if (toclevels) {
+      asciidoc.toc(toclevels);
+    }
+  }
+
+  function reinstallAndRemoveTimer() {
+    clearInterval(timerId);
+    reinstall();
+  }
+
+  timerId = setInterval(reinstall, 500);
+  if (document.addEventListener)
+    document.addEventListener("DOMContentLoaded", reinstallAndRemoveTimer, false);
+  else
+    window.onload = reinstallAndRemoveTimer;
+}
+
+}
+asciidoc.install();
+/*]]>*/
+</script>
+</head>
+<body class="manpage">
+<div id="header">
+<h1>
+prob2lts-sym(1) Manual Page
+</h1>
+<h2>NAME</h2>
+<div class="sectionbody">
+<p>prob2lts-sym -
+   Symbolic reachability analysis for B, through ProB.
+</p>
+</div>
+</div>
+<div id="content">
+<div class="sect1">
+<h2 id="_synopsis">SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="paragraph"><p><strong>prob2lts-sym</strong> [OPTION]&#8230; <em>/path/to/socket.probz|/path/to/machine.[mch|eventb|tlc]</em> [<em>output.etf</em>]</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_description">DESCRIPTION</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>prob2lts-sym performs symbolic reachability analysis on a specification provided
+through <em>/path/to/machine.[mch|eventb|tlc]</em>, or through a specification
+provided through <em>/path/to/socket.probz</em>. <em>output.etf</em> specifies the name of the output
+archive, written in <a href="etf.html">etf(5)</a> format.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_prob">ProB</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The ProB front-end for LTSmin uses ZMQ to communicate with ProB.
+There are two ways LTSmin can communicate with ProB.
+One option is to manually start ProB and specify a path to a ZMQ socket.
+The other option is to add ProB to the PATH variable and let
+LTSmin start ProB. The latter option allows significant speedups through parallelism.
+More information about ProB can be found at <a href="https://www3.hhu.de/stups/prob">https://www3.hhu.de/stups/prob</a>.</p></div>
+<div class="sect2">
+<h3 id="_option_1_strong_probz_strong_extension">Option 1: <strong>.probz</strong> extension</h3>
+<div class="paragraph"><p>To use this front-end with the <strong>.probz</strong> extension a ZMQ socket has to be opened first with ProB.
+This can be done with the commandline
+<strong>LD_LIBRARY_PATH=lib ./probcli /path/to/machine.[mch|eventb|b|&#8230;] -ltsmin2 /tmp/ltsmin.probz</strong>.
+The path to the socket is given with the option <strong>-ltsmin2</strong>. The file extension should be <strong>.probz</strong>.</p></div>
+</div>
+<div class="sect2">
+<h3 id="_option_2_strong_mch_strong_strong_eventb_strong_strong_tlc_strong_extensions">Option 2: <strong>.mch</strong>|<strong>.eventb</strong>|<strong>.tlc</strong> extensions</h3>
+<div class="paragraph"><p>To enable parallelism the <strong>.mch</strong>|<strong>.eventb</strong>|<strong>.tlc</strong> extensions are used.
+To use these extensions some environment variables need to be set.</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+First set the <strong>LD_LIBRARY_PATH</strong> variable: <strong>export LD_LIBRARY_PATH=/path/to/ProB/lib:$LD_LIBRARY_PATH</strong>.
+</p>
+</li>
+<li>
+<p>
+Next set the <strong>PATH</strong> variable: <strong>export PATH=/path/to/ProB:$PATH</strong>.
+</p>
+</li>
+</ol></div>
+<div class="paragraph"><p>Make sure you can run <strong>probcli</strong> from the commandline.
+When <strong>probcli</strong> can be run from the commandline, then LTSmin can start multiple ProB instances to
+enable parallelism.</p></div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_options">OPTIONS</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--order</strong>=<em>ORDER</em>
+</dt>
+<dd>
+<p>
+        Select the exploration strategy: <em>bfs-prev</em>, <em>bfs</em>, <em>chain-prev</em>,
+        or <em>chain</em>. With <em>bfs-prev</em> and <em>bfs</em>, breadth-first search is
+        used. Here, <em>bfs-prev</em> only considers the states found at the
+        previous level, while <em>bfs</em> considers the whole visited set. With
+        <em>chain-prev</em> and <em>chain</em>, a chaining strategy is used. Here,
+        <em>chain-prev</em> at each level starts from the states found at the
+        previous level, while <em>chain</em> uses the whole visited set. Defaults
+        to <em>bfs-prev</em>.
+</p>
+<div class="paragraph"><p>When using breadth-first search, the tool performs the next state computation
+for all edge groups on the current level or current set of visited states.
+Chaining means to apply next state for the first group to the visited
+states, then apply next-state for the second group to the result,
+etc.  Thus, a chaining analysis can be completed in much less
+iterations than a BFS analysis.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--saturation</strong>=<em>SATURATION</em>
+</dt>
+<dd>
+<p>
+        Select a saturation strategy: <em>none</em>, <em>sat-like</em>, <em>sat-loop</em>, <em>sat-fix</em>,
+        <em>sat</em>. The <em>sat-like</em> strategy goes up and down the levels of the BDD
+        used to represent the state space. The <em>sat-loop</em> strategy loops over
+        the levels. The <em>sat-fix</em> strategy repeatedly performs a fixpoint
+        computation using saturation. The <em>sat</em> strategy does saturation as
+        described in the literature with on-the-fly expansion of the transition
+        relations. Defaults to <em>none</em>, i.e. no saturation.
+</p>
+<div class="paragraph"><p>All strategies except <em>sat-fix</em> and <em>sat</em> work in combination with the <em>order</em>
+to saturate levels.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--sat-granularity</strong>=<em>GRANULARITY</em>
+</dt>
+<dd>
+<p>
+        Select the granularity of <em>sat-like</em> and <em>sat-loop</em> strategies. The
+        granularity indicates how many BDD levels are considered at the same
+        time. Defaults to 10.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--save-sat-levels</strong>
+</dt>
+<dd>
+<p>
+        Save the previous states seen at saturation levels. This option has
+        effect for any of the saturation strategies in combination with either
+        <em>bfs-prev</em> or <em>chain-prev</em>.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--guidance</strong>=<em>STRATEGY</em>
+</dt>
+<dd>
+<p>
+        Select a search strategy for searching for actions: <em>unguided</em>,
+        <em>directed</em>. The <em>unguided</em> strategy considers all transition
+        groups. The <em>directed</em> strategy focuses the search on the transition
+        groups in which the action occurs. Defaults to <em>unguided</em>.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--dot</strong>=<em>DIR</em>
+</dt>
+<dd>
+<p>
+    If this option is supplied <em>DIR</em> is a directory to which dot files of vector sets are written to.
+    Note that this option should only be used for smaller vector sets because of disk space.
+</p>
+<div class="paragraph"><p>Three type of dot files are (over)written:</p></div>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+current-l&lt;L&gt;.dot: the nodes in the vector set at level L (and only level L),
+</p>
+</li>
+<li>
+<p>
+visited-l&lt;L&gt;.dot: the nodes in the vector set up to and included level L,
+</p>
+</li>
+<li>
+<p>
+group_next-l&lt;L&gt;-k&lt;K&gt;.dot: the nodes in the transition relation of group K at level L.
+</p>
+</li>
+</ol></div>
+</dd>
+<dt class="hdlist1">
+<strong>--mu</strong>=<em>MUFILE|MUFORMULA</em>
+</dt>
+<dd>
+<p>
+    After computing all reachable states, evaluate the mu-formula in <em>MUFILE</em>
+</p>
+<div class="paragraph"><p><em>MUFILE</em> is a file containing a Mu Calculus formula (see
+<a href="ltsmin-mu.html">ltsmin-mu(5)</a>). Alternatively, the formula can be provide directly as
+MUFORMULA. This formula is a propositional formula with least and greatest
+fixpoint operator. It will be evaluated after generation of the complete state
+space.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--ctl-star</strong>=<em>CTLFILE|CTLFORMULA</em>
+</dt>
+<dd>
+<p>
+    <em>CTLFILE</em> is a file containing an Linear Temporal Logic Star (CTL*) formula
+    (see <a href="ltsmin-ctl.html">ltsmin-ctl(5)</a>).  Which content can also be provided directly as
+    <em>CTLFORMULA</em>.
+    The formula is translated to a mu-formula (see <a href="ltsmin-mu.html">ltsmin-mu(5)</a>),
+    which is evaluated after computing all reachable states.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--no-matrix</strong>
+</dt>
+<dd>
+<p>
+        Do not print the dependency matrix if -v (verbose) is used.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--no-soundness-check</strong>
+</dt>
+<dd>
+<p>
+        When using <em>--pins-guards=assume-true</em> disable the soundness check of the model specification.
+        The soundness check may be expensive and can be disabled when the model specification is known to be sound.
+        A guard may not evaluate to true or false but to maybe. A guard which evaluates to maybe depends on
+        the evaluation of another guard. For languages such as Promela and DVE it checks whether if
+        a guard evaluates to maybe there is another guard on the left which evaluates to false. For languages such as
+        mCRL2 it also checks whether a guard on the right evaluates to false. If for all states this holds then the
+        model specification is sound for guard-splitting.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--precise</strong>
+</dt>
+<dd>
+<p>
+        Compute the final number of states precisely.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--next-union</strong>
+</dt>
+<dd>
+<p>
+        If supported by the vset implementation; perform the computation of successor states simultaneously with unifying
+        the current states. Simultaneously, means with a single BDD/MDD operation.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--inv-par</strong>
+</dt>
+<dd>
+<p>
+        Checks all invariants in parallel.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--inv-bin-par</strong>
+</dt>
+<dd>
+<p>
+        Checks both sides of a binary operand in parallel in an invariant, requires <strong>--inv-par</strong>.
+        Note that this option may actually slow down invariant checking, because parallelization
+        of a binary operand disables short-circuit evaluation.
+</p>
+</dd>
+</dl></div>
+<div class="sect2">
+<h3 id="_prob_options">ProB Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--no-close</strong>
+</dt>
+<dd>
+<p>
+    Do not close the connection to ProB. This will leave the ProB instance running,
+    such that the connection can be reused.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-n</strong>, <strong>--no-exit</strong>
+</dt>
+<dd>
+<p>
+      Do not exit when an error is found. Just count errors. Error counts are
+      printed with <tt>-v</tt>.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-d</strong>, <strong>--deadlock</strong>
+</dt>
+<dd>
+<p>
+      Find state with no outgoing transitions. Returns with exit code 1 if
+      a deadlock is found, 0 or 255 (error) otherwise.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-i</strong>, <strong>--invariant</strong>=<em>PREDFILE|PREDEXPRESSION</em>
+</dt>
+<dd>
+<p>
+      Find state where the invariant is violated. The file <em>PREDFILE</em>
+      contains an expression in a simple predicate language (see
+      <a href="ltsmin-pred.html">ltsmin-pred(5)</a>). Its contents can also be entered directly as
+      a <em>PREDEXPRESSION</em>. Returns with exit code 1 if
+      a violation is found, 0 or 255 (error) otherwise.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-a</strong>, <strong>--action</strong>=<em>STRING</em>
+</dt>
+<dd>
+<p>
+      Find state with an outgoing transition of type <em>STRING</em>. Returns with exit
+      code 1 if the action is found, 0 or 255 (error) otherwise.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--trace</strong>='FILE'<em>.gcf</em>
+</dt>
+<dd>
+<p>
+      When finding a deadlock state or a transition labelled with a certain
+      action, write a trace to 'FILE'<em>.gcf</em>, beginning from the initial state.
+      Traces can be pretty-printed with <a href="ltsmin-printtrace.html">ltsmin-printtrace(1)</a>.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_pins_options">PINS Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--labels</strong>
+</dt>
+<dd>
+<p>
+        Print state variable, type and value names, and state and action labels.
+        Then exit.
+        Useful for writing predicate (<tt>--invariant</tt>), LTL (<tt>--ltl</tt>),
+        CTL/CTL* (<tt>--ctl</tt>), and mu-calculus (<tt>--mu</tt>) expressions.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--matrix</strong>
+</dt>
+<dd>
+<p>
+        Print the dependency matrix and exit.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-c</strong>, <strong>--cache</strong>
+</dt>
+<dd>
+<p>
+    Enable caching of greybox calls.
+</p>
+<div class="paragraph"><p>If this option is used, the state space generator makes calls to the
+short version of the greybox next-state function and memoizes the
+results. If the next-state function is expensive this will yield
+substantial speedups.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--pins-guards</strong>
+</dt>
+<dd>
+<p>
+    Use guards in combination with the long next-state function to speed up the next-state function.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-r</strong>, <strong>--regroup</strong>=<em>SPEC</em>
+</dt>
+<dd>
+<p>
+    Enable regrouping optimizations on the dependency matrix.
+</p>
+<div class="paragraph"><p><em>SPEC</em> is a comma-separated sequence of transformations
+<em>&lt;(<em>T</em>,)+&gt;</em> which are applied in this order to the
+dependency matrix.  The following transformations <em>T</em> are available:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+gs
+</dt>
+<dd>
+<p>
+  Group Safely; macro for "<strong>gc</strong>,<strong>gr</strong>,<strong>cw</strong>,<strong>rs</strong>"; almost
+  always a win.
+</p>
+</dd>
+<dt class="hdlist1">
+ga
+</dt>
+<dd>
+<p>
+  Group Aggressively (row subsumption); macro for
+  "<strong>gc</strong>,<strong>rs</strong>,<strong>ru</strong>,<strong>cw</strong>,<strong>rs</strong>"; can be a huge win, but in some
+  cases causes slower state space generation.
+</p>
+</dd>
+<dt class="hdlist1">
+gsa
+</dt>
+<dd>
+<p>
+  Group Simulated Annealing; macro for "<strong>gc</strong>,<strong>gr</strong>,<strong>csa</strong>,<strong>rs</strong>"; almost
+  always a win; usually better than <strong>gs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+gc
+</dt>
+<dd>
+<p>
+  Group Columns; macro for "<strong>cs</strong>,<strong>cn</strong>".
+</p>
+</dd>
+<dt class="hdlist1">
+gr
+</dt>
+<dd>
+<p>
+  Group Rows; macro for "<strong>rs</strong>,<strong>rn</strong>".
+</p>
+</dd>
+<dt class="hdlist1">
+cs
+</dt>
+<dd>
+<p>
+  Column Sort; sort columns lexicographically.
+</p>
+</dd>
+<dt class="hdlist1">
+cn
+</dt>
+<dd>
+<p>
+  Column Nub; (temporarily) group duplicate columns, thereby making
+  <em>ca</em> more tractable.  Requires <strong>cs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+cw
+</dt>
+<dd>
+<p>
+  Column sWap; minimize distance between columns by swapping them
+  heuristically.  This reordering improves performance of the symbolic
+  data structures.
+</p>
+</dd>
+<dt class="hdlist1">
+ca
+</dt>
+<dd>
+<p>
+  Column All permutations; try to find the column permutation with the
+  best cost metric.  Potentially, this is an expensive operation.
+</p>
+</dd>
+<dt class="hdlist1">
+csa
+</dt>
+<dd>
+<p>
+  Column Simulated Annealing; minimize distance between columns by
+  swapping them using simulated annealing.
+</p>
+</dd>
+<dt class="hdlist1">
+rs
+</dt>
+<dd>
+<p>
+  Row Sort; sort rows lexicographically.
+</p>
+</dd>
+<dt class="hdlist1">
+rn
+</dt>
+<dd>
+<p>
+  Row Nub; remove duplicate rows from the dependency matrix.  This is
+  always a win.  Requires <strong>rs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+ru
+</dt>
+<dd>
+<p>
+  Row sUbsume; try to remove more rows than nubbing, thereby trading
+  speed for memory.  Requires <strong>rs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+w2W
+</dt>
+<dd>
+<p>
+  Over-approximate all must-write to may-write. May-write supports the copy (-) dependency.
+</p>
+</dd>
+<dt class="hdlist1">
+r2+
+</dt>
+<dd>
+<p>
+  Over-approximate read to read+write. Allows read dependencies to also subsume write dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+w2+
+</dt>
+<dd>
+<p>
+  Over-approximate must-write to read+write. Allows must-write dependencies to also subsume read dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+W2+
+</dt>
+<dd>
+<p>
+  Over-approximate may-write to read+write. Allows must-write dependencies to also subsume read dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+-2r
+</dt>
+<dd>
+<p>
+  Over-approximate copy to read. May be useful for testing whether the dependency matrix is correct.
+</p>
+</dd>
+<dt class="hdlist1">
+rb4w
+</dt>
+<dd>
+<p>
+  Use special heuristics to move read dependencies before write dependences. Often a win in symbolic state space generation.
+</p>
+</dd>
+<dt class="hdlist1">
+mm
+</dt>
+<dd>
+<p>
+  Writes metrics of the selected (<strong>sr</strong>, <strong>sw</strong>, <strong>sc</strong>) matrix to stdout. The following metrics are printed:
+</p>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+Event span: the total distance between the minimum and maximum column of rows.
+</p>
+</li>
+<li>
+<p>
+Normalized event span: the event span divided by the size of the matrix (rows x columns).
+</p>
+</li>
+<li>
+<p>
+Weighted event span: the weighted event span, the event span, including a moment signifying the location of the span. See, Siminiceanu et al., we use moment 1.
+</p>
+</li>
+<li>
+<p>
+Normalized weighted event span: the weighted event span divided by the size of the matrix (rows x column).
+</p>
+</li>
+</ol></div>
+</dd>
+<dt class="hdlist1">
+sr
+</dt>
+<dd>
+<p>
+ Select the read matrix for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+sw
+</dt>
+<dd>
+<p>
+ Select the write matrix (default) for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+ The write matrix is the default selection, because only write dependencies can create new nodes in decision diagrams.
+ A bad variable order in the write matrix thus leads to a large number of peak nodes during reachability analysis.
+ A bad variable order in the read matrix can also lead to a slow reachability analysis, but typically
+ not as severe as a bad variable order in the write matrix. Slow reachability analysis due to a bad variable order
+ in the read matrix causes many recursive calls to the relational product operation. Typically it is best that read
+ dependencies are moved to the top DD level, thus left most in the read matrix.
+</p>
+</dd>
+<dt class="hdlist1">
+sc
+</dt>
+<dd>
+<p>
+ Select the combined matrix for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+ The combined matrix is the logical or of the read and write matrix.
+</p>
+</dd>
+<dt class="hdlist1">
+bg
+</dt>
+<dd>
+<p>
+  Use a bipartite graph (default) for <strong>bcm</strong>, <strong>bk</strong>, <strong>bs</strong>, <strong>vcm</strong>, <strong>vacm</strong> and <strong>vgps</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+tg
+</dt>
+<dd>
+<p>
+  Create a total graph of the bipartite graph for <strong>bcm</strong>, <strong>bk</strong>, <strong>bs</strong>, <strong>vcm</strong>, <strong>vacm</strong> and <strong>vgps</strong>.
+  This adds more vertices and edges thus increasing computation time, but sometimes provides a better ordering.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p>Below, the sparse matrix algorithms prefixed with <strong>b</strong> are only available when LTSmin is compiled with Boost.
+Algorithms prefixed with <strong>v</strong> are only available when LTSmin is compiled with ViennaCL.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+bcm
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+bk
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s King ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+bs
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s Sloan ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vcm
+</dt>
+<dd>
+<p>
+  Apply ViennaCL&#8217;s Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vacm
+</dt>
+<dd>
+<p>
+  Apply ViennaCL&#8217;s advanced Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vgps
+</dt>
+<dd>
+<p>
+  Apply ViennaCl&#8217;s Gibbs-Poole-Stockmeyer ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+f
+</dt>
+<dd>
+<p>
+  Apply FORCE ordering.
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>--row-perm</strong>=<em>PERM</em>
+</dt>
+<dd>
+<p>
+    Apply row permutation <em>PERM</em>, where <em>PERM</em> is a sequence of row numbers, separated by a comma.
+    E.g. the vector 2,1,0 will swap row 2 with row 0.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--col-perm</strong>=<em>PERM</em>
+</dt>
+<dd>
+<p>
+    Apply column permutation <em>PERM</em>, where <em>PERM</em> is a sequence of column numbers, separated by a comma.
+    E.g. the vector 2,1,0 will swap column 2 with column 0.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--col-ins</strong>=<em>PAIRS</em>
+</dt>
+<dd>
+<p>
+    Insert columns before other columns in the dependency matrix.
+</p>
+<div class="paragraph"><p><em>PAIRS</em> is a comma-separated sequence of pairs <em>&lt;(C.C</em>,)+&gt;'.
+E.g. <strong>--col-ins=1.0</strong> will insert column <strong>1</strong> before column <strong>0</strong>.
+Each pair contains a source column <strong>C</strong> and a target column <strong>C'</strong>. During the application of the whole
+sequence, <strong>C</strong> will always be the column number that corresponds with the column before the application of the whole sequence.
+The column number <strong>C'</strong> will always be the column during the application of the whole sequence. This means that
+in for example <strong>--col-ins=2.0,1.0</strong>, first column <strong>2</strong> is inserted at position <strong>0</strong>, then column <strong>1</strong> is inserted at position <strong>0</strong>.
+The result will be that the original column <strong>2</strong> will be at position <strong>1</strong>.
+Another important detail is that when <strong>--col-ins</strong> is used, all source columns will temporarily be "removed"
+during reordering from the dependency matrix, i.e. when the <strong>-r</strong>,<strong>--regroup</strong> option is given. After reordering
+is done, the columns will be inserted at the desired target position. In other words, reordering algorithms
+given by the option <strong>-r</strong>,<strong>--regroup</strong>, will only be applied on the dependency matrix with source columns removed.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--graph-metrics</strong>
+</dt>
+<dd>
+<p>
+    Print Boost&#8217;s and ViennaCL&#8217;s graph metrics (only available when LTSmin is compiled with Boost or ViennaCL).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--regroup-exit</strong>
+</dt>
+<dd>
+<p>
+    Exit with 0 when regrouping is done.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--regroup-time</strong>
+</dt>
+<dd>
+<p>
+    Print timing information of each transformation, given in sequence <strong>--regroup</strong> (<strong>-r</strong>).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--mucalc</strong>=<em>FILE</em>|<em>FORMULA</em>
+</dt>
+<dd>
+<p>
+    Compute a parity game for the mu-calculus formula.
+</p>
+<div class="paragraph"><p>The mu-calculus formula is provided in the file <em>FILE</em> or directly
+as a string <em>FORMULA</em>. The syntax and tool support are described in
+<a href="ltsmin-mucalc.html">ltsmin-mucalc(5)</a>.</p></div>
+</dd>
+<dt class="hdlist1">
+<strong>--por</strong>
+</dt>
+<dd>
+<p>
+    Activate partial order reduction
+</p>
+<div class="paragraph"><p>Partial Order Reduction can reduce the state space when searching
+for deadlocks (<tt>-d</tt>) or accepting cycles (<tt>--ltl</tt>).</p></div>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_symbolic_parity_game_options">Symbolic Parity Game Options</h3>
+<div class="paragraph"><p>A symbolic parity game can be generated either by using the <tt>--mucalc</tt>
+option or by using the PBES language module.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--pg-solve</strong>
+</dt>
+<dd>
+<p>
+        Solve the generated parity game.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--pg-reduce</strong>
+</dt>
+<dd>
+<p>
+        Reduce the generated parity game on-the-fly (experimental).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--pg-write=<em>FILE</em></strong>
+</dt>
+<dd>
+<p>
+        Writes a symbolic parity game to <em>FILE</em>.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_symbolic_parity_game_solver_options">Symbolic Parity Game Solver Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--attr</strong>=<em>default</em>|<em>chain</em>|<em>par</em>|<em>par2</em>
+</dt>
+<dd>
+<p>
+        Choose attractor function.
+</p>
+<div class="paragraph"><p>Available attractor functions:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<em>default</em>
+</dt>
+<dd>
+<p>
+    Straightforward attractor computation.
+</p>
+</dd>
+<dt class="hdlist1">
+<em>chain</em>
+</dt>
+<dd>
+<p>
+    Chaining attractor, applies transition groups in a different order
+    than <em>default</em> in computing an attractor level.
+</p>
+</dd>
+<dt class="hdlist1">
+<em>par</em>
+</dt>
+<dd>
+<p>
+    Spawns parallel tasks to compute forward and backward steps for each
+    attractor level.
+</p>
+</dd>
+<dt class="hdlist1">
+<em>par2</em>
+</dt>
+<dd>
+<p>
+    Spawns more parallel tasks than <em>par</em>, by applying forward steps in
+    parallel to the result of the backward steps of the different
+    transition groups.
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+<strong>--saturating-attractor</strong>
+</dt>
+<dd>
+<p>
+        Use saturation in the chaining attractor.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--pg-write-dot</strong>
+</dt>
+<dd>
+<p>
+        Write dot files to disk during parity game solving for debugging.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_vector_set_options">Vector Set Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--vset</strong>=<em>TYPE</em>
+</dt>
+<dd>
+<p>
+        Select type of vector set: <em>ldd64</em>, <em>ldd</em>, <em>list</em>, <em>tree</em>, <em>fdd</em>, <em>ddd</em>, <em>sylvan</em>, or <em>lddmc</em>.
+        With <em>ldd64</em>, the 64-bit ListDD list encoding is used (non-ATerm based).
+        With <em>ldd</em>, the 32-bit ListDD list encoding is used (non-ATerm based).
+        With <em>list</em>, ATermDD with list encoding is used.
+        With <em>tree</em>, ATermDD with tree encoding is used.
+        With <em>fdd</em>, BuDDy FDDs are used.
+        With <em>ddd</em>, libDDD SDDs are used.
+        With <em>sylvan</em>, the parallel BDD package Sylvan is used.
+        With <em>lddmc</em>, the parallel LDD package LDDmc is used.
+        Defaults to first available type in the list.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>vset-cache-diff</strong>=<em>diff</em>
+</dt>
+<dd>
+<p>
+        Influences the size of operations cache when counting precisely with bignums:
+        cache size = floor((2log(<em>nodes-to-count</em>) + &lt;diff&gt;)^2). More precisely; LTSmin
+        will bitshift &lt;diff&gt; bits to the left or right on the number of nodes in the vector set,
+        depending on the signedness of &lt;diff&gt;. The default is <strong>0</strong>, meaning that if
+        the cache is full the number of bignums in memory will be equal to the number of nodes
+        in the vector set. The default value seems to work well, even when the number vectors
+        in the vector set is very large relative to the number of nodes. If the number of vectors
+        relative to the number of nodes is lower, &lt;diff&gt; may be decreased. The user may want to
+        set &lt;diff&gt; as low as possible (to save memory), while keeping the operations cache effective.
+        Bignums are not floating point numbers and may thus consume a lot of memory.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_listdd_options">ListDD Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--ldd32-step</strong>=<em>STEP</em>
+</dt>
+<dd>
+<p>
+        The internal tables of ListDD resize according to the Fibonacci series.
+        This option sets the initial size to the Fibonacci number <em>STEP</em>.
+        Defaults to 30.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--ldd32-cache</strong>=<em>DIFF</em>
+</dt>
+<dd>
+<p>
+        Set Fibonacci difference <em>DIFF</em> between the cache and nodes (DIFF may be negative).
+        Defaults to 1.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_listdd_options_2">ListDD Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--ldd-step</strong>=<em>STEP</em>
+</dt>
+<dd>
+<p>
+        The internal tables of ListDD resize according to the Fibonacci series.
+        This option sets the initial size to the Fibonacci number <em>STEP</em>.
+        Defaults to 30.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--ldd-cache</strong>=<em>DIFF</em>
+</dt>
+<dd>
+<p>
+        Set Fibonacci difference <em>DIFF</em> between the cache and nodes (DIFF may be negative).
+        Defaults to 1.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_buddy_options">BuDDy Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--cache-ratio</strong>=<em>RATIO</em>
+</dt>
+<dd>
+<p>
+        Set cache ration.  Defaults to 64.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--max-increase</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Set maximum increase.  Defaults to 1,000,000.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--min-free-nodes</strong>=<em>PERCENTAGE</em>
+</dt>
+<dd>
+<p>
+        Sets the minimum percentage of free nodes as integer between 0
+        and 100.  Defaults to 20.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--fdd-bits</strong>=<em>BITS</em>
+</dt>
+<dd>
+<p>
+        Sets the number of bits for each FDD variable.  Defaults to
+        16.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--fdd-reorder</strong>=<em>STRATEGY</em>
+</dt>
+<dd>
+<p>
+        Sets the strategy for dynamic variable reordering.  Valid
+        options are <em>none</em>, <em>win2</em>, <em>win2ite</em>, <em>win3</em>, <em>win3ite</em>, <em>sift</em>,
+        <em>siftite</em>, <em>random</em>.  Refer to the <a href="http://buddy.sourceforge.net/manual/group__reorder.html">BuDDy manual</a>
+        for details.  Defaults to <em>none</em>.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_sylvan_options">Sylvan Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--sylvan-threads</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Set number of workers. Defaults to 1.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p>*--sylvan-dqsize
+        Sets the size of the (static) task queue for work stealing in Wool
+        to N.  Defaults to 100000.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--sylvan-tablesize</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Sets the size of the BDD table to 1&lt;&lt;N nodes. Defaults to 23.
+        Maximum of 29.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--sylvan-cachesize</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Set the size of the memoization table to 1&lt;&lt;N entries.
+        Defaults to 23.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--sylvan-bits</strong>=<em>BITS</em>
+</dt>
+<dd>
+<p>
+        Sets the number of bits for each integer in the state vector.
+        Defaults to 16.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--sylvan-granularity</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Controls memoization table usage.  Only use the memoization
+        table every 1/N BDD levels.  Defaults to 1, i.e., always use the table.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_lddmc_options">LDDmc Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--lddmc-tablesize</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Sets the size of the BDD table to 1&lt;&lt;N nodes. Defaults to 23.
+        Maximum of 29.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--lddmc-cachesize</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Set the size of the memoization table to 1&lt;&lt;N entries.
+        Defaults to 23.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_lace_options">Lace Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>--lace-workers</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Set number of Lace workers (threads for parallelization).
+        Defaults to the number of available cores if parallel algorithms
+        are used, 1 otherwise.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--lace-dqsize</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Set length of Lace task queue.
+        Defaults to 40960000.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--lace-stacksize</strong>=<em>NUMBER</em>
+</dt>
+<dd>
+<p>
+        Set size of program stack in kilo bytes.
+        Defaults to 0, which means using the default stack size.
+</p>
+</dd>
+</dl></div>
+</div>
+<div class="sect2">
+<h3 id="_general_options">General Options</h3>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>-v</strong>
+</dt>
+<dd>
+<p>
+        Increase the level of verbosity
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-q</strong>
+</dt>
+<dd>
+<p>
+        Be quiet; do not print anything to the terminal.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--debug=&lt;file.c&gt;</strong>
+</dt>
+<dd>
+<p>
+        Enable debugging output for file.c (option allowed multiple times).
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--version</strong>
+</dt>
+<dd>
+<p>
+        Print version string of this tool.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>-h</strong>, <strong>--help</strong>
+</dt>
+<dd>
+<p>
+        Print help text
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>--usage</strong>
+</dt>
+<dd>
+<p>
+        Print short usage summary.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_exit_status">EXIT STATUS</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+<strong>0</strong>
+</dt>
+<dd>
+<p>
+        Successful termination.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>1</strong>
+</dt>
+<dd>
+<p>
+        Counter example found.
+</p>
+</dd>
+<dt class="hdlist1">
+<strong>255</strong>
+</dt>
+<dd>
+<p>
+        Some error occurred.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_support">SUPPORT</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Send questions, bug reports, comments and feature suggestions to the
+<a href="mailto:ltsmin-support@lists.utwente.nl">LTSmin Support Team</a>.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_see_also">SEE ALSO</h2>
+<div class="sectionbody">
+<div class="paragraph"><p><a href="ltsmin.html">ltsmin(7)</a>,
+<a href="etf.html">etf(5)</a>,
+<a href="ltsmin-mpi.html">ltsmin-mpi(1)</a>,
+<a href="ltsmin-mucalc.html">ltsmin-mucalc(5)</a>,
+<a href="ltsmin-convert.html">ltsmin-convert(1)</a>,
+<a href="ltsmin-printtrace.html">ltsmin-printtrace(1)</a>,
+<a href="http://dx.doi.org/10.1007/978-3-540-85762-4_6">ICTAC 2008, LNCS 5160</a>,
+<a href="http://www.cwi.nl/&#126;mcrl/">muCRL</a>,
+<a href="http://www.mcrl2.org/">mCRL2</a>,
+<a href="http://divine.fi.muni.cz/">DiVinE 2.2</a>,
+<a href="http://www.mpi-forum.org/">MPI Forum</a>,
+<a href="http://buddy.sourceforge.net/">BuDDy</a>,
+<a href="http://eprints.eemcs.utwente.nl/22042/">prom</a>, and
+<a href="https://www3.hhu.de/stups/prob/index.php/Main_Page">ProB</a></p></div>
+</div>
+</div>
+</div>
+<div id="footnotes"><hr /></div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2016-11-25 16:16:33 UTC
+</div>
+</div>
+</body>
+</html>
