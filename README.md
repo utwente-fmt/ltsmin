@@ -58,7 +58,7 @@ LTSmin supports language independence via its definition of a **Partitioned Next
 * [muCRL's](http://homepages.cwi.nl/~mcrl/) process algebra,
 * [mCRL2's](http://www.mcrl2.org/) process algebra,
 * [DiVinE's](http://divine.fi.muni.cz/) [DVE](http://divine.fi.muni.cz/manual.html#the-dve-specification-language) language, based on extended state machines,
-* the builtin symbolic [ETF](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/etf.html) format,
+* the builtin symbolic [ETF](assets/man/etf.html) format,
 * [SPIN's Promela](http://spinroot.com/) via the included [SpinS](http://eprints.eemcs.utwente.nl/22042/), a [SpinJa](http://code.google.com/p/spinja/) spinoff,
 * [UPPAAL's](http://www.uppaal.org/) timed automata via [opaal](http://opaal-modelchecker.com/),
 * [SCOOP's](http://wwwhome.cs.utwente.nl/~timmer/scoop/) process algebra for Markov Automata,
@@ -79,7 +79,7 @@ To connect a new language module, one merely needs to implement the PINS next-st
 The PINS interface divides our model checking tools cleanly into the two independent parts discussed above: language modules and model checking algorithms. However it also enables us to create PINS2PINS modules, that reside between the language module and the algorithm, and modify or optimize the next-state function. These PINS2PINS modules can benefit all algorithmic backends and can be turned on and off on demand:
 
 * transition storing/caching speeds up slow language modules,
-* [regrouping](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/dve2lts-sym.html#_pins_options) speeds up the symbolic algorithms by optimizing dependencies, and
+* [regrouping](assets/man/dve2lts-sym.html#_pins_options) speeds up the symbolic algorithms by optimizing dependencies, and
 * [partial order reduction](http://essay.utwente.nl/61036/) reduces the state space by dropping irrelevant transitions.
 
 ![PINS-interface](assets/img/pins_modern.png)
@@ -122,19 +122,20 @@ Ordered by the number of commits (January 2017) LTSmin's contributors are:
 
 ## Selected Documentation
 
-*   [lps2lts-sym](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/lps2lts-sym.html) (BDD-based reachability with mCRL2 frontend)
-*   [dve2lts-mc](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/dve2lts-mc.html) (multi-core reachability with DiVinE 2 frontend)
-*   [prom2lts-mc](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/prom2lts-mc.html) (multi-core reachability with Promela SpinS frontend)
-*   [lpo2lts-seq](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/lpo2lts-seq.html) (sequential enumerative reachability with muCRL frontend)
-*   [etf2lts-dist](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/etf2lts-dist.html) (distributed reachability with ETF frontend)
-*   [lps2torx](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/lps2torx.html) (TorX testing tool connector with mCRL2 frontend)
-*   [pbes2lts-sym](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/pbes2lts-sym.html) (Symbolic reachability tool with PBES frontend: [example](http://wwwhome.cs.utwente.nl/~kant/git/))
-*   [pins2lts-sym](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/pins2lts-sym.html) (Symbolic reachability tool using the dlopen API: [tutorial](https://github.com/utwente-fmt/ltsmin-tacas2015/tree/master/sokoban))
-*   [mapa2lts-sym](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/mapa2lts-sym.html) (Symbolic reachability tool with MAPA frontend)
-*   [pnml2lts-sym](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/pnml2lts-sym.html) (Symbolic reachability tool with PNML frontend)
-*   [prob2lts-sym](https://htmlpreview.github.io/?https://github.com/utwente-fmt/ltsmin-manpages/blob/3.0/prob2lts-sym.html) (Symbolic reachability tool with ProB frontend)
+*   [ltsmin](assets/man/ltsmin.html) (LTSmin's main man page)
+*   [lps2lts-sym](assets/man/lps2lts-sym.html) (BDD-based reachability with mCRL2 frontend)
+*   [dve2lts-mc](assets/man/dve2lts-mc.html) (multi-core reachability with DiVinE 2 frontend)
+*   [prom2lts-mc](assets/man/prom2lts-mc.html) (multi-core reachability with Promela SpinS frontend)
+*   [lpo2lts-seq](assets/man/lpo2lts-seq.html) (sequential enumerative reachability with muCRL frontend)
+*   [etf2lts-dist](assets/man/etf2lts-dist.html) (distributed reachability with ETF frontend)
+*   [lps2torx](assets/man/lps2torx.html) (TorX testing tool connector with mCRL2 frontend)
+*   [pbes2lts-sym](assets/man/pbes2lts-sym.html) (Symbolic reachability tool with PBES frontend: [example](http://wwwhome.cs.utwente.nl/~kant/git/))
+*   [pins2lts-sym](assets/man/pins2lts-sym.html) (Symbolic reachability tool using the dlopen API: [tutorial](https://github.com/utwente-fmt/ltsmin-tacas2015/tree/master/sokoban))
+*   [mapa2lts-sym](assets/man/mapa2lts-sym.html) (Symbolic reachability tool with MAPA frontend)
+*   [pnml2lts-sym](assets/man/pnml2lts-sym.html) (Symbolic reachability tool with PNML frontend)
+*   [prob2lts-sym](assets/man/prob2lts-sym.html) (Symbolic reachability tool with ProB frontend)
 
-More manpages can be found at <https://github.com/utwente-fmt/ltsmin-manpages>.
+More manpages can be found at [here](assets/man/).
 
 ## Supported Systems
 
