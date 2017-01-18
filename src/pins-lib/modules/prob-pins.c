@@ -32,6 +32,8 @@ static int no_close = 0;
 
 static char* zocket_prefix = "/tmp/ltsmin-";
 
+static char* prob_opts = "";
+
 typedef struct prob_context {
     size_t num_vars;
     int op_type_no;
@@ -69,6 +71,7 @@ struct poptOption prob_options[] = {
     { NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void*) &prob_popt, 0, NULL, NULL },
     { "no-close", 0, POPT_ARG_NONE, &no_close, 0, "do not close the ProB connection (so that it can be reused)", NULL },
     { "zocket-prefix", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &zocket_prefix, 0, "use a default ZMQ socket prefix, ignored for a file with a .probz extension", NULL },
+    { "ProB-opts", 0, POPT_ARG_STRING, &prob_opts, 0, "execute the \"probcli\" command together with <OPTIONS>", "<OPTIONS>" },
     POPT_TABLEEND };
 
 static prob_context_t*
@@ -128,9 +131,11 @@ ProBstartProb(model_t model, const char* file)
 
     Warning(info, "Creating zocket for HRE worker %d at %s", HREme(HREglobal()), ctx->zocket);
 
-    const char* command = "probcli %s -ltsmin2 %s &";
-    char buf[snprintf(NULL, 0, command, ret_filename, ctx->zocket) + 1];
-    sprintf(buf, command, ret_filename, ctx->zocket);
+    const char* command = "probcli %s -ltsmin2 %s %s &";
+    char buf[snprintf(NULL, 0, command, ret_filename, ctx->zocket, prob_opts) + 1];
+    sprintf(buf, command, ret_filename, ctx->zocket, prob_opts);
+
+    Warning(infoLong, "Starting ProB for worker %d using \"%s\"", HREme(HREglobal()), buf);
 
     if (system(buf) != 0) Abort("Could not launch 'probcli', make sure it is on your PATH");
 
