@@ -60,13 +60,22 @@ public:
     // allocate memory for ltsmin_buchi_t
     ba = (ltsmin_buchi_t*) RTmalloc(sizeof(ltsmin_buchi_t) + numberOfStates * sizeof(ltsmin_buchi_state_t*));
     ba->state_count = numberOfStates;
+
+    // create a state mapping for the number of states
+    for (unsigned int i=0; i<numberOfStates; i++) {
+      state_map.push_back(i); // every state is mapped to itself
+    }
   }
 
   virtual void addStartStates(const int_list& stateConjunction) override {
     // one initial state, and this must be named '0'
     HREassert(stateConjunction.size() == 1, "Multiple initial states defined");
     for (unsigned int state : stateConjunction) {
-      HREassert(state == 0, "The initial state is not labeled '0'");
+      if (state != 0) {
+        // possibly swap starting state so it's always 0
+        state_map[state] = 0;
+        state_map[0] = state;
+      }
     }
   }
 
@@ -224,7 +233,7 @@ public:
 
     transitions.push_back(tmp_pos);
     transitions.push_back(tmp_neg);
-    transitions.push_back(conjSuccessors.front());
+    transitions.push_back(state_map[conjSuccessors.front()]);
     transitions.push_back(t_acc);
 
     transition_count ++;
@@ -309,7 +318,7 @@ public:
         n_trans++;
     }
 
-    ba->states[state_index++] = bs;
+    ba->states[state_map[state_index++]] = bs;
 
     transitions.clear();
     transition_count = 0;
@@ -337,6 +346,7 @@ private:
   int state_index = 0;
   int index = 0; // global uniquely increasing counter
   std::vector<int> transitions;
+  std::vector<int> state_map;
 };
 
 }

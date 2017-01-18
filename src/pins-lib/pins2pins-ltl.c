@@ -648,7 +648,6 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
 
             // debug
             HREassert(ba != NULL, "Buchi automata is NULL");
-            print_ltsmin_buchi(ba, env);
         
         } else {
 #endif
