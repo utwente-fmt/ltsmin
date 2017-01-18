@@ -42,8 +42,12 @@ dict set commands test13_dist exp "Deadlocks: 501"
 dict set commands test14_seq cmd "$binpaths(prom2lts-seq) p312.pml.spins --por --check --action=assert --trace=t14_seq.gcf"
 dict set commands test14_seq exp ""
 
-dict set commands test14_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --por --check --action=assert --trace=t14_mc.gcf --threads=2"
-dict set commands test14_mc exp ""
+# JM: the --check and --trace are not compatible here.
+dict set commands test14a_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --por --check --action=assert --threads=2"
+dict set commands test14a_mc exp ""
+
+dict set commands test14b_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --por --action=assert --trace=t14_mc.gcf --threads=2"
+dict set commands test14b_mc exp ""
 
 # TEST 15:
 
