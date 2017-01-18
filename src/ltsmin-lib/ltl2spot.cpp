@@ -389,9 +389,9 @@ ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env)
   if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
     // use a system call to get the Rabin automaton from the LTL formula
     std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > /tmp/tmp.ltl"
-    //+ " && ltldo --relabel 'ltl3dra' -F /tmp/tmp.ltl > /tmp/tmp.hoa";
-    + " && ltldo --relabel 'ltl3hoa' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
-    //+ " && cat /tmp/tmp.ltl | ltldo --relabel 'rabinizer3 -silent -format=hoa -in=formula -out=std %[RWMei^]f > %O' > /tmp/tmp.hoa";
+    //+ " && ltldo --relabel 'ltl3dra' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
+    //+ " && ltldo --relabel 'ltl3hoa' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
+    + " && cat /tmp/tmp.ltl | ltldo --relabel 'rabinizer3 -silent -format=hoa -in=formula -out=std %[RWMei^]f > %O' | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
     std::cerr << "system command: " << command << std::endl;
     if (system(command.c_str())) {
       Abort("Could not use system command");
