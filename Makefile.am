@@ -12,6 +12,7 @@ EXTRA_DIST  = ltsminreconf
 EXTRA_DIST += Doxyfile
 EXTRA_DIST += contrib/bash-completion/ltsmin
 EXTRA_DIST += CODING-STANDARDS
+EXTRA_DIST += README.md
 
 doc_DATA = AUTHORS COPYING README.md CODING-STANDARDS
 
