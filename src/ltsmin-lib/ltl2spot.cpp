@@ -387,11 +387,23 @@ ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env)
 
   // TODO: Replace system calls
   if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
+
     // use a system call to get the Rabin automaton from the LTL formula
-    std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > /tmp/tmp.ltl"
-    //+ " && ltldo --relabel 'ltl3dra' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
-    //+ " && ltldo --relabel 'ltl3hoa' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
-    + " && cat /tmp/tmp.ltl | ltldo --relabel 'rabinizer3 -silent -format=hoa -in=formula -out=std %[RWMei^]f > %O' | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
+    std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > /tmp/tmp.ltl";
+
+    if (PINS_RABIN_TYPE == PINS_RABIN_TYPE_LTL3DRA) {
+      command += " && ltldo --relabel 'ltl3dra' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
+    }
+    else if (PINS_RABIN_TYPE == PINS_RABIN_TYPE_LTL3HOA) {
+      command += " && ltldo --relabel 'ltl3hoa' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
+    }
+    else if (PINS_RABIN_TYPE == PINS_RABIN_TYPE_RABINIZER) {
+      command += " && cat /tmp/tmp.ltl | ltldo --relabel 'rabinizer3 -silent -format=hoa -in=formula -out=std %[RWMei^]f > %O' | autfilt --generalized-rabin=share-inf > /tmp/tmp.hoa";
+    }
+    else {
+      Abort("Could not detect the rabin translator used");
+    }
+
     std::cerr << "system command: " << command << std::endl;
     if (system(command.c_str())) {
       Abort("Could not use system command");
