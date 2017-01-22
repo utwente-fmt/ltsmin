@@ -35,6 +35,7 @@ static const char      *ltl_semantics_name = "none";
 static const char      *buchi_type = "ba";
 pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
 pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
+pins_rabin_type_t       PINS_RABIN_TYPE = PINS_RABIN_TYPE_LTL3HOA;
 
 static si_map_entry db_ltl_semantics[]={
     {"none",    PINS_LTL_NONE},
@@ -47,8 +48,17 @@ static si_map_entry db_ltl_semantics[]={
 static si_map_entry db_buchi_type[]={
     {"ba",      PINS_BUCHI_TYPE_BA},
     {"tgba",    PINS_BUCHI_TYPE_TGBA},
-    {"rabin",   PINS_BUCHI_TYPE_RABIN},
+    {"rabinizer",PINS_BUCHI_TYPE_RABIN},
+    {"ltl3dra", PINS_BUCHI_TYPE_RABIN},
+    {"ltl3hoa", PINS_BUCHI_TYPE_RABIN},
     {"spotba",  PINS_BUCHI_TYPE_SPOTBA},
+    {NULL, 0}
+};
+
+static si_map_entry db_rabin_type[]={
+    {"rabinizer",PINS_RABIN_TYPE_RABINIZER},
+    {"ltl3dra", PINS_RABIN_TYPE_LTL3DRA},
+    {"ltl3hoa", PINS_RABIN_TYPE_LTL3HOA},
     {NULL, 0}
 };
 
@@ -106,6 +116,10 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
             }
             Print (infoLong, "Buchi type: %s", buchi_type);
             PINS_BUCHI_TYPE = b;
+            if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
+                int r = linear_search (db_rabin_type, buchi_type);
+                PINS_RABIN_TYPE = r;
+            }
         }
         return;
     case POPT_CALLBACK_REASON_OPTION:
@@ -121,7 +135,7 @@ struct poptOption ltl_options[] = {
     {"ltl-semantics", 0, POPT_ARG_STRING, &ltl_semantics_name, 0,
      "LTL semantics", "<spin|textbook|ltsmin> (default: \"spin\")"},
     {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
-     "Buchi automaton type", "<ba|tgba|spotba|rabin>"},
+     "Buchi automaton type", "<ba|tgba|spotba|rabinizer|ltl3dra|ltl3hoa>"},
     POPT_TABLEEND
 };
 

@@ -54,6 +54,21 @@ typedef enum {
  */
 extern pins_buchi_type_t PINS_BUCHI_TYPE;
 
+
+/**
+ * \brief rabin translator used for obtaining a rabin automata
+ */
+typedef enum {
+    PINS_RABIN_TYPE_RABINIZER,
+    PINS_RABIN_TYPE_LTL3DRA,
+    PINS_RABIN_TYPE_LTL3HOA,
+} pins_rabin_type_t;
+
+/**
+ * \brief rabin translator type
+ */
+extern pins_rabin_type_t PINS_RABIN_TYPE;
+
 /**
 \brief Add LTL layer on top all other pins layers
 */
