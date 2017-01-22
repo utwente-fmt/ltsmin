@@ -414,7 +414,7 @@ ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env)
       trans.set_type(spot::postprocessor::TGBA);
     } else if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA)
       trans.set_type(spot::postprocessor::BA);
-    trans.set_pref(spot::postprocessor::Deterministic);
+    //trans.set_pref(spot::postprocessor::Deterministic);
 
     // create the automaton
     spot_automaton = trans.run(f.f);
