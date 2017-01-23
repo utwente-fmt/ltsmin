@@ -397,20 +397,20 @@ ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env)
       + " && ltldo --relabel 'ltl3dra' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/ltl3dra.hoa";
 
       if (system(command.c_str())) 
-        Abort("Could not use system command");
+        Warning(info,"Could not use system command for ltl3dra");
 
       command = "echo \"" + ltl + "\" | tr \\# \\\" > /tmp/tmp.ltl"
       + " && ltldo --relabel 'ltl3hoa' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/ltl3hoa.hoa";
 
       if (system(command.c_str())) 
-        Abort("Could not use system command");
+        Warning(info,"Could not use system command for ltl3hoa");
 
       command = "echo \"" + ltl + "\" | tr \\# \\\" > /tmp/tmp.ltl"
       + " && cat /tmp/tmp.ltl | ltldo --relabel 'rabinizer3 -silent -format=hoa -in=formula -out=std %[RWMei^]f > %O'"
       + " | autfilt --generalized-rabin=share-inf > /tmp/rabinizer3.hoa";
 
       if (system(command.c_str())) 
-        Abort("Could not use system command");
+        Warning(info, "Could not use system command for rabinizer3");
 
       Abort("Finished generating rabin!");
     }
