@@ -151,17 +151,22 @@ public:
   }
 
   virtual void provideAcceptanceName(const std::string& name, const std::vector<IntOrString>& extraInfo) override {
+    int n_pairs = 1;
+    // case 1: rabin or GRA
     std::string rabin ("Rabin");
     std::string gra ("generalized-Rabin");
-    if (gra.compare(name) != 0 && rabin.compare(name) != 0)
-      HREassert(false, "We only accept Rabin or Generalized Rabin automata"); 
-    
-    // get the number of rabin pairs
-    HREassert(extraInfo.size() > 0, "Info on the number of pairs is not available in the HOA"); 
-    HREassert(extraInfo[0].isInteger(), "First extra element for generalized rabin should indicate the number of pairs"); 
+    if (gra.compare(name) == 0 || rabin.compare(name) == 0) {
+      // get the number of rabin pairs
+      HREassert(extraInfo.size() > 0, "Info on the number of pairs is not available in the HOA"); 
+      HREassert(extraInfo[0].isInteger(), "First extra element for generalized rabin should indicate the number of pairs"); 
 
-    //std::cout << "Number of pairs: " << extraInfo[0].getInteger() << std::endl;
-    int n_pairs = extraInfo[0].getInteger();
+      //std::cout << "Number of pairs: " << extraInfo[0].getInteger() << std::endl;
+      n_pairs = extraInfo[0].getInteger();
+    }
+    // case 2: simpler automata
+    else {
+      n_pairs = 1;
+    }
 
     ba->rabin = (rabin_t*) RTmalloc(sizeof(rabin_t) + n_pairs * sizeof(rabin_pair_t) );
     ba->rabin->n_pairs = n_pairs;
