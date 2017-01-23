@@ -56,12 +56,20 @@ extern pins_buchi_type_t PINS_BUCHI_TYPE;
 
 
 /**
- * \brief rabin translator used for obtaining a rabin automata
+ * \brief rabin translator used for obtaining a rabin automata.
+ * The GEN type is used for generating (and then aborting)
+ * HOA files in the three different formats, and READ takes one
+ * statically defined HOA file as input and parses and uses it.
+ * The motivation is to prevent installing rabin translators on
+ * Machines with no root access, so LTL translation can occur 
+ * elsewhere.
  */
 typedef enum {
     PINS_RABIN_TYPE_RABINIZER,
     PINS_RABIN_TYPE_LTL3DRA,
     PINS_RABIN_TYPE_LTL3HOA,
+    PINS_RABIN_TYPE_GEN,
+    PINS_RABIN_TYPE_READ,
 } pins_rabin_type_t;
 
 /**

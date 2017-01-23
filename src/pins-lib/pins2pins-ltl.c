@@ -48,17 +48,21 @@ static si_map_entry db_ltl_semantics[]={
 static si_map_entry db_buchi_type[]={
     {"ba",      PINS_BUCHI_TYPE_BA},
     {"tgba",    PINS_BUCHI_TYPE_TGBA},
-    {"rabinizer",PINS_BUCHI_TYPE_RABIN},
+    {"rabinizer3",PINS_BUCHI_TYPE_RABIN},
     {"ltl3dra", PINS_BUCHI_TYPE_RABIN},
     {"ltl3hoa", PINS_BUCHI_TYPE_RABIN},
+    {"genrabin",PINS_BUCHI_TYPE_RABIN},
+    {"readrabin",PINS_BUCHI_TYPE_RABIN},
     {"spotba",  PINS_BUCHI_TYPE_SPOTBA},
     {NULL, 0}
 };
 
 static si_map_entry db_rabin_type[]={
-    {"rabinizer",PINS_RABIN_TYPE_RABINIZER},
+    {"rabinizer3",PINS_RABIN_TYPE_RABINIZER},
     {"ltl3dra", PINS_RABIN_TYPE_LTL3DRA},
     {"ltl3hoa", PINS_RABIN_TYPE_LTL3HOA},
+    {"genrabin",PINS_RABIN_TYPE_GEN},
+    {"readrabin",PINS_RABIN_TYPE_READ},
     {NULL, 0}
 };
 
@@ -135,7 +139,7 @@ struct poptOption ltl_options[] = {
     {"ltl-semantics", 0, POPT_ARG_STRING, &ltl_semantics_name, 0,
      "LTL semantics", "<spin|textbook|ltsmin> (default: \"spin\")"},
     {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
-     "Buchi automaton type", "<ba|tgba|spotba|rabinizer|ltl3dra|ltl3hoa>"},
+     "Buchi automaton type", "<ba|tgba|spotba|rabinizer3|ltl3dra|ltl3hoa|genrabin|readrabin>"},
     POPT_TABLEEND
 };
 
