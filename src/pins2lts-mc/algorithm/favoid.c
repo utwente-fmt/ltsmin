@@ -574,6 +574,13 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
 void
 favoid_run  (run_t *run, wctx_t *ctx)
 {
+
+#if HAVE_PROFILER
+    if (ctx->id == 0)
+        Warning (info, "Using the profiler");
+    ProfilerStart ("favoid.perf");
+#endif
+
     if (keep_logging) {
         printf ("digraph g {\n");// DEBUG
     }
@@ -606,6 +613,12 @@ favoid_run  (run_t *run, wctx_t *ctx)
             dfs_stack_clear (loc->roots_stack);
         }
     }
+
+#if HAVE_PROFILER
+    if (ctx->id == 0)
+        Warning(info, "Done profiling");
+    ProfilerStop();
+#endif
 
     // TODO: add counterexample construction
 
