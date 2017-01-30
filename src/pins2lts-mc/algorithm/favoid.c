@@ -21,9 +21,6 @@
 #include <gperftools/profiler.h>
 #endif
 
-int keep_logging = 0; // DEBUG: print the first x cases
-int log_again = 0;    // DEBUG: print more log info for new searches
-
 /**
  * local counters
  */
@@ -162,17 +159,6 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (ti->labels != NULL) {
 
         acc_set = ti->labels[pins_get_accepting_set_edge_label_index(ctx->model)];
-
-        if (keep_logging) { // DEBUG
-            if (loc->rabin_pair_f & acc_set) {
-                printf ("A%zu [color=salmon,style=filled];\n", successor->ref);
-                printf("A%zu -> A%zu [label=F];\n",ctx->state->ref, successor->ref);
-                keep_logging --;
-            }
-            else {
-                printf("A%zu -> A%zu;\n",ctx->state->ref, successor->ref);
-            }
-        }
 
         // avoid and store successors of F transitions
         if (loc->rabin_pair_f & acc_set) {
@@ -526,10 +512,6 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
 
     //Warning(info, "checking pair %d", loc->rabin_pair_id);
 
-    if (keep_logging) {
-        printf ("A%zu [color=green,style=filled];\n", ctx->initial->ref);
-    }
-
     // search from the initial state
     //Warning (info, "Starting initial search from %zu", ctx->initial->ref);
     if (favoid_check_pair_aux (ctx, run, init_state)) return true;
@@ -538,7 +520,8 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
     // check all states that we have avoided
     while (!iterset_is_empty (shared->pairs[pair_id].is)) {
 
-        if (run_is_stopped(run)) return;
+        if (run_is_stopped(run)) 
+            return false;
         
         ref_t new_init;
         iterset_pick_state (shared->pairs[pair_id].is, &new_init);
@@ -550,14 +533,6 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
         }
 
         //Warning (info, "Starting new search from %zu", new_init);
-
-        if (log_again) {
-            printf ("A%zu [color=lightblue,style=filled];\n", new_init);
-            keep_logging = 10000;
-            log_again --;
-        } else {
-            keep_logging = 0;
-        }
 
         if (favoid_check_pair_aux (ctx, run, new_init)) return true;
 
@@ -581,10 +556,6 @@ favoid_run  (run_t *run, wctx_t *ctx)
     ProfilerStart ("favoid.perf");
 #endif
 
-    if (keep_logging) {
-        printf ("digraph g {\n");// DEBUG
-    }
-
     alg_local_t            *loc = ctx->local;
     raw_data_t              state_data;
 
@@ -605,8 +576,6 @@ favoid_run  (run_t *run, wctx_t *ctx)
             report_counterexample (ctx);
         }
 
-        keep_logging = 0; // DEBUG
-
         if (i+1 < number_of_pairs) {
             // reset the local stacks
             dfs_stack_clear (loc->search_stack);
@@ -625,10 +594,6 @@ favoid_run  (run_t *run, wctx_t *ctx)
     (void) run;
     (void) state_data;
     (void) loc;
-    
-    if (keep_logging) {
-        printf ("\n}\n");// DEBUG
-    }
 }
 
 
