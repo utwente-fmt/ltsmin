@@ -78,7 +78,7 @@ iterset_is_in_set (const iterset_t *is, ref_t state)
 
 
 is_pick_e
-iterset_pick_state_aux (iterset_t *is, ref_t state, ref_t *ret)
+iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret)
 {
     // invariant: every consecutive non-LOCK state is in the same set
     ref_t               a, b, c;
@@ -109,7 +109,7 @@ iterset_pick_state_aux (iterset_t *is, ref_t state, ref_t *ret)
 
         HREassert ( b != 0 );
 
-        // if a is TOMB and only element, then the SCC is DEAD
+        // if a is TOMB and only element, then the set is empty
         if (a == b) {
             atomic_write (&is->current, 0);
             return IS_PICK_DEAD;
@@ -159,7 +159,7 @@ iterset_pick_state (iterset_t *is, ref_t *ret)
         atomic_write (&is->current, next);
     }
     
-    return iterset_pick_state_aux(is, state, ret);
+    return iterset_pick_state_from(is, state, ret);
 }
 
 
@@ -259,7 +259,7 @@ iterset_is_empty (iterset_t *is)
 {
     if (atomic_read (&is->current) == 0) return true;
     ref_t dummy;
-    return (iterset_pick_state_aux (is, is->current, &dummy) != IS_PICK_SUCCESS);
+    return (iterset_pick_state_from (is, is->current, &dummy) != IS_PICK_SUCCESS);
 }
 
 
@@ -271,7 +271,7 @@ iterset_lock_list (iterset_t *is, ref_t a, ref_t *a_l)
     char pick;
 
     while ( 1 ) {
-        pick = iterset_pick_state_aux (is, a, a_l);
+        pick = iterset_pick_state_from (is, a, a_l);
         if ( pick != IS_PICK_SUCCESS )
             return 0;
         if (cas (&is->array[*a_l].list_status, LIST_LIVE, LIST_LOCK) )

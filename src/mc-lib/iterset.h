@@ -29,6 +29,8 @@ extern void        iterset_clear (iterset_t *is);
 
 extern bool        iterset_is_in_set (const iterset_t *is, ref_t state);
 
+extern is_pick_e   iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret);
+
 extern is_pick_e   iterset_pick_state (iterset_t *is, ref_t *ret);
 
 extern bool        iterset_add_state (iterset_t *is, ref_t state);
