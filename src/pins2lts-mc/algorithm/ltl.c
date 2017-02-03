@@ -70,22 +70,21 @@ find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack, bool is_lasso)
 }
 
 void
-ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
+ndfs_report_cycle (wctx_t *ctx, model_t model, dfs_stack_t stack,
                    state_info_t *cycle_closing_state)
 {
     global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
     /* Stop other workers, exit if some other worker was first here */
-    if ( no_exit || !run_stop(run) )
+    if ( no_exit || !run_stop(ctx->run) )
         return;
     size_t              level = dfs_stack_nframes (stack) + 1;
     Warning (info, " ");
     Warning (info, "Accepting cycle FOUND at depth %zu!", level);
     Warning (info, " ");
-    if (trc_output) {
-        /* Write last state to stack to close cycle */
-        state_data_t data = dfs_stack_push (stack, NULL);
-        state_info_serialize (cycle_closing_state, data);
-        find_and_write_dfs_stack_trace (model, stack, true);
+    if (trc_output && ctx->counter_example == 0) {
+        state_info_set (ctx->ce_state, cycle_closing_state->ref, cycle_closing_state->lattice);
+        ctx->counter_example = 1; // delay, to avoid re-entrancy of GBgetTrans
+        //find_and_write_dfs_stack_trace (model, stack, true);
     }
 }
 

@@ -353,7 +353,7 @@ ta_cndfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, 
     cndfs_alg_local_t  *cndfs_loc = (cndfs_alg_local_t *) ctx->local;
     /* Find cycle back to the seed */
     if ( ta_cndfs_is_cyan(ctx, successor, NULL, false) )
-        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+        ndfs_report_cycle (ctx, ctx->model, loc->stack, successor);
     if ( !ta_cndfs_has_state(cndfs_loc->pink, successor, false) //&&
          /*!ta_cndfs_subsumed(ctx, successor, LM_RED)*/ ) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
@@ -376,7 +376,7 @@ ta_cndfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti,
     int cyan = ta_cndfs_is_cyan (ctx, successor, NULL, false);
     if (ecd && cyan && (is_acc(ctx, successor) || is_acc(ctx, ctx->state)) ) {
         /* Found cycle in blue search */
-        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+        ndfs_report_cycle (ctx, ctx->model, loc->stack, successor);
     }
     if ( all_red || !cyan ) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
@@ -396,6 +396,7 @@ ta_cndfs_explore_state_red (wctx_t *ctx)
     dfs_stack_enter (loc->stack);
     increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, ctx->state, ta_cndfs_handle_red, ctx);
+    check_counter_example (ctx, loc->stack, true);
     cnt->explored++;
     run_maybe_report (ctx->run, cnt, "[Red ] ");
 }
@@ -408,6 +409,7 @@ ta_cndfs_explore_state_blue (wctx_t *ctx)
     dfs_stack_enter (loc->stack);
     increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, ctx->state, ta_cndfs_handle_blue, ctx);
+    check_counter_example (ctx, loc->stack, true);
     cnt->explored++;
     run_maybe_report1 (ctx->run, cnt, "[Blue] ");
 }

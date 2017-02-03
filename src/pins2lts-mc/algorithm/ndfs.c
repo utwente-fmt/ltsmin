@@ -46,7 +46,7 @@ ndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         return; // only revisit blue states to determinize POR
     if ( nn_color_eq(color, NNCYAN) ) {
         /* Found cycle back to the stack */
-        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+        ndfs_report_cycle (ctx, ctx->model, loc->stack, successor);
     } else if ( nn_color_eq(color, NNBLUE) && (loc->strat != Strat_LNDFS ||
             !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits)) ) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
@@ -73,7 +73,7 @@ ndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             (pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) ||
              pins_state_is_accepting(ctx->model, state_info_state(successor))) ) {
         /* Found cycle in blue search */
-        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+        ndfs_report_cycle (ctx, ctx->model, loc->stack, successor);
     } else if ((loc->strat == Strat_LNDFS && !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits)) ||
                (loc->strat != Strat_LNDFS && !nn_color_eq(color, NNPINK))) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
@@ -90,16 +90,19 @@ ndfs_explore_state_red (wctx_t *ctx)
     dfs_stack_enter (loc->stack);
     increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, ctx->state, ndfs_red_handle, ctx);
+    check_counter_example (ctx, loc->stack, true);
     run_maybe_report (ctx->run, cnt, "[Red ] ");
 }
 
 void
 ndfs_explore_state_blue (wctx_t *ctx)
 {
+    alg_local_t        *loc = ctx->local;
     work_counter_t     *cnt = ctx->counters;
-    dfs_stack_enter (ctx->local->stack);
+    dfs_stack_enter (loc->stack);
     increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, ctx->state, ndfs_blue_handle, ctx);
+    check_counter_example (ctx, loc->stack, true);
     cnt->explored++;
     run_maybe_report (ctx->run, cnt, "[Blue] ");
 }

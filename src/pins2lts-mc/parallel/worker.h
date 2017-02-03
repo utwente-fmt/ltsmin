@@ -29,6 +29,8 @@ struct thread_ctx_s {
     alg_local_t        *local;          // Worker information, local to worker
     alg_global_t       *global;         // Worker information, shared with others
     state_info_t       *state;          // currently explored state
+    int                 counter_example;// found counter-example
+    state_info_t       *ce_state;
 };
 
 extern wctx_t *wctx_create (model_t model, run_t *run);

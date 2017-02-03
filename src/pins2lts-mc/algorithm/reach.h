@@ -111,6 +111,17 @@ extern void handle_error_trace (wctx_t *ctx);
 static inline void
 deadlock_detect (wctx_t *ctx, size_t count)
 {
+    if (EXPECT_FALSE(ctx->counter_example)) {
+        run_stop (ctx->run);
+        alg_global_t        *sm = ctx->global;
+        raw_data_t          data = dfs_stack_push (sm->stack, NULL);
+        state_info_serialize (ctx->ce_state, data);
+        dfs_stack_enter (sm->stack);
+
+        handle_error_trace (ctx);
+        return;
+    }
+
     if (EXPECT_TRUE(count > 0))
         return;
 
@@ -167,16 +178,16 @@ action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
     alg_global_t       *sm = ctx->global;
 
     loc->counters.errors++;
-    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
-    if ((!no_exit || trc_output) && run_stop(ctx->run)) {
-        raw_data_t          data = dfs_stack_push (sm->stack, NULL);
-        state_info_serialize (successor, data);
-        dfs_stack_enter (sm->stack);
+    if ((!no_exit || trc_output) && !ctx->counter_example) { // once
         Warning (info, " ");
         Warning (info, "Error action '%s' found at depth %zu!",
                  act_detect, ctx->counters->level_cur);
         Warning (info, " ");
-        handle_error_trace (ctx);
+        // GBgetTransitions is not necessarily reentrant,
+        // so we handle trace writing and exit in deadlock_detect (above)
+        ctx->counter_example = 1;
+        state_info_set (ctx->ce_state, successor->ref, successor->lattice);
+        /*handle_error_trace (ctx);*/
     }
 }
 
