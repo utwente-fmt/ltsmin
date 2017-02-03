@@ -392,7 +392,7 @@ ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env)
       // assumes /tmp/tmp.hoa already exists
     }
     else if (PINS_RABIN_TYPE == PINS_RABIN_TYPE_GEN) {
-      // generates three files, one for each rabin translator
+      // generates four files, one for each rabin translator and a TGBA to TGRA one
       std::string command = "echo \"" + ltl + "\" | tr \\# \\\" > /tmp/tmp.ltl"
       + " && ltldo --relabel 'ltl3dra' -F /tmp/tmp.ltl | autfilt --generalized-rabin=share-inf > /tmp/ltl3dra.hoa";
 
@@ -411,6 +411,12 @@ ltsmin_ltl2spot(ltsmin_expr_t e, ltsmin_parse_env_t env)
 
       if (system(command.c_str())) 
         Warning(info, "Could not use system command for rabinizer3");
+
+      command = "echo \"" + ltl + "\" | tr \\# \\\" > /tmp/tmp.ltl"
+      + " && cat /tmp/tmp.ltl | ltl2tgba | autfilt --generalized-rabin > /tmp/tgbarabin.hoa";
+
+      if (system(command.c_str())) 
+        Warning(info, "Problems occurred when constructing a TGBA-TGRA");
 
       Abort("Finished generating rabin!");
     }
