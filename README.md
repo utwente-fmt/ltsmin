@@ -164,10 +164,22 @@ in Section [Build Dependencies](#build-dependencies) below.
     # Configure
     $ ./configure --disable-dependency-tracking --prefix /path/
 
+### Some notes on configuring pkgconf
+
 If you have installed `pkgconf` in a non-standard location, you may
 need to specify the location of the pkg-config utility, e.g.:
 
     $ ./configure --disable-dependency-tracking --prefix /path/ PKG_CONFIG="/path/to/pkg-config"
+
+If you have installed dependencies (e.g. Sylvan) in a non-standard location,
+you may need to tell `pkgconf` to search for `*.pc` files in this non standard
+location. E.g. if Sylvan is installed in `/opt/local/` and Sylvan's `sylvan.pc`
+is located in `/opt/local/lib/pkgconfig`, 
+you need to set `PKG_CONFIG_LIBDIR` to `/opt/local/lib/pkgconfig`:
+
+    $ ./configure --disable-dependency-tracking --prefix /path/ PKG_CONFIG_LIBDIR="/opt/local/lib/pkgconfig"
+
+Note that as usual, you can separate multiple paths to `*.pc` files with `:`.
 
 It is a good idea to check the output of ./configure, to see whether
 all dependencies were found.
@@ -421,6 +433,7 @@ be installed.  They are available from Apple
 installation CDs.
 
 #### CZMQ
+
 To build the ProB front-end, [CZMQ](http://czmq.zeromq.org/) is required.
 
 #### libxml2
@@ -430,6 +443,9 @@ To build the Petri net front-end, [libxml2](http://xmlsoft.org/) is required.
 #### Sylvan
 
 To build the symbolic back-end, [Sylvan](https://github.com/trolando/sylvan) is required.
+If Sylvan is installed in a non-standard location please refer to
+[this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
+and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).
 
 ## Building from a Git Repository
 
@@ -439,7 +455,9 @@ have to be executed in the top-level source directory:
     $ git submodule update --init
     $ ./ltsminreconf
 
-However, if you have installed `pkgconf` in a non-standard location you may need
+### A note on aclocal and pkgconf
+
+If you have installed `pkgconf` in a non-standard location you may need
 to specify the location to `pkg.m4` using the `ACLOCAL_PATH`
 variable manually, before running `ltsminreconf`. Assuming
 the path to `pkg.m4` is `~/.local/share/aclocal/pkg.m4`, run:
