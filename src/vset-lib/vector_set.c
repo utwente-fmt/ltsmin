@@ -110,7 +110,9 @@ vdom_create_domain(int n, vset_implementation_t impl)
 {
     if (impl == VSET_IMPL_AUTOSELECT) impl = vset_default_domain;
     switch(impl){
+#ifdef HAVE_SYLVAN
     case VSET_LDDmc: return vdom_create_lddmc(n);
+#endif
     case VSET_ListDD64: return vdom_create_list64_native(n);
     case VSET_ListDD: return vdom_create_list_native(n);
 #ifdef HAVE_ATERM2_H
@@ -121,7 +123,9 @@ vdom_create_domain(int n, vset_implementation_t impl)
 #ifdef HAVE_DDD_H
     case VSET_DDD: return vdom_create_ddd(n);
 #endif
+#ifdef HAVE_SYLVAN
     case VSET_Sylvan: return vdom_create_sylvan(n);
+#endif
     default: return NULL;
     }
 }
@@ -135,7 +139,7 @@ vdom_create_domain_from_file(FILE *f, vset_implementation_t impl)
     case VSET_LDDmc: return vdom_create_lddmc_from_file(f);
     case VSET_Sylvan: return vdom_create_sylvan_from_file(f);
 #endif // HAVE_SYLVAN
-    default: return NULL;
+    default: return NULL; (void) f;
     }
 }
 

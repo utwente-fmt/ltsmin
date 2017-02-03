@@ -414,14 +414,19 @@ AC_ARG_ENABLE([werror],
     [enable_werror=no])
 AS_IF([test x"$enable_werror" = "xyes"], [AC_SUBST([AM_CFLAGS], [-Werror])])
 
-PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.1],[
-    have_sylvan=yes
-    SYLVAN_CPPFLAGS="$SYLVAN_CFLAGS"
-    AC_SUBST(SYLVAN_CFLAGS)
-    AC_SUBST(SYLVAN_CPPFLAGS)
-    AC_SUBST(SYLVAN_LDFLAGS)
-    AC_SUBST(SYLVAN_LIBS)],
-    [AC_MSG_FAILURE(Sylvan is not installed.)])
+AC_ARG_WITH([sylvan],
+    [AS_HELP_STRING([--without-sylvan], [do not include Sylvan's multi-core decision diagram packages])])
+
+AS_IF([test "x$with_sylvan" != "xno"], [
+    PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.1],[
+        have_sylvan=yes
+        SYLVAN_CPPFLAGS="$SYLVAN_CFLAGS"
+        AC_SUBST(SYLVAN_CFLAGS)
+        AC_SUBST(SYLVAN_CPPFLAGS)
+        AC_SUBST(SYLVAN_LDFLAGS)
+        AC_SUBST(SYLVAN_LIBS)],
+        [AC_MSG_WARN(Sylvan is not installed.)])
+])
 
 #AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
@@ -603,5 +608,6 @@ Configuration:
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
     PNML     = ${have_xml2:-NO, not building pnml (Petri net) front-end}
     PROB     = ${acx_prob:-NO, either ProB was disabled or CZMQ could not be found}
+    Sylvan   = ${have_sylvan:-NOT FOUND, not building symbolic back-end}
 ======================================================================
 EOM

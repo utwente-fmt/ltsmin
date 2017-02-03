@@ -9,6 +9,7 @@
 #include <gperftools/profiler.h>
 #endif
 #include <assert.h>
+#include <time.h>
 
 #include <hre/config.h>
 #include <hre/user.h>

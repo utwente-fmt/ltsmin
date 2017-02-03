@@ -263,10 +263,6 @@ Download Apache Ant from <http://ant.apache.org/>.  We tested with ant
 tarball (unless Java files were modified).  Note that we require
 JavaCC task support for Ant.
 
-#### Sylvan
-
-Download Sylvan from <https://github.com/trolando/sylvan>.
-
 #### pkgconf
 
 Download pkgconf from <https://github.com/pkgconf/pkgconf>.
@@ -427,8 +423,13 @@ installation CDs.
 #### CZMQ
 To build the ProB front-end, [CZMQ](http://czmq.zeromq.org/) is required.
 
-### libxml2
+#### libxml2
+
 To build the Petri net front-end, [libxml2](http://xmlsoft.org/) is required.
+
+#### Sylvan
+
+To build the symbolic back-end, [Sylvan](https://github.com/trolando/sylvan) is required.
 
 ## Building from a Git Repository
 
