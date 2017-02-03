@@ -313,7 +313,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         if (0 == type_value_count) {
             lts_type_set_format (ltstype, i, LTStypeDirect);
         } else {
-             lts_type_set_format (ltstype, i, LTStypeEnum);
+            lts_type_set_format (ltstype, i, LTStypeEnum);
         }
     }
 
@@ -358,6 +358,11 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // setting values for types
     for(int i=0; i < ntypes; i++) {
         int type_value_count = prom_get_type_value_count(i);
+        if (lts_type_get_format(ltstype, i) != LTStypeChunk &&
+            lts_type_get_format(ltstype, i) != LTStypeEnum) {
+            Debug ("Skipping type values for non-chunk type %s", lts_type_get_type(ltstype, i));
+            continue;
+        }
         for(int j=0; j < type_value_count; ++j) {
             const char* type_value = prom_get_type_value_name(i, j);
             pins_chunk_put_at (model, i, chunk_str((char*)type_value), j);
