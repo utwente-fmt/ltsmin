@@ -28,7 +28,19 @@ typedef union trace_info_u {
 extern void find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack,
                                             bool is_lasso);
 
-extern void ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
+static inline void
+check_counter_example (wctx_t *ctx, dfs_stack_t stack, bool is_lasso)
+{
+    if (EXPECT_FALSE(ctx->counter_example)) {
+        /* Write last state to stack to close cycle */
+        state_data_t data = dfs_stack_push (stack, NULL);
+        state_info_serialize (ctx->ce_state, data);
+
+        find_and_write_dfs_stack_trace (ctx->model, stack, is_lasso);
+    }
+}
+
+extern void ndfs_report_cycle (wctx_t *ctx, model_t model, dfs_stack_t stack,
                                state_info_t *cycle_closing_state);
 
 static inline bool

@@ -162,7 +162,7 @@ endfs_handle_red (void *arg, state_info_t *successor, transition_info_t *ti, int
     }
 
     if ( onstack && *level < cloc->accepting_depth )
-        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+        ndfs_report_cycle (ctx, ctx->model, loc->stack, successor);
     /* Mark states dangerous if necessary */
     if ( Strat_ENDFS == loc->strat &&
          pins_state_is_accepting(ctx->model, state_info_state(successor)) &&
@@ -206,7 +206,7 @@ endfs_handle_blue (void *arg, state_info_t *successor, transition_info_t *ti, in
      */
     if ( ecd && onstack && *level < cloc->accepting_depth) {
         /* Found cycle in blue search */
-        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+        ndfs_report_cycle (ctx, ctx->model, loc->stack, successor);
     } else if ( all_red || (!onstack &&
                          state_store_get_colors (successor->ref) != CBLUE) ) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
@@ -249,6 +249,7 @@ endfs_explore_state_red (wctx_t *ctx)
     dfs_stack_enter (loc->stack);
     increase_level (ctx->counters);
     cnt->trans += permute_trans (ctx->permute, ctx->state, endfs_handle_red, ctx);
+    check_counter_example (ctx, loc->stack, true);
     cnt->explored++;
     run_maybe_report (ctx->run, cnt, "[Red ] ");
 
@@ -267,6 +268,7 @@ endfs_explore_state_blue (wctx_t *ctx)
     dfs_stack_enter (loc->stack);
     increase_level (ctx->counters);
     cnt->trans += permute_trans (ctx->permute, ctx->state, endfs_handle_blue, ctx);
+    check_counter_example (ctx, loc->stack, true);
     cnt->explored++;
     run_maybe_report1 (ctx->run, cnt, "[Blue] ");
 

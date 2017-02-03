@@ -138,7 +138,7 @@ renault_local_deinit (run_t *run, wctx_t *ctx)
 
 static void
 renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
-        int seen)
+                int seen)
 {
     // parent state is ctx->state
 
@@ -162,11 +162,11 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
             uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, acc_set);
             if (GBgetAcceptingSet() == acc) {
-                ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+                ndfs_report_cycle (ctx, ctx->model, loc->search_stack, successor);
             }
         } if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(successor)) ) {
             // TODO: this cycle report won't work correctly
-            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+            ndfs_report_cycle (ctx, ctx->model, loc->search_stack, successor);
         }
         return;
     }
@@ -188,13 +188,13 @@ renault_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA && shared->ltl) {
             uint32_t acc = r_uf_add_acc (shared->uf, successor->ref, acc_set);
             if (GBgetAcceptingSet() == acc) {
-                ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+                ndfs_report_cycle (ctx, ctx->model, loc->search_stack, successor);
             }
         } 
         if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(ctx->state)))
-            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, ctx->state);
+            ndfs_report_cycle (ctx, ctx->model, loc->search_stack, ctx->state);
         if (shared->ltl && pins_state_is_accepting(ctx->model, state_info_state(successor)))
-            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, successor);
+            ndfs_report_cycle (ctx, ctx->model, loc->search_stack, successor);
 
         state_info_deserialize (loc->target, *addr);
         if (loc->state_tarjan.lowlink > loc->target_tarjan.lowlink)
@@ -235,6 +235,7 @@ explore_state (wctx_t *ctx)
     increase_level (ctx->counters);
 
     trans = permute_trans (ctx->permute, ctx->state, renault_handle, ctx);
+    check_counter_example (ctx, loc->search_stack, true);
 
     ctx->counters->explored++;
     run_maybe_report1 (ctx->run, (work_counter_t *) ctx->counters, "");
@@ -376,12 +377,13 @@ pop_scc (wctx_t *ctx, ref_t root, uint32_t root_low)
         acc_set = r_uf_get_acc (shared->uf, root);
         if (GBgetAcceptingSet() == acc_set) {
             state_info_set (loc->target, root, LM_NULL_LATTICE);
-            ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, loc->target);
+            ndfs_report_cycle (ctx, ctx->model, loc->search_stack, loc->target);
         }
     } else if (accepting != DUMMY_IDX) {
         state_info_set (loc->target, accepting, LM_NULL_LATTICE);
-        ndfs_report_cycle (ctx->run, ctx->model, loc->search_stack, loc->target);
+        ndfs_report_cycle (ctx, ctx->model, loc->search_stack, loc->target);
     }
+    check_counter_example (ctx, loc->search_stack, true);
 
     // move the root of the SCC (since it is not on tarjan_stack)
     move_scc (ctx, root);
