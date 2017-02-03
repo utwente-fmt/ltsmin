@@ -179,7 +179,7 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     if (ctx->state->ref == successor->ref) {
         loc->cnt[pair_id].selfloop ++;
         uint32_t acc = uf_add_acc (shared->pairs[pair_id].uf, successor->ref + 1, acc_set);
-        if ((loc->rabin_pair_i & acc) == acc) {
+        if ((loc->rabin_pair_i & acc) == loc->rabin_pair_i) {
             report_counterexample (ctx);
         }
         return;
@@ -324,7 +324,7 @@ successor (wctx_t *ctx)
         if (uf_sameset (shared->pairs[pair_id].uf, loc->target->ref + 1, ctx->state->ref + 1)) {
             // add transition acceptance set
             uint32_t acc = uf_add_acc (shared->pairs[pair_id].uf, ctx->state->ref + 1, loc->state_acc);
-            if ((loc->rabin_pair_i & acc) == acc) {
+            if ((loc->rabin_pair_i & acc) == loc->rabin_pair_i) {
                 report_counterexample (ctx);
             }
             dfs_stack_pop (loc->search_stack);
@@ -359,7 +359,7 @@ successor (wctx_t *ctx)
 
         // after uniting SCC, report lasso
         acc_set = uf_get_acc (shared->pairs[pair_id].uf, ctx->state->ref + 1);
-        if ((loc->rabin_pair_i & acc) == acc) {
+        if ((loc->rabin_pair_i & acc) == loc->rabin_pair_i) {
             report_counterexample (ctx);
         }
 
