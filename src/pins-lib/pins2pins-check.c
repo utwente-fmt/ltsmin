@@ -42,6 +42,7 @@ typedef struct check_ctx_s {
     int                *src;
     int                 group;
     ci_list            *check_must;
+    int                 reentrent;      // check whether function is re-entered
 
     // for compare:
     int                *src2;
@@ -286,7 +287,10 @@ check_long (model_t model, int g, int *src, TransitionCB cb, void *context)
     ctx->user_ctx = context;
     ci_clear (ctx->check_must);
     isba_discard_int (ctx->stack, isba_size_int(ctx->stack));
+    HREassert (!ctx->reentrent, "INTERFACE ERROR: GBgetTransitions* is not re-entrant");
+    ctx->reentrent = 1;
     count = GBgetTransitionsLong (ctx->parent, g, src, collect, ctx);
+    ctx->reentrent = 0;
     found = isba_size_int(ctx->stack);
     abort_if (count != found, "Wrong count returned by GBnextLong(collect): %d (Found: %d).",
               count, found);
@@ -410,6 +414,7 @@ GBaddCheck (model_t model)
         ctx->magic[0][i] = min;
         ctx->magic[1][i] = min + 1;
     }
+    ctx->reentrent = 0;
 
     GBsetContext (check, ctx);
     GBsetNextStateAll (check, check_all);
