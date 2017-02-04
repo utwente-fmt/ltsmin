@@ -164,7 +164,7 @@ iterset_pick_state (iterset_t *is, ref_t *ret)
 
 
 bool
-iterset_add_state (iterset_t *is, ref_t state)
+iterset_add_state_at (iterset_t *is, ref_t state, ref_t pos)
 {
     // ensure that list next pointer is never 0 for LIVE or TOMB states
 
@@ -199,10 +199,10 @@ iterset_add_state (iterset_t *is, ref_t state)
 
     // state is locked and next = 0 at this point
 
-    ref_t current = atomic_read (&is->current);
+    //ref_t current = atomic_read (&is->current);
 
     // first state to be added ([state]->[state])
-    if (current == 0) {
+    if (pos == 0) { // current = 0
 
         // status = LIST_LIVE
         atomic_write (&is->array[state].list_next, state);
@@ -212,28 +212,36 @@ iterset_add_state (iterset_t *is, ref_t state)
         }
 
         // someone else has updated is->current: normal procedure
-        current = atomic_read (&is->current);
-        HREassert (current != 0);
+        pos = atomic_read (&is->current);
+        HREassert (pos != 0);
     }
 
-    // Try to lock current (we want [current_l]->[state]->[current_l->next])
-    ref_t current_l;
-    HREassert(iterset_lock_list (is, current, &current_l));
+    // Try to lock pos (we want [pos_l]->[state]->[pos_l->next])
+    ref_t pos_l;
+    HREassert(iterset_lock_list (is, pos, &pos_l));
 
     // update the next pointer of state
-    ref_t cur_l_next = atomic_read (&is->array[current_l].list_next);
+    ref_t cur_l_next = atomic_read (&is->array[pos_l].list_next);
     atomic_write (&is->array[state].list_next, cur_l_next);
 
-    // update the next pointer of current_l
-    atomic_write (&is->array[current_l].list_next, state);
+    // update the next pointer of pos_l
+    atomic_write (&is->array[pos_l].list_next, state);
 
-    // unlock current_l and state
-    iterset_unlock_list (is, current_l);
+    // unlock pos_l and state
+    iterset_unlock_list (is, pos_l);
     iterset_unlock_list (is, state);
 
-    atomic_write (&is->current, current_l); // update current, because why not?
+    //atomic_write (&is->current, current_l); // update current, because why not?
 
     return true;
+}
+
+
+bool
+iterset_add_state (iterset_t *is, ref_t state)
+{
+    ref_t current = atomic_read (&is->current);
+    return iterset_add_state_at (is, state, current);
 }
 
 

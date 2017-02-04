@@ -33,6 +33,8 @@ extern is_pick_e   iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *r
 
 extern is_pick_e   iterset_pick_state (iterset_t *is, ref_t *ret);
 
+extern bool        iterset_add_state_at (iterset_t *is, ref_t state, ref_t pos);
+
 extern bool        iterset_add_state (iterset_t *is, ref_t state);
 
 extern bool        iterset_remove_state (iterset_t *is, ref_t state);
