@@ -534,7 +534,12 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
             return false;
         
         ref_t new_init;
-        iterset_pick_state (shared->pairs[pair_id].is, &new_init);
+        if (loc->add_state_idx != 0) {
+            iterset_pick_state_from (shared->pairs[pair_id].is, loc->add_state_idx, &new_init);
+        }
+        else {
+            iterset_pick_state (shared->pairs[pair_id].is, &new_init);
+        }
         new_init --; // iterset uses ref_t + 1
 
         if (uf_is_dead (shared->pairs[pair_id].uf, new_init+1)) {
