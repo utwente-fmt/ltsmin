@@ -39,15 +39,22 @@ bms_set_all (bms_t *bms, int set)
 }
 
 void
-bms_clear_all(bms_t *bms)
+bms_clear_all (bms_t *bms)
 {
     bms->corrupt_stack = 0;
-    bms_set_all (bms, 0);
-    bms_clear_lists (bms);
+    if (bms->types == 1) {
+        int c = bms->lists[0]->count;
+        for (size_t i = 0; i < c; i++) {
+            bms_pop (bms, 0);
+        }
+    } else {
+        bms_set_all (bms, 0);
+        bms_clear_lists (bms);
+    }
 }
 
 void
-bms_clear_lists(bms_t *bms)
+bms_clear_lists (bms_t *bms)
 {
     for (size_t i = 0; i < bms->types; i++) {
         bms_clear (bms, i);
