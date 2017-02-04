@@ -46,6 +46,7 @@ struct alg_local_s {
     uint32_t            rabin_pair_id;        // Rabin Pair identifier
     uint32_t            rabin_pair_f;         // F fragment of rabin pair
     uint32_t            rabin_pair_i;         // I fragment of rabin pair
+    ref_t               add_state_idx;        // index in the iterset to add new states
     counter_t          *cnt;                  // local counter per rabin pair
     state_info_t       *target;               // auxiliary state
     state_info_t       *root;                 // auxiliary state
@@ -113,6 +114,7 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->rabin_pair_id               = 0;
     ctx->local->rabin_pair_f                = 0;
     ctx->local->rabin_pair_i                = 0;
+    ctx->local->add_state_idx               = 0;
 
     int n_pairs = GBgetRabinNPairs();
     ctx->local->cnt    = RTmalloc (sizeof (counter_t) * n_pairs );
@@ -163,8 +165,16 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         // avoid and store successors of F transitions
         if (loc->rabin_pair_f & acc_set) {
             // add state to iterset
-            if (iterset_add_state (shared->pairs[pair_id].is, successor->ref+1)) {
-                loc->cnt[pair_id].fstates ++; // count only if newly added
+            if (loc->add_state_idx != 0) {
+                if (iterset_add_state_at (shared->pairs[pair_id].is, successor->ref+1, loc->add_state_idx)) {
+                    loc->add_state_idx = successor->ref+1;
+                    loc->cnt[pair_id].fstates ++; // count only if newly added
+                }
+            } else {
+                if (iterset_add_state (shared->pairs[pair_id].is, successor->ref+1)) {
+                    loc->add_state_idx = successor->ref+1;
+                    loc->cnt[pair_id].fstates ++; // count only if newly added
+                }
             }
             return;
         }
