@@ -245,7 +245,7 @@ deletion_analyze (por_context *ctx, ci_list *delete)
         if (revert) {
             Debug ("Deletion rollback: |T'| = %d \t|K'| = %d \t|D'| = %d",
                      ci_count(delctx->Nprime), ci_count(delctx->Kprime), ci_count(delctx->Dprime));
-            bms_add (del, DEL_R, v); // fail transition!
+            bms_push_new (del, DEL_R, v); // fail transition!
             while (ci_count(delctx->Kprime) != 0) {
                 int x = ci_pop (delctx->Kprime);
                 bool seen = bms_push_new (del, DEL_K, x);
@@ -352,7 +352,7 @@ del_por_all (model_t self, int *src, TransitionCB cb, void *user_context)
     por_context* ctx = ((por_context*)GBgetContext(self));
     deletion_setup (self, ctx, src, true);
     if (ctx->exclude) {
-        deletion_analyze (ctx, ctx->exclude);
+        deletion_analyze (ctx, bms_list(ctx->exclude, 0));
     }
     deletion_analyze (ctx, ctx->enabled_list);
     return deletion_emit (self, ctx, src, cb, user_context);

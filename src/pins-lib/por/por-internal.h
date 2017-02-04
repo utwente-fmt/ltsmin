@@ -93,7 +93,8 @@ struct por_ctx {
     int             *group_score;   // score assigned to each group by heuristic function
     int             *nes_score;     // Template for the nes_score
 
-    ci_list         *exclude;
+    bms_t           *include;
+    bms_t           *exclude;
     leap_t          *leap;
 };
 
@@ -130,6 +131,18 @@ static inline int
 is_visible (por_context* ctx, int group)
 {
     return bms_has(ctx->visible, VISIBLE, group);
+}
+
+static inline int
+nr_excludes (por_context *ctx)
+{
+    return bms_count (ctx->exclude, 0);
+}
+
+static inline int
+is_excluded (por_context *ctx, int group)
+{
+    return bms_has (ctx->exclude, 0, group);
 }
 
 #endif // POR_INTERNAL

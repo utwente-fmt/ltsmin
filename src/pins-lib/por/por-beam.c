@@ -69,12 +69,22 @@ typedef struct search_context {
     key_type_t      has_key;        // key transitions type
     int             visible_nes;    // set of visible NESs included
     int             visible_nds;    // set of visible NDSs included
+    int             score_en;       // score of enabled trans (used as comparison in case transitions are excluded)
 } search_context_t;
 
 struct beam_s {
     int              beam_used;     // number of search contexts in use
     search_context_t**search;       // search contexts
 };
+
+static inline bool
+emitting_all (por_context *ctx)
+{
+    beam_t             *beam = (beam_t *) ctx->alg;
+    search_context_t   *s = beam->search[0];
+    return beam->beam_used == 0 || s->enabled->count >= ctx->enabled_list->count ||
+          (beam->beam_used == 1 && nr_excludes(ctx) == 0);
+}
 
 static inline void
 incr_ns_update (por_context *ctx, int group, int new_group_score)
@@ -143,8 +153,8 @@ por_transition_costs (por_context *ctx)
     if (ctx->exclude == NULL) return;
     // try avoid excluded groups
     int max_score = ctx->enabled_list->count * ctx->ngroups;
-    for (int g = 0; g < ctx->exclude->count; g++) {
-        int group = ctx->exclude->data[g];
+    for (int g = 0; g < bms_count(ctx->exclude, 0); g++) {
+        int group = bms_get (ctx->exclude, 0, g);
         incr_ns_update (ctx, group, max_score);
     }
 }
@@ -189,6 +199,7 @@ select_group (por_context* ctx, search_context_t *s, int group)
     } else {
         s->work_enabled->data[s->work_enabled->count++] = group;
         s->score_vis_en += visible;
+        s->score_en += is_excluded(ctx, group) ? ctx->enabled_list->count : 1;
         s->enabled->data[s->enabled->count++] = group;
     }
     s->score_visible += visible;
@@ -362,7 +373,7 @@ static inline int
 beam_cmp (search_context_t *s1, search_context_t *s2)
 {
     //if (s1->score != s2->score)
-        return s1->enabled->count - s2->enabled->count;
+        return s1->score_en - s2->score_en;
     //int a = s1->disabled_score + s1->score- s1->work_disabled;
     //int b = s2->disabled_score + s2->score - s2->work_disabled;
     //return (a << 15) / s1->work_disabled - (b << 15) / s2->work_disabled;
@@ -411,8 +422,8 @@ beam_sort (por_context *ctx)
 static inline void
 beam_search (por_context *ctx)
 {
-    if (ctx->enabled_list->count <= 1) return;
     beam_t             *beam = (beam_t *) ctx->alg;
+    if (emitting_all(ctx)) return;
 
     Debugf ("BEAM search (re)started (enabled: %d)\n", ctx->enabled_list->count);
     do {
@@ -454,7 +465,8 @@ beam_search (por_context *ctx)
         }
 
         // if the current search context has enabled transitions, handle all of them
-        while (s->work_enabled->count > 0 && beam_cmp(s, beam->search[1]) <= 0) {
+        while (s->work_enabled->count > 0 &&
+               (beam->beam_used == 1 || beam_cmp(s, beam->search[1]) <= 0)) {
             group = s->work_enabled->data[--s->work_enabled->count];
             HREassert (s->emit_status[group] & ES_QUEUED);
             if (s->emit_status[group] & ES_VISITED) continue;
@@ -522,15 +534,15 @@ beam_ensure_invisible_and_key (por_context* ctx)
 
     Debugf ("ADDING KEY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
     beam_t             *beam = (beam_t *) ctx->alg;
+    search_context_t   *s = beam->search[0];
+    bool                need_invisible = (SAFETY || PINS_LTL) &&
+                             ctx->visible_enabled != ctx->enabled_list->count;
     while (true) {
-        search_context_t   *s = beam->search[0];
-        if (s->enabled->count == ctx->enabled_list->count || ctx->enabled_list->count <= 1) {
+        if (emitting_all(ctx)) {
             Debugf ("BEAM %d needs no (invisible) key\n", s->idx);
             break;
         }
 
-        bool need_invisible = (SAFETY || PINS_LTL) &&
-                                 ctx->visible_enabled != ctx->enabled_list->count;
         if (need_invisible && s->has_key == KEY_INVISIBLE) {
             Debugf ("BEAM %d has invisible key\n", s->idx);
             break;
@@ -636,12 +648,11 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
 {
     // selected in winning search context
     beam_t             *beam = (beam_t *) ctx->alg;
-    // if no enabled transitions, return directly
-    if (beam->beam_used == 0) return 0;
+    if (beam->beam_used == 0 && nr_excludes(ctx) == 0) return 0;
     search_context_t   *s = beam->search[0];
     int emitted = 0;
     // if the score is larger then the number of enabled transitions, emit all
-    if (s->enabled->count >= ctx->enabled_list->count || ctx->enabled_list->count <= 1) {
+    if (emitting_all(ctx)) {
         // return all enabled
         prov_t provctx = {cb, uctx, 0, 0, 1};
         emitted = emit_all (ctx, ctx->enabled_list, &provctx, src);
@@ -683,23 +694,25 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
  * This setup is then reused by the analysis function
  */
 static void
-beam_setup (model_t model, por_context* ctx, int* src)
+beam_setup (model_t model, por_context *ctx, int *src)
 {
     por_init_transitions (model, ctx, src);
     por_transition_costs (ctx);
 
     beam_t         *beam = ctx->alg;
     int             c = RANDOM ? clock() : 0;
-    beam->beam_used = ctx->enabled_list->count;
-    if (MAX_BEAM != -1 && beam->beam_used > MAX_BEAM)
-        beam->beam_used = MAX_BEAM;
+    int             beams = ctx->enabled_list->count;
+    if (MAX_BEAM != -1 && beams > MAX_BEAM)
+        beams = MAX_BEAM;
+    beam->beam_used = 0;
     Debugf ("Initializing searches: ");
-    for (int i = 0; i < beam->beam_used; i++) {
-        int enabled = i;
-        if (RANDOM) enabled = (enabled + c) % beam->beam_used;
-        int group = ctx->enabled_list->data[enabled];
+    for (int i = 0; i < beams; i++) {
+        int idx = i;
+        if (RANDOM) idx = (idx + c) % beams;
+        int group = ctx->enabled_list->data[idx];
+        if (is_excluded(ctx, group)) continue;
 
-        search_context_t *search = beam->search[i];
+        search_context_t *search = beam->search[beam->beam_used];
         search->has_key = KEY_NONE;
         search->visible_nds = 0;
         search->visible_nes = 0;
@@ -711,8 +724,11 @@ beam_setup (model_t model, por_context* ctx, int* src)
         search->initialized = 0;
         search->score_visible = 0;
         search->score_vis_en = 0;
-        search->idx = i;
+        search->score_en = 0;
+        search->idx = beam->beam_used;
         search->group = group;
+
+        beam->beam_used++;
         Debugf ("BEAM-%d=%d, ", i, group);
     }
     Debugf ("\n");
@@ -769,6 +785,6 @@ beam_is_stubborn (por_context *ctx, int group)
     beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s = beam->search[0];
     return s->enabled->count >= ctx->enabled_list->count ||
-          (s->emit_status[group] & ES_QUEUED);
+                                (s->emit_status[group] & ES_QUEUED);
 }
 

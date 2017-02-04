@@ -106,7 +106,7 @@ add_trans (ample_ctx_t *ample, int t)
         if (!dm_is_set(&ample->gnce, t, *tt)) continue;
 
         bool added = add_trans (ample, *tt);
-        if (!added && ample->group2proc[*tt] != ample->num_procs) {
+        if (!added && ample->group2proc[*tt] != (int) ample->num_procs) {
             Warning (info, "Group %d already added to proc %d. Enabled by group %d.",
                      *tt, ample->group2proc[*tt], t);
         }
