@@ -359,7 +359,7 @@ successor (wctx_t *ctx)
 
         // after uniting SCC, report lasso
         acc_set = uf_get_acc (shared->pairs[pair_id].uf, ctx->state->ref + 1);
-        if ((loc->rabin_pair_i & acc) == loc->rabin_pair_i) {
+        if ((loc->rabin_pair_i & acc_set) == loc->rabin_pair_i) {
             report_counterexample (ctx);
         }
 
@@ -561,7 +561,12 @@ favoid_run  (run_t *run, wctx_t *ctx)
 
 
     int number_of_pairs = GBgetRabinNPairs();
+
+#if SEQ_PAIRS
+    int start_pair = 0;
+#else 
     int start_pair = ctx->id % number_of_pairs;
+#endif
 
     for (int i=0; i<number_of_pairs; i++) {
 
@@ -714,12 +719,20 @@ favoid_shared_init   (run_t *run)
 
     run->shared   = RTmallocZero (sizeof (favoid_shared_t));
     shared        = (favoid_shared_t*) run->shared;
+
+#if SEQ_PAIRS
+    shared->pairs = RTmalloc (sizeof (favoid_shared_pair_t));
+    shared->pairs[0].uf = uf_create();
+    shared->pairs[0].is = iterset_create();
+
+#else
     shared->pairs = RTmalloc (sizeof (favoid_shared_pair_t) * n_pairs);
 
     for (int i=0; i<n_pairs; i++) {
         shared->pairs[i].uf = uf_create();
         shared->pairs[i].is = iterset_create();
     }
+#endif
 }
 
 
