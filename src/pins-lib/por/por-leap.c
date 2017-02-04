@@ -17,11 +17,13 @@ struct leap_s {
     size_t                  round;
     prov_t                  proviso;
     bool                    visible;
-    ci_list               **lists;
+    bms_t                 **lists;
     por_context            *por;
     dfs_stack_t             inout[2];
     void                   *uctx;
     TransitionCB            ucb;
+    size_t                  states;
+    size_t                  levels;
 };
 
 static void
@@ -47,14 +49,15 @@ chain_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 }
 
 static inline size_t
-leap_do_emit (leap_t *leap, int *src, ci_list *groups, TransitionCB cb,
+leap_do_emit (leap_t *leap, int *src, bms_t *groups, TransitionCB cb,
               void *uctx)
 {
     por_context        *ctx = leap->por;
 
-    size_t emitted = 0;
-    for (int g = 0; g < groups->count; g++) {
-        int group = ci_get (groups, g);
+    size_t              emitted = 0;
+    int                 c = bms_count (groups, 0);
+    for (int g = 0; g < c; g++) {
+        int group = bms_get (groups, 0, g);
         emitted += GBgetTransitionsLong (ctx->parent, group, src, cb, uctx);
     }
     return emitted;
@@ -63,7 +66,7 @@ leap_do_emit (leap_t *leap, int *src, ci_list *groups, TransitionCB cb,
 static inline size_t
 leap_level (leap_t *leap, size_t round)
 {
-    ci_list            *groups = leap->lists[round];
+    bms_t              *groups = leap->lists[round];
 
     TransitionCB        cb;
     void               *uctx;
@@ -81,7 +84,7 @@ leap_level (leap_t *leap, size_t round)
         HREassert (dfs_stack_size(leap->inout[1]) == 0);
         Printf (debug, "Following: ");
     }
-    ci_debug (groups);
+    bms_debug (groups);
     Printf (debug, " (%zu < %zu)\n", round, leap->round);
 
     // process stack in order
@@ -118,46 +121,42 @@ static void
 leap_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     leap_t             *leap = (leap_t *) context;
-    ci_list            *groups = leap->lists[leap->round];
+    bms_t              *groups = leap->lists[leap->round];
 
-    size_t              c = ci_count(groups);
-    ci_add_if (groups, ti->group, c == 0 || ci_top(groups) != ti->group);
+    size_t              c = bms_count (groups, 0);
+    bms_push_if (groups, 0, ti->group, c == 0 || bms_top(groups, 0) != ti->group);
 
     (void) cpy; (void) dst;
 }
 
 static bool
-conjoin_lists (leap_t *leap, ci_list *groups)
+conjoin_lists (leap_t *leap, bms_t *exclude, bms_t *groups, bool *second_visible)
 {
-    ci_list            *all = leap->lists[leap->groups];
+    *second_visible = false;
     bool                visible = false;
-    ci_sort (all);
-    for (int g = 0; g < groups->count; g++) {
-        int                 group = ci_get(groups, g);
+    int                 group;
+    bool                disjoint = true;
+    int                 c = bms_count (groups, 0);
+    for (int g = 0; g < c; g++) {
+        group = bms_get (groups, 0, g);
+        disjoint &= bms_push_new (exclude, 0, group);
         visible |= bms_has (leap->por->visible, VISIBLE, group);
-        if (ci_binary_search (all, group) != -1) {
-            Printf (debug, "Found overlapping stubborn set: ");
-            ci_debug (groups);
-            Printf (debug, " (%d)\n", ci_count(groups));
-            return false;
-        }
     }
-    if ((SAFETY || PINS_LTL) && visible && leap->visible) {
-        Printf (debug, "Found second visible stubborn set: ");
-        ci_debug (groups);
-        Printf (debug, " (%d)\n", ci_count(groups));
-        return false;
-    }
-    leap->visible |= visible;
 
-    for (int g = 0; g < groups->count; g++) {
-        int                 group = ci_get(groups, g);
-        ci_add (all, group);
+    if ((SAFETY || PINS_LTL) && visible && leap->visible) {
+        *second_visible = true;
+        bms_clear_all (groups);
     }
-    Printf (debug, "Found leaping stubborn set: ");
-    ci_debug (groups);
-    Printf (debug, " (%d%s)\n", ci_count(groups), (visible ? " visible" : ""));
-    return true;
+    if (debug) {
+        Printf (debug, "Pot. leaping stubborn set: ");
+        bms_debug_1 (groups, 0);
+        Printf (debug, " (%d%s) %s\n", c, (visible ? " visible" : ""),
+                        *second_visible ? "[SKIPPING: second visible]" :
+                        (disjoint ? "[USING]" : "[SKIPPING: overlapping]"));
+    }
+
+    leap->visible |= visible;
+    return disjoint;
 }
 
 static size_t
@@ -183,26 +182,25 @@ leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
     size_t              total;
     size_t              stubborn, cross = 1;
     bool                disjoint;
+    bool                second_visible;
 
-    ci_list            *all = leap->lists[leap->groups];
-    all->count = 0;
+    bms_clear_all (ctx->exclude);
     leap->visible = false;
     leap->proviso.por_proviso_false_cnt = 0;
     leap->proviso.por_proviso_true_cnt = 0;
     leap->round = 0;
     while (true) {
-        ci_list            *groups = leap->lists[leap->round];
-        ci_clear (groups);
+        bms_t              *groups = leap->lists[leap->round];
+        bms_clear_all (groups);
 
-        por_exclude (ctx, all);
         stubborn = leap->next_por (self, src, leap_cb, leap);
-        por_exclude (ctx, NULL);
 
         HREassert (stubborn != 0 || leap->round == 0);
         if (stubborn == 0) return 0;
 
-        disjoint = conjoin_lists (leap, groups);
+        disjoint = conjoin_lists (leap, ctx->exclude, groups, &second_visible);
         if (!disjoint) break;
+        if (second_visible) continue;
         cross *= stubborn;
         leap->round++;
     }
@@ -216,6 +214,9 @@ leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
     } else if (leap->round > 1) { // 1 round is taken care of by POR layer
         total = handle_proviso (self, src, total);
     }
+    leap->states++;
+    leap->levels += leap->round;
+    Printf (debug, "---------- (%f) \n", (float) leap->levels / leap->states);
     return total;
 }
 
@@ -277,10 +278,12 @@ leap_create_context (model_t *por_model, model_t pre_por,
     leap->inout[0] = dfs_stack_create (leap->slots);
     leap->inout[1] = dfs_stack_create (leap->slots);
     leap->groups = pins_get_group_count (ctx->parent);
-    leap->lists = RTmalloc (sizeof(ci_list **[leap->groups + 1]));
-    for (size_t i = 0; i < leap->groups + 1; i++)
-        leap->lists[i] = ci_create (leap->groups);
+    leap->lists = RTmalloc (sizeof(bms_t **[leap->groups]));
+    for (size_t i = 0; i < leap->groups; i++)
+        leap->lists[i] = bms_create (leap->groups, 1);
     leap->por = ctx;
+    leap->states = 0;
+    leap->levels = 0;
 
     add_leap_group (por_model, pre_por);
     return leap;

@@ -19,7 +19,6 @@
 #include <pins-lib/por/por-leap.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/por/pins2pins-por-check.h>
-#include <util-lib/bitmultiset.h>
 #include <util-lib/dfs-stack.h>
 
 int SAFETY = 0;
@@ -190,9 +189,25 @@ init_visible_labels (por_context* ctx)
     SAFETY = bms_count(ctx->visible, VISIBLE) != 0 || NO_L12;
 }
 
+static void
+seen_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
+{
+    por_context        *ctx = context;
+
+    size_t              c = ctx->enabled_list->count;
+    ci_add_if (ctx->enabled_list, ti->group, c == 0 || ci_top(ctx->enabled_list) != ti->group);
+
+
+    (void) cpy; (void) dst;
+}
+
 void
 por_init_transitions (model_t model, por_context *ctx, int *src)
 {
+    // Find seen successor, for free inclusion
+    ctx->enabled_list->count = 0;
+    GBgetTransitionsAll (ctx->parent, src, seen_cb, ctx);
+
     init_visible_labels (ctx);
 
     // fill guard status, request all guard values
@@ -201,7 +216,7 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
     ctx->visible_enabled = 0;
     ctx->visible_nes_enabled = 0;
     ctx->visible_nds_enabled = 0;
-    ctx->enabled_list->count = 0;
+    int enabled = 0; // check
     // fill group status and score
     for (int i = 0; i < ctx->ngroups; i++) {
         ctx->group_status[i] = GS_ENABLED; // reset
@@ -215,13 +230,18 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
         }
         // set group score
         if (ctx->group_status[i] == GS_ENABLED) {
-            ctx->enabled_list->data[ctx->enabled_list->count++] = i;
+            HREassert (ctx->enabled_list->data[enabled++] == i,
+                       "Guards do not agree with enabledness of group %d", i);
             ctx->visible_enabled += is_visible (ctx, i);
             char vis = ctx->visible->set[i];
             ctx->visible_nes_enabled += (vis & (1 << VISIBLE_NES)) != 0;
             ctx->visible_nds_enabled += (vis & (1 << VISIBLE_NDS)) != 0;
         }
     }
+    HREassert (ctx->enabled_list->count == enabled,
+               "Guards do not agree with enabledness of group %d", ctx->enabled_list->data[enabled]);
+
+
     Debugf ("Visible %d, +enabled %d/%d (NES: %d, NDS: %d)\n", bms_count(ctx->visible,VISIBLE),
            ctx->visible_enabled, ctx->enabled_list->count, ctx->visible_nes_enabled, ctx->visible_nds_enabled);
 }
@@ -609,7 +629,7 @@ PORwrapper (model_t model)
                 for (int j = 0; j < ctx->ngroups; j++) {
                     if (i == j) continue;
 
-                    // j may disable i (OK)
+                    // j must disable i (OK)
                     if (!NO_MDS && all_guards(ctx, i, must_disable, j)) {
                         continue;
                     }
@@ -799,7 +819,9 @@ PORwrapper (model_t model)
 
     ctx->nes_score    = RTmallocZero(NS_SIZE(ctx) * sizeof(int));
     ctx->group_score  = RTmallocZero(ctx->ngroups * sizeof(int));
-    ctx->exclude = NULL;
+
+    ctx->include = bms_create (ctx->ngroups, 1);
+    ctx->exclude = bms_create (ctx->ngroups, 1);
 
     return pormodel;
 }
@@ -813,12 +835,6 @@ por_is_stubborn (por_context *ctx, int group)
     case POR_AMPLE:   return ample_is_stubborn (ctx, group);
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
-}
-
-void
-por_exclude (por_context *ctx, ci_list *groups)
-{
-    ctx->exclude = groups;
 }
 
 void

@@ -2,6 +2,7 @@
 #define PINS2PINS_POR
 
 #include <pins-lib/pins.h>
+#include <util-lib/bitmultiset.h>
 #include <util-lib/util.h>
 
 
@@ -119,8 +120,6 @@ extern struct poptOption por_options[];
 extern int NO_L12;
 
 typedef struct por_ctx por_context;
-
-extern void por_exclude (por_context *ctx, ci_list *groups);
 
 extern bool por_is_stubborn (por_context *ctx, int group);
 
