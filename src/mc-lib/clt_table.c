@@ -11,6 +11,7 @@
 #include <mc-lib/atomics.h>
 #include <mc-lib/clt_table.h>
 #include <mc-lib/dbs-ll.h>
+#include <mc-lib/treedbs-ll.h>
 #include <util-lib/fast_hash.h>
 #include <util-lib/util.h>
 
@@ -139,7 +140,7 @@ clt_unlock (const clt_dbs_t* dbs, size_t pos)
 }
 
 int
-clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
+clt_find_or_put (const clt_dbs_t* dbs, uint64_t k, bool insert)
 {
     HREassert (k < (1UL << dbs->keysize), "Cleary table: invalid key");
     clt_bucket_t        check, oldval, newval;
@@ -157,7 +158,7 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
     	} else if (!oldval.occupied && oldval.locked) {
     		// locked, start over
             nanosleep (&BO, NULL);
-    		return clt_find_or_put (dbs, k);
+    		return clt_find_or_put (dbs, k, insert);
     	} // oldval.occupied -> normal insert
     }
     size_t          t_left = clt_find_left_from (dbs, idx);
@@ -168,12 +169,12 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
 
 	if (!clt_try_lock(dbs, t_left)) {
         nanosleep (&BO, NULL);
-		return clt_find_or_put (dbs, k);
+		return clt_find_or_put (dbs, k, insert);
     }
 	if (!clt_try_lock(dbs, t_right)) {
 		clt_unlock (dbs, t_left);
 		nanosleep (&BO, NULL);
-		return clt_find_or_put (dbs, k);
+		return clt_find_or_put (dbs, k, insert);
 	}
 	/* Start of CS */
     /* =========== */
@@ -207,6 +208,12 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
                 }
                 --j;
             }
+        }
+
+        if (!insert) {
+            clt_unlock (dbs, t_left);
+            clt_unlock (dbs, t_right);
+            return DB_NOT_FOUND; // NOT FOUND
         }
 
         // swap
@@ -264,6 +271,12 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
                 c2 += dbs->table[j].change;
                 ++j;
             }
+        }
+
+        if (!insert) {
+            clt_unlock (dbs, t_left);
+            clt_unlock (dbs, t_right);
+            return DB_NOT_FOUND; // NOT FOUND
         }
 
         // swap 
