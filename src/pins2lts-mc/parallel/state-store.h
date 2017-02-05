@@ -94,6 +94,9 @@ extern void store_set_state (store_t *store, state_data_t state);
 
 extern state_data_t store_state (store_t *store);
 
+extern int store_find (store_t *store, state_data_t data, transition_info_t *ti,
+                       store_t *src);
+
 extern tree_t store_tree (store_t *store);
 
 extern void store_tree_index (store_t *store, tree_t tree);

@@ -13,6 +13,7 @@
 
 #include <hre/unix.h>
 #include <pins-lib/pins2pins-ltl.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/reach.h>
 #include <pins2lts-mc/parallel/global.h>
@@ -338,6 +339,13 @@ permute_set_por (permute_t *perm, int por)
     perm->por_proviso = por;
 }
 
+static int
+state_find (state_data_t state, transition_info_t *ti, state_data_t src, void *t)
+{
+    permute_t          *perm = t;
+    return state_info_find_state (perm->next, state, ti, perm->state) != DB_NOT_FOUND;
+}
+
 permute_t *
 permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f ssf,
                 int worker_index, void *run_ctx)
@@ -409,6 +417,8 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
             Warning(infoLong,"no inhibit class label");
         }
     }
+
+    if (PINS_POR) por_set_find_state (state_find, perm);
 
     return perm;
 }

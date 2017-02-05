@@ -351,10 +351,23 @@ del_por_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     por_context* ctx = ((por_context*)GBgetContext(self));
     deletion_setup (self, ctx, src, true);
-    if (ctx->exclude) {
+    if (bms_count(ctx->exclude, 0) > 0) {
         deletion_analyze (ctx, bms_list(ctx->exclude, 0));
     }
-    deletion_analyze (ctx, ctx->enabled_list);
+    if (bms_count(ctx->include, 0) > 0) {
+        int c = ctx->enabled_list->count;
+        int idx = 0;
+        for (int i = 0; i < c; i++) {
+            if (!bms_has(ctx->include, 0, ci_get(ctx->enabled_list, i))) {
+                ctx->enabled_list->data[idx++] = ctx->enabled_list->data[i];
+            }
+        }
+        ctx->enabled_list->count = idx;
+        deletion_analyze (ctx, ctx->enabled_list);
+        deletion_analyze (ctx, bms_list(ctx->include, 0));
+    } else {
+        deletion_analyze (ctx, ctx->enabled_list);
+    }
     return deletion_emit (self, ctx, src, cb, user_context);
 }
 

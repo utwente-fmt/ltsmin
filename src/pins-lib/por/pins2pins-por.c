@@ -33,6 +33,7 @@ static int NO_DNA = 0;
 static int NO_NES = 0;
 static int NO_NDS = 0;
 static int NO_MDS = 0;
+static int CHECK_SEEN = 0;
 static int NO_MC = 0;
 static int leap = 0;
 static const char *algorithm = "heur";
@@ -124,6 +125,7 @@ struct poptOption por_options[]={
     { "no-commutes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_COMMUTES , 1 , "without commutes (for left-accordance)" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
+    { "seen" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &CHECK_SEEN , 1 , "Prefer visited successor states" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC" , NULL },
     { "no-mcnds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MCNDS , 1 , "Do not create NESs from MC and NDS" , NULL },
@@ -189,6 +191,32 @@ init_visible_labels (por_context* ctx)
     SAFETY = bms_count(ctx->visible, VISIBLE) != 0 || NO_L12;
 }
 
+static hre_key_t local_key;
+
+typedef struct local_s {
+    state_find_f find_state;
+    void *find_state_ctx;
+} local_t;
+
+static inline local_t *
+get_local ()
+{
+    local_t* loc = HREgetLocal (local_key);
+    if (loc == NULL) {
+        loc = RTmalloc (sizeof(local_t));
+        HREsetLocal (local_key, loc);
+    }
+    return loc;
+}
+
+void
+por_set_find_state (state_find_f f, void *t)
+{
+    local_t* loc = get_local ();
+    loc->find_state = f;
+    loc->find_state_ctx = t;
+}
+
 static void
 seen_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
@@ -197,6 +225,16 @@ seen_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     size_t              c = ctx->enabled_list->count;
     ci_add_if (ctx->enabled_list, ti->group, c == 0 || ci_top(ctx->enabled_list) != ti->group);
 
+    if (!CHECK_SEEN) return;
+    local_t *loc = get_local ();
+    if (!loc) return;
+
+    size_t              s = bms_count (ctx->include, 0);
+    if (loc->find_state(dst, ti, ctx->src_state, loc->find_state_ctx)) {
+        bms_push_if (ctx->include, 0, ti->group, s == 0 || bms_top(ctx->include, 0) != ti->group);
+    } else if (s > 0 && bms_top(ctx->include, 0) == ti->group) {
+        bms_pop (ctx->include, 0);
+    }
 
     (void) cpy; (void) dst;
 }
@@ -206,7 +244,10 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
 {
     // Find seen successor, for free inclusion
     ctx->enabled_list->count = 0;
+    ctx->src_state = src;
+    bms_clear_all (ctx->include);
     GBgetTransitionsAll (ctx->parent, src, seen_cb, ctx);
+    Debug ("Found %zu 'seen' groups", bms_count(ctx->include, 0));
 
     init_visible_labels (ctx);
 
@@ -240,7 +281,6 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
     }
     HREassert (ctx->enabled_list->count == enabled,
                "Guards do not agree with enabledness of group %d", ctx->enabled_list->data[enabled]);
-
 
     Debugf ("Visible %d, +enabled %d/%d (NES: %d, NDS: %d)\n", bms_count(ctx->visible,VISIBLE),
            ctx->visible_enabled, ctx->enabled_list->count, ctx->visible_nes_enabled, ctx->visible_nds_enabled);
@@ -309,6 +349,8 @@ GBaddPOR (model_t model)
 model_t
 PORwrapper (model_t model)
 {
+    HREcreateLocal (&local_key, RTfree);
+
     if (pins_get_accepting_state_label_index(model) != -1) {
         Print1  (info, "POR layer: model may be a buchi automaton.");
         Print1  (info, "POR layer: use LTSmin's own LTL layer (--ltl) for correct POR.");

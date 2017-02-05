@@ -519,6 +519,22 @@ store_first (store_t *store, state_data_t data)
     return ctx.seen;
 }
 
+int
+store_find (store_t *store, state_data_t data,
+            transition_info_t *ti, store_t *src)
+{
+    ref_t ref;
+    switch (db_type) {
+    case HashTable:
+        return DBSLLfind_hash (global->store->dbs, data, &ref, NULL);
+    case ClearyTree:
+    case TreeTable:
+        return TreeDBSLLfind_dm (global->store->dbs, data, store_tree(src),
+                                 store->tmp, ti->group);
+    default: Abort ("State store not implemented");
+    }
+}
+
 void
 store_set_state (store_t *store, state_data_t state)
 {
