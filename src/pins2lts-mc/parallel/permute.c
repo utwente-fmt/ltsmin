@@ -340,7 +340,7 @@ permute_set_por (permute_t *perm, int por)
 }
 
 static int
-state_find (state_data_t state, transition_info_t *ti, state_data_t src, void *t)
+state_find (state_data_t state, transition_info_t *ti, void *t)
 {
     permute_t          *perm = t;
     return state_info_find_state (perm->next, state, ti, perm->state) != DB_NOT_FOUND;

@@ -15,6 +15,7 @@ extern int NO_DYN_VIS;
 extern int NO_MCNDS;
 extern int NO_V;
 extern int PREFER_NDS;
+extern int CHECK_SEEN;
 
 /**
  * Beam search algorithm for persistent sets
@@ -95,7 +96,7 @@ struct por_ctx {
 
     bms_t           *include;
     bms_t           *exclude;
-    int             *src_state;
+    int              src_changed;
 
     leap_t          *leap;
 };
@@ -125,6 +126,8 @@ extern model_t PORwrapper (model_t model);
 extern bool por_is_stubborn (por_context *ctx, int group);
 
 extern void por_init_transitions (model_t model, por_context *ctx, int *src);
+
+extern void por_seen_groups (por_context *ctx, int *src, int src_changed);
 
 // number of necessary sets (halves if MC is absent, because no NDSs then)
 static inline int

@@ -121,7 +121,7 @@ extern struct poptOption por_options[];
 
 extern int NO_L12;
 
-typedef int (*state_find_f)(int *state, transition_info_t *ti, int *src, void *ctx);
+typedef int (*state_find_f)(int *state, transition_info_t *ti, void *ctx);
 
 extern void por_set_find_state (state_find_f f, void *tmp);
 
