@@ -83,7 +83,7 @@ emitting_all (por_context *ctx)
     beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s = beam->search[0];
     return beam->beam_used == 0 || s->enabled->count >= ctx->enabled_list->count ||
-          (beam->beam_used == 1 && nr_excludes(ctx) == 0);
+          (beam->beam_used == 1 && (nr_excludes(ctx) == 0));
 }
 
 static inline void
@@ -150,14 +150,21 @@ por_transition_costs (por_context *ctx)
         }
     }
 
-    if (ctx->exclude == NULL) return;
-    // try avoid excluded groups
-    int max_score = ctx->enabled_list->count * ctx->ngroups;
-    for (int g = 0; g < bms_count(ctx->exclude, 0); g++) {
-        int group = bms_get (ctx->exclude, 0, g);
-        incr_ns_update (ctx, group, max_score);
+    if (ctx->exclude != NULL) {
+        // try avoid excluded groups
+        int max_score = ctx->enabled_list->count * ctx->ngroups;
+        for (int g = 0; g < bms_count(ctx->exclude, 0); g++) {
+            int group = bms_get (ctx->exclude, 0, g);
+            incr_ns_update (ctx, group, max_score);
+        }
     }
-}
+    if (ctx->include != NULL) {
+        // cheapen included groups
+        for (int g = 0; g < bms_count(ctx->include, 0); g++) {
+            int group = bms_get (ctx->include, 0, g);
+            incr_ns_update (ctx, group, 2);
+        }
+    }}
 
 /**
  * The function update_score is called whenever a new group is added to the stubborn set
@@ -199,7 +206,8 @@ select_group (por_context* ctx, search_context_t *s, int group)
     } else {
         s->work_enabled->data[s->work_enabled->count++] = group;
         s->score_vis_en += visible;
-        s->score_en += is_excluded(ctx, group) ? ctx->enabled_list->count : 1;
+        s->score_en += is_excluded(ctx, group) ? ctx->enabled_list->count :
+                       (bms_has(ctx->include, 0, group) ? 0 : 1);
         s->enabled->data[s->enabled->count++] = group;
     }
     s->score_visible += visible;
@@ -648,7 +656,8 @@ beam_emit (por_context* ctx, int* src, TransitionCB cb, void* uctx)
 {
     // selected in winning search context
     beam_t             *beam = (beam_t *) ctx->alg;
-    if (beam->beam_used == 0 && nr_excludes(ctx) == 0) return 0;
+    if (beam->beam_used == 0 && nr_excludes(ctx) == 0 && bms_count(ctx->include, 0) == 0)
+        return 0;
     search_context_t   *s = beam->search[0];
     int emitted = 0;
     // if the score is larger then the number of enabled transitions, emit all

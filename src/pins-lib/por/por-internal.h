@@ -95,6 +95,8 @@ struct por_ctx {
 
     bms_t           *include;
     bms_t           *exclude;
+    int             *src_state;
+
     leap_t          *leap;
 };
 
@@ -120,6 +122,10 @@ extern void hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy);
 
 extern model_t PORwrapper (model_t model);
 
+extern bool por_is_stubborn (por_context *ctx, int group);
+
+extern void por_init_transitions (model_t model, por_context *ctx, int *src);
+
 // number of necessary sets (halves if MC is absent, because no NDSs then)
 static inline int
 NS_SIZE (por_context* ctx)
@@ -143,6 +149,12 @@ static inline int
 is_excluded (por_context *ctx, int group)
 {
     return bms_has (ctx->exclude, 0, group);
+}
+
+static inline int
+not_included (por_context *ctx, int group)
+{
+    return bms_count (ctx->include, 0) > 0 && bms_has (ctx->include, 0, group);
 }
 
 #endif // POR_INTERNAL

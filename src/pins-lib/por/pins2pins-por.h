@@ -105,6 +105,8 @@ typedef enum {
  */
 extern pins_por_t PINS_POR;
 
+typedef struct por_ctx por_context;
+
 /**
 \brief Add POR layer before LTL layer
 */
@@ -119,10 +121,8 @@ extern struct poptOption por_options[];
 
 extern int NO_L12;
 
-typedef struct por_ctx por_context;
+typedef int (*state_find_f)(int *state, transition_info_t *ti, int *src, void *ctx);
 
-extern bool por_is_stubborn (por_context *ctx, int group);
-
-extern void por_init_transitions (model_t model, por_context *ctx, int *src);
+extern void por_set_find_state (state_find_f f, void *tmp);
 
 #endif // PINS2PINS_POR

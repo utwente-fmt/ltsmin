@@ -41,6 +41,9 @@ extern void     state_info_deserialize  (state_info_t *state, raw_data_t data);
 extern int      state_info_new_state    (state_info_t *state, state_data_t data,
                                          transition_info_t *ti, state_info_t *src);
 
+extern int      state_info_find_state   (state_info_t *state, state_data_t data,
+                                         transition_info_t *ti, state_info_t *src);
+
 extern int      state_info_first (state_info_t *si, state_data_t data);
 
 extern state_data_t state_info_state    (state_info_t *si);
