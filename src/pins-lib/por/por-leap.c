@@ -24,6 +24,7 @@ struct leap_s {
     TransitionCB            ucb;
     size_t                  states;
     size_t                  levels;
+    size_t                  seens;
 };
 
 static void
@@ -55,10 +56,13 @@ leap_do_emit (leap_t *leap, int *src, bms_t *groups, TransitionCB cb,
     por_context        *ctx = leap->por;
 
     size_t              emitted = 0;
-    int                 c = bms_count (groups, 0);
-    for (int g = 0; g < c; g++) {
+    for (int g = 0; g < bms_count (groups, 0); g++) {
         int group = bms_get (groups, 0, g);
-        emitted += GBgetTransitionsLong (ctx->parent, group, src, cb, uctx);
+        if (CHECK_SEEN && bms_has(ctx->include, 0, group)) { // state seen:
+            emitted += GBgetTransitionsLong (ctx->parent, group, src, forward_cb, uctx);
+        } else {
+            emitted += GBgetTransitionsLong (ctx->parent, group, src, cb, uctx);
+        }
     }
     return emitted;
 }
@@ -91,6 +95,9 @@ leap_level (leap_t *leap, size_t round)
     size_t              emitted = 0;
     for (size_t s = 0; s < dfs_stack_size(leap->inout[0]); s++) {
         int                *next = dfs_stack_index (leap->inout[0], s);
+        if (CHECK_SEEN && round != 0) { // re check seen groups:
+            por_seen_groups (leap->por, next, true);
+        }
         emitted += leap_do_emit (leap, next, groups, cb, uctx);
     }
     dfs_stack_clear (leap->inout[0]); // processed in stack
@@ -209,14 +216,18 @@ leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
     leap->ucb = cb;
     total = leap_emit (leap, src);
     if (!SAFETY && !PINS_LTL) {
-        HREassert (total == cross, "Wrong number of sets %zu, expected %zu (rounds: %zu)",
+        HREassert (CHECK_SEEN ? total <= cross : total == cross,
+                   "Wrong number of sets %zu, expected %zu (rounds: %zu)",
                    total, cross, leap->round);
     } else if (leap->round > 1) { // 1 round is taken care of by POR layer
         total = handle_proviso (self, src, total);
     }
+    leap->seens += cross - total;
     leap->states++;
     leap->levels += leap->round;
-    Printf (debug, "---------- (%f) \n", (float) leap->levels / leap->states);
+    Printf (debug, "---------- (avg. levels: %f\% / avg. seen: %f\%) \n",
+            (float) (leap->levels / leap->states),
+            (float) (leap->seens / leap->states));
     return total;
 }
 
@@ -284,6 +295,7 @@ leap_create_context (model_t *por_model, model_t pre_por,
     leap->por = ctx;
     leap->states = 0;
     leap->levels = 0;
+    leap->seens = 0;
 
     add_leap_group (por_model, pre_por);
     return leap;

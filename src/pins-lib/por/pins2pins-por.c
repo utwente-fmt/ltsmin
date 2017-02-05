@@ -27,13 +27,13 @@ int NO_DYN_VIS = 1;
 int NO_V = 0;
 int NO_MCNDS = 0;
 int PREFER_NDS = 0;
+int CHECK_SEEN = 0;
 
 static int NO_COMMUTES = 0;
 static int NO_DNA = 0;
 static int NO_NES = 0;
 static int NO_NDS = 0;
 static int NO_MDS = 0;
-static int CHECK_SEEN = 0;
 static int NO_MC = 0;
 static int leap = 0;
 static const char *algorithm = "heur";
@@ -230,7 +230,8 @@ seen_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     if (!loc) return;
 
     size_t              s = bms_count (ctx->include, 0);
-    if (loc->find_state(dst, ti, ctx->src_state, loc->find_state_ctx)) {
+    if (ctx->src_changed) ti->group = -1; // avoid dep matrix in tree
+    if (loc->find_state(dst, ti, loc->find_state_ctx)) {
         bms_push_if (ctx->include, 0, ti->group, s == 0 || bms_top(ctx->include, 0) != ti->group);
     } else if (s > 0 && bms_top(ctx->include, 0) == ti->group) {
         bms_pop (ctx->include, 0);
@@ -240,14 +241,21 @@ seen_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 }
 
 void
-por_init_transitions (model_t model, por_context *ctx, int *src)
+por_seen_groups (por_context *ctx, int *src, int src_changed)
 {
     // Find seen successor, for free inclusion
     ctx->enabled_list->count = 0;
-    ctx->src_state = src;
+    ctx->src_changed = src_changed;
     bms_clear_all (ctx->include);
     GBgetTransitionsAll (ctx->parent, src, seen_cb, ctx);
-    Debug ("Found %zu 'seen' groups", bms_count(ctx->include, 0));
+    Debug("Found %zu 'seen' groups", bms_count(ctx->include, 0));
+}
+
+void
+por_init_transitions (model_t model, por_context *ctx, int *src)
+{
+    // Find seen successor, for free inclusion
+    por_seen_groups (ctx, src, false);
 
     init_visible_labels (ctx);
 
