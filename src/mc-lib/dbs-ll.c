@@ -160,7 +160,7 @@ DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref)
 }
 
 int
-DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *hash)
+DBSLLfop_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *hash, bool insert)
 {
     local_t            *loc = get_local (dbs);
     stats_t            *stat = &loc->stat;
@@ -185,6 +185,7 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *ha
         for (size_t i = 0; i < CACHE_LINE_SIZE; i++) {
             mem_hash_t         *bucket = &dbs->table[ref];
             if (EMPTY == *bucket) {
+                if (!insert) return DB_NOT_FOUND;
                 if (cas (bucket, EMPTY, WAIT)) {
                     memcpy (&dbs->data[ref * l], v, b);
                     atomic_write (bucket, DONE);
@@ -217,20 +218,6 @@ DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst)
 {
     return &dbs->data[ref * dbs->length];
     (void) dst;
-}
-
-int
-DBSLLlookup_ret (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret)
-{
-    return DBSLLlookup_hash (dbs, v, ret, NULL);
-}
-
-dbs_ref_t
-DBSLLlookup (const dbs_ll_t dbs, const int *vector)
-{
-    dbs_ref_t             ret;
-    DBSLLlookup_hash (dbs, vector, &ret, NULL);
-    return ret;
 }
 
 dbs_ll_t

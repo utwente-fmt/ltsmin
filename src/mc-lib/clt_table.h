@@ -24,6 +24,7 @@
  *
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 
 
@@ -35,7 +36,7 @@ typedef struct clt_dbs_s clt_dbs_t;
  * certain properties of the key space that can be exploited for efficient
  * randomization.
  */
-extern int          clt_find_or_put (const clt_dbs_t* dbs, uint64_t k);
+extern int          clt_find_or_put (const clt_dbs_t* dbs, uint64_t k, bool insert);
 
 extern clt_dbs_t   *clt_create (uint32_t ksize, uint32_t log_size);
 

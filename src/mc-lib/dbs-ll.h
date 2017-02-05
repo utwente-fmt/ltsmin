@@ -21,11 +21,14 @@
 }
 */
 
+#include <stdbool.h>
+
 #include <dm/dm.h>
 #include <mc-lib/stats.h>
 #include <util-lib/fast_hash.h>
 
 #define             DB_FULL -1
+#define             DB_NOT_FOUND -9
 
 /**
 \typedef Lockless hastable database.
@@ -66,8 +69,6 @@ und.
 \param vector The int vector
 \return the index of the vector in  one of the segments of the db
 */
-extern dbs_ref_t    DBSLLlookup (const dbs_ll_t dbs, const int *vector);
-
 extern int          DBSLLtry_set_sat_bits (const dbs_ll_t dbs, const ref_t ref,
                                            size_t bits, size_t offs,
                                            uint64_t exp, uint64_t new_val);
@@ -102,14 +103,30 @@ und.
 \retval idx The index that the vector was found or inserted at
 \return 1 if the vector was present, 0 if it was added
 */
-extern int          DBSLLlookup_ret (const dbs_ll_t dbs, const int *v,
-                                     dbs_ref_t *ret);
-extern int          DBSLLlookup_hash (const dbs_ll_t dbs, const int *v,
-                                      dbs_ref_t *ret, hash64_t *hh);
+extern int          DBSLLfop_hash (const dbs_ll_t dbs, const int *v,
+                                   dbs_ref_t *ret, hash64_t *hash, bool insert);
 
 extern int         *DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst);
 
 extern mem_hash_t   DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref);
+
+static inline int
+DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *hash)
+{
+    return DBSLLfop_hash (dbs, v, ret, hash, true);
+}
+
+static inline int
+DBSLLlookup_ret (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret)
+{
+    return DBSLLfop_hash (dbs, v, ret, NULL, true);
+}
+
+static inline int
+DBSLLfind_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *hash)
+{
+    return DBSLLfop_hash (dbs, v, ret, hash, false);
+}
 
 /**
 \brief Free the memory used by a dbs.
