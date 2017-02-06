@@ -77,6 +77,14 @@ ci_pop (ci_list *list)
 }
 
 static inline int
+ci_find (ci_list *list, int e)
+{
+    for (int *a = ci_begin(list); a != ci_end(list); a++)
+         if (*a == e) return a - ci_begin(list);
+    return -1;
+}
+
+static inline int
 ci_count (ci_list *list)
 {
     return list->count;
@@ -130,6 +138,8 @@ list_invert (ci_list *list)
 
 
 extern char *gnu_basename (char *path);
+
+extern bool has_suffix(const char *str, const char *suffix);
 
 extern bool has_prefix (const char *name, const char *prefix);
 

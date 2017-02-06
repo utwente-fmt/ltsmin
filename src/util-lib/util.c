@@ -17,6 +17,18 @@ gnu_basename (char *path)
 }
 
 bool
+has_suffix(const char *str, const char *suffix)
+{
+    if (!str || !suffix)
+        return 0;
+    size_t lenstr = strlen(str);
+    size_t lensuffix = strlen(suffix);
+    if (lensuffix >  lenstr)
+        return 0;
+    return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
+}
+
+bool
 has_prefix (const char *name, const char *prefix)
 {
     return 0 == strncmp(name, prefix, strlen(prefix));
