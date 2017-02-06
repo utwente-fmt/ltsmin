@@ -20,12 +20,24 @@ struct leap_s {
     bms_t                 **lists;
     por_context            *por;
     dfs_stack_t             inout[2];
+    dfs_stack_t             stack_states;
     void                   *uctx;
     TransitionCB            ucb;
     size_t                  states;
     size_t                  levels;
     size_t                  seens;
 };
+
+static void
+proviso_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
+{
+    leap_t             *leap = (leap_t *) context;
+    // set group to the special group we added in the add_leap_group function
+    transition_info_t ti_new = { ti->labels, leap->groups, ti->por_proviso };
+    leap->ucb (leap->uctx, &ti_new, dst, cpy);
+    // avoid full exploration (proviso is enforced later in backtrack)
+    ti->por_proviso = 1;
+}
 
 static void
 forward_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
@@ -37,6 +49,9 @@ forward_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     leap->ucb (leap->uctx, &ti_new, dst, cpy);
     leap->proviso.por_proviso_false_cnt += ti_new.por_proviso == 0;
     leap->proviso.por_proviso_true_cnt += ti_new.por_proviso != 0;
+    if ((PINS_LTL || SAFETY) && ti_new.por_proviso == 0) {
+        dfs_stack_push (leap->stack_states, dst);
+    }
     // avoid full exploration (proviso is enforced later in backtrack)
     ti->por_proviso = 1;
 }
@@ -115,6 +130,8 @@ leap_emit (leap_t *leap, int *src)
 {
     size_t              emitted;
     HREassert (dfs_stack_size(leap->inout[0]) == 0);
+    if ((PINS_LTL || SAFETY))
+        dfs_stack_clear (leap->stack_states);
     dfs_stack_push (leap->inout[0], src);
 
     emitted = leap_level (leap, 0);
@@ -166,6 +183,15 @@ conjoin_lists (leap_t *leap, bms_t *exclude, bms_t *groups, bool *second_visible
     return disjoint;
 }
 
+static inline bool
+in_leap_set (leap_t* leap, int e)
+{
+    for (int l = 0; l < leap->round; l++) {
+        if (bms_has (leap->lists[l], 0, e)) return false;
+    }
+    return true;
+}
+
 static size_t
 handle_proviso (model_t self, int *src, size_t total)
 {
@@ -175,8 +201,18 @@ handle_proviso (model_t self, int *src, size_t total)
     if ((PINS_LTL && leap->proviso.por_proviso_false_cnt != 0) ||
         (SAFETY && leap->proviso.por_proviso_true_cnt != 0)) {
         // also emit all single steps (probably results in horrid reductions)
-        total += GBgetTransitionsAll (GBgetParent(self), src, leap->ucb,
-                                                              leap->uctx);
+        size_t              emitted = 0;
+        ci_list            *en = ctx->enabled_list;
+        while (dfs_stack_size(leap->stack_states)) {
+            int                *next = dfs_stack_pop (leap->stack_states);
+            for (int *e = ci_begin (en); e != ci_end (en); e++) {
+                if (!in_leap_set (leap, *e)) {
+                    total += GBgetTransitionsLong (ctx->parent, *e, next,
+                                                   proviso_cb, leap->uctx);
+                }
+            }
+            if (SAFETY) break;
+        }
     }
     return total;
 }
@@ -288,6 +324,8 @@ leap_create_context (model_t *por_model, model_t pre_por,
     leap->slots = pins_get_state_variable_count (ctx->parent);
     leap->inout[0] = dfs_stack_create (leap->slots);
     leap->inout[1] = dfs_stack_create (leap->slots);
+    if ((PINS_LTL || SAFETY))
+        leap->stack_states = dfs_stack_create (leap->slots);
     leap->groups = pins_get_group_count (ctx->parent);
     leap->lists = RTmalloc (sizeof(bms_t **[leap->groups]));
     for (size_t i = 0; i < leap->groups; i++)
