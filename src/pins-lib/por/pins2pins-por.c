@@ -28,13 +28,13 @@ int NO_V = 0;
 int NO_MCNDS = 0;
 int PREFER_NDS = 0;
 int CHECK_SEEN = 0;
+int NO_MC = 0;
 
 static int NO_COMMUTES = 0;
 static int NO_DNA = 0;
 static int NO_NES = 0;
 static int NO_NDS = 0;
 static int NO_MDS = 0;
-static int NO_MC = 0;
 static int leap = 0;
 static const char *algorithm = "heur";
 static const char *weak = "no";
@@ -312,30 +312,6 @@ por_short (model_t self, int group, int *src, TransitionCB cb, void *ctx)
 {
     (void)self; (void)group; (void)src; (void)cb; (void)ctx;
     Abort ("Using Partial Order Reduction in combination with -reach or --cached? Short call failed.");
-}
-
-static inline bool
-guard_of (por_context *ctx, int i, matrix_t *m, int j)
-{
-    for (int g = 0; g < ctx->group2guard[i]->count; g++) {
-        int guard = ctx->group2guard[i]->data[g];
-        if (dm_is_set (m, guard, j)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static inline bool
-all_guards (por_context *ctx, int i, matrix_t *m, int j)
-{
-    for (int g = 0; g < ctx->group2guard[i]->count; g++) {
-        int guard = ctx->group2guard[i]->data[g];
-        if (!dm_is_set (m, guard, j)) {
-            return false;
-        }
-    }
-    return true;
 }
 
 /**
@@ -817,7 +793,7 @@ PORwrapper (model_t model)
         break;
     }
     case POR_AMPLE1: {
-        next_all = ample_search_all;
+        next_all = ample_search_one;
         ctx->alg = ample_create_context (ctx, false);
         break;
     }
@@ -880,9 +856,10 @@ bool
 por_is_stubborn (por_context *ctx, int group)
 {
     switch (alg) {
-    case POR_BEAM:  return beam_is_stubborn (ctx, group);
-    case POR_DEL:   return del_is_stubborn (ctx, group);
-    case POR_AMPLE:   return ample_is_stubborn (ctx, group);
+    case POR_BEAM:      return beam_is_stubborn (ctx, group);
+    case POR_DEL:       return del_is_stubborn (ctx, group);
+    case POR_AMPLE:
+    case POR_AMPLE1:    return ample_is_stubborn (ctx, group);
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
 }
