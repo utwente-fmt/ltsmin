@@ -48,6 +48,7 @@ struct ample_s {
     bool                all;
 
     ci_list           **dep; // do not accord process: group --> proc
+    //ci_list           **gdep;
     matrix_t            gnce;
     ci_list           **gmayen;
     int                *g2p;
@@ -91,9 +92,12 @@ init_ample (ample_t* a, int *src)
     }
 
     ci_list            *en = por->enabled_list;
-    for (int* g = ci_begin (en); g != ci_end (en); g++) {
+    for (int *g = ci_begin (en); g != ci_end (en); g++) {
         process_t *proc = &a->procs[a->g2p[*g]];
         ci_add (proc->en, *g);
+        //for (int *h = ci_begin(a->gdep[*g]); h != ci_end(a->gdep[*g]); ) {
+
+        //}
         proc->conflicts += a->dep[*g]->count + a->fdep[*g]->count;
         proc->visible |= por->visible->set[*g];
     }
@@ -285,8 +289,7 @@ ample_create_context (por_context *por, bool all)
             if (i == j) continue;
             process_t      *o = &a->procs[j];
             for (int *h = ci_begin(o->groups); h != ci_end(o->groups); h++) {
-                if (  dm_is_set(&por->not_accords_with, g, *h) ||
-                      dm_is_set(&nes, g, *h) || dm_is_set(&nes, *h, g)  ) {
+                if (  dm_is_set(&por->not_accords_with, g, *h)  ) {
                     dm_set (&dep, g, j);
                     break;
                 }
@@ -315,11 +318,14 @@ ample_create_context (por_context *por, bool all)
         process_t      *p = &a->procs[i];
         for (size_t j = 0; j < a->num_procs; j++) {
             if (i == j || dm_is_set(&dep, g, j)) continue; // no need to duplicate transitions already dependent
-            for (int *h = ci_begin(p->groups); h != ci_end(p->groups); h++) {
-                if ( *h == g || dm_is_set(&por->nce, *h, g) ) continue;
-                if ( dm_is_set(&dep, *h, j) ) {
-                    ci_add (a->fdep[g], j);
-                    break;
+            process_t      *o = &a->procs[j];
+            for (int *f = ci_begin(o->groups); o && f != ci_end(o->groups); f++) {
+                for (int *h = ci_begin(p->groups); o && h != ci_end(p->groups); h++) {
+                    if ( *h == g || dm_is_set(&por->nce, *h, g) ) continue;
+                    if ( dm_is_set(&nes, *h, *f) ) {
+                        ci_add (a->fdep[g], j);
+                        o = NULL;
+                    }
                 }
             }
         }
