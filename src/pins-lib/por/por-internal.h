@@ -16,6 +16,7 @@ extern int NO_MCNDS;
 extern int NO_V;
 extern int PREFER_NDS;
 extern int CHECK_SEEN;
+extern int NO_MC;
 
 /**
  * Beam search algorithm for persistent sets
@@ -158,6 +159,30 @@ static inline int
 not_included (por_context *ctx, int group)
 {
     return bms_count (ctx->include, 0) > 0 && bms_has (ctx->include, 0, group);
+}
+
+static inline bool
+guard_of (por_context *ctx, int i, matrix_t *m, int j)
+{
+    for (int g = 0; g < ctx->group2guard[i]->count; g++) {
+        int guard = ctx->group2guard[i]->data[g];
+        if (dm_is_set (m, guard, j)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static inline bool
+all_guards (por_context *ctx, int i, matrix_t *m, int j)
+{
+    for (int g = 0; g < ctx->group2guard[i]->count; g++) {
+        int guard = ctx->group2guard[i]->data[g];
+        if (!dm_is_set (m, guard, j)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 #endif // POR_INTERNAL
