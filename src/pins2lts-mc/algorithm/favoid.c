@@ -628,7 +628,11 @@ favoid_run  (run_t *run, wctx_t *ctx)
 
     for (int i=0; i<number_of_pairs; i++) {
 
-        Warning(info, "Starting pair %d", i);
+#ifdef SEQ_PAIRS
+        if (ctx->id == 0) {
+            Warning(info, "Starting pair %d", i);
+        }
+#endif
         if (run_is_stopped(run)) return;
 
         // set the current pair id
