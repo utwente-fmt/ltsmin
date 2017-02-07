@@ -17,6 +17,7 @@
 #include <pins-lib/por/por-deletion.h>
 #include <pins-lib/por/por-internal.h>
 #include <pins-lib/por/por-leap.h>
+#include <pins-lib/por/por-lipton.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/por/pins2pins-por-check.h>
 #include <util-lib/dfs-stack.h>
@@ -55,6 +56,7 @@ typedef enum {
     POR_NONE,
     POR_BEAM,
     POR_DEL,
+    POR_LIPTON,
     POR_AMPLE,
     POR_AMPLE1,
 } por_alg_t;
@@ -66,6 +68,7 @@ static si_map_entry por_algorithm[]={
     {"",        POR_BEAM},
     {"heur",    POR_BEAM},
     {"del",     POR_DEL},
+    {"lipton",  POR_LIPTON},
     {"ample",   POR_AMPLE},
     {"ample1",  POR_AMPLE1},
     {NULL, 0}
@@ -806,11 +809,17 @@ PORwrapper (model_t model)
         ctx->alg = del_create (ctx);
         break;
     }
+    case POR_LIPTON: {
+        next_all = lipton_por_all;
+        ctx->alg = lipton_create (ctx, pormodel);
+        break;
+    }
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
     GBsetNextStateAll   (pormodel, next_all);
 
     if (leap) {
+        HREassert (alg != POR_LIPTON, "Lipton reduction and leaping sets cannot be combined.");
         // changes POR model (sets modified r/w matrices)
         ctx->leap = leap_create_context (pormodel, model, next_all);
         GBsetNextStateAll   (pormodel, leap_search_all);
@@ -861,6 +870,7 @@ por_is_stubborn (por_context *ctx, int group)
     case POR_AMPLE1:    return ample_is_stubborn (ctx, group);
     case POR_BEAM:      return beam_is_stubborn (ctx, group);
     case POR_DEL:       return del_is_stubborn (ctx, group);
+    case POR_LIPTON:    return lipton_is_stubborn (ctx, group);
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
 }
