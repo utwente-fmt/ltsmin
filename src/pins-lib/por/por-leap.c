@@ -290,34 +290,34 @@ enlarge_matrix (matrix_t *dm, int add_rows, int add_cols)
     return new;
 }
 
-static void
-add_leap_group (model_t *por_model, model_t pre_por)
+void
+leap_add_leap_group (model_t por_model, model_t pre_por)
 {
     matrix_t *dm = enlarge_matrix (GBgetDMInfo(pre_por), 1, 0);
     set_row (dm, dm_nrows (dm) - 1);
-    GBsetDMInfo (*por_model, dm);
+    GBsetDMInfo (por_model, dm);
 
     dm = enlarge_matrix (GBgetDMInfoMayWrite(pre_por), 1, 0);
     set_row (dm, dm_nrows (dm) - 1);
-    GBsetDMInfoMayWrite (*por_model, dm);
+    GBsetDMInfoMayWrite (por_model, dm);
 
     dm = enlarge_matrix (GBgetDMInfoMustWrite(pre_por), 1, 0);
     set_row (dm, dm_nrows (dm) - 1);
-    GBsetDMInfoMustWrite (*por_model, dm);
+    GBsetDMInfoMustWrite (por_model, dm);
 
     dm = enlarge_matrix (GBgetDMInfoRead(pre_por), 1, 0);
     set_row (dm, dm_nrows (dm) - 1);
-    GBsetDMInfoRead (*por_model, dm);
+    GBsetDMInfoRead (por_model, dm);
 
     // TODO: Leaping POR does not modify guard-dependencies and commutativity info yet.
     // assuming higher layers are not using that
 }
 
 leap_t *
-leap_create_context (model_t *por_model, model_t pre_por,
+leap_create_context (model_t por_model, model_t pre_por,
                      next_method_black_t next_all)
 {
-    por_context *ctx = GBgetContext (*por_model);
+    por_context *ctx = GBgetContext (por_model);
 
     leap_t             *leap = RTmalloc (sizeof(leap_t));
     leap->next_por = next_all;
@@ -335,7 +335,7 @@ leap_create_context (model_t *por_model, model_t pre_por,
     leap->levels = 0;
     leap->seens = 0;
 
-    add_leap_group (por_model, pre_por);
+    leap_add_leap_group (por_model, pre_por);
     return leap;
 }
 

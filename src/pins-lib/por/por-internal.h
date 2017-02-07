@@ -58,6 +58,7 @@ struct por_ctx {
     matrix_t        label_nes_matrix;
     matrix_t        label_nds_matrix;
     matrix_t        not_accords_with;
+    matrix_t       *nla;
     matrix_t        nce;            // not-coenabled
     matrix_t        gnce_matrix;    // guard not-coenabled
     ci_list       **not_accords;    // mapping from transition group to groups that it accords with
