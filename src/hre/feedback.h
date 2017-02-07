@@ -182,7 +182,8 @@ extern log_t hre_debug;
 }
 
 #define Warning Print
-#define Print1(log,...) if (HREme(HREglobal()) == 0) HREmessage(log,__VA_ARGS__);
+#define Print1(log,...) if (log && HREme(HREglobal()) == 0) HREmessage(log,__VA_ARGS__);
+#define Printf1(log,...) if (log && HREme(HREglobal()) == 0) HREprintf(log,__VA_ARGS__);
 
 #define Fatal(code,chan,...) Abort(__VA_ARGS__)
 
