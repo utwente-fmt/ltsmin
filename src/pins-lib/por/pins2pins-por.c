@@ -628,10 +628,9 @@ PORwrapper (model_t model)
          *
          */
 
-        matrix_t* not_left_accords;
         id = GBgetMatrixID(model, LTSMIN_NOT_LEFT_ACCORDS);
         if (id != SI_INDEX_FAILED) {
-            not_left_accords = GBgetMatrix(model, id);
+            ctx->nla = GBgetMatrix(model, id);
         } else {
             matrix_t *must_disable = NULL;
             int id = GBgetMatrixID(model, LTSMIN_MUST_DISABLE_MATRIX);
@@ -649,8 +648,8 @@ PORwrapper (model_t model)
                 Print1 (info, "No must-enable matrix available for Valmari's weak sets.");
             }
 
-            not_left_accords = RTmalloc(sizeof(matrix_t));
-            dm_create(not_left_accords, ctx->ngroups, ctx->ngroups);
+            ctx->nla = RTmalloc(sizeof(matrix_t));
+            dm_create(ctx->nla, ctx->ngroups, ctx->ngroups);
             for (int i = 0; i < ctx->ngroups; i++) {
                 for (int j = 0; j < ctx->ngroups; j++) {
                     if (i == j) continue;
@@ -673,7 +672,7 @@ PORwrapper (model_t model)
                     } else {
                         // j may enable i (NOK)
                         if (guard_of(ctx, i, &ctx->label_nes_matrix, j)) {
-                            dm_set( not_left_accords, i, j );
+                            dm_set( ctx->nla, i, j );
                             continue;
                         }
                     }
@@ -684,12 +683,12 @@ PORwrapper (model_t model)
                     } else {
                         // i may disable j (NOK)
                         if (dm_is_set(&nds, j, i)) {
-                            dm_set( not_left_accords, i, j );
+                            dm_set( ctx->nla, i, j );
                             continue;
                         }
                         // i may enable j (NOK)
                         if (guard_of(ctx, j, &ctx->label_nes_matrix, i)) {
-                            dm_set( not_left_accords, i, j );
+                            dm_set( ctx->nla, i, j );
                             continue;
                         }
                         // i,j commute (OK)
@@ -701,22 +700,22 @@ PORwrapper (model_t model)
                         if ((dm_is_set( p_dm_w, i, k) && dm_is_set( p_dm, j, k)) ||
                             (dm_is_set( p_dm, i, k) && dm_is_set( p_dm_w, j, k)) ||
                             (dm_is_set( p_dm_w, i, k) && dm_is_set(p_dm_w, j, k))) {
-                            dm_set( not_left_accords, i, j );
+                            dm_set( ctx->nla, i, j );
                             break;
                         }
                     }
                 }
             }
         }
-        ctx->not_left_accords = (ci_list **) dm_rows_to_idx_table(not_left_accords);
-        ctx->not_left_accordsn= (ci_list **) dm_cols_to_idx_table(not_left_accords);
+        ctx->not_left_accords = (ci_list **) dm_rows_to_idx_table(ctx->nla);
+        ctx->not_left_accordsn= (ci_list **) dm_cols_to_idx_table(ctx->nla);
 
         matrix_t dna_diff;
         dm_create(&dna_diff, ctx->ngroups, ctx->ngroups);
         for (int i = 0; i < ctx->ngroups; i++) {
             for (int j = 0; j < ctx->ngroups; j++) {
                 if ( dm_is_set(&ctx->not_accords_with, i , j) &&
-                    !dm_is_set(not_left_accords, i , j) ) {
+                    !dm_is_set(ctx->nla, i , j) ) {
                     dm_set (&dna_diff, i, j);
                 }
             }
@@ -813,7 +812,7 @@ PORwrapper (model_t model)
 
     if (leap) {
         // changes POR model (sets modified r/w matrices)
-        ctx->leap = leap_create_context (&pormodel, model, next_all);
+        ctx->leap = leap_create_context (pormodel, model, next_all);
         GBsetNextStateAll   (pormodel, leap_search_all);
     }
 
@@ -855,11 +854,13 @@ PORwrapper (model_t model)
 bool
 por_is_stubborn (por_context *ctx, int group)
 {
+    if (leap)           return leap_is_stubborn (ctx, group);
+
     switch (alg) {
-    case POR_BEAM:      return beam_is_stubborn (ctx, group);
-    case POR_DEL:       return del_is_stubborn (ctx, group);
     case POR_AMPLE:
     case POR_AMPLE1:    return ample_is_stubborn (ctx, group);
+    case POR_BEAM:      return beam_is_stubborn (ctx, group);
+    case POR_DEL:       return del_is_stubborn (ctx, group);
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
 }

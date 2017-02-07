@@ -24,12 +24,14 @@
 
 typedef struct leap_s leap_t;
 
-extern leap_t      *leap_create_context (model_t *por_model, model_t pre_por,
+extern leap_t      *leap_create_context (model_t por_model, model_t pre_por,
                                          next_method_black_t next_all);
 
 extern bool         leap_is_stubborn (por_context *ctx, int group);
 
 extern int          leap_search_all (model_t self, int *src, TransitionCB cb,
                                      void *user_context);
+
+extern void         leap_add_leap_group (model_t por_model, model_t pre_por);
 
 #endif

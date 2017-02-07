@@ -64,10 +64,11 @@ struct ample_s {
 extern void find_procs (ample_t* ample);
 
 static void
-init_ample (ample_t* a, int *src)
+ample_init (ample_t *a, int *src)
 {
     por_context        *por = a->por;
     HREassert (bms_count(por->exclude, 0) == 0, "Not implemented for ample sets.");
+    HREassert (bms_count(por->include, 0) == 0, "Not implemented for ample sets.");
 
     por_init_transitions (por->parent, por, src);
 
@@ -111,6 +112,7 @@ handle_proviso (ample_t *a, prov_t *provctx, int *src)
         for (size_t j = 0; j < a->num_procs; j++) {
             emitted += ample_emit (a->por, a->procs[j].en, src, &*provctx);
         }
+        Debugf ("AMPLE proviso kickin, emitting %zu more\n", emitted);
     }
     return emitted;
 }
@@ -193,12 +195,13 @@ ample_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
     por_context        *por = ((por_context *)GBgetContext(self));
     ample_t            *a = (ample_t *)por->alg;
 
-    init_ample (a, src);
+    ample_init (a, src);
 
     find_sccs (a);
 
     prov_t              provctx = {cb, uctx, 0, 0, 0};
     int                 emitted = 0;
+    Debugf ("AMPLE emitting ample set with %d procs\n", a->scc.scc->count);
     for (int *i = ci_begin(a->scc.scc); i != ci_end(a->scc.scc); i++)
         emitted += ample_emit (por, a->procs[*i].en, src, &provctx);
     emitted += handle_proviso (a, &provctx, src);
@@ -211,7 +214,7 @@ ample_search_one (model_t self, int *src, TransitionCB cb, void *uctx)
     por_context        *por = ((por_context *)GBgetContext(self));
     ample_t            *a = (ample_t *)por->alg;
 
-    init_ample (a, src);
+    ample_init (a, src);
 
     size_t              emitted = 0;
     prov_t              provctx = {cb, uctx, 0, 0, 0};
@@ -232,12 +235,95 @@ ample_search_one (model_t self, int *src, TransitionCB cb, void *uctx)
     return ample_emit (por, por->enabled_list, src, &provctx);
 }
 
+void
+ample_init_dependencies (por_context *por, ample_t *a)
+{
+    matrix_t nes;
+    dm_create (&nes, por->ngroups, por->ngroups);
+    for (int i = 0; i < por->ngroups; i++) {
+        for (int j = 0; j < por->ngroups; j++) {
+            if (guard_of (por, i, &por->label_nes_matrix, j)) {
+                dm_set (&nes, i, j);
+            }
+        }
+    }
+
+    matrix_t dep;
+    dm_create (&dep, por->ngroups, a->num_procs);
+    for (int g = 0; g < por->ngroups; g++) {
+        int i = a->g2p[g];
+        for (size_t j = 0; j < a->num_procs; j++) {
+            if (i == j) continue;
+
+            process_t *o = &a->procs[j];
+            for (int *h = ci_begin(o->groups); h != ci_end(o->groups); h++) {
+                if (dm_is_set (&por->not_accords_with, g, *h)) {
+                    dm_set (&dep, g, j);
+                    break;
+                }
+            }
+        }
+    }
+    a->dep = (ci_list**) dm_rows_to_idx_table (&dep);
+
+    Printf1(infoLong, "Process --> Conflict groups:\n");
+    for (int i = 0; i < a->num_procs; i++) {
+        Printf1(infoLong, "%3d: ", i);
+        for (int g = 0; g < por->ngroups; g++) {
+            for (int *o = ci_begin(a->dep[g]); o != ci_end(a->dep[g]); o++) {
+                if (*o == i) {
+                    Printf1(infoLong, "%3d,", g);
+                }
+            }
+        }
+        Printf1(infoLong, "\n");
+    }
+
+    a->fdep = RTmalloc (sizeof(ci_list *[por->ngroups]));
+    for (int g = 0; g < por->ngroups; g++) {
+        int i = a->g2p[g];
+        a->fdep[g] = ci_create (a->num_procs);
+        process_t *p = &a->procs[i];
+        for (size_t j = 0; j < a->num_procs; j++) {
+            if (i == j || dm_is_set (&dep, g, j)) continue;
+            // no need to duplicate transitions already dependent
+            process_t *o = &a->procs[j];
+            for (int *f = ci_begin(o->groups); o && f != ci_end(o->groups); f++) {
+                for (int *h = ci_begin(p->groups); o && h != ci_end(p->groups); h++) {
+                    if (*h == g || dm_is_set (&por->nce, *h, g)) continue;
+
+                    if (dm_is_set (&nes, *h, *f)) {
+                        ci_add (a->fdep[g], j);
+                        o = NULL;
+                    }
+                }
+            }
+        }
+    }
+
+    Printf1(infoLong, "g in P --> { O | exists (g,h) in NCE, h in P, f in O, (g,f) in DEP } \n");
+    for (int i = 0; i < a->num_procs; i++) {
+        Printf1(infoLong, "%2d: ", i);
+        process_t *p = &a->procs[i];
+        for (int *g = ci_begin(p->groups); g != ci_end(p->groups); g++) {
+            Printf1(infoLong, "%3d --> {", *g);
+            for (int* j = ci_begin(a->fdep[*g]); j != ci_end(a->fdep[*g]); j++) {
+                Printf1(infoLong, "%2d,", *j);
+            }
+            Printf1(infoLong, "},  ");
+        }
+        Printf1(infoLong, "\n");
+    }
+    dm_free (&nes);
+    dm_free (&dep);
+}
+
 ample_t *
 ample_create_context (por_context *por, bool all)
 {
     if (NO_MC) Abort ("Ample sets require a may-be coenabled matrix.");
     model_t             model = por->parent;
-    ample_t        *a = RTmalloc(sizeof(ample_t));
+    ample_t            *a = RTmalloc(sizeof(ample_t));
     a->por = por;
     a->all = all;
 
@@ -255,84 +341,7 @@ ample_create_context (por_context *por, bool all)
     a->scc.tmp = ci_create (a->num_procs);
     a->scc.vset = RTmallocZero(sizeof(visited_index_t[a->num_procs]));
 
-    // Ample sets require more than just DNA:
-    // Groups may also not enable ech other.
-    matrix_t nes;
-    dm_create(&nes, por->ngroups, por->ngroups);
-    for (int i = 0; i < por->ngroups; i++) {
-        for (int j = 0; j < por->ngroups; j++) {
-            if (guard_of(por, i, &por->label_nes_matrix, j)) {
-                dm_set( &nes, i, j);
-            }
-        }
-    }
-
-    matrix_t dep;
-    dm_create (&dep, por->ngroups, a->num_procs);
-    for (int g = 0; g < por->ngroups; g++) {
-        int             i = a->g2p[g];
-        for (size_t j = 0; j < a->num_procs; j++) {
-            if (i == j) continue;
-            process_t      *o = &a->procs[j];
-            for (int *h = ci_begin(o->groups); h != ci_end(o->groups); h++) {
-                if (  dm_is_set(&por->not_accords_with, g, *h)  ) {
-                    dm_set (&dep, g, j);
-                    break;
-                }
-            }
-        }
-    }
-    a->dep = (ci_list **) dm_rows_to_idx_table (&dep);
-
-    Printf1 (infoLong, "Process --> Conflict groups:\n");
-    for (int i = 0; i < a->num_procs; i++) {
-        Printf1 (infoLong, "%3d: ", i);
-        for (int g = 0; g < por->ngroups; g++) {
-            for (int *o = ci_begin(a->dep[g]); o != ci_end(a->dep[g]); o++) {
-                if (*o == i) {
-                    Printf1 (infoLong, "%3d,", g);
-                }
-            }
-        }
-        Printf1 (infoLong, "\n");
-    }
-
-    a->fdep = RTmalloc (sizeof(ci_list *[por->ngroups]));
-    for (int g = 0; g < por->ngroups; g++) {
-        int             i = a->g2p[g];
-        a->fdep[g] = ci_create (a->num_procs);
-        process_t      *p = &a->procs[i];
-        for (size_t j = 0; j < a->num_procs; j++) {
-            if (i == j || dm_is_set(&dep, g, j)) continue; // no need to duplicate transitions already dependent
-            process_t      *o = &a->procs[j];
-            for (int *f = ci_begin(o->groups); o && f != ci_end(o->groups); f++) {
-                for (int *h = ci_begin(p->groups); o && h != ci_end(p->groups); h++) {
-                    if ( *h == g || dm_is_set(&por->nce, *h, g) ) continue;
-                    if ( dm_is_set(&nes, *h, *f) ) {
-                        ci_add (a->fdep[g], j);
-                        o = NULL;
-                    }
-                }
-            }
-        }
-    }
-
-    Printf1 (infoLong, "g in P --> { O | exists (g,h) in NCE, h in P, f in O, (g,f) in DEP } \n");
-    for (int i = 0; i < a->num_procs; i++) {
-        Printf1 (infoLong, "%2d: ", i);
-        process_t      *p = &a->procs[i];
-        for (int *g = ci_begin(p->groups); g != ci_end(p->groups); g++) {
-            Printf1 (infoLong, "%3d --> {", *g);
-            for (int *j = ci_begin(a->fdep[*g]); j != ci_end(a->fdep[*g]); j++) {
-                Printf1 (infoLong, "%2d,", *j);
-            }
-            Printf1 (infoLong, "},  ");
-        }
-        Printf1 (infoLong, "\n");
-    }
-
-    dm_free (&nes);
-    dm_free (&dep);
+    ample_init_dependencies (por, a);
 
     return a;
 }
@@ -407,6 +416,7 @@ pins_group_is_in_proc_with_name (model_t model, int group, char *name, int pc)
         return false;
     } else {
         Abort("Undefined PC identification criteria for current frontend");
+        return false;
     }
 }
 

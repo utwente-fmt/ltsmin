@@ -1,9 +1,10 @@
 #ifndef AMPLE_POR
 #define AMPLE_POR
 
+#include <stdbool.h>
 
 #include <pins-lib/por/pins2pins-por.h>
-
+#include <util-lib/fast_set.h>
 
 typedef struct ample_s ample_t;
 
@@ -17,6 +18,7 @@ typedef struct process_s {
     ci_list            *succs;
     bool                visible;
     size_t              conflicts;
+    fset_t             *fset;           // for detecting non-progress
 } process_t;
 
 extern ample_t     *ample_create_context (por_context *ctx, bool all);
