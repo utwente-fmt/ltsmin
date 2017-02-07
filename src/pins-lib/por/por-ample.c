@@ -29,18 +29,6 @@ typedef struct scc_ctx_s {
     ci_list                *tmp;
 } scc_ctx_t;
 
-typedef struct process_s {
-    int                 id;
-    char               *name;
-    int                 pc_slot;
-    ci_list            *groups;
-
-    ci_list            *en;
-    ci_list            *succs;
-    bool                visible;
-    size_t              conflicts;
-} process_t;
-
 struct ample_s {
     por_context        *por;
     size_t              num_procs;
@@ -74,8 +62,6 @@ struct ample_s {
 };
 
 extern void find_procs (ample_t* ample);
-
-process_t *identify_procs (ample_t *ample, size_t *num_procs, int *group2proc);
 
 static void
 init_ample (ample_t* a, int *src)
@@ -257,7 +243,7 @@ ample_create_context (por_context *por, bool all)
 
     // find processes:
     a->g2p = RTmallocZero (sizeof(int[por->ngroups]));
-    a->procs = identify_procs (a, &a->num_procs, a->g2p);
+    a->procs = identify_procs (por, &a->num_procs, a->g2p);
     //find_procs (ample); // TODO: use dependency matrices for this?
 
     HREassert (!all || a->num_procs <= 255, "Only up to 255 processes are supported in the ample set.");
@@ -359,63 +345,35 @@ ample_is_stubborn (por_context *por, int group)
     return a->all ? ci_find (a->scc.scc, i) != -1 : i == a->ample;
 }
 
-int
-pins_slot_with_type_name_is_pc (model_t model, int i)
+static int
+pins_slot_with_type_name_is_pc (model_t model, int i, char **res)
 {
-    lts_type_t          ltstype = GBgetLTStype(model);
-    char* name = lts_type_get_state_name (ltstype, i);
-    char* type = lts_type_get_state_type (ltstype, i);
-
-//#if defined(MAPA)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(MCRL)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(MCRL2)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(LTSMIN_PBES)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(ETF)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(DIVINE)
-//        return strcmp(name, type) == 0;
-//#elif defined(SPINS)
-        return has_suffix(name, "._pc");
-//#elif defined(OPAAL)
-//        return strcmp(name, type) == 0;
-//#else
-//        Abort("Undefined PC identification criteria for current frontend");
-//#endif
-}
-
-char *
-pins_get_proc_name_from_pc (model_t model, int i)
-{
-//#if defined(MAPA)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(MCRL)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(MCRL2)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(LTSMIN_PBES)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(ETF)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(DIVINE)
-//        return strcmp(name, type) == 0;
-//#elif defined(SPINS)
     lts_type_t          ltstype = GBgetLTStype(model);
     char *name = lts_type_get_state_name (ltstype, i);
+    char *type = lts_type_get_state_type (ltstype, i);
 
-    char *dot = strchr (name, '.');
-    HREassert (dot[0] == '.');
-    dot[0] = '\0';
-    char *res = strdup (name);
-    dot[0] = '.';//#elif defined(OPAAL)
-    return res;
-//        return strcmp(name, type) == 0;
-//#else
-//        Abort("Undefined PC identification criteria for current frontend");
-//#endif
+    const char *mod = HREappName();
+    if (strncmp(mod, "prom2", 5) == 0) {
+        if (!has_suffix(name, "._pc")) return false;
+
+        lts_type_t          ltstype = GBgetLTStype(model);
+        char *n = lts_type_get_state_name (ltstype, i);
+
+        char *dot = strchr (n, '.');
+        HREassert (dot[0] == '.');
+        dot[0] = '\0';
+        *res = strdup (n);
+        dot[0] = '.';//#elif defined(OPAAL)
+        return true;
+    } else if (strncmp(mod, "dve2", 4) == 0) {
+        if (strcmp(name, type) == 0) {
+            *res = name;
+            return true;
+        }
+    } else {
+        Abort("Undefined PC identification criteria for current frontend");
+    }
+    return false;
 }
 
 static char *
@@ -431,55 +389,50 @@ prom_group_name (model_t model, int group)
     return c.data;
 }
 
-
-bool
-pins_group_is_in_proc_with_name (model_t model, int group, char *name)
+static bool
+pins_group_is_in_proc_with_name (model_t model, int group, char *name, int pc)
 {
-//#if defined(MAPA)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(MCRL)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(MCRL2)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(LTSMIN_PBES)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(ETF)
-//        Abort("Undefined PC identification criteria for current frontend");
-//#elif defined(DIVINE)
-//        return strcmp(name, type) == 0;
-//#elif defined(SPINS)
-    char *gname = prom_group_name (model, group);
-    return strncmp (name, strchr(gname, '(') + 1, strlen(name)) == 0;
-//        return strcmp(name, type) == 0;
-//#else
-//        Abort("Undefined PC identification criteria for current frontend");
-//#endif
+    const char *mod = HREappName();
+    if (strncmp(mod, "prom2", 5) == 0) {
+        char *gname = prom_group_name (model, group);
+        return strncmp (name, strchr(gname, '(') + 1, strlen(name)) == 0;
+    } else if (strncmp(mod, "dve2", 4) == 0) {
+        ci_list *gs = (ci_list *) GBgetGuard(model, group);
+        for (int *g = ci_begin(gs); g != ci_end(gs); g++) {
+            matrix_t *sl = GBgetStateLabelInfo (model);
+            if (dm_is_set(sl, *g, pc) && dm_ones_in_row(sl, *g) == 1) {
+                return true;
+            }
+        }
+        return false;
+    } else {
+        Abort("Undefined PC identification criteria for current frontend");
+    }
 }
 
 process_t *
-identify_procs (ample_t *ample, size_t *num_procs, int *group2proc)
+identify_procs (por_context *por, size_t *num_procs, int *group2proc)
 {
     *num_procs = 0;
-    por_context        *ctx = ample->por;
-    model_t             model = ctx->parent;
-    process_t          *procs = RTmalloc (sizeof(process_t[ctx->ngroups]));
-    for (size_t i = 0; i < ctx->nslots; i++) {
-        if (pins_slot_with_type_name_is_pc (model, i)) {
+    model_t             model = por->parent;
+    process_t          *procs = RTmalloc (sizeof(process_t[por->ngroups]));
+    for (size_t i = 0; i < por->nslots; i++) {
+        if (pins_slot_with_type_name_is_pc (model, i, &procs[*num_procs].name)) {
             procs[*num_procs].pc_slot = i;
-            procs[*num_procs].name = pins_get_proc_name_from_pc (model, i);
+            //procs[*num_procs].name;
             procs[*num_procs].id = *num_procs;
-            procs[*num_procs].groups = ci_create (ample->por->ngroups);
-            procs[*num_procs].en = ci_create (ample->por->ngroups);
-            procs[*num_procs].succs = ci_create (ample->por->ngroups);
+            procs[*num_procs].groups = ci_create (por->ngroups);
+            procs[*num_procs].en = ci_create (por->ngroups);
+            procs[*num_procs].succs = ci_create (por->ngroups);
             (*num_procs)++;
         }
     }
     //matrix_t           *writes = GBgetDMInfoMayWrite(model);
 
-    for (size_t j = 0; j < ctx->ngroups; j++) {
+    for (size_t j = 0; j < por->ngroups; j++) {
         bool found = false;
         for (size_t i = 0; i < *num_procs; i++) {
-            if (pins_group_is_in_proc_with_name(model, j, procs[i].name)) {
+            if (pins_group_is_in_proc_with_name(model, j, procs[i].name, procs[i].pc_slot)) {
                 if (found) Warning (info, "Group %d doubly assigned to an ample-set process %s (chosing first encountered)", j, procs[i].name);
                 ci_add (procs[i].groups, j);
                 group2proc[j] = i;
