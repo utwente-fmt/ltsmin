@@ -45,4 +45,6 @@ extern bool        iterset_is_empty (iterset_t *is);
 
 extern ref_t       iterset_debug (const iterset_t *is);
 
+extern int         iterset_size (const iterset_t *is);
+
 #endif /* ITERSET_H */

@@ -87,7 +87,7 @@ iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret)
     a = state;
 
     while ( 1 ) {
-        HREassert ( a != 0 ); // TODO: This has triggered once, but could not replicate
+        //HREassert ( a != 0 ); // TODO: This has triggered once, but could not replicate
 
         // if we exit this loop, a.status == TOMB or we returned a LIVE state
         while ( 1 ) {
@@ -102,12 +102,16 @@ iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret)
             // otherwise wait until a is TOMB (it might be LOCK now)
             else if (a_status == LIST_TOMB)
                 break;
+
+            // wait and try again if a_status == LIST_LOCK
         }
+
+        //HREassert ( a_status == LIST_TOMB );
 
         // find next state: a --> b
         b = atomic_read (&is->array[a].list_next);
 
-        HREassert ( b != 0 );
+        //HREassert ( b != 0 );
 
         // if a is TOMB and only element, then the set is empty
         if (a == b) {
@@ -130,10 +134,18 @@ iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret)
                 break;
         }
 
+        //HREassert ( a_status == LIST_TOMB );
+        //HREassert ( b_status == LIST_TOMB );
+
         // a --> b --> c
         c = atomic_read (&is->array[b].list_next);
 
-        HREassert ( c != 0 );
+        if (c == a) {
+            atomic_write (&is->current, 0);
+            return IS_PICK_DEAD;
+        }
+
+        //HREassert ( c != 0 );
 
         // make the list shorter (a --> c)
         atomic_write (&is->array[a].list_next, c);
@@ -152,14 +164,18 @@ iterset_pick_state (iterset_t *is, ref_t *ret)
     if (state == 0) {
         return IS_PICK_DEAD;
     }
+    
+    is_pick_e result = iterset_pick_state_from(is, state, ret);
 
-    // update current to point to the next one (might not be optimal)
-    ref_t next = atomic_read (&is->array[state].list_next);
-    if (next != 0) {
-        atomic_write (&is->current, next);
+    if (result == IS_PICK_SUCCESS) {
+        // update current to point to the next one (might not be optimal)
+        ref_t next = atomic_read (&is->array[*ret].list_next);
+        if (next != 0) {
+            cas(&is->current, state, next);
+        }
     }
     
-    return iterset_pick_state_from(is, state, ret);
+    return result;
 }
 
 
@@ -176,15 +192,18 @@ iterset_add_state_at (iterset_t *is, ref_t state, ref_t pos)
         while (status == LIST_LOCK) {
             status =  atomic_read (&is->array[state].list_status);
         }
-        next = atomic_read (&is->array[state].list_next);
-        HREassert (next != 0);
+        // status might be LIVE or TOMB now
+        //next = atomic_read (&is->array[state].list_next);
+        //HREassert (next != 0);
         return false; // already added
     }
+
+    //HREassert(status == LIST_LIVE);
 
     // Otherwise: Lock state
     if (!cas(&is->array[state].list_status, LIST_LIVE, LIST_LOCK)) {
         // CAS failed, we should start over
-        return iterset_add_state (is, state);
+        return iterset_add_state_at (is, state, pos);
     }
 
     // the state is locked now
@@ -204,6 +223,12 @@ iterset_add_state_at (iterset_t *is, ref_t state, ref_t pos)
     // first state to be added ([state]->[state])
     if (pos == 0) { // current = 0
 
+        ref_t current = atomic_read (&is->current);
+        if (current != 0) {
+            iterset_unlock_list (is, state);
+            return iterset_add_state_at (is, state, current);
+        }
+
         // status = LIST_LIVE
         atomic_write (&is->array[state].list_next, state);
         if (cas(&is->current, 0, state)) {
@@ -213,7 +238,7 @@ iterset_add_state_at (iterset_t *is, ref_t state, ref_t pos)
 
         // someone else has updated is->current: normal procedure
         pos = atomic_read (&is->current);
-        HREassert (pos != 0);
+        //HREassert (pos != 0);
     }
 
     // Try to lock pos (we want [pos_l]->[state]->[pos_l->next])
@@ -341,7 +366,29 @@ iterset_debug_list_aux (const iterset_t *is, ref_t start, ref_t state, int depth
 ref_t
 iterset_debug (const iterset_t *is)
 {
+    Warning (info, "Debugging");
     ref_t current = atomic_read (&is->current);
     iterset_debug_list_aux (is, current, current, 0);
     return current;
+}
+
+
+int
+iterset_size (const iterset_t *is)
+{
+    ref_t current = atomic_read (&is->current);
+    if (current == 0) {
+        return 0;
+    }
+    else {
+        int counter = 1;
+        ref_t state = current;
+        ref_t next = 0;
+        while (next != current) {
+            next = atomic_read (&is->array[state].list_next);
+            state = next;
+            counter ++;
+        }
+        return counter;
+    }
 }
