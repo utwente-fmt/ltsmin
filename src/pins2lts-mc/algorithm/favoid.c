@@ -571,7 +571,6 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
     //Warning (info, "Starting initial search from %zu", ctx->initial->ref);
     if (favoid_check_pair_aux (ctx, run, init_state)) return true;
 
-
     // check all states that we have avoided
     while (!iterset_is_empty (shared->pairs[pair_struct_id].is)) {
 
@@ -584,6 +583,7 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
 
         if (uf_is_dead (shared->pairs[pair_struct_id].uf, new_init+1)) {
             //Warning (info, "F state %zu is dead, disregard", new_init);
+            iterset_remove_state (shared->pairs[pair_struct_id].is, new_init+1);
             continue;
         }
 
@@ -613,21 +613,22 @@ favoid_run  (run_t *run, wctx_t *ctx)
     ProfilerStart ("favoid.perf");
 #endif
 
-    alg_local_t            *loc = ctx->local;
+    alg_local_t            *loc         = ctx->local;
     raw_data_t              state_data;
-    favoid_shared_t        *shared    = (favoid_shared_t*) ctx->run->shared;
+    favoid_shared_t        *shared      = (favoid_shared_t*) ctx->run->shared;
 
 
     int number_of_pairs = GBgetRabinNPairs();
 
 #ifdef SEQ_PAIRS
-    int start_pair = 0;
+    int                 start_pair = 0;
 #else 
     int start_pair = ctx->id % number_of_pairs;
 #endif
 
     for (int i=0; i<number_of_pairs; i++) {
 
+        Warning(info, "Starting pair %d", i);
         if (run_is_stopped(run)) return;
 
         // set the current pair id
@@ -639,14 +640,27 @@ favoid_run  (run_t *run, wctx_t *ctx)
             report_counterexample (ctx);
         }
 
+
         if (i+1 < number_of_pairs) {
+
             // reset the local stacks
             dfs_stack_clear (loc->search_stack);
             dfs_stack_clear (loc->roots_stack);
             
 #ifdef SEQ_PAIRS
-            uf_clear(shared->pairs[0].uf);
-            iterset_clear(shared->pairs[0].is);
+
+            // barrier
+            HREbarrier(HREglobal());
+            
+            if (ctx->id == 0) {
+                Warning(info, "Empty product in pair %d", i);
+                uf_clear(shared->pairs[0].uf);
+                iterset_clear(shared->pairs[0].is);
+            }
+
+            // barrier
+            HREbarrier(HREglobal());
+
 #endif
         }
     }
