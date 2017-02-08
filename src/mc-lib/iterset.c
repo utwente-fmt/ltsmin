@@ -100,13 +100,13 @@ iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret)
             }
 
             // otherwise wait until a is TOMB (it might be LOCK now)
-            else if (a_status == LIST_TOMB)
+            else // if (a_status == LIST_TOMB)
                 break;
 
             // wait and try again if a_status == LIST_LOCK
         }
 
-        //HREassert ( a_status == LIST_TOMB );
+        // a_status = {LIST_TOMB, LIST_LOCK}
 
         // find next state: a --> b
         b = atomic_read (&is->array[a].list_next);
@@ -114,7 +114,7 @@ iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret)
         //HREassert ( b != 0 );
 
         // if a is TOMB and only element, then the set is empty
-        if (a == b) {
+        if (a_status == LIST_TOMB && a == b) {
             atomic_write (&is->current, 0);
             return IS_PICK_DEAD;
         }
@@ -130,17 +130,17 @@ iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret)
             }
 
             // otherwise wait until b is TOMB (it might be LOCK now)
-            else if (b_status == LIST_TOMB)
+            else // if (b_status == LIST_TOMB)
                 break;
         }
 
-        //HREassert ( a_status == LIST_TOMB );
-        //HREassert ( b_status == LIST_TOMB );
+        // a_status = {LIST_TOMB, LIST_LOCK}
+        // b_status = {LIST_TOMB, LIST_LOCK}
 
         // a --> b --> c
         c = atomic_read (&is->array[b].list_next);
 
-        if (c == a) {
+        if (c == a && a_status == LIST_TOMB && b_status == LIST_TOMB) {
             atomic_write (&is->current, 0);
             return IS_PICK_DEAD;
         }
@@ -148,7 +148,8 @@ iterset_pick_state_from (iterset_t *is, ref_t state, ref_t *ret)
         //HREassert ( c != 0 );
 
         // make the list shorter (a --> c)
-        atomic_write (&is->array[a].list_next, c);
+        if (a_status == LIST_TOMB && b_status == LIST_TOMB)
+            atomic_write (&is->array[a].list_next, c);
 
         a = c; // continue searching from c
     }
