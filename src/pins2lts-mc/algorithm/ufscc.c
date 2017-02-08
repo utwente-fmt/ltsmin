@@ -16,7 +16,7 @@
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/fast_set.h>
 
-#ifdef CHECKER_TIMEOUT_TIME;
+#ifdef CHECKER_TIMEOUT_TIME
 #include <time.h>
 #endif
 
@@ -47,7 +47,7 @@ struct alg_local_s {
     dfs_stack_t         search_stack;         // search stack (D)
     dfs_stack_t         roots_stack;          // roots stack (R)
     uint32_t            acc_mark;             // acceptance mark
-#ifdef CHECKER_TIMEOUT_TIME;
+#ifdef CHECKER_TIMEOUT_TIME
     unsigned long       time_stop;            // when to report a timeout
 #endif
     counter_t           cnt;
@@ -120,7 +120,7 @@ ufscc_local_init (run_t *run, wctx_t *ctx)
     ctx->local->cnt.claimsuccess            = 0;
     ctx->local->cnt.cum_max_stack           = 0;
 
-#ifdef CHECKER_TIMEOUT_TIME;
+#ifdef CHECKER_TIMEOUT_TIME
     ctx->local->time_stop                   = (unsigned long)time(NULL) + CHECKER_TIMEOUT_TIME;
 #endif
 
@@ -211,7 +211,7 @@ explore_state (wctx_t *ctx)
 
 #ifdef CHECKER_TIMEOUT_TIME
     if (loc->cnt.unique_states % 1000 == 0) {
-        if (unsigned long)time(NULL) > loc->time_stop) {
+        if ((unsigned long)time(NULL) > loc->time_stop) {
             if (ctx->id == 0)
                 Warning(info, "ERROR: Timeout");
             run_stop(ctx->run);

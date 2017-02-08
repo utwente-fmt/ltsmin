@@ -17,7 +17,7 @@
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/fast_set.h>
 
-#ifdef CHECKER_TIMEOUT_TIME;
+#ifdef CHECKER_TIMEOUT_TIME
 #include <time.h>
 #endif
 
@@ -53,7 +53,7 @@ struct alg_local_s {
     uint32_t            rabin_pair_f;         // F fragment of rabin pair
     uint32_t            rabin_pair_i;         // I fragment of rabin pair
     ref_t               add_state_idx;        // index in the iterset to add new states
-#ifdef CHECKER_TIMEOUT_TIME;
+#ifdef CHECKER_TIMEOUT_TIME
     unsigned long       time_stop;            // when to report a timeout
 #endif
     counter_t          *cnt;                  // local counter per rabin pair
@@ -125,7 +125,7 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->rabin_pair_i                = 0;
     ctx->local->add_state_idx               = 0;
 
-#ifdef CHECKER_TIMEOUT_TIME;
+#ifdef CHECKER_TIMEOUT_TIME
     ctx->local->time_stop                   = (unsigned long)time(NULL) + CHECKER_TIMEOUT_TIME;
 #endif
 
@@ -242,7 +242,7 @@ explore_state (wctx_t *ctx)
 
 #ifdef CHECKER_TIMEOUT_TIME
     if (loc->cnt[pair_id].unique_states % 1000 == 0) {
-        if (unsigned long)time(NULL) > loc->time_stop) {
+        if ((unsigned long)time(NULL) > loc->time_stop) {
             if (ctx->id == 0)
                 Warning(info, "ERROR: Timeout");
             run_stop(ctx->run);
