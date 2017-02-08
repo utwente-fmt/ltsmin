@@ -17,11 +17,11 @@
 #include <pins2lts-mc/parallel/worker.h>
 #include <util-lib/fast_set.h>
 
+#ifdef CHECKER_TIMEOUT_TIME;
 #include <time.h>
+#endif
 
-#define TIMEOUT_TIME 600
-
-#define SEQ_PAIRS
+//#define CHECKER_TIMEOUT_TIME 600
 
 #if HAVE_PROFILER
 #include <gperftools/profiler.h>
@@ -53,7 +53,9 @@ struct alg_local_s {
     uint32_t            rabin_pair_f;         // F fragment of rabin pair
     uint32_t            rabin_pair_i;         // I fragment of rabin pair
     ref_t               add_state_idx;        // index in the iterset to add new states
+#ifdef CHECKER_TIMEOUT_TIME;
     unsigned long       time_stop;            // when to report a timeout
+#endif
     counter_t          *cnt;                  // local counter per rabin pair
     state_info_t       *target;               // auxiliary state
     state_info_t       *root;                 // auxiliary state
@@ -123,8 +125,9 @@ favoid_local_init (run_t *run, wctx_t *ctx)
     ctx->local->rabin_pair_i                = 0;
     ctx->local->add_state_idx               = 0;
 
-
-    ctx->local->time_stop                   = (unsigned long)time(NULL) + TIMEOUT_TIME;
+#ifdef CHECKER_TIMEOUT_TIME;
+    ctx->local->time_stop                   = (unsigned long)time(NULL) + CHECKER_TIMEOUT_TIME;
+#endif
 
     int n_pairs = GBgetRabinNPairs();
     ctx->local->cnt    = RTmalloc (sizeof (counter_t) * n_pairs );
@@ -167,11 +170,9 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     uint32_t            acc_set   = 0;
     int                 pair_id   = loc->rabin_pair_id;
 
-#ifdef SEQ_PAIRS
-    int pair_struct_id = 0;
-#else 
     int pair_struct_id = pair_id;
-#endif
+    if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ)
+        pair_struct_id = 0;
 
     // acceptance
     if (ti->labels != NULL) {
@@ -238,11 +239,13 @@ explore_state (wctx_t *ctx)
     raw_data_t          stack_loc;
     size_t              trans;
 
+#ifdef CHECKER_TIMEOUT_TIME;
     if ((unsigned long)time(NULL) > loc->time_stop) {
-        Warning(info, "ERROR: Timeout");
+        if (ctx->id == 0)
+            Warning(info, "ERROR: Timeout");
         run_stop(ctx->run);
     }
-
+#endif
 
     // push the state on the roots stack
     state_info_set (loc->root,  ctx->state->ref, LM_NULL_LATTICE);
@@ -273,11 +276,9 @@ favoid_init  (wctx_t *ctx, ref_t init_state)
     raw_data_t          state_data;
     int                 pair_id   = loc->rabin_pair_id;
 
-#ifdef SEQ_PAIRS
-    int pair_struct_id = 0;
-#else 
     int pair_struct_id = pair_id;
-#endif
+    if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ)
+        pair_struct_id = 0;
 
     // set initial state
     state_info_set (loc->target, init_state, LM_NULL_LATTICE);
@@ -312,11 +313,9 @@ successor (wctx_t *ctx)
     size_t              trans;
     int                 pair_id   = loc->rabin_pair_id;
 
-#ifdef SEQ_PAIRS
-    int pair_struct_id = 0;
-#else 
     int pair_struct_id = pair_id;
-#endif
+    if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ)
+        pair_struct_id = 0;
 
     // get the parent state from the search_stack
     state_data = dfs_stack_peek_top (loc->search_stack, 1);
@@ -435,11 +434,9 @@ backtrack (wctx_t *ctx)
     raw_data_t          root_data;
     int                 pair_id   = loc->rabin_pair_id;
 
-#ifdef SEQ_PAIRS
-    int pair_struct_id = 0;
-#else 
     int pair_struct_id = pair_id;
-#endif
+    if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ)
+        pair_struct_id = 0;
 
     // leave the stackframe
     dfs_stack_leave (loc->search_stack);
@@ -559,11 +556,10 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
     favoid_shared_t        *shared    = (favoid_shared_t*) ctx->run->shared;
     ref_t                   init_state = ctx->initial->ref;
 
-#ifdef SEQ_PAIRS
-    int pair_struct_id = 0;
-#else 
+
     int pair_struct_id = loc->rabin_pair_id;
-#endif
+    if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ)
+        pair_struct_id = 0;
 
     //Warning(info, "checking pair %d", loc->rabin_pair_id);
 
@@ -620,19 +616,19 @@ favoid_run  (run_t *run, wctx_t *ctx)
 
     int number_of_pairs = GBgetRabinNPairs();
 
-#ifdef SEQ_PAIRS
-    int                 start_pair = 0;
-#else 
+    
     int start_pair = ctx->id % number_of_pairs;
-#endif
+    if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ)
+        start_pair = 0;
 
     for (int i=0; i<number_of_pairs; i++) {
 
-#ifdef SEQ_PAIRS
-        if (ctx->id == 0) {
-            Warning(info, "Starting pair %d", i);
+        if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ) {
+            if (ctx->id == 0) {
+                Warning(info, "Starting pair %d", i);
+            }
         }
-#endif
+
         if (run_is_stopped(run)) return;
 
         // set the current pair id
@@ -651,21 +647,20 @@ favoid_run  (run_t *run, wctx_t *ctx)
             dfs_stack_clear (loc->search_stack);
             dfs_stack_clear (loc->roots_stack);
             
-#ifdef SEQ_PAIRS
+            if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ) {
+                    
+                // barrier
+                HREbarrier(HREglobal());
+                
+                if (ctx->id == 0) {
+                    Warning(info, "Empty product in pair %d", i);
+                    uf_clear(shared->pairs[0].uf);
+                    iterset_clear(shared->pairs[0].is);
+                }
 
-            // barrier
-            HREbarrier(HREglobal());
-            
-            if (ctx->id == 0) {
-                Warning(info, "Empty product in pair %d", i);
-                uf_clear(shared->pairs[0].uf);
-                iterset_clear(shared->pairs[0].is);
+                // barrier
+                HREbarrier(HREglobal());
             }
-
-            // barrier
-            HREbarrier(HREglobal());
-
-#endif
         }
     }
 
@@ -773,11 +768,9 @@ favoid_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
     alg_local_t        *loc       = ctx->local;
     int                 pair_id   = loc->rabin_pair_id;
 
-#ifdef SEQ_PAIRS
-    int pair_struct_id = 0;
-#else 
     int pair_struct_id = pair_id;
-#endif
+    if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ)
+        pair_struct_id = 0;
 
     return uf_owner (shared->pairs[pair_struct_id].uf, ref + 1, ctx->id);
     (void) seen; (void) ti; (void) pair_id;
@@ -807,19 +800,18 @@ favoid_shared_init   (run_t *run)
     run->shared   = RTmallocZero (sizeof (favoid_shared_t));
     shared        = (favoid_shared_t*) run->shared;
 
-#ifdef SEQ_PAIRS
-    shared->pairs = RTmalloc (sizeof (favoid_shared_pair_t));
-    shared->pairs[0].uf = uf_create();
-    shared->pairs[0].is = iterset_create();
+    if (PINS_RABIN_PAIR_ORDER == PINS_RABIN_PAIR_SEQ) {
+        shared->pairs = RTmalloc (sizeof (favoid_shared_pair_t));
+        shared->pairs[0].uf = uf_create();
+        shared->pairs[0].is = iterset_create();
+    } else {
+        shared->pairs = RTmalloc (sizeof (favoid_shared_pair_t) * n_pairs);
 
-#else
-    shared->pairs = RTmalloc (sizeof (favoid_shared_pair_t) * n_pairs);
-
-    for (int i=0; i<n_pairs; i++) {
-        shared->pairs[i].uf = uf_create();
-        shared->pairs[i].is = iterset_create();
+        for (int i=0; i<n_pairs; i++) {
+            shared->pairs[i].uf = uf_create();
+            shared->pairs[i].is = iterset_create();
+        }
     }
-#endif
 
     (void) n_pairs;
 }

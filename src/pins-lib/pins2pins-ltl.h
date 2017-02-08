@@ -78,6 +78,20 @@ typedef enum {
 extern pins_rabin_type_t PINS_RABIN_TYPE;
 
 /**
+ * \brief option indicating whether rabin pairs are checked 
+ * in parallel or sequentially.
+ */
+typedef enum {
+    PINS_RABIN_PAIR_SEQ,
+    PINS_RABIN_PAIR_PAR,
+} pins_rabin_pair_order_t;
+
+/**
+ * \brief rabin pair checking order
+ */
+extern pins_rabin_pair_order_t PINS_RABIN_PAIR_ORDER;
+
+/**
 \brief Add LTL layer on top all other pins layers
 */
 extern model_t GBaddLTL(model_t model);

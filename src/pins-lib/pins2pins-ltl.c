@@ -33,9 +33,11 @@ rabin_t                *RABIN_PAIRS = NULL;
 static char            *ltl_file = NULL;
 static const char      *ltl_semantics_name = "none";
 static const char      *buchi_type = "spotba";
+static const char      *rabin_pair_order = "seq";
 pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
 pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
 pins_rabin_type_t       PINS_RABIN_TYPE = PINS_RABIN_TYPE_LTL3HOA;
+pins_rabin_pair_order_t PINS_RABIN_PAIR_ORDER = PINS_RABIN_PAIR_SEQ;
 
 static si_map_entry db_ltl_semantics[]={
     {"none",    PINS_LTL_NONE},
@@ -63,6 +65,12 @@ static si_map_entry db_rabin_type[]={
     {"ltl3hoa", PINS_RABIN_TYPE_LTL3HOA},
     {"genrabin",PINS_RABIN_TYPE_GEN},
     {"readrabin",PINS_RABIN_TYPE_READ},
+    {NULL, 0}
+};
+
+static si_map_entry db_rabin_pair_order[]={
+    {"seq", PINS_RABIN_PAIR_SEQ},
+    {"par", PINS_RABIN_PAIR_PAR},
     {NULL, 0}
 };
 
@@ -123,6 +131,10 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
             if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_RABIN) {
                 int r = linear_search (db_rabin_type, buchi_type);
                 PINS_RABIN_TYPE = r;
+
+                Print (infoLong, "Rabin pair order: %s", rabin_pair_order);
+                int ro = linear_search (db_rabin_pair_order, rabin_pair_order);
+                PINS_RABIN_PAIR_ORDER = ro;
             }
         }
         return;
@@ -140,6 +152,8 @@ struct poptOption ltl_options[] = {
      "LTL semantics", "<spin|textbook|ltsmin> (default: \"spin\")"},
     {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
      "Buchi automaton type", "<ba|tgba|spotba|rabinizer3|ltl3dra|ltl3hoa|genrabin|readrabin>"},
+    {"rabin-order", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &rabin_pair_order, 0,
+     "Rabin pair order", "<seq|par>"},
     POPT_TABLEEND
 };
 
