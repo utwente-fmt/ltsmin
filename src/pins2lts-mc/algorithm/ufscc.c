@@ -209,11 +209,13 @@ explore_state (wctx_t *ctx)
     raw_data_t          stack_loc;
     size_t              trans;
 
-#ifdef CHECKER_TIMEOUT_TIME;
-    if ((unsigned long)time(NULL) > loc->time_stop) {
-        if (ctx->id == 0)
-            Warning(info, "ERROR: Timeout");
-        run_stop(ctx->run);
+#ifdef CHECKER_TIMEOUT_TIME
+    if (loc->cnt.unique_states % 1000 == 0) {
+        if (unsigned long)time(NULL) > loc->time_stop) {
+            if (ctx->id == 0)
+                Warning(info, "ERROR: Timeout");
+            run_stop(ctx->run);
+        }
     }
 #endif
 

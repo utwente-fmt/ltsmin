@@ -238,12 +238,15 @@ explore_state (wctx_t *ctx)
     alg_local_t        *loc       = ctx->local;
     raw_data_t          stack_loc;
     size_t              trans;
+    int                 pair_id   = loc->rabin_pair_id;
 
-#ifdef CHECKER_TIMEOUT_TIME;
-    if ((unsigned long)time(NULL) > loc->time_stop) {
-        if (ctx->id == 0)
-            Warning(info, "ERROR: Timeout");
-        run_stop(ctx->run);
+#ifdef CHECKER_TIMEOUT_TIME
+    if (loc->cnt[pair_id].unique_states % 1000 == 0) {
+        if (unsigned long)time(NULL) > loc->time_stop) {
+            if (ctx->id == 0)
+                Warning(info, "ERROR: Timeout");
+            run_stop(ctx->run);
+        }
     }
 #endif
 
