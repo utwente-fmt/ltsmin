@@ -68,11 +68,10 @@ del_enabled (por_context* ctx, int u)
 }
 
 static void
-deletion_setup (model_t model, por_context* ctx, int* src, bool reset)
+deletion_setup (por_context* ctx, bool reset)
 {
     del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
     bms_t           *del = delctx->del;
-    por_init_transitions (model, ctx, src);
     if (ctx->enabled_list->count == 0) return;
 
     // use -1 for deactivated NESs
@@ -152,7 +151,7 @@ deletion_delete (por_context* ctx)
                 }
             }
         }
-        if (bms_count(del, DEL_K) == 0) return true;
+        if (!USE_DEL && bms_count(del, DEL_K) == 0) return true;
 
         // Second, the enabled transitions x that are still stubborn and
         // belong to DNB_u need to be removed from other stubborn and put to Z.
@@ -175,7 +174,7 @@ deletion_delete (por_context* ctx)
                     if (bms_rem(del, DEL_N, x)) ci_add (delctx->Nprime, x);
                     if (bms_rem(del, DEL_K, x)) {
                         ci_add (delctx->Kprime, x);
-                        if (bms_count(del, DEL_K) == 0) return true;
+                        if (!USE_DEL && bms_count(del, DEL_K) == 0) return true;
                         delctx->invisible_enabled -= !is_visible(ctx, x);
                         if (delctx->has_invisible && delctx->invisible_enabled == 0) return true;
                     }
@@ -215,7 +214,7 @@ deletion_delete (por_context* ctx)
         }
         if (inR) return true; // revert
     }
-    return bms_count(del, DEL_K) == 0;
+    return USE_DEL || bms_count(del, DEL_K) == 0;
 }
 
 static inline void
@@ -303,8 +302,7 @@ del_all_stubborn (por_context *ctx, ci_list *list)
 }
 
 static inline int
-deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
-               void *uctx)
+deletion_emit (por_context *ctx, int *src, TransitionCB cb, void *uctx)
 {
     del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
     bms_t              *del = delctx->del;
@@ -336,7 +334,7 @@ deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
                 int x = del->lists[DEL_V]->data[i];
                 del->set[x] |= 1 << DEL_R;
             }
-            deletion_setup (model, ctx, src, false);
+            deletion_setup (ctx, false);
             deletion_analyze (ctx, ctx->enabled_list);
 
             emitted += deletion_emit_new (ctx, &provctx, src);
@@ -346,11 +344,10 @@ deletion_emit (model_t model, por_context *ctx, int *src, TransitionCB cb,
     return emitted;
 }
 
-int
-del_por_all (model_t self, int *src, TransitionCB cb, void *user_context)
+void
+del_por (por_context *ctx)
 {
-    por_context* ctx = ((por_context*)GBgetContext(self));
-    deletion_setup (self, ctx, src, true);
+    deletion_setup (ctx, true);
     if (bms_count(ctx->exclude, 0) > 0) {
         deletion_analyze (ctx, bms_list(ctx->exclude, 0));
     }
@@ -368,9 +365,24 @@ del_por_all (model_t self, int *src, TransitionCB cb, void *user_context)
     } else {
         deletion_analyze (ctx, ctx->enabled_list);
     }
-    return deletion_emit (self, ctx, src, cb, user_context);
 }
 
+int
+del_por_all (model_t self, int *src, TransitionCB cb, void *user_context)
+{
+    por_context *ctx = ((por_context*)GBgetContext(self));
+    por_init_transitions (self, ctx, src);
+    del_por (ctx);
+    return deletion_emit (ctx, src, cb, user_context);
+}
+
+bool
+del_is_stubborn_key (por_context *ctx, int group)
+{
+    del_ctx_t *del_ctx = (del_ctx_t *)ctx->alg;
+    bms_t* del = del_ctx->del;
+    return bms_has(del, DEL_K, group);
+}
 
 bool
 del_is_stubborn (por_context *ctx, int group)

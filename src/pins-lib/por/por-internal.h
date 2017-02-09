@@ -17,6 +17,7 @@ extern int NO_V;
 extern int PREFER_NDS;
 extern int CHECK_SEEN;
 extern int NO_MC;
+extern int USE_DEL;
 
 /**
  * Beam search algorithm for persistent sets

@@ -1,6 +1,8 @@
 #ifndef LIPTON_POR
 #define LIPTON_POR
 
+
+#include <stdbool.h>
 #include <stdlib.h>
 #include <pins-lib/por/pins2pins-por.h>
 
