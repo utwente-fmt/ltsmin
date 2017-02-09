@@ -30,6 +30,7 @@ int NO_MCNDS = 0;
 int PREFER_NDS = 0;
 int CHECK_SEEN = 0;
 int NO_MC = 0;
+int USE_DEL = 0;
 
 static int NO_COMMUTES = 0;
 static int NO_DNA = 0;
@@ -95,6 +96,8 @@ por_popt (poptContext con, enum poptCallbackReason reason,
             }
             if ((alg = num) != POR_NONE)
                 PINS_POR = PINS_CORRECTNESS_CHECK ? PINS_POR_CHECK : PINS_POR_ON;
+            if (alg == POR_LIPTON)
+                POR_WEAK = 1;
             return;
         } else if (opt->shortName == -1) {
             if (arg == NULL) arg = "";
@@ -129,6 +132,7 @@ struct poptOption por_options[]={
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
     { "seen" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &CHECK_SEEN , 1 , "Prefer visited successor states" , NULL },
+    { "del" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &USE_DEL , 1 , "Use deletion in Lipton" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC" , NULL },
     { "no-mcnds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MCNDS , 1 , "Do not create NESs from MC and NDS" , NULL },
