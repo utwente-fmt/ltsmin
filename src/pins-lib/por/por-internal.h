@@ -79,6 +79,7 @@ struct por_ctx {
 
     int             *group_visibility; // visible groups
     int             *label_visibility; // visible labels
+    bms_t           *visible_labels;
 
     /**
      * The global data used for the search

@@ -166,17 +166,16 @@ init_visible_labels (por_context* ctx)
     }
 
     int c = 0;
-    for (int i = 0; i < ctx->nlabels; i++) {
-        if (!ctx->label_visibility[i]) continue;
-
-        for (int j = 0; j < ctx->label_nes[i]->count; j++) {
-            int group = ctx->label_nes[i]->data[j];
+    ci_list            *vis = bms_list (ctx->visible_labels, 0);
+    for (int *l = ci_begin(vis); l != ci_end(vis); l++) {
+        for (int j = 0; j < ctx->label_nes[*l]->count; j++) {
+            int             group = ctx->label_nes[*l]->data[j];
             bms_push_new (ctx->visible, VISIBLE_NES, group);
             bms_push_new (ctx->visible, VISIBLE, group);
             bms_push_new (ctx->visible_nes, c, group);
         }
-        for (int j = 0; j < ctx->label_nds[i]->count; j++) {
-            int group = ctx->label_nds[i]->data[j];
+        for (int j = 0; j < ctx->label_nds[*l]->count; j++) {
+            int group = ctx->label_nds[*l]->data[j];
             bms_push_new (ctx->visible, VISIBLE_NDS, group);
             bms_push_new (ctx->visible, VISIBLE, group);
             bms_push_new (ctx->visible_nds, c, group);
@@ -879,6 +878,11 @@ PORwrapper (model_t model)
 
     ctx->include = bms_create (ctx->ngroups, 1);
     ctx->exclude = bms_create (ctx->ngroups, 1);
+
+    ctx->visible_labels = bms_create (ctx->nlabels, 1);
+    for (int i = 0; i < ctx->nlabels; i++) {
+        bms_push_if (ctx->visible_labels, 0, i, ctx->label_visibility[i]);
+    }
 
     return pormodel;
 }
