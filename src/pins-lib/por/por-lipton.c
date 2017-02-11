@@ -68,6 +68,15 @@ struct lipton_ctx_s {
 static inline int
 lipton_commutes (lipton_ctx_t *lipton, int i, ci_list **dir)
 {
+    if (SAFETY) {
+        por_context        *por = lipton->por;
+        ci_list            *vis = bms_list (por->visible_labels, 0);
+        matrix_t           *neds = dir == lipton->p_rght_dep ? &por->label_nds_matrix
+                                                             : &por->label_nes_matrix;
+        for (int *l = ci_begin(vis); l != ci_end(vis); l++) {
+            if (dm_is_set(neds, *l, i)) return false;
+        }
+    }
     if (USE_DEL) {
         return dir == lipton->p_rght_dep ? lipton->commutes_right : lipton->commutes_left;
     } else {
@@ -296,6 +305,7 @@ lipton_create (por_context *por, model_t model)
     HRE_ASSERT (GROUP_BITS + PROC_BITS + 1 == 32);
     HREassert (por->ngroups < (1LL << GROUP_BITS) - 1, // minus GROUP_NONE
                "Lipton reduction does not support more than 2^%d-1 groups", GROUP_BITS);
+    HREassert (PINS_LTL == PINS_LTL_NONE, "LTL currently not supported in Lipton reduction.");
 
     lipton_ctx_t *lipton = RTmalloc (sizeof(lipton_ctx_t));
 
