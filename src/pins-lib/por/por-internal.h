@@ -130,7 +130,9 @@ extern bool por_is_stubborn (por_context *ctx, int group);
 
 extern void por_init_transitions (model_t model, por_context *ctx, int *src);
 
+extern bool por_seen_group  (por_context *ctx, int *src, int group, int src_changed);
 extern void por_seen_groups (por_context *ctx, int *src, int src_changed);
+extern bool por_seen (int *dst, int group, bool src_changed);
 
 // number of necessary sets (halves if MC is absent, because no NDSs then)
 static inline int
