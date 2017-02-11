@@ -54,11 +54,13 @@ struct lipton_ctx_s {
     ci_list           **not_left_accords;   // to swap out in POR layer, controlling deletion algorithm
     ci_list           **not_left_accordsn;  // to swap out in POR layer, controlling deletion algorithm
 
-    dfs_stack_t         level;
+    dfs_stack_t         queue[2];
+    dfs_stack_t         commit;
     TransitionCB        ucb;
     void               *uctx;
     stack_data_t       *src;
     size_t              emitted;
+    size_t              depth;
     bool                commutes_left;
     bool                commutes_right;
 };
@@ -75,10 +77,11 @@ lipton_commutes (lipton_ctx_t *lipton, int i, ci_list **dir)
 }
 
 static inline stack_data_t *
-lipton_stack (lipton_ctx_t *lipton, int *dst, int proc, phase_e phase, int group)
+lipton_stack (lipton_ctx_t *lipton, dfs_stack_t q, int *dst, int proc,
+              phase_e phase, int group)
 {
     HREassert (group == GROUP_NONE || group < lipton->por->ngroups);
-    stack_data_t       *data = (stack_data_t*) dfs_stack_push (lipton->level, NULL);
+    stack_data_t       *data = (stack_data_t*) dfs_stack_push (q, NULL);
     memcpy (&data->state, dst, sizeof(int[lipton->por->nslots]));
     data->group = group;
     data->proc = proc;
@@ -95,14 +98,14 @@ lipton_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     int                 proc = lipton->src->proc;
     if (phase == PRE__COMMIT && !lipton_commutes(lipton, ti->group, lipton->p_rght_dep))
         phase = POST_COMMIT;
-    lipton_stack (lipton, dst, proc, phase, ti->group);
+    lipton_stack (lipton, lipton->queue[1], dst, proc, phase, ti->group);
     (void) cpy;
 }
 
 void
 lipton_emit_one (lipton_ctx_t *lipton, int *dst, int group)
 {
-    group = dfs_stack_nframes(lipton->level) == 1 ? group : lipton->lipton_group;
+    group = lipton->depth == 1 ? group : lipton->lipton_group;
     transition_info_t       ti = GB_TI (NULL, group);
     ti.por_proviso = 1; // force proviso true
     lipton->ucb (lipton->uctx, &ti, dst, NULL);
@@ -110,11 +113,12 @@ lipton_emit_one (lipton_ctx_t *lipton, int *dst, int group)
 }
 
 static void
-lipton_init_proc_enabled (lipton_ctx_t *lipton, int *src, process_t *proc, int g)
+lipton_init_proc_enabled (lipton_ctx_t *lipton, int *src, process_t *proc,
+                          int g_prev)
 {
     ci_clear (proc->en);
     model_t             model = lipton->por->parent;
-    ci_list            *cands = g == GROUP_NONE ? proc->groups : lipton->g_next[g];
+    ci_list            *cands = g_prev == GROUP_NONE ? proc->groups : lipton->g_next[g_prev];
     for (int *n = ci_begin(cands); n != ci_end(cands); n++) {
         guard_t            *gs = GBgetGuard (lipton->por->parent, *n);
         HREassert(gs != NULL, "GUARD RETURNED NULL %d", *n);
@@ -123,7 +127,7 @@ lipton_init_proc_enabled (lipton_ctx_t *lipton, int *src, process_t *proc, int g
             enabled &= GBgetStateLabelLong (model, gs->guard[j], src) != 0;
         ci_add_if (proc->en, *n, enabled);
     }
-    if (debug && g != GROUP_NONE) {
+    if (debug && g_prev != GROUP_NONE) {
         int                 count = 0;
         for (int *n = ci_begin(proc->groups); n != ci_end(proc->groups); n++) {
             guard_t            *gs = GBgetGuard (lipton->por->parent, *n);
@@ -138,26 +142,29 @@ lipton_init_proc_enabled (lipton_ctx_t *lipton, int *src, process_t *proc, int g
 }
 
 static bool
-lipton_calc_commutes (lipton_ctx_t *lipton, process_t *proc, bool left)
+lipton_calc_commutes (lipton_ctx_t *lipton, process_t *proc, ci_list **deps)
 {
     por_context        *por = lipton->por;
+
+    size_t c = 0;
+    for (int *g = ci_begin(proc->en); c == 0 && g != ci_end(proc->en); g++)
+        c += deps[*g]->count;
+    if (c == 0) return true;
+
     swap (por->alg, lipton->del);  // NO DELETION CALLS BEFORE
 
-    por->not_left_accordsn = left ? lipton->not_left_accordsn : lipton->not_left_accords;
+    por->not_left_accordsn = deps == lipton->p_left_dep ?
+                        lipton->not_left_accordsn : lipton->not_left_accords;
     del_por (por);
     int                 count1 = 0;
     for (int *g = ci_begin(por->enabled_list); !count1 && g != ci_end(por->enabled_list); g++) {
-        if (lipton->g2p[*g] != proc->id && del_is_stubborn(por, *g)) {
-            count1++;
-        }
+        count1 += lipton->g2p[*g] != proc->id && del_is_stubborn(por, *g);
     }
 
     int                 count2 = 0;
 //    if (left) {
 //        for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++) {
-//            if (!del_is_stubborn_key(por, *g)) {
-//                count2++;
-//            }
+//            count2 += !del_is_stubborn_key(por, *g);
 //        }
 //    }
 
@@ -171,8 +178,8 @@ lipton_calc_commutes (lipton_ctx_t *lipton, process_t *proc, bool left)
     return true;
 }
 
-static bool
-lipton_prepare_next (lipton_ctx_t *lipton, stack_data_t *state)
+static bool //FIX: return values (N, seen, new)
+lipton_gen_succs (lipton_ctx_t *lipton, stack_data_t *state)
 {
     por_context        *por = lipton->por;
     int                 group = state->group; // Keep variables off of the recursive stack
@@ -180,11 +187,18 @@ lipton_prepare_next (lipton_ctx_t *lipton, stack_data_t *state)
     int                *src = state->state;
     process_t          *proc = &lipton->procs[state->proc];
 
+    if (CHECK_SEEN && lipton->depth != 0 && por_seen(src, group, true)) {
+        lipton_emit_one (lipton, src, group);
+        return false;
+    }
+
+    int                 seen = fset_find (proc->fset, NULL, src, NULL, true);
+    HREassert (seen != FSET_FULL, "Table full");
+    if (seen) return false;
     lipton_init_proc_enabled (lipton, src, proc, group);
 
     if (proc->en->count == 0) {  // avoid re-emition of external start state:
-        if (dfs_stack_nframes(lipton->level) != 0)
-            lipton_emit_one (lipton, src, group);
+        if (lipton->depth != 0) lipton_emit_one (lipton, src, group);
         return false;
     }
 
@@ -195,9 +209,9 @@ lipton_prepare_next (lipton_ctx_t *lipton, stack_data_t *state)
         por_init_transitions (por->parent, por, src);
 
         // left commutativity
-        lipton->commutes_left = lipton_calc_commutes (lipton, proc, true);
+        lipton->commutes_left = lipton_calc_commutes (lipton, proc, lipton->p_left_dep);
         // right commutativity
-        lipton->commutes_right = lipton_calc_commutes (lipton, proc, false);
+        lipton->commutes_right = lipton_calc_commutes (lipton, proc, lipton->p_rght_dep);
 
         bms_clear_all (por->include);
     }
@@ -211,44 +225,47 @@ lipton_prepare_next (lipton_ctx_t *lipton, stack_data_t *state)
         }
     }
 
-    dfs_stack_enter (lipton->level);
-    for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++) {
+    lipton->src = state;
+    for (int *g = ci_begin (proc->en); g != ci_end (proc->en); g++) {
         GBgetTransitionsLong (por->parent, *g, src, lipton_cb, lipton);
     }
+
     return true;
 }
 
 static void
-lipton_next (lipton_ctx_t *lipton) // RECURSIVE
+lipton_bfs (lipton_ctx_t *lipton) // RECURSIVE
 {
-    if (!lipton_prepare_next(lipton, lipton->src)) return;
-
-    while (dfs_stack_frame_size(lipton->level)) {
-        lipton->src = (stack_data_t *) dfs_stack_top (lipton->level);
-        lipton_next (lipton);
-        dfs_stack_pop (lipton->level);
+    void               *state;
+    while (dfs_stack_size(lipton->queue[1])) {
+        swap (lipton->queue[0], lipton->queue[1]);
+        lipton->depth++;
+        while ((state = dfs_stack_pop (lipton->queue[0]))) {
+            lipton_gen_succs (lipton, (stack_data_t *) state);
+        }
     }
-
-    dfs_stack_leave (lipton->level);
-    lipton->src = (stack_data_t *) dfs_stack_top (lipton->level);
 }
 
 static inline int
 lipton_lipton (por_context *por, int *src)
 {
     lipton_ctx_t           *lipton = (lipton_ctx_t *) por->alg;
-    HREassert (dfs_stack_size(lipton->level) == 0);
+    HREassert (dfs_stack_size(lipton->queue[0]) == 0 &&
+               dfs_stack_size(lipton->queue[1]) == 0 &&
+               dfs_stack_size(lipton->commit  ) == 0);
+
+    stack_data_t           *state = lipton_stack (lipton, lipton->queue[0], src,
+                                                  0, PRE__COMMIT, GROUP_NONE);
+    lipton->depth = 0;
+    for (size_t i = 0; i < lipton->num_procs; i++) {
+        fset_clear (lipton->procs[i].fset);
+        state->proc = i;
+        lipton_gen_succs (lipton, state);
+    }
+    dfs_stack_pop (lipton->queue[0]);
 
     lipton->emitted = 0;
-    lipton->src = lipton_stack (lipton, src, 0, PRE__COMMIT, GROUP_NONE);
-
-    for (size_t i = 0; i < lipton->num_procs; i++) {
-        lipton->src->proc = i;
-        lipton_next (lipton);
-    }
-
-    dfs_stack_pop (lipton->level);
-
+    lipton_bfs (lipton);
     return lipton->emitted;
 }
 
@@ -285,10 +302,16 @@ lipton_create (por_context *por, model_t model)
     // find processes:
     lipton->g2p = RTmallocZero (sizeof(int[por->ngroups]));
     lipton->procs = identify_procs (por, &lipton->num_procs, lipton->g2p);
-    lipton->level = dfs_stack_create (por->nslots + 1);
+    lipton->queue[0] = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
+    lipton->queue[1] = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
+    lipton->commit   = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
     lipton->por = por;
     lipton->not_left_accords = por->not_left_accords;
     lipton->not_left_accordsn = por->not_left_accordsn;
+    for (size_t i = 0; i < lipton->num_procs; i++) {
+        lipton->procs[i].transaction = bms_create (por->ngroups, 1);
+        lipton->procs[i].fset = fset_create (sizeof(int[por->nslots]), 0, 4, 10);
+    }
     if (USE_DEL) {
         lipton->del = del_create (por);
     }
