@@ -186,14 +186,14 @@ conjoin_lists (leap_t *leap, bms_t *exclude, bms_t *groups, bool *second_visible
 static inline bool
 in_leap_set (leap_t* leap, int e)
 {
-    for (int l = 0; l < leap->round; l++) {
+    for (size_t l = 0; l < leap->round; l++) {
         if (bms_has (leap->lists[l], 0, e)) return false;
     }
     return true;
 }
 
 static size_t
-handle_proviso (model_t self, int *src, size_t total)
+handle_proviso (model_t self, size_t total)
 {
     por_context        *ctx = ((por_context *)GBgetContext(self));
     leap_t             *leap = ctx->leap;
@@ -201,7 +201,6 @@ handle_proviso (model_t self, int *src, size_t total)
     if ((PINS_LTL && leap->proviso.por_proviso_false_cnt != 0) ||
         (SAFETY && leap->proviso.por_proviso_true_cnt != 0)) {
         // also emit all single steps (probably results in horrid reductions)
-        size_t              emitted = 0;
         ci_list            *en = ctx->enabled_list;
         while (dfs_stack_size(leap->stack_states)) {
             int                *next = dfs_stack_pop (leap->stack_states);
@@ -256,12 +255,12 @@ leap_search_all (model_t self, int *src, TransitionCB cb, void *uctx)
                    "Wrong number of sets %zu, expected %zu (rounds: %zu)",
                    total, cross, leap->round);
     } else if (leap->round > 1) { // 1 round is taken care of by POR layer
-        total = handle_proviso (self, src, total);
+        total = handle_proviso (self, total);
     }
     leap->seens += cross - total;
     leap->states++;
     leap->levels += leap->round;
-    Printf (debug, "---------- (avg. levels: %f\% / avg. seen: %f\%) \n",
+    Printf (debug, "---------- (avg. levels: %f%% / avg. seen: %f%%) \n",
             (float) (leap->levels / leap->states),
             (float) (leap->seens / leap->states));
     return total;

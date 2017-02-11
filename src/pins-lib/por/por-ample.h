@@ -8,17 +8,19 @@
 
 typedef struct ample_s ample_t;
 
-typedef struct process_s {
-    int                 id;
+typedef struct __attribute__((packed)) process_s {
     char               *name;
+    int                 id;
     int                 pc_slot;
     ci_list            *groups;
 
     ci_list            *en;
     ci_list            *succs;
-    bool                visible;
     size_t              conflicts;
+    size_t              depth;
     fset_t             *fset;           // for detecting non-progress
+    bms_t              *transaction;
+    bool                visible;
 } process_t;
 
 extern ample_t     *ample_create_context (por_context *ctx, bool all);
