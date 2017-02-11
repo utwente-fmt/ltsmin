@@ -224,6 +224,15 @@ por_set_find_state (state_find_f f, void *t)
     loc->find_state_ctx = t;
 }
 
+bool
+por_seen (int *dst, int group, bool src_changed)
+{
+    transition_info_t  ti = GB_TI (NULL, src_changed ? -1 : group);
+    local_t           *loc = get_local ();
+    HREassert (loc, "POR seen not activated (call por_set_find_state)");
+    return loc->find_state (dst, &ti, loc->find_state_ctx);
+}
+
 static void
 seen_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
@@ -233,17 +242,13 @@ seen_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     ci_add_if (ctx->enabled_list, ti->group, c == 0 || ci_top(ctx->enabled_list) != ti->group);
 
     if (!CHECK_SEEN) return;
-    local_t *loc = get_local ();
-    if (!loc) return;
-
-    size_t              s = bms_count (ctx->include, 0);
-    if (ctx->src_changed) ti->group = -1; // avoid dep matrix in tree
-    if (loc->find_state(dst, ti, loc->find_state_ctx)) {
-        bms_push_if (ctx->include, 0, ti->group, s == 0 || bms_top(ctx->include, 0) != ti->group);
-    } else if (s > 0 && bms_top(ctx->include, 0) == ti->group) {
+    size_t              s = bms_count (ctx->include, 0);;
+    if (por_seen(dst, ti->group, ctx->src_changed)) {
+        bms_push_if (ctx->include, 0, ti->group,
+                     s == 0 || bms_top (ctx->include, 0) != ti->group);
+    } else if (s > 0 && bms_top (ctx->include, 0) == ti->group) {
         bms_pop (ctx->include, 0);
     }
-
     (void) cpy; (void) dst;
 }
 
@@ -255,6 +260,20 @@ por_seen_groups (por_context *ctx, int *src, int src_changed)
     ctx->src_changed = src_changed;
     bms_clear_all (ctx->include);
     GBgetTransitionsAll (ctx->parent, src, seen_cb, ctx);
+    Debug("Found %zu 'seen' groups", bms_count(ctx->include, 0));
+}
+
+bool
+por_seen_group (por_context *ctx, int *src, int group, int src_changed)
+{
+    // Find seen successor, for free inclusion
+    ctx->enabled_list->count = 0;
+    ctx->src_changed = src_changed;
+    bms_clear_all (ctx->include);
+    GBgetTransitionsLong (ctx->parent, group, src, seen_cb, ctx);
+    int ret = bms_count (ctx->include, 0) != 0;
+    bms_clear_all (ctx->include);
+    return ret;
     Debug("Found %zu 'seen' groups", bms_count(ctx->include, 0));
 }
 
