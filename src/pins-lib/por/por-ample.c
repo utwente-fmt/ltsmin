@@ -118,7 +118,7 @@ handle_proviso (ample_t *a, prov_t *provctx, int *src)
 }
 
 static ci_list *
-init_scc_edges (scc_ctx_t *ctx, int i)
+init_scc_edges (scc_ctx_t *ctx, size_t i)
 {
     ample_t* a = ctx->ample;
     process_t* pp = &a->procs[i];
@@ -141,7 +141,7 @@ init_scc_edges (scc_ctx_t *ctx, int i)
 }
 
 static bool
-scc_check_r (scc_ctx_t *ctx, int i)
+scc_check_r (scc_ctx_t *ctx, size_t i)
 {
     HREassert (i < ctx->ample->num_procs);
 
@@ -151,7 +151,7 @@ scc_check_r (scc_ctx_t *ctx, int i)
 
     bool                root = true;
     ci_list            *succs = init_scc_edges (ctx, i);
-    for (int *j = ci_begin(succs); j != ci_end(succs); *j++) {
+    for (int *j = ci_begin(succs); j != ci_end(succs); j++) {
         if (!scc_check_r(ctx, *j)) return false;
         root &= ctx->vset[i] <= ctx->vset[*j];
         ctx->vset[i] = min(ctx->vset[i], ctx->vset[*j]);
@@ -251,11 +251,11 @@ ample_init_dependencies (por_context *por, ample_t *a)
     matrix_t dep;
     dm_create (&dep, por->ngroups, a->num_procs);
     for (int g = 0; g < por->ngroups; g++) {
-        int i = a->g2p[g];
+        size_t              i = a->g2p[g];
         for (size_t j = 0; j < a->num_procs; j++) {
             if (i == j) continue;
 
-            process_t *o = &a->procs[j];
+            process_t      *o = &a->procs[j];
             for (int *h = ci_begin(o->groups); h != ci_end(o->groups); h++) {
                 if (dm_is_set (&por->not_accords_with, g, *h)) {
                     dm_set (&dep, g, j);
@@ -267,11 +267,11 @@ ample_init_dependencies (por_context *por, ample_t *a)
     a->dep = (ci_list**) dm_rows_to_idx_table (&dep);
 
     Printf1(infoLong, "Process --> Conflict groups:\n");
-    for (int i = 0; i < a->num_procs; i++) {
-        Printf1(infoLong, "%3d: ", i);
+    for (size_t i = 0; i < a->num_procs; i++) {
+        Printf1(infoLong, "%3zu: ", i);
         for (int g = 0; g < por->ngroups; g++) {
             for (int *o = ci_begin(a->dep[g]); o != ci_end(a->dep[g]); o++) {
-                if (*o == i) {
+                if (*o == (int) i) {
                     Printf1(infoLong, "%3d,", g);
                 }
             }
@@ -281,13 +281,13 @@ ample_init_dependencies (por_context *por, ample_t *a)
 
     a->fdep = RTmalloc (sizeof(ci_list *[por->ngroups]));
     for (int g = 0; g < por->ngroups; g++) {
-        int i = a->g2p[g];
+        size_t              i = a->g2p[g];
         a->fdep[g] = ci_create (a->num_procs);
-        process_t *p = &a->procs[i];
+        process_t          *p = &a->procs[i];
         for (size_t j = 0; j < a->num_procs; j++) {
             if (i == j || dm_is_set (&dep, g, j)) continue;
             // no need to duplicate transitions already dependent
-            process_t *o = &a->procs[j];
+            process_t          *o = &a->procs[j];
             for (int *f = ci_begin(o->groups); o && f != ci_end(o->groups); f++) {
                 for (int *h = ci_begin(p->groups); o && h != ci_end(p->groups); h++) {
                     if (*h == g || dm_is_set (&por->nce, *h, g)) continue;
@@ -302,8 +302,8 @@ ample_init_dependencies (por_context *por, ample_t *a)
     }
 
     Printf1(infoLong, "g in P --> { O | exists (g,h) in NCE, h in P, f in O, (g,f) in DEP } \n");
-    for (int i = 0; i < a->num_procs; i++) {
-        Printf1(infoLong, "%2d: ", i);
+    for (size_t i = 0; i < a->num_procs; i++) {
+        Printf1(infoLong, "%2zu: ", i);
         process_t *p = &a->procs[i];
         for (int *g = ci_begin(p->groups); g != ci_end(p->groups); g++) {
             Printf1(infoLong, "%3d --> {", *g);
@@ -322,7 +322,6 @@ ample_t *
 ample_create_context (por_context *por, bool all)
 {
     if (NO_MC) Abort ("Ample sets require a may-be coenabled matrix.");
-    model_t             model = por->parent;
     ample_t            *a = RTmalloc(sizeof(ample_t));
     a->por = por;
     a->all = all;
@@ -392,7 +391,7 @@ prom_group_name (model_t model, int group)
     int             label = lts_type_find_edge_label (ltstype, LTSMIN_EDGE_TYPE_STATEMENT);
     if (label) return NULL;
     int             type = lts_type_get_edge_label_typeno (ltstype, label);
-    int             count = pins_chunk_count  (model, type);
+    size_t          count = pins_chunk_count  (model, type);
     if (count < pins_get_group_count(model)) return NULL;
     chunk           c = pins_chunk_get (model, type, group);
     return c.data;
@@ -426,7 +425,7 @@ identify_procs (por_context *por, size_t *num_procs, int *group2proc)
     *num_procs = 0;
     model_t             model = por->parent;
     process_t          *procs = RTmalloc (sizeof(process_t[por->ngroups]));
-    for (size_t i = 0; i < por->nslots; i++) {
+    for (int i = 0; i < por->nslots; i++) {
         if (pins_slot_with_type_name_is_pc (model, i, &procs[*num_procs].name)) {
             procs[*num_procs].pc_slot = i;
             //procs[*num_procs].name;
@@ -439,13 +438,13 @@ identify_procs (por_context *por, size_t *num_procs, int *group2proc)
     }
     //matrix_t           *writes = GBgetDMInfoMayWrite(model);
 
-    for (size_t j = 0; j < por->ngroups; j++) {
+    for (int g = 0; g < por->ngroups; g++) {
         bool found = false;
         for (size_t i = 0; i < *num_procs; i++) {
-            if (pins_group_is_in_proc_with_name(model, j, procs[i].name, procs[i].pc_slot)) {
-                if (found) Warning (info, "Group %d doubly assigned to an ample-set process %s (chosing first encountered)", j, procs[i].name);
-                ci_add (procs[i].groups, j);
-                group2proc[j] = i;
+            if (pins_group_is_in_proc_with_name(model, g, procs[i].name, procs[i].pc_slot)) {
+                if (found) Warning (info, "Group %d doubly assigned to an ample-set process %s (chosing first encountered)", g, procs[i].name);
+                ci_add (procs[i].groups, g);
+                group2proc[g] = i;
                 found = true;
             }
 //            if (dm_is_set(writes, j, procs[i].pc_slot)) {
@@ -459,7 +458,7 @@ identify_procs (por_context *por, size_t *num_procs, int *group2proc)
 //                }
 //            }
         }
-        HREassert (found, "Group %d not assigned to an ample-set process", j);
+        HREassert (found, "Group %d not assigned to an ample-set process", g);
     }
 
     Printf1 (infoLong, "Process --> Groups:\n");
