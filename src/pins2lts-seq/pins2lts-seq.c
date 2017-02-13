@@ -1521,7 +1521,7 @@ gsea_setup(const char *output)
         opt.act_index = pins_chunk_put (opt.model, typeno, c);
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
         if (PINS_POR) {
-            pins_add_edge_label_visible(opt.model, opt.act_label, opt.act_index);
+            pins_add_edge_label_visible (opt.model, opt.act_label, opt.act_index);
             set_cycle_proviso ();
         }
     }

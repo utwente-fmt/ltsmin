@@ -111,35 +111,15 @@ por_transition_costs (por_context *ctx)
         int visible = ctx->visible_enabled * ctx->ngroups
                         + bms_count (ctx->visible, VISIBLE)
                         - ctx->visible_enabled;
-        int visibleNds = ctx->visible_nds_enabled * ctx->ngroups
-                        + bms_count (ctx->visible, VISIBLE_NDS)
-                        - ctx->visible_nds_enabled;
-        int visibleNes = ctx->visible_nes_enabled * ctx->ngroups
-                        + bms_count (ctx->visible, VISIBLE_NES)
-                        - ctx->visible_nes_enabled;
-        if (NO_DYN_VIS) {
-            visibleNes = visibleNds = visible;
-        }
         if (NO_V) {
-            visible = visibleNds = visibleNes = ctx->enabled_list->count * ctx->ngroups;
+            visible = ctx->enabled_list->count * ctx->ngroups;
         }
         for (int i = 0; i < ctx->ngroups; i++) {
             int             new_score;
             if (ctx->group_status[i] == GS_DISABLED) {
                 new_score = 1;
             } else {
-                int vis = ctx->visible->set[i];
-                bool nes = (vis & (1 << VISIBLE_NES)) != 0;
-                bool nds = (vis & (1 << VISIBLE_NDS)) != 0;
-                if (vis && nes == nds) { // visible & group | visible & nes & nds
-                    new_score = visible;
-                } else if (nes) {
-                    new_score = visibleNds;
-                } else if (nds) {
-                    new_score = visibleNes;
-                } else {
-                    new_score = ctx->ngroups;
-                }
+                new_score = ctx->visible->set[i] ? visible : ctx->ngroups;
             }
             incr_ns_update (ctx, i, new_score);
         }
@@ -330,24 +310,7 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group)
 
         bool            nes = (vis & (1 << VISIBLE_NES)) != 0;
         bool            nds = (vis & (1 << VISIBLE_NDS)) != 0;
-        if (NO_DYN_VIS || nes == nds) { // visible & group | visible & nes & nds
-            select_all (ctx, s, ctx->visible->lists[VISIBLE]);
-        } else {
-            int newNDS = ctx->visible_nes->set[group] ^ s->visible_nds; // g in NES ==> NDS C Ts
-            int newNES = ctx->visible_nds->set[group] ^ s->visible_nes; // g in NDS ==> NES C Ts
-            if (newNES || newNDS) {
-                for (size_t i = 0; i < ctx->visible_nds->types; i++) {
-                    if ((1 << i) & newNDS) {
-                        select_all (ctx, s, ctx->visible_nds->lists[i]);
-                    }
-                    if ((1 << i) & newNES) {
-                        select_all (ctx, s, ctx->visible_nes->lists[i]);
-                    }
-                }
-                s->visible_nds |= newNDS;
-                s->visible_nes |= newNES;
-            }
-        }
+        select_all (ctx, s, ctx->visible->lists[VISIBLE]);
         Debugf ("] ");
     }
 

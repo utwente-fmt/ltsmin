@@ -11,7 +11,6 @@
 extern int SAFETY;
 extern int POR_WEAK;
 
-extern int NO_DYN_VIS;
 extern int NO_MCNDS;
 extern int NO_V;
 extern int PREFER_NDS;
@@ -30,7 +29,6 @@ typedef enum {
 
 typedef enum {
     VISIBLE,            // group or label NES/NDS
-    VISIBLE_GROUP,      // group
     VISIBLE_NES,        // label NES
     VISIBLE_NDS,        // label NDS
     VISIBLE_COUNT
@@ -62,7 +60,7 @@ struct por_ctx {
     matrix_t       *nla;
     matrix_t        nce;            // not-coenabled
     matrix_t        gnce_matrix;    // guard not-coenabled
-    ci_list       **not_accords;    // mapping from transition group to groups that it accords with
+    ci_list       **not_accords;    // mapping from transition group to groups that it doesn't accords with
     ci_list       **guard2group;    // mapping from guard to transition group
     ci_list       **group2guard;    // mapping from group to guards
     ci_list       **label_nes;      // transition groups that form a nes for a guard (guard -> [t1, t2, t..])
@@ -89,15 +87,13 @@ struct por_ctx {
     char            *group_status;  // status of the transition groups in the current state
     ci_list         *enabled_list;  // enabled groups
     bms_t           *visible;
-    bms_t           *visible_nes;
-    bms_t           *visible_nds;
+    int              visible_initialized;
     int              visible_enabled;// number of enabled visible transitions
-    int              visible_nes_enabled;// number of enabled visible transitions
-    int              visible_nds_enabled;// number of enabled visible transitions
 
     int             *group_score;   // score assigned to each group by heuristic function
     int             *nes_score;     // Template for the nes_score
 
+    bms_t           *fix;
     bms_t           *include;
     bms_t           *exclude;
     int              src_changed;
@@ -137,15 +133,15 @@ extern bool por_seen (int *dst, int group, bool src_changed);
 
 // number of necessary sets (halves if MC is absent, because no NDSs then)
 static inline int
-NS_SIZE (por_context* ctx)
+NS_SIZE (por_context *ctx)
 {
     return NO_MCNDS ? ctx->nguards : ctx->nguards << 1;
 }
 
 static inline int
-is_visible (por_context* ctx, int group)
+is_visible (por_context *ctx, int group)
 {
-    return bms_has(ctx->visible, VISIBLE, group);
+    return bms_has (ctx->visible, VISIBLE, group);
 }
 
 static inline int

@@ -105,6 +105,18 @@ typedef enum {
  */
 extern pins_por_t PINS_POR;
 
+typedef enum {
+    POR_NONE,
+    POR_AMPLE,
+    POR_AMPLE1,
+    POR_BEAM,
+    POR_DEL,
+    POR_LIPTON,
+    POR_UNINITIALIZED = -1,
+} por_alg_t;
+
+extern por_alg_t    PINS_POR_ALG;
+
 typedef struct por_ctx por_context;
 
 /**

@@ -433,7 +433,7 @@ reach_reduce  (run_t *run, wctx_t *ctx)
              runtime);
     work_report ("", ctx->counters);
 
-    if (Strat_ECD & strategy[1]) {
+    if ((strategy[0] & Strat_DFS) && proviso == Proviso_Stack) {
         fset_print_statistics (ctx->local->cyan, "ECD set");
     }
 }
@@ -605,7 +605,7 @@ reach_run (run_t *run, wctx_t *ctx)
     case Strat_BFS:
         bfs (ctx); break;
     case Strat_DFS:
-        if (PINS_POR && (proviso == Proviso_Stack || proviso == Proviso_ClosedSet)) {
+        if (PINS_POR && proviso == Proviso_Stack) {
             dfs_proviso (ctx);
         } else {
             dfs (ctx);

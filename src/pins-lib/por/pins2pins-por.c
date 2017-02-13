@@ -24,7 +24,6 @@
 
 int SAFETY = 0;
 int NO_L12 = 0;
-int NO_DYN_VIS = 1;
 int NO_V = 0;
 int NO_MCNDS = 0;
 int PREFER_NDS = 0;
@@ -53,16 +52,7 @@ static si_map_entry por_weak[]={
 
 int POR_WEAK = 0; //extern
 
-typedef enum {
-    POR_NONE,
-    POR_BEAM,
-    POR_DEL,
-    POR_LIPTON,
-    POR_AMPLE,
-    POR_AMPLE1,
-} por_alg_t;
-
-static por_alg_t    alg = -1;
+por_alg_t    PINS_POR_ALG = POR_UNINITIALIZED;
 
 static si_map_entry por_algorithm[]={
     {"none",    POR_NONE},
@@ -94,9 +84,9 @@ por_popt (poptContext con, enum poptCallbackReason reason,
                 HREprintUsage();
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
-            if ((alg = num) != POR_NONE)
+            if ((PINS_POR_ALG = num) != POR_NONE)
                 PINS_POR = PINS_CORRECTNESS_CHECK ? PINS_POR_CHECK : PINS_POR_ON;
-            if (alg == POR_LIPTON)
+            if (PINS_POR_ALG == POR_LIPTON || PINS_POR_ALG == POR_TR)
                 POR_WEAK = 1;
             return;
         } else if (opt->shortName == -1) {
@@ -136,7 +126,6 @@ struct poptOption por_options[]={
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC" , NULL },
     { "no-mcnds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MCNDS , 1 , "Do not create NESs from MC and NDS" , NULL },
-    { "no-dynamic-labels" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_DYN_VIS , 1 , "without dynamic visibility" , NULL },
     { "no-V" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_V , 1 , "without V proviso, instead use Peled's visibility proviso, or V'     " , NULL },
     { "no-L12" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_L12 , 1 , "without L1/L2 proviso, instead use Peled's cycle proviso, or L2'   " , NULL },
     POPT_TABLEEND
@@ -150,20 +139,21 @@ struct poptOption por_options[]={
 static inline void
 init_visible_labels (por_context* ctx)
 {
-    if (ctx->visible != NULL) return;
-    NO_DYN_VIS |= NO_V;
+    if (ctx->visible_initialized) return;
+    ctx->visible_initialized = 1;
 
-    model_t model = ctx->parent;
-    int groups = dm_nrows (GBgetDMInfo(model));
-    ctx->visible = bms_create (groups, VISIBLE_COUNT);
-    ctx->visible_nes = bms_create (groups, 8);
-    ctx->visible_nds = bms_create (groups, 8);
+    model_t             model = ctx->parent;
+    int                 groups = dm_nrows (GBgetDMInfo(model));
 
-    for (int i = 0; i < groups; i++) {
+    for (int i = 0; i < ctx->nlabels; i++)
+        bms_push_if (ctx->visible_labels, 0, i, ctx->label_visibility[i]);
+    for (int i = 0; i < ctx->ngroups; i++) {
         if (!ctx->group_visibility[i]) continue;
-        bms_push_new (ctx->visible, VISIBLE, i);
-        bms_push_new (ctx->visible, VISIBLE_GROUP, i);
+        for (int *l = ci_begin(ctx->group2guard[i]); l != ci_end(ctx->group2guard[i]); l++) {
+            bms_push_new (ctx->visible_labels, 0, *l);
+        }
     }
+    Print1 (infoLong, "POR visible labels: %zu / %zu", bms_count(ctx->visible_labels, 0), ctx->nlabels);
 
     int c = 0;
     ci_list            *vis = bms_list (ctx->visible_labels, 0);
@@ -172,27 +162,12 @@ init_visible_labels (por_context* ctx)
             int             group = ctx->label_nes[*l]->data[j];
             bms_push_new (ctx->visible, VISIBLE_NES, group);
             bms_push_new (ctx->visible, VISIBLE, group);
-            bms_push_new (ctx->visible_nes, c, group);
         }
         for (int j = 0; j < ctx->label_nds[*l]->count; j++) {
             int group = ctx->label_nds[*l]->data[j];
             bms_push_new (ctx->visible, VISIBLE_NDS, group);
             bms_push_new (ctx->visible, VISIBLE, group);
-            bms_push_new (ctx->visible_nds, c, group);
         }
-
-        HREassert (++c <= 8, "Only 8 dynamic labels supported currently.");
-    }
-    ctx->visible_nes->types = c;
-    ctx->visible_nds->types = c;
-    int vgroups = bms_count(ctx->visible, VISIBLE_GROUP);
-    if (!NO_DYN_VIS && vgroups > 0 && vgroups != bms_count(ctx->visible, VISIBLE)) {
-        Print1 (info, "Turning off dynamic visibility in presence of visible groups");
-        NO_DYN_VIS = 1;
-    }
-    if (!NO_DYN_VIS && (alg == POR_AMPLE || alg == POR_AMPLE1)) {
-        Print1 (info, "Turning off dynamic visibility for ample-set algorithm.");
-        NO_DYN_VIS = 1;
     }
     SAFETY = bms_count(ctx->visible, VISIBLE) != 0 || NO_L12;
 }
@@ -288,8 +263,6 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
     GBgetStateLabelsGroup (model, GB_SL_GUARDS, src, ctx->label_status);
 
     ctx->visible_enabled = 0;
-    ctx->visible_nes_enabled = 0;
-    ctx->visible_nds_enabled = 0;
     int enabled = 0; // check
     // fill group status and score
     for (int i = 0; i < ctx->ngroups; i++) {
@@ -308,15 +281,10 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
                        "Guards do not agree with enabledness of group %d", i);
             ctx->visible_enabled += is_visible (ctx, i);
             char vis = ctx->visible->set[i];
-            ctx->visible_nes_enabled += (vis & (1 << VISIBLE_NES)) != 0;
-            ctx->visible_nds_enabled += (vis & (1 << VISIBLE_NDS)) != 0;
         }
     }
     HREassert (ctx->enabled_list->count == enabled,
                "Guards do not agree with enabledness of group %d", ctx->enabled_list->data[enabled]);
-
-    Debugf ("Visible %d, +enabled %d/%d (NES: %d, NDS: %d)\n", bms_count(ctx->visible,VISIBLE),
-           ctx->visible_enabled, ctx->enabled_list->count, ctx->visible_nes_enabled, ctx->visible_nds_enabled);
 }
 
 /**
@@ -377,7 +345,6 @@ PORwrapper (model_t model)
 
     por_context *ctx = RTmalloc (sizeof *ctx);
     ctx->parent = model;
-    ctx->visible = NULL; // initialized on demand
 
     sl_group_t *guardLabels = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
     sl_group_t* sl_guards = GBgetStateLabelGroupInfo(model, GB_SL_ALL);
@@ -385,6 +352,8 @@ PORwrapper (model_t model)
     ctx->nlabels = pins_get_state_label_count(model);
     ctx->ngroups = pins_get_group_count(model);
     ctx->nslots = pins_get_state_variable_count (model);
+    ctx->visible_initialized = 0;
+    ctx->visible = bms_create (ctx->ngroups, VISIBLE_COUNT);
     HREassert (ctx->nguards <= ctx->nlabels);
     HREassert (guardLabels->sl_idx[0] == 0, "Expecting guards at index 0 of all labels.");
 
@@ -810,7 +779,7 @@ PORwrapper (model_t model)
     GBsetNextStateLong  (pormodel, por_long);
     GBsetNextStateShort (pormodel, por_short);
     next_method_black_t next_all;
-    switch (alg) {
+    switch (PINS_POR_ALG) {
     case POR_AMPLE: {
         next_all = ample_search_all;
         ctx->alg = ample_create_context (ctx, true);
@@ -836,12 +805,12 @@ PORwrapper (model_t model)
         ctx->alg = lipton_create (ctx, pormodel);
         break;
     }
-    default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
+    default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, PINS_POR_ALG));
     }
     GBsetNextStateAll   (pormodel, next_all);
 
     if (leap) {
-        HREassert (alg != POR_LIPTON, "Lipton reduction and leaping sets cannot be combined.");
+        HREassert (PINS_POR_ALG != POR_LIPTON && PINS_POR_ALG != POR_TR, "Lipton reduction and leaping sets cannot be combined.");
         // changes POR model (sets modified r/w matrices)
         ctx->leap = leap_create_context (pormodel, model, next_all);
         GBsetNextStateAll   (pormodel, leap_search_all);
@@ -878,11 +847,9 @@ PORwrapper (model_t model)
 
     ctx->include = bms_create (ctx->ngroups, 1);
     ctx->exclude = bms_create (ctx->ngroups, 1);
+    ctx->fix     = bms_create (ctx->ngroups, 1);
 
     ctx->visible_labels = bms_create (ctx->nlabels, 1);
-    for (int i = 0; i < ctx->nlabels; i++) {
-        bms_push_if (ctx->visible_labels, 0, i, ctx->label_visibility[i]);
-    }
 
     return pormodel;
 }
@@ -892,7 +859,7 @@ por_is_stubborn (por_context *ctx, int group)
 {
     if (leap)           return leap_is_stubborn (ctx, group);
 
-    switch (alg) {
+    switch (PINS_POR_ALG) {
     case POR_AMPLE:
     case POR_AMPLE1:    return ample_is_stubborn (ctx, group);
     case POR_BEAM:      return beam_is_stubborn (ctx, group);

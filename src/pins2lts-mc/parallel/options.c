@@ -86,12 +86,13 @@ options_static_init      (model_t model, bool timed)
         strategy[0] |= Strat_TA;
     }
 
-    if (PINS_POR && (strategy[0] & Strat_LTL & ~Strat_DFSFIFO)) {
+    if (PINS_POR && (strategy[0] & Strat_LTL & ~Strat_DFSFIFO) &&
+                    PINS_POR_ALG != POR_LIPTON && PINS_POR_ALG != POR_TR) {
         if (HREpeers(HREglobal()) > 1 && (strategy[0] & ~Strat_CNDFS))
             Abort ("POR with more than one worker only works in CNDFS!");
         if (proviso == Proviso_None) {
-            Warning (info, "Forcing use of the an ignoring proviso");
             proviso = strategy[0] & Strat_CNDFS ? Proviso_CNDFS : Proviso_Stack;
+            Warning (info, "Forcing use of the an ignoring proviso (%s)", provisos[proviso].key);
         }
         if (proviso != Proviso_ForceNone) {
             if ((strategy[0] & Strat_CNDFS) && proviso != Proviso_CNDFS)
@@ -105,8 +106,8 @@ options_static_init      (model_t model, bool timed)
 
     if (PINS_POR && (strategy[0] & Strat_Reach) && (inv_detect || act_detect)) {
         if (proviso == Proviso_None) {
-            Warning (info, "Forcing use of the an ignoring proviso");
             proviso = strategy[0] & Strat_DFS ? Proviso_Stack : Proviso_ClosedSet;
+            Warning (info, "Forcing use of the an ignoring proviso (%s)", provisos[proviso].key);
         }
         if (proviso != Proviso_ForceNone) {
             if ((strategy[0] & Strat_DFS) && proviso != Proviso_Stack && proviso != Proviso_ClosedSet)
@@ -122,7 +123,7 @@ options_static_init      (model_t model, bool timed)
         proviso = Proviso_None;
     } else if (PINS_POR && (strategy[0] & Strat_Reach) && proviso != Proviso_None &&
                act_detect == NULL && inv_detect == NULL && !NO_L12) {
-        Warning (info, "POR layer will ignore ignoring proviso in absence of safety property (--invariant or --action). To enforce the (stronger) proviso, use: --no-L12.");
+        Warning (info, "POR layer will disregard ignoring proviso in absence of safety property (--invariant or --action). To enforce the (stronger) proviso, use: --no-L12.");
     }
 
     if (!ecd && strategy[1] != Strat_None)
