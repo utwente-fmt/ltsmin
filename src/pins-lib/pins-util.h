@@ -17,6 +17,10 @@ extern size_t       pins_get_group_count (model_t model);
 
 /**
 \brief Adds visibility info for groups that can produce and edge with a specific label.
+*
+* When guards are present that have the same prefix as the edge label, then
+* these guards are set as visible labels. Otherwise the group is. The POR
+* layer will then pick the guards of the group.
 */
 extern void         pins_add_edge_label_visible (model_t model, int edge, int label);
 

@@ -57,6 +57,20 @@ pins_add_edge_label_visible (model_t model, int edge, int label)
     int *visibles = GBgetPorGroupVisibility (model);
     HREassert (visibles != NULL, "pins_add_edge_label_visible: No (lower) PINS layer uses POR visibility.");
 
+    lts_type_t      ltstype = GBgetLTStype (model);
+    int             typeno = lts_type_get_edge_label_typeno (ltstype, label);
+    chunk           c = pins_chunk_get (model, typeno, label);
+    int             sl_size = pins_get_state_label_count (model);
+    int             count = 0;
+    for (int i = 0; i < sl_size; i++) {
+        char *name = lts_type_get_state_label_name (ltstype, i);
+        if (strncmp(name, c.data, c.len) == 0) {
+            pins_add_state_label_visible (model, i);
+            count++;
+        }
+    }
+    if (count > 0) return;
+
     int* groups_of_edge = NULL;
     const int n = GBgroupsOfEdge(model, edge, label, &groups_of_edge);
     if (n > 0) {
