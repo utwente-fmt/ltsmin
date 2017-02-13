@@ -63,17 +63,19 @@ int         (*prom_get_label)       (void *, int g, int *src);
 const char* (*prom_get_label_name)  (int g);
 void        (*prom_get_labels_many)  (void *, int *src, int* labels, bool guards_only);
 const int*  (*prom_get_trans_commutes_matrix)(int t);
-const int*  (*prom_get_trans_do_not_accord_matrix)(int t);
-const int*  (*prom_get_label_may_be_coenabled_matrix)(int g);
-const int*  (*prom_get_label_nes_matrix)(int g); // could be optional for POR
-const int*  (*prom_get_label_nds_matrix)(int g); // could be optional for POR
+const int*  (*prom_get_trans_do_not_accord_matrix)(int t) = NULL;
+const int*  (*prom_get_label_may_be_coenabled_matrix)(int g) = NULL;
+const int*  (*prom_get_label_nes_matrix)(int g) = NULL; // could be optional for POR
+const int*  (*prom_get_label_nds_matrix)(int g) = NULL; // could be optional for POR
 
 /* PINS flexible matrices */
-const int*  (*prom_get_matrix)(int m, int x);
-int         (*prom_get_matrix_count)();
-const char* (*prom_get_matrix_name)(int m);
-int         (*prom_get_matrix_row_count)(int m);
-int         (*prom_get_matrix_col_count)(int m);
+const int*  (*prom_get_matrix)(int m, int x) = NULL;
+int         (*prom_get_matrix_count)() = NULL;
+const char* (*prom_get_matrix_name)(int m) = NULL;
+int         (*prom_get_matrix_row_count)(int m) = NULL;
+int         (*prom_get_matrix_col_count)(int m) = NULL;
+int         (*prom_transition_has_edge)(int t, int e, int v) = NULL;
+
 
 static void
 prom_popt (poptContext con,
@@ -252,6 +254,8 @@ PromLoadDynamicLib(model_t model, const char *filename)
         RTtrydlsym( dlHandle, "spins_get_matrix_row_count" );
     prom_get_matrix_col_count = (int (*)(int m))
          RTtrydlsym( dlHandle, "spins_get_matrix_col_count" );
+    prom_transition_has_edge = (int (*)(int t, int e, int v))
+         RTtrydlsym( dlHandle, "spins_transition_has_edge" );
     (void)model;
 }
 
@@ -266,6 +270,25 @@ void
 sl_all (model_t model, int*src, int *label)
 {
     prom_get_labels_many (model, src, label, false);
+}
+
+static int
+groups_of_edge (model_t model, int edgeno, int index, int **groups)
+{
+    if (prom_transition_has_edge == NULL)
+        Abort ("spins_transition_has_edge() not available, update Spins and recompile model");
+    int             nr_groups = pins_get_group_count (model);
+    int             count = 0;
+    for (int i = 0; i < nr_groups; i++)
+        count += prom_transition_has_edge(i, edgeno, index);
+    *groups = (int*) RTmalloc(sizeof(int[count]));
+    count = 0;
+    for (int i = 0; i < nr_groups; i++) {
+        if (prom_transition_has_edge(i, edgeno, index)) {
+            groups[0][count++] = i;
+        }
+    }
+    return count;
 }
 
 /**
@@ -379,32 +402,36 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         HREassert (i >= nguards || has_prefix(name, LTSMIN_LABEL_TYPE_GUARD_PREFIX),
                    "Label %d was expected to ba a guard instead of '%s'", i, name);
 
-        if (strcmp (ACCEPTING_STATE_LABEL_NAME, name) == 0) {
+        if (strcmp(ACCEPTING_STATE_LABEL_NAME, name) == 0) {
             name = LTSMIN_STATE_LABEL_ACCEPTING;
         }
-        if(strcmp(PROGRESS_STATE_LABEL_NAME, name) == 0) {
+        if (strcmp(PROGRESS_STATE_LABEL_NAME, name) == 0) {
             name = LTSMIN_STATE_LABEL_PROGRESS;
         }
-        if(strcmp(VALID_END_STATE_LABEL_NAME, name) == 0) {
+        if (strcmp(VALID_END_STATE_LABEL_NAME, name) == 0) {
             name = LTSMIN_STATE_LABEL_VALID_END;
         }
 
         lts_type_set_state_label_name (ltstype, i, name);
-        lts_type_set_state_label_typeno (ltstype, i, guard_type);
+        if (i < nguards) {
+            lts_type_set_state_label_typeno (ltstype, i, guard_type);
+        } else {
+            lts_type_set_state_label_typeno (ltstype, i, bool_type);
+        }
     }
 
     lts_type_validate(ltstype); // done with ltstype
 
     // set the label group implementation
-    sl_group_t* sl_group_all = RTmallocZero(sizeof(sl_group_t) + sl_size * sizeof(int));
+    sl_group_t *sl_group_all = RTmallocZero (sizeof(sl_group_t) + sl_size * sizeof(int));
     sl_group_all->count = sl_size;
     for(int i=0; i < sl_group_all->count; i++) sl_group_all->sl_idx[i] = i;
-    GBsetStateLabelGroupInfo(model, GB_SL_ALL, sl_group_all);
+        GBsetStateLabelGroupInfo (model, GB_SL_ALL, sl_group_all);
     if (nguards > 0) {
-        sl_group_t* sl_group_guards = RTmallocZero(sizeof(sl_group_t) + nguards * sizeof(int));
+        sl_group_t *sl_group_guards = RTmallocZero (sizeof(sl_group_t) + nguards * sizeof(int));
         sl_group_guards->count = nguards;
         for(int i=0; i < sl_group_guards->count; i++) sl_group_guards->sl_idx[i] = i;
-        GBsetStateLabelGroupInfo(model, GB_SL_GUARDS, sl_group_guards);
+        GBsetStateLabelGroupInfo (model, GB_SL_GUARDS, sl_group_guards);
     }
 
     // get state labels
@@ -551,4 +578,6 @@ PromLoadGreyboxModel(model_t model, const char *filename)
         }
         GBsetGuardNDSInfo(model, gnds_info);
     }
+
+    GBsetGroupsOfEdge(model, groups_of_edge);
 }
