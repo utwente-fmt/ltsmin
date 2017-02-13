@@ -31,7 +31,7 @@ This section is shared by the parsers for all LTSmin languages.
     }
 }
 %parse_failure { HREabort(0); }
-%parse_accept { Warning(infoLong,"success!"); }
+%parse_accept { Print1(infoLong,"success!"); }
 %extra_argument { ltsmin_parse_env_t env }
 %stack_overflow {
     (void)yypMinor;
