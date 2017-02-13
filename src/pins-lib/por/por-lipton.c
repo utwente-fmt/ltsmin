@@ -24,6 +24,14 @@
  */
 
 typedef enum {
+    COMMUTE_RGHT = 0,
+    COMMUTE_LEFT = 1,
+    COMMUTE_COUNT = 2,
+} commute_e;
+
+char *comm_name[2] = { "right", "left" };
+
+typedef enum {
     PRE__COMMIT = true,
     POST_COMMIT = false
 } phase_e;
@@ -49,10 +57,10 @@ struct lipton_ctx_s {
     del_ctx_t          *del;        // deletion context
     ci_list           **g_next;     // group --> group [proc internal] (enabling, inv. of NES)
     ci_list           **p_dis;      // group --> process [proc remote] (disabled, NDS)
-    ci_list           **p_left_dep;
-    ci_list           **p_rght_dep;
-    ci_list           **not_left_accords;   // to swap out in POR layer, controlling deletion algorithm
-    ci_list           **not_left_accordsn;  // to swap out in POR layer, controlling deletion algorithm
+    ci_list           **nla[2];   // to swap out in POR layer, controlling deletion algorithm
+    ci_list           **commute[2];
+    bms_t              *visible;
+    int                 visible_initialized;
 
     dfs_stack_t         queue[2];
     dfs_stack_t         commit;
@@ -65,60 +73,134 @@ struct lipton_ctx_s {
     bool                commutes_right;
 };
 
-static inline int
-lipton_commutes (lipton_ctx_t *lipton, int i, ci_list **dir)
+static int
+lipton_comm_static (lipton_ctx_t *lipton, int i, commute_e comm)
 {
-    if (SAFETY) {
-        por_context        *por = lipton->por;
-        ci_list            *vis = bms_list (por->visible_labels, 0);
-        matrix_t           *neds = dir == lipton->p_rght_dep ? &por->label_nds_matrix
-                                                             : &por->label_nes_matrix;
-        for (int *l = ci_begin(vis); l != ci_end(vis); l++) {
-            if (dm_is_set(neds, *l, i)) return false;
-        }
+    if (SAFETY && bms_has(lipton->visible, comm, i)) {
+        Debugf ("LIPTON: visible %s group %d\n", comm_name[comm], i);
+        return false;
     }
-    if (USE_DEL) {
-        return dir == lipton->p_rght_dep ? lipton->commutes_right : lipton->commutes_left;
-    } else {
-        return dir[i]->count == 0;
-    }
-    (void) lipton;
+    return lipton->commute[comm][i]->count == 0;
 }
 
-static inline stack_data_t *
-lipton_stack (lipton_ctx_t *lipton, dfs_stack_t q, int *dst, int proc,
-              phase_e phase, int group)
+static bool
+lipton_comm_all_static (lipton_ctx_t *lipton, ci_list *list, commute_e comm)
 {
-    HREassert (group == GROUP_NONE || group < lipton->por->ngroups);
-    stack_data_t       *data = (stack_data_t*) dfs_stack_push (q, NULL);
-    memcpy (&data->state, dst, sizeof(int[lipton->por->nslots]));
-    data->group = group;
-    data->proc = proc;
-    data->phase = phase;
-    return data;
+    for (int *g = ci_begin(list); g != ci_end(list); g++)
+        if (!lipton_comm_static(lipton, *g, comm)) return false;
+    return true;
+}
+
+static bool
+lipton_calc_del (lipton_ctx_t *lipton, process_t *proc, int group, commute_e comm)
+{
+    por_context        *por = lipton->por;
+
+    swap (por->alg, lipton->del);  // NO DELETION CALLS BEFORE
+
+    por->not_left_accordsn = lipton->nla[comm];
+    del_por (por, false);
+    int                 c = 0;
+    Debugf ("LIPTON: DEL checking proc %d group %d (%s)", proc->id, group, comm==COMMUTE_LEFT?"left":"right");
+    if (debug) {
+        Debugf (" enabled { ");
+        for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++)
+            Debugf ("%d, ", *g);
+        Debugf ("}\n");
+    }
+    Debugf ("LIPTON: DEL found: ");
+    for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
+        if (lipton->g2p[*g] != proc->id && del_is_stubborn(por, *g)) {
+            Debugf ("%d(%d), ", *g, lipton->g2p[*g]);
+            c += 1;
+        }
+    }
+    Debugf (" %s\n-----------------\n", c == 0 ? "REDUCED" : "");
+
+    swap (por->alg, lipton->del); // NO DELETION CALLS AFTER
+
+    return c == 0;
+    (void) group;
+}
+
+/**
+ * Calls the deletion algorithm to figure out whether a dependent action is
+ * reachable. Dependent is left-dependent in the post-phase and right-dependent
+ * in the pre-phase. However, because we check the pre-phase only after the
+ * fact (after the execution of the action), we cannot use the algorithm in
+ * the normal way. Instead, for the right-depenency check, we fix the
+ * dependents directly in the deletion algorithm (instead of the action itself).
+ * For left-commutativity, we need to check that all enabled actions commute in
+ * non-stubborn futures. Therefore, we fix all enabled actions of the process in
+ * that case.
+ * The inclusion takes care that the algorithm does not attempt to delete
+ * the process' enabled actions.
+ */
+static bool
+lipton_comm_del (lipton_ctx_t *lipton, process_t *proc, int group,
+                 int *src, commute_e comm)
+{
+    ci_list            *list;
+    if (comm == COMMUTE_RGHT) {
+        if (lipton_comm_static(lipton, group, comm)) return true;
+        if (SAFETY && bms_has(lipton->visible, comm, group)) return false;
+        list = lipton->por->not_left_accordsn[group];
+    } else {
+        if (lipton_comm_all_static(lipton, proc->en, comm)) return true;
+        for (int *g = ci_begin (proc->en); SAFETY && g != ci_end (proc->en); g++) {
+            if (bms_has(lipton->visible, comm, *g)) return false;
+        }
+        list = proc->en;
+    }
+
+    por_context        *por = lipton->por;
+    por_init_transitions (por->parent, por, src);
+    bms_clear_all (por->fix);
+    bms_clear_all (por->include);
+    for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++)
+        bms_push (por->include, 0, *g);
+    for (int *g = ci_begin(list); g != ci_end(list); g++)
+        bms_push (por->fix, 0, *g);
+    return lipton_calc_del (lipton, proc, group, comm);
 }
 
 static inline void
-lipton_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
+lipton_init_visibles (lipton_ctx_t* lipton, int* src)
 {
-    // TODO: ti->group, cpy, labels (also in leaping)
-    lipton_ctx_t       *lipton = (lipton_ctx_t*) context;
-    phase_e             phase = lipton->src->phase;
-    int                 proc = lipton->src->proc;
-    if (phase == PRE__COMMIT && !lipton_commutes(lipton, ti->group, lipton->p_rght_dep))
-        phase = POST_COMMIT;
-    lipton_stack (lipton, lipton->queue[1], dst, proc, phase, ti->group);
-    (void) cpy;
+    if (lipton->visible_initialized) return;
+    lipton->visible_initialized = 1;
+
+    por_context        *por = lipton->por;
+    por_init_transitions (por->parent, por, src);
+    ci_list            *vis = bms_list (por->visible_labels, 0);
+    for (int* l = ci_begin (vis); l != ci_end (vis); l++) {
+        for (int* g = ci_begin (por->label_nds[*l]);
+                        g != ci_end (por->label_nds[*l]); g++) {
+            bms_push_new (lipton->visible, COMMUTE_RGHT, *g);
+        }
+    }
+    for (int* l = ci_begin (vis); l != ci_end (vis); l++) {
+        for (int* g = ci_begin (por->label_nes[*l]);
+                        g != ci_end (por->label_nes[*l]); g++) {
+            bms_push_new (lipton->visible, COMMUTE_LEFT, *g);
+        }
+    }
+    Print1 (infoLong, "LIPTON visible groups: %zu (right), %zu (left) / %zu",
+            bms_count(lipton->visible, COMMUTE_RGHT), bms_count(lipton->visible, COMMUTE_LEFT), por->nlabels);
+    bms_debug_1 (lipton->visible, COMMUTE_RGHT);
+    bms_debug_1 (lipton->visible, COMMUTE_LEFT);
+    bms_clear_all (por->visible);
+    bms_clear_all (por->visible_labels);
 }
 
-void
-lipton_emit_one (lipton_ctx_t *lipton, int *dst, int group)
+static bool
+lipton_comm (lipton_ctx_t* lipton, process_t* proc, int group, int* src, commute_e comm)
 {
-    group = lipton->depth == 1 ? group : lipton->lipton_group;
-    transition_info_t       ti = GB_TI (NULL, group);
-    ti.por_proviso = 1; // force proviso true
-    lipton->ucb (lipton->uctx, &ti, dst, NULL);
-    lipton->emitted += 1;
+    lipton_init_visibles (lipton, src);
+    bool            rc = comm == COMMUTE_RGHT;
+    if (USE_DEL) return lipton_comm_del (lipton, proc, group, src, comm);
+    else if (rc) return lipton_comm_static (lipton, group, COMMUTE_RGHT);
+    else         return lipton_comm_all_static (lipton, proc->en, COMMUTE_LEFT);
 }
 
 static void
@@ -150,41 +232,40 @@ lipton_init_proc_enabled (lipton_ctx_t *lipton, int *src, process_t *proc,
     }
 }
 
-static bool
-lipton_calc_commutes (lipton_ctx_t *lipton, process_t *proc, ci_list **deps)
+static inline stack_data_t *
+lipton_stack (lipton_ctx_t *lipton, dfs_stack_t q, int *dst, int proc,
+              phase_e phase, int group)
 {
-    por_context        *por = lipton->por;
+    HREassert (group == GROUP_NONE || group < lipton->por->ngroups);
+    stack_data_t       *data = (stack_data_t*) dfs_stack_push (q, NULL);
+    memcpy (&data->state, dst, sizeof(int[lipton->por->nslots]));
+    data->group = group;
+    data->proc = proc;
+    data->phase = phase;
+    return data;
+}
 
-    size_t c = 0;
-    for (int *g = ci_begin(proc->en); c == 0 && g != ci_end(proc->en); g++)
-        c += deps[*g]->count;
-    if (c == 0) return true;
+static inline void
+lipton_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
+{
+    // TODO: ti->group, cpy, labels (also in leaping)
+    lipton_ctx_t       *lipton = (lipton_ctx_t*) context;
+    phase_e             phase = lipton->src->phase;
+    int                 proc = lipton->src->proc;
+//    if (phase == PRE__COMMIT && !lipton_commutes(lipton, ti->group, lipton->p_rght_dep))
+//        phase = POST_COMMIT;
+    lipton_stack (lipton, lipton->queue[1], dst, proc, phase, ti->group);
+    (void) cpy;
+}
 
-    swap (por->alg, lipton->del);  // NO DELETION CALLS BEFORE
-
-    por->not_left_accordsn = deps == lipton->p_left_dep ?
-                        lipton->not_left_accordsn : lipton->not_left_accords;
-    del_por (por);
-    int                 count1 = 0;
-    for (int *g = ci_begin(por->enabled_list); !count1 && g != ci_end(por->enabled_list); g++) {
-        count1 += lipton->g2p[*g] != proc->id && del_is_stubborn(por, *g);
-    }
-
-    int                 count2 = 0;
-//    if (left) {
-//        for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++) {
-//            count2 += !del_is_stubborn_key(por, *g);
-//        }
-//    }
-
-    swap (por->alg, lipton->del); // NO DELETION CALLS AFTER
-
-    if (count1 > 0 || count2 > 0) {
-        if (count2 > 0 && count2 != proc->en->count)
-            Debug ("Lost precision in key transition handling. Implement it on a per-transition basis.");
-        return false;
-    }
-    return true;
+void
+lipton_emit_one (lipton_ctx_t *lipton, int *dst, int group)
+{
+    group = lipton->depth == 1 ? group : lipton->lipton_group;
+    transition_info_t       ti = GB_TI (NULL, group);
+    ti.por_proviso = 1; // force proviso true
+    lipton->ucb (lipton->uctx, &ti, dst, NULL);
+    lipton->emitted += 1;
 }
 
 static bool //FIX: return values (N, seen, new)
@@ -211,27 +292,14 @@ lipton_gen_succs (lipton_ctx_t *lipton, stack_data_t *state)
         return false;
     }
 
-    if (USE_DEL) {
-        for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++) {
-            bms_push (por->include, 0, *g);
-        }
-        por_init_transitions (por->parent, por, src);
-
-        // left commutativity
-        lipton->commutes_left = lipton_calc_commutes (lipton, proc, lipton->p_left_dep);
-        // right commutativity
-        lipton->commutes_right = lipton_calc_commutes (lipton, proc, lipton->p_rght_dep);
-
-        bms_clear_all (por->include);
+    if (lipton->depth != 0 && phase == PRE__COMMIT &&
+                                !lipton_comm(lipton, proc, group, src, COMMUTE_RGHT)) {
+        phase = state->phase = POST_COMMIT;
     }
 
-    if (phase == POST_COMMIT) {
-        for (int *g = ci_begin (proc->en); g != ci_end (proc->en); g++) {
-            if (!lipton_commutes(lipton, *g, lipton->p_left_dep)) {
-                lipton_emit_one (lipton, src, group);
-                return false;
-            }
-        }
+    if (phase == POST_COMMIT && !lipton_comm(lipton, proc, group, src, COMMUTE_LEFT)) {
+        lipton_emit_one (lipton, src, group);
+        return false;
     }
 
     lipton->src = state;
@@ -282,7 +350,7 @@ static void
 lipton_setup (model_t model, por_context *por, TransitionCB ucb, void *uctx)
 {
     HREassert (bms_count(por->exclude, 0) == 0, "Not implemented for Lipton reduction.");
-    HREassert (bms_count(por->include, 0) == 0, "Not implemented for Lipton reduction.");
+//    HREassert (bms_count(por->include, 0) == 0, "Not implemented for Lipton reduction.");
 
     lipton_ctx_t       *lipton = (lipton_ctx_t *) por->alg;
 
@@ -316,10 +384,9 @@ lipton_create (por_context *por, model_t model)
     lipton->queue[1] = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
     lipton->commit   = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
     lipton->por = por;
-    lipton->not_left_accords = por->not_left_accords;
-    lipton->not_left_accordsn = por->not_left_accordsn;
+    lipton->nla[COMMUTE_RGHT] = por->not_left_accords;
+    lipton->nla[COMMUTE_LEFT] = por->not_left_accordsn;
     for (size_t i = 0; i < lipton->num_procs; i++) {
-        lipton->procs[i].transaction = bms_create (por->ngroups, 1);
         lipton->procs[i].fset = fset_create (sizeof(int[por->nslots]), 0, 4, 10);
     }
     if (USE_DEL) {
@@ -330,6 +397,22 @@ lipton_create (por_context *por, model_t model)
     lipton->lipton_group = por->ngroups;
 
     HREassert (lipton->num_procs < (1ULL << PROC_BITS));
+    lipton->visible_initialized = 0;
+    lipton->visible = bms_create (por->ngroups, COMMUTE_COUNT);
+
+
+    matrix_t            tmp;
+    dm_create (&tmp, por->ngroups, por->ngroups);
+    for (int g = 0; g < por->ngroups; g++) {
+        for (int h = 0; h < por->ngroups; h++) {
+            if (lipton->g2p[g] == lipton->g2p[h]) continue;
+            if (dm_is_set(por->nla, g, h)) {
+                dm_set (&tmp, g, h); // self-enablement isn't captured in NES
+            }
+        }
+    }
+    lipton->nla[COMMUTE_RGHT] = (ci_list **) dm_cols_to_idx_table (&tmp); // not need to remove local transitions
+    dm_free (&tmp);
 
     matrix_t            nes;
     dm_create (&nes, por->ngroups, por->ngroups);
@@ -388,14 +471,28 @@ lipton_create (por_context *por, model_t model)
             }
         }
     }
-    lipton->p_left_dep = (ci_list**) dm_rows_to_idx_table (&p_left_dep);
-    lipton->p_rght_dep = (ci_list**) dm_rows_to_idx_table (&p_rght_dep);
+    lipton->commute[COMMUTE_LEFT] = (ci_list**) dm_rows_to_idx_table (&p_left_dep);
+    lipton->commute[COMMUTE_RGHT] = (ci_list**) dm_rows_to_idx_table (&p_rght_dep);
 
     Printf1(infoLong, "Process --> Left Conflict groups:\n");
     for (size_t i = 0; i < lipton->num_procs; i++) {
         Printf1(infoLong, "%3zu: ", i);
         for (int g = 0; g < por->ngroups; g++) {
-            for (int *o = ci_begin(lipton->p_left_dep[g]); o != ci_end(lipton->p_left_dep[g]); o++) {
+            for (int *o = ci_begin(lipton->commute[COMMUTE_LEFT][g]);
+                      o != ci_end(lipton->commute[COMMUTE_LEFT][g]); o++) {
+                if (*o == (int) i) {
+                    Printf1(infoLong, "%3d,", g);
+                }
+            }
+        }
+        Printf1(infoLong, "\n");
+    }
+    Printf1(infoLong, "Process --> Right Conflict groups:\n");
+    for (size_t i = 0; i < lipton->num_procs; i++) {
+        Printf1(infoLong, "%3zu: ", i);
+        for (int g = 0; g < por->ngroups; g++) {
+            for (int *o = ci_begin(lipton->commute[COMMUTE_RGHT][g]);
+                      o != ci_end(lipton->commute[COMMUTE_RGHT][g]); o++) {
                 if (*o == (int) i) {
                     Printf1(infoLong, "%3d,", g);
                 }
@@ -405,7 +502,6 @@ lipton_create (por_context *por, model_t model)
     }
     dm_free (&p_left_dep);
     dm_free (&p_rght_dep);
-
     return lipton;
 }
 
