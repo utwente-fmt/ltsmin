@@ -96,10 +96,8 @@ lipton_calc_del (lipton_ctx_t *lipton, process_t *proc, int group, commute_e com
 {
     por_context        *por = lipton->por;
 
-    swap (por->alg, lipton->del);  // NO DELETION CALLS BEFORE
-
     por->not_left_accordsn = lipton->nla[comm];
-    del_por (por, false);
+    del_por (lipton->del, false);
     int                 c = 0;
     Debugf ("LIPTON: DEL checking proc %d group %d (%s)", proc->id, group, comm==COMMUTE_LEFT?"left":"right");
     if (debug) {
@@ -110,14 +108,12 @@ lipton_calc_del (lipton_ctx_t *lipton, process_t *proc, int group, commute_e com
     }
     Debugf ("LIPTON: DEL found: ");
     for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
-        if (lipton->g2p[*g] != proc->id && del_is_stubborn(por, *g)) {
+        if (lipton->g2p[*g] != proc->id && del_is_stubborn(lipton->del, *g)) {
             Debugf ("%d(%d), ", *g, lipton->g2p[*g]);
             c += 1;
         }
     }
     Debugf (" %s\n-----------------\n", c == 0 ? "REDUCED" : "");
-
-    swap (por->alg, lipton->del); // NO DELETION CALLS AFTER
 
     return c == 0;
     (void) group;
@@ -185,7 +181,7 @@ lipton_init_visibles (lipton_ctx_t* lipton, int* src)
             bms_push_new (lipton->visible, COMMUTE_LEFT, *g);
         }
     }
-    Print1 (infoLong, "LIPTON visible groups: %zu (right), %zu (left) / %zu",
+    Print1 (infoLong, "LIPTON visible groups: %d (right), %d (left) / %d",
             bms_count(lipton->visible, COMMUTE_RGHT), bms_count(lipton->visible, COMMUTE_LEFT), por->nlabels);
     bms_debug_1 (lipton->visible, COMMUTE_RGHT);
     bms_debug_1 (lipton->visible, COMMUTE_LEFT);
@@ -252,8 +248,6 @@ lipton_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     lipton_ctx_t       *lipton = (lipton_ctx_t*) context;
     phase_e             phase = lipton->src->phase;
     int                 proc = lipton->src->proc;
-//    if (phase == PRE__COMMIT && !lipton_commutes(lipton, ti->group, lipton->p_rght_dep))
-//        phase = POST_COMMIT;
     lipton_stack (lipton, lipton->queue[1], dst, proc, phase, ti->group);
     (void) cpy;
 }
@@ -368,7 +362,7 @@ lipton_por_all (model_t model, int *src, TransitionCB ucb, void *uctx)
 }
 
 lipton_ctx_t *
-lipton_create (por_context *por, model_t model)
+lipton_create (por_context *por, model_t pormodel)
 {
     HRE_ASSERT (GROUP_BITS + PROC_BITS + 1 == 32);
     HREassert (por->ngroups < (1LL << GROUP_BITS) - 1, // minus GROUP_NONE
@@ -384,7 +378,7 @@ lipton_create (por_context *por, model_t model)
     lipton->queue[1] = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
     lipton->commit   = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
     lipton->por = por;
-    lipton->nla[COMMUTE_RGHT] = por->not_left_accords;
+    lipton->nla[COMMUTE_RGHT] = por->not_left_accords;   // Overwritten with better version to fix after-the-fact POR
     lipton->nla[COMMUTE_LEFT] = por->not_left_accordsn;
     for (size_t i = 0; i < lipton->num_procs; i++) {
         lipton->procs[i].fset = fset_create (sizeof(int[por->nslots]), 0, 4, 10);
@@ -393,7 +387,7 @@ lipton_create (por_context *por, model_t model)
         lipton->del = del_create (por);
     }
 
-    leap_add_leap_group (model, por->parent);
+    leap_add_leap_group (pormodel, por->parent);
     lipton->lipton_group = por->ngroups;
 
     HREassert (lipton->num_procs < (1ULL << PROC_BITS));

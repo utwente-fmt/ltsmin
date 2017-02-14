@@ -120,8 +120,8 @@ handle_proviso (ample_t *a, prov_t *provctx, int *src)
 static ci_list *
 init_scc_edges (scc_ctx_t *ctx, size_t i)
 {
-    ample_t* a = ctx->ample;
-    process_t* pp = &a->procs[i];
+    ample_t            *a = ctx->ample;
+    process_t          *pp = &a->procs[i];
     ci_clear (pp->succs);
     if (pp->visible || pp->en->count == 0) {
         for (size_t j = 0; j < a->num_procs; j++) {
