@@ -62,6 +62,7 @@ struct tr_ctx_s {
     del_ctx_t          *del;        // deletion context
     matrix_t            must_dis; // group X group
     matrix_t            must_ena; // group X group
+    matrix_t            equiv_one; // group X group   never codisabled on one guard's account
     ci_list           **nla[COMMUTE_COUNT];
     bms_t              *visible;
     int                 visible_initialized;
@@ -108,6 +109,7 @@ tr_emit_one (tr_ctx_t *tr, int *dst, int group)
     ti.por_proviso = 1; // force proviso true
     tr->ucb (tr->uctx, &ti, dst, NULL);
     tr->emitted += 1;
+    Debugf ("EMITTED\n\n");
 }
 
 
@@ -116,9 +118,17 @@ tr_same_proc_criteria (tr_ctx_t *tr, dyn_process_t *proc, int g)
 {
     if (tr->g2p[g] != -1) return false; // already claimed by another proc
     for (int *h = ci_begin (proc->en); h != ci_end (proc->en); h++) {
-        if (!dm_is_set (&tr->must_dis, *h, g) ||
-            !dm_is_set (&tr->must_dis, g, *h)) {
-            return false;
+        if (TR_MODE == 0) {
+            if (!dm_is_set (&tr->must_dis, *h, g) ||
+                !dm_is_set (&tr->must_dis, g, *h)) {
+                return false;
+            }
+        } else if (TR_MODE == 1) {
+            if (!dm_is_set (&tr->equiv_one, g, *h)) {
+                return false;
+            }
+        } else {
+            Abort ("TR: unimplemented mode: %d", TR_MODE);
         }
     }
     return true;
@@ -138,39 +148,36 @@ tr_does_commute (tr_ctx_t *tr, dyn_process_t *proc)
 
 
 static bool
-tr_calc_del (tr_ctx_t *tr, dyn_process_t *proc, int group, comm_e comm)
+tr_calc_del (tr_ctx_t *tr, dyn_process_t *proc, comm_e comm)
 {
     por_context        *por = tr->por;
 
     por->not_left_accordsn = tr->nla[comm];
     del_por (tr->del, false);
-    Debugf ("TR: DEL checking proc %d group %d (%s)", proc->id, group, comm==COMMUTE_LEFT?"left":"right");
     if (debug) {
+        Debugf ("TR-%d DEL in-group %d (%s)", proc->id, tr->src->group, comm==COMMUTE_LEFT?"left, outgoing":"right, incoming");
         Debugf (" enabled { ");
         for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++)
-            Debugf ("%d, ", *g);
+            Debugf ("%3d,", *g);
         Debugf ("}\n");
     }
-    Debugf ("TR: DEL found: ");
 
     bool                commutes = tr_does_commute (tr, proc);
-    Debugf (" %s\n-----------------\n", commutes ? "REDUCED" : "");
+    Debugf ("TR-%d DEL %s\n", proc->id, commutes ? "REDUCED" : "");
     if (commutes) { // add all stubborn transitions (enabled and diabled)
-        Debugf ("TR adding to proc %d enableds: ", proc->id);
+        Debugf ("TR-%d adding enableds { ", proc->id);
         for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
             if (!del_is_stubborn(tr->del, *g) || tr->g2p[*g] == proc->id) continue;
             HREassert (tr->g2p[*g] == -1);
             tr->g2p[*g] = proc->id;
             ci_add (proc->groups, *g);
             ci_add (proc->en, *g);
-            Debugf ("%d, ", *g);
+            Debugf ("%3d,", *g);
         }
-        Debugf ("\n");
+        Debugf ("}\n");
     }
-    Debugf ("\n");
 
     return commutes;
-    (void) group;
 }
 
 /**
@@ -187,27 +194,32 @@ tr_calc_del (tr_ctx_t *tr, dyn_process_t *proc, int group, comm_e comm)
  * the process' enabled actions.
  */
 static bool
-tr_comm (tr_ctx_t *tr, dyn_process_t *proc, int group, int *src, comm_e comm)
+tr_comm_rght (tr_ctx_t *tr, dyn_process_t *proc, int group, int *src)
 {
-
-    ci_list            *list;
-    if (comm == COMMUTE_RGHT) {
-        if (SAFETY && bms_has(tr->visible, comm, group)) return false;
-        list = tr->por->not_left_accordsn[group];
-    } else {
-        for (int *g = ci_begin (proc->en); SAFETY && g != ci_end (proc->en); g++)
-            if (bms_has(tr->visible, comm, *g)) return false;
-        list = proc->en;
-    }
-
     por_context        *por = tr->por;
+    if (SAFETY && bms_has(tr->visible, COMMUTE_RGHT, group)) return false;
     bms_clear_all (por->fix);
     bms_clear_all (por->include);
     for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++)
         bms_push (por->include, 0, *g);
-    for (int *g = ci_begin(list); g != ci_end(list); g++)
+    for (int *g = ci_begin(tr->por->not_left_accordsn[group]); g != ci_end(tr->por->not_left_accordsn[group]); g++)
         bms_push (por->fix, 0, *g);
-    return tr_calc_del (tr, proc, group, comm);
+    return tr_calc_del (tr, proc, COMMUTE_RGHT);
+}
+
+static bool
+tr_comm_left (tr_ctx_t *tr, dyn_process_t *proc, int *src)
+{
+    por_context        *por = tr->por;
+    for (int *g = ci_begin (proc->en); SAFETY && g != ci_end (proc->en); g++)
+        if (bms_has(tr->visible, COMMUTE_LEFT, *g)) return false;
+    bms_clear_all (por->fix);
+    bms_clear_all (por->include);
+    for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++)
+        bms_push (por->include, 0, *g);
+    for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++)
+        bms_push (por->fix, 0, *g);
+    return tr_calc_del (tr, proc, COMMUTE_LEFT);
 }
 
 static void
@@ -216,9 +228,12 @@ tr_init_proc_enabled (tr_ctx_t *tr, int *src, dyn_process_t *proc, int g_prev)
     ci_clear (proc->en);
     por_context            *por = tr->por;
     if (tr->depth > 0) por_init_transitions (por->parent, por, src);
+    Debugf ("en { ");
     for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
         ci_add_if (proc->en, *g, tr->g2p[*g] == proc->id);
+        if (tr->g2p[*g] == proc->id) Debugf ("%3d,", *g);
     }
+    Debugf ("}\n");
     (void) g_prev;
 }
 
@@ -231,33 +246,44 @@ tr_gen_succs (tr_ctx_t *tr, stack_data_t *state)
     int                *src = state->state;
     dyn_process_t      *proc = &tr->procs[state->proc];
 
+    Debugf ("TR-%d in-group %3d ", proc->id, group == GROUP_NONE ? - 1 : group);
     if (CHECK_SEEN && tr->depth != 0 && por_seen(src, group, true)) {
+        Debugf ("SEEN ");
         tr_emit_one (tr, src, group);
         return false;
     }
-
-    //int                 seen = fset_find (proc->fset, NULL, src, NULL, true);
-    //HREassert (seen != FSET_FULL, "Table full");
-    //if (seen) return false;
     tr_init_proc_enabled (tr, src, proc, group);
 
-    if (tr->depth > 0 && phase == PRE__COMMIT && !tr_comm(tr, proc, group, src, COMMUTE_RGHT)) {
+    if (group != GROUP_NONE && phase == PRE__COMMIT && !tr_comm_rght(tr, proc, group, src)) {
         phase = state->phase = POST_COMMIT;
     }
-    if (phase == POST_COMMIT && !tr_comm(tr, proc, group, src, COMMUTE_LEFT)) {
+    if (proc->en->count == 0) {
+        HREassert (group != GROUP_NONE);
+        for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
+            if (!dm_is_set(&tr->must_ena, group, *g)) continue;
+            tr->g2p[*g] = proc->id;
+            ci_add (proc->groups, *g);
+            ci_add (proc->en, *g);
+            break;
+        }
+    }
+    if (phase == POST_COMMIT && !tr_comm_left(tr, proc, src)) {
         tr_emit_one (tr, src, group);
         return false;
     }
-    if (proc->en->count == 0) {  // avoid re-emition of external start state:
-        if (tr->depth != 0) tr_emit_one (tr, src, group);
+    if (proc->en->count == 0) {
+        HREassert (group != GROUP_NONE);
+        tr_emit_one (tr, src, group);
         return false;
     }
 
+    Debugf ("TR-%d stepping { ", proc->id);
     tr->src = state;
     for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++) {
         GBgetTransitionsLong (por->parent, *g, src, tr_cb, tr);
+        Debugf ("%3d,", *g);
     }
-
+    Debugf ("}\n\n");
     return true;
 }
 
@@ -324,7 +350,7 @@ tr_lipton (por_context *por, int *src)
         if (tr->g2p[tr->num_procs] != -1) continue;
 
         dyn_process_t           *proc = &tr->procs[tr->num_procs];
-        Debugf ("TR-%d initializing with group %d --> [ ", proc->id, *g);
+        Debugf ("TR-%d initializing with group %3d\n", proc->id, *g);
         ci_clear (proc->groups);
         // fset_clear (proc->fset);
         tr->g2p[*g] = tr->num_procs;
@@ -332,7 +358,6 @@ tr_lipton (por_context *por, int *src)
         state->proc = tr->num_procs;
         tr_gen_succs (tr, state);
         tr->num_procs++;
-        Debugf (" ]\n");
     }
     dfs_stack_pop (tr->queue[0]);
 
@@ -415,6 +440,36 @@ tr_create (por_context *por, model_t pormodel)
         }
     }
 
+    id = GBgetMatrixID (por->parent, LTSMIN_MAYBE_INV_COENANBLED);
+    if (id == SI_INDEX_FAILED) Abort ("TR requires a maybe co-disabled matrix.");
+    matrix_t               *ice = GBgetMatrix (por->parent, id);
+    // !dm_is_set(ice, g1m g2)  <===>  forall s : g2(s) ==> g1(s)
+    dm_create (&tr->equiv_one, por->ngroups, por->ngroups);
+    for (int g = 0; g < por->ngroups; g++) {
+        for (int h = 1; h < g; h++) {
+            // look for one guard of each s.t. g1 <===> g2
+            bool            equiv = false;
+            for (int *l = ci_begin(por->group2guard[g]); !equiv && l != ci_end(por->group2guard[g]); l++) {
+                for (int *k = ci_begin(por->group2guard[h]); !equiv && k != ci_end(por->group2guard[h]); k++) {
+                    equiv |= *l == *k || (!dm_is_set(ice, *k, *l) && !dm_is_set(ice, *l, *k));
+                }
+            }
+            if (equiv) {
+                dm_set (&tr->equiv_one, g, h);
+                dm_set (&tr->equiv_one, h, g);
+            }
+        }
+        dm_set (&tr->equiv_one, g, g);
+    }
+
+    Printf1(infoLong, "Group --> group equiv_one:\n");
+    for (int g = 0; g < por->ngroups; g++) {
+        Printf1(infoLong, "%3d: ", g);
+        for (int h = 0; h < por->ngroups; h++) {
+            if (dm_is_set(&tr->equiv_one, g, h)) Printf1(infoLong, "%3d,", h);
+        }
+        Printf1(infoLong, "\n");
+    }
 
     return tr;
 }

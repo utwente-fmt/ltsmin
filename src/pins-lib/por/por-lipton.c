@@ -452,7 +452,7 @@ lipton_create (por_context *por, model_t pormodel)
     for (size_t g = 0; g < (size_t) por->ngroups; g++) {
         size_t              i = lipton->g2p[g];
         for (size_t j = 0; j < lipton->num_procs; j++) {
-            if (i == j) continue;
+            if (TR_MODE == 0 && i == j) continue;
             process_t          *o = &lipton->procs[j];
             int                 d = 0;
             for (int *h = ci_begin(o->groups); d != 3 && h != ci_end(o->groups); h++) {
