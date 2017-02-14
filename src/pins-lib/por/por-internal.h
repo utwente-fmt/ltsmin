@@ -11,6 +11,7 @@
 extern int SAFETY;
 extern int POR_WEAK;
 
+extern int TR_MODE;
 extern int NO_MCNDS;
 extern int NO_V;
 extern int PREFER_NDS;
@@ -93,10 +94,10 @@ struct por_ctx {
     int             *group_score;   // score assigned to each group by heuristic function
     int             *nes_score;     // Template for the nes_score
 
-    bms_t           *fix;
-    bms_t           *include;
-    bms_t           *exclude;
-    int              src_changed;
+    bms_t           *fix;           // must include (remove or fail: T_s==en(s))
+    bms_t           *include;       // may include (prefer keeping)
+    bms_t           *exclude;       // may exclude (prefer removal / try to remove)
+    int              src_changed;   // for --seen (leap / lipton / tr change POR src state)
 
     leap_t          *leap;
 };

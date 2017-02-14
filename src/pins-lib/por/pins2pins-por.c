@@ -31,6 +31,8 @@ int PREFER_NDS = 0;
 int CHECK_SEEN = 0;
 int NO_MC = 0;
 int USE_DEL = 0;
+int POR_WEAK = 0;
+int TR_MODE = 0;
 
 static int NO_COMMUTES = 0;
 static int NO_DNA = 0;
@@ -50,8 +52,6 @@ static si_map_entry por_weak[]={
     {"valmari", WEAK_VALMARI},
     {NULL, 0}
 };
-
-int POR_WEAK = 0; //extern
 
 por_alg_t    PINS_POR_ALG = POR_UNINITIALIZED;
 
@@ -125,6 +125,7 @@ struct poptOption por_options[]={
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
     { "seen" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &CHECK_SEEN , 1 , "Prefer visited successor states" , NULL },
     { "del" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &USE_DEL , 1 , "Use deletion in Lipton" , NULL },
+    { "tr" , 0, POPT_ARG_INT | POPT_ARGFLAG_DOC_HIDDEN , &TR_MODE , 0 , "TR mode" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
     { "no-mc" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MC , 1 , "without MC" , NULL },
     { "no-mcnds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MCNDS , 1 , "Do not create NESs from MC and NDS" , NULL },
