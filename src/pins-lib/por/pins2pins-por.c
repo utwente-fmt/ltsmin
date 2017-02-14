@@ -18,6 +18,7 @@
 #include <pins-lib/por/por-internal.h>
 #include <pins-lib/por/por-leap.h>
 #include <pins-lib/por/por-lipton.h>
+#include <pins-lib/por/por-tr.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/por/pins2pins-por-check.h>
 #include <util-lib/dfs-stack.h>
@@ -60,6 +61,7 @@ static si_map_entry por_algorithm[]={
     {"heur",    POR_BEAM},
     {"del",     POR_DEL},
     {"lipton",  POR_LIPTON},
+    {"tr",      POR_TR},
     {"ample",   POR_AMPLE},
     {"ample1",  POR_AMPLE1},
     {NULL, 0}
@@ -805,6 +807,11 @@ PORwrapper (model_t model)
         ctx->alg = lipton_create (ctx, pormodel);
         break;
     }
+    case POR_TR: {
+        next_all = tr_por_all;
+        ctx->alg = tr_create (ctx, pormodel);
+        break;
+    }
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, PINS_POR_ALG));
     }
     GBsetNextStateAll   (pormodel, next_all);
@@ -865,7 +872,8 @@ por_is_stubborn (por_context *ctx, int group)
     case POR_BEAM:      return beam_is_stubborn (ctx, group);
     case POR_DEL:       return del_is_stubborn ((del_ctx_t *)ctx->alg, group);
     case POR_LIPTON:    return lipton_is_stubborn (ctx, group);
-    default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
+    case POR_TR:        return tr_is_stubborn (ctx, group);
+    default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, PINS_POR_ALG));
     }
 }
 

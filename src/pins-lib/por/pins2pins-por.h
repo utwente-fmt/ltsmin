@@ -112,6 +112,7 @@ typedef enum {
     POR_BEAM,
     POR_DEL,
     POR_LIPTON,
+    POR_TR,
     POR_UNINITIALIZED = -1,
 } por_alg_t;
 
