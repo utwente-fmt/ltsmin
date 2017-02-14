@@ -25,6 +25,8 @@ libpor_la_SOURCES += por-leap.h
 libpor_la_SOURCES += por-leap.c
 libpor_la_SOURCES += por-lipton.h
 libpor_la_SOURCES += por-lipton.c
+libpor_la_SOURCES += por-tr.h
+libpor_la_SOURCES += por-tr.c
 libpor_la_SOURCES += pins2pins-por-check.h
 libpor_la_SOURCES += pins2pins-por-check.c
 
