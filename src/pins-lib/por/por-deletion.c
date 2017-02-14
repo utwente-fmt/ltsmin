@@ -47,10 +47,11 @@ struct del_ctx_s {
     int                 invisible_enabled;
     bool                has_invisible;
     bool                del_v;
+    por_context        *por;
 };
 
 del_ctx_t *
-del_create (por_context* ctx)
+del_create (por_context *ctx)
 {
     del_ctx_t *delctx = RTmalloc (sizeof(del_ctx_t));
     delctx->del = bms_create (ctx->ngroups, DEL_COUNT);
@@ -60,6 +61,7 @@ del_create (por_context* ctx)
     delctx->tmp    = ci_create (ctx->ngroups);
     delctx->group_score  = RTmallocZero (ctx->ngroups * sizeof(int));
     delctx->nes_score    = RTmallocZero (NS_SIZE(ctx) * sizeof(int));
+    delctx->por = ctx;
     return delctx;
 }
 
@@ -70,9 +72,9 @@ del_enabled (por_context* ctx, int u)
 }
 
 static void
-deletion_setup (por_context* ctx, bool reset)
+deletion_setup (del_ctx_t *delctx, bool reset)
 {
-    del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
+    por_context     *ctx = delctx->por;
     bms_t           *del = delctx->del;
     if (ctx->enabled_list->count == 0) return;
 
@@ -126,9 +128,9 @@ deletion_setup (por_context* ctx, bool reset)
  * del_nes and del_nds indicate whether the visibles have already been deleted
  */
 static inline bool
-deletion_delete (por_context *ctx)
+deletion_delete (del_ctx_t *delctx)
 {
-    del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
+    por_context     *ctx = delctx->por;
     bms_t           *del = delctx->del;
 
     // search the deletion space:
@@ -221,10 +223,10 @@ deletion_delete (por_context *ctx)
 }
 
 static inline void
-deletion_analyze (por_context *ctx, ci_list *delete)
+deletion_analyze (del_ctx_t *delctx, ci_list *delete)
 {
     if (delete->count == 0) return;
-    del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
+    por_context        *ctx = delctx->por;
     bms_t              *del = delctx->del;
     delctx->del_v = false;
 
@@ -239,7 +241,7 @@ deletion_analyze (por_context *ctx, ci_list *delete)
         Debug ("Deletion start from v = %d: |E| = %d \t|K| = %d", v, ctx->enabled_list->count, bms_count(del, DEL_K));
 
         int             del_v_old = delctx->del_v;
-        bool            revert = deletion_delete (ctx);
+        bool            revert = deletion_delete (delctx);
 
         while (bms_count(del, DEL_Z) != 0) bms_pop (del, DEL_Z);
 
@@ -281,15 +283,15 @@ deletion_analyze (por_context *ctx, ci_list *delete)
 }
 
 static inline int
-deletion_emit_new (por_context *ctx, prov_t *provctx, int* src)
+deletion_emit_new (del_ctx_t *delctx, prov_t *provctx, int* src)
 {
-    del_ctx_t       *delctx = (del_ctx_t *) ctx->alg;
+    por_context     *ctx = delctx->por;
     bms_t           *del = delctx->del;
     int             c = 0, groups = 0;
     Debugf ("DEL: emit |{ ");
     for (int z = 0; z < ctx->enabled_list->count; z++) {
         int i = ctx->enabled_list->data[z];
-        if (del_is_stubborn(ctx,i) && !bms_has(del,DEL_E,i)) {
+        if (del_is_stubborn(delctx, i) && !bms_has(del,DEL_E,i)) {
             del->set[i] |= 1<<DEL_E | 1<<DEL_R;
             Debugf ("%d, ", i);
             groups++;
@@ -306,31 +308,31 @@ deletion_emit_new (por_context *ctx, prov_t *provctx, int* src)
 }
 
 static inline bool
-del_all_stubborn (por_context *ctx, ci_list *list)
+del_all_stubborn (del_ctx_t *delctx, ci_list *list)
 {
     for (int i = 0; i < list->count; i++)
-        if (!del_is_stubborn(ctx, list->data[i])) return false;
+        if (!del_is_stubborn(delctx, list->data[i])) return false;
     return true;
 }
 
 static inline int
-deletion_emit (por_context *ctx, int *src, TransitionCB cb, void *uctx)
+deletion_emit (del_ctx_t *delctx, int *src, TransitionCB cb, void *uctx)
 {
-    del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
+    por_context        *ctx = delctx->por;
     bms_t              *del = delctx->del;
     prov_t              provctx = {cb, uctx, 0, 0, 0};
 
     if (PINS_LTL || SAFETY) {
         if (NO_L12) {
-            provctx.force_proviso_true = del_all_stubborn(ctx,ctx->enabled_list);
+            provctx.force_proviso_true = del_all_stubborn(delctx, ctx->enabled_list);
         } else { // Deletion guarantees that I holds, but does V hold?
             provctx.force_proviso_true = !delctx->del_v;
             HRE_ASSERT (provctx.force_proviso_true ==
-                        del_all_stubborn(ctx,ctx->visible->lists[VISIBLE]));
+                        del_all_stubborn(delctx,ctx->visible->lists[VISIBLE]));
         }
     }
 
-    int emitted = deletion_emit_new (ctx, &provctx, src);
+    int emitted = deletion_emit_new (delctx, &provctx, src);
 
     // emit more if we need to fulfill a liveness / safety proviso
     if ( ( PINS_LTL && provctx.por_proviso_false_cnt != 0) ||
@@ -340,16 +342,16 @@ deletion_emit (por_context *ctx, int *src, TransitionCB cb, void *uctx)
                 int x = ctx->enabled_list->data[i];
                 del->set[x] |= (1 << DEL_N);
             }
-            emitted += deletion_emit_new (ctx, &provctx, src);
+            emitted += deletion_emit_new (delctx, &provctx, src);
         } else {
             for (int i = 0; i < del->lists[DEL_V]->count; i++) {
                 int x = del->lists[DEL_V]->data[i];
                 del->set[x] |= 1 << DEL_R;
             }
-            deletion_setup (ctx, false);
-            deletion_analyze (ctx, ctx->enabled_list);
+            deletion_setup (delctx, false);
+            deletion_analyze (delctx, ctx->enabled_list);
 
-            emitted += deletion_emit_new (ctx, &provctx, src);
+            emitted += deletion_emit_new (delctx, &provctx, src);
         }
     }
 
@@ -357,16 +359,16 @@ deletion_emit (por_context *ctx, int *src, TransitionCB cb, void *uctx)
 }
 
 void
-del_por (por_context *ctx, bool prune_includes)
+del_por (del_ctx_t *delctx, bool prune_includes)
 {
-    del_ctx_t          *delctx = (del_ctx_t *) ctx->alg;
+    por_context        *ctx = delctx->por;
     bms_t              *del = delctx->del;
-    deletion_setup (ctx, true);
+    deletion_setup (delctx, true);
     for (int i = 0; i < bms_count(ctx->fix, 0); i++) {
         del->set[ bms_get(ctx->fix, 0, i) ] |= 1 << DEL_R; // retain
     }
     if (bms_count(ctx->exclude, 0) > 0) {
-        deletion_analyze (ctx, bms_list(ctx->exclude, 0));
+        deletion_analyze (delctx, bms_list(ctx->exclude, 0));
     }
     if (bms_count(ctx->include, 0) > 0) {
         ci_clear (delctx->tmp);
@@ -375,34 +377,33 @@ del_por (por_context *ctx, bool prune_includes)
                 ci_add (delctx->tmp, ctx->enabled_list->data[i]);
             }
         }
-        deletion_analyze (ctx, delctx->tmp);
-        if (prune_includes) deletion_analyze (ctx, bms_list(ctx->include, 0));
+        deletion_analyze (delctx, delctx->tmp);
+        if (prune_includes) deletion_analyze (delctx, bms_list(ctx->include, 0));
     } else {
-        deletion_analyze (ctx, ctx->enabled_list);
+        deletion_analyze (delctx, ctx->enabled_list);
     }
 }
 
 int
 del_por_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
-    por_context *ctx = ((por_context*)GBgetContext(self));
+    por_context *ctx = ((por_context *) GBgetContext(self));
+    del_ctx_t   *del = (del_ctx_t *) ctx->alg;
     por_init_transitions (self, ctx, src);
-    del_por (ctx, true);
-    return deletion_emit (ctx, src, cb, user_context);
+    del_por (del, true);
+    return deletion_emit (del, src, cb, user_context);
 }
 
 bool
-del_is_stubborn_key (por_context *ctx, int group)
+del_is_stubborn_key (del_ctx_t *delctx, int group)
 {
-    del_ctx_t *del_ctx = (del_ctx_t *)ctx->alg;
-    bms_t* del = del_ctx->del;
+    bms_t *del = delctx->del;
     return bms_has(del, DEL_K, group);
 }
 
 bool
-del_is_stubborn (por_context *ctx, int group)
+del_is_stubborn (del_ctx_t *delctx, int group)
 {
-    del_ctx_t *del_ctx = (del_ctx_t *)ctx->alg;
-    bms_t* del = del_ctx->del;
+    bms_t *del = delctx->del;
     return bms_has(del, DEL_N, group) || bms_has(del, DEL_K, group);
 }

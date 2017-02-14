@@ -863,7 +863,7 @@ por_is_stubborn (por_context *ctx, int group)
     case POR_AMPLE:
     case POR_AMPLE1:    return ample_is_stubborn (ctx, group);
     case POR_BEAM:      return beam_is_stubborn (ctx, group);
-    case POR_DEL:       return del_is_stubborn (ctx, group);
+    case POR_DEL:       return del_is_stubborn ((del_ctx_t *)ctx->alg, group);
     case POR_LIPTON:    return lipton_is_stubborn (ctx, group);
     default: Abort ("Unknown POR algorithm: '%s'", key_search(por_algorithm, alg));
     }
