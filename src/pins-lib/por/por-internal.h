@@ -12,6 +12,7 @@ extern int SAFETY;
 extern int POR_WEAK;
 
 extern int TR_MODE;
+extern int TR_MAX;
 extern int NO_MCNDS;
 extern int NO_V;
 extern int PREFER_NDS;
