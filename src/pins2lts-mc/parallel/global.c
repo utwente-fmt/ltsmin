@@ -13,6 +13,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/reach.h>
 #include <pins2lts-mc/algorithm/timed.h>
@@ -207,6 +208,8 @@ global_print_stats (model_t model, size_t local_state_infos, size_t stack)
     } else {
         Warning (info, "Table memory: %.1fMB, fill ratio: %.1f%%", memDB, fill);
     }
+    if (PINS_POR_ALG == POR_LIPTON || PINS_POR_ALG == POR_TR)
+        por_stats (model);
     double chunks = cct_print_stats (info, infoLong, GBgetLTStype(model),
                                      global->tables) / (1<<20);
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",

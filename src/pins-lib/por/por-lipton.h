@@ -15,4 +15,6 @@ extern int          lipton_por_all (model_t self, int *src, TransitionCB cb,
 
 extern bool         lipton_is_stubborn (por_context *ctx, int group);
 
+extern void         lipton_stats (model_t model);
+
 #endif

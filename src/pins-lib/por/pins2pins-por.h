@@ -138,4 +138,6 @@ typedef int (*state_find_f)(int *state, transition_info_t *ti, void *ctx);
 
 extern void por_set_find_state (state_find_f f, void *tmp);
 
+extern void por_stats (model_t model);
+
 #endif // PINS2PINS_POR

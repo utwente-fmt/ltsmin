@@ -34,4 +34,6 @@ extern int          leap_search_all (model_t self, int *src, TransitionCB cb,
 
 extern void         leap_add_leap_group (model_t por_model, model_t pre_por);
 
+extern void         leap_stats (model_t model);
+
 #endif
