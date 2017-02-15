@@ -259,7 +259,7 @@ fset_delete (fset_t *dbs, mem_hash_t *mem, void *key)
 
 int
 fset_find (fset_t *dbs, mem_hash_t *m, void *key, void **data,
-           bool insert_absert)
+           bool insert_absent)
 {
     HREassert (dbs->data_length == 0 || data);
     size_t              ref;
@@ -268,7 +268,7 @@ fset_find (fset_t *dbs, mem_hash_t *m, void *key, void **data,
     mem_hash_t          mem = m == NULL ? EMPTY : *m;
     int                 found = fset_locate (dbs, &mem, key, &ref, &tomb);
 
-    if (insert_absert && !found) {
+    if (insert_absent && !found) {
         // insert:
         if (tomb != NONE) {
             ref = tomb;
