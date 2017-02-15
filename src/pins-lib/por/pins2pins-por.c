@@ -879,6 +879,25 @@ por_is_stubborn (por_context *ctx, int group)
 }
 
 void
+por_stats (model_t model)
+{
+    if (leap) {
+        leap_stats (model);
+        return;
+    }
+
+    switch (PINS_POR_ALG) {
+    case POR_AMPLE:     break;
+    case POR_AMPLE1:    break;
+    case POR_BEAM:      break;
+    case POR_DEL:       break;
+    case POR_LIPTON:    lipton_stats (model); break;
+    case POR_TR:        tr_stats (model); break;
+    default: return;
+    }
+}
+
+void
 hook_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
 {
     prov_t *infoctx = (prov_t *)context;

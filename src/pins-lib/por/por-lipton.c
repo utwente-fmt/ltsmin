@@ -71,6 +71,11 @@ struct lipton_ctx_s {
     size_t              depth;
     bool                commutes_left;
     bool                commutes_right;
+    size_t              max_stack;
+    size_t              max_depth;
+    size_t              avg_stack;
+    size_t              avg_depth;
+    size_t              states;
 };
 
 static int
@@ -276,12 +281,12 @@ lipton_gen_succs (lipton_ctx_t *lipton, stack_data_t *state)
         return false;
     }
 
-    int                 seen = fset_find (proc->fset, NULL, src, NULL, true);
-    HREassert (seen != FSET_FULL, "Table full");
-    if (seen) return false;
+//    int                 seen = fset_find (proc->fset, NULL, src, NULL, true);
+//    HREassert (seen != FSET_FULL, "Table full");
+//    if (seen) return false;
     lipton_init_proc_enabled (lipton, src, proc, group);
 
-    if (proc->en->count == 0) {  // avoid re-emition of external start state:
+    if (proc->en->count == 0 && phase == POST_COMMIT ) {  // avoid re-emition of external start state:
         if (lipton->depth != 0) lipton_emit_one (lipton, src, group);
         return false;
     }
@@ -289,6 +294,11 @@ lipton_gen_succs (lipton_ctx_t *lipton, stack_data_t *state)
     if (lipton->depth != 0 && phase == PRE__COMMIT &&
                                 !lipton_comm(lipton, proc, group, src, COMMUTE_RGHT)) {
         phase = state->phase = POST_COMMIT;
+    }
+
+    if (proc->en->count == 0) {  // avoid re-emition of external start state:
+        if (lipton->depth != 0 && phase == POST_COMMIT) lipton_emit_one (lipton, src, group);
+        return false;
     }
 
     if (phase == POST_COMMIT && !lipton_comm(lipton, proc, group, src, COMMUTE_LEFT)) {
@@ -311,6 +321,8 @@ lipton_bfs (lipton_ctx_t *lipton) // RECURSIVE
     while (dfs_stack_size(lipton->queue[1])) {
         swap (lipton->queue[0], lipton->queue[1]);
         lipton->depth++;
+        lipton->max_stack = max (lipton->max_stack, dfs_stack_size(lipton->queue[0]));
+        lipton->max_depth = max (lipton->max_depth, lipton->depth);
         while ((state = dfs_stack_pop (lipton->queue[0]))) {
             lipton_gen_succs (lipton, (stack_data_t *) state);
         }
@@ -329,14 +341,23 @@ lipton_lipton (por_context *por, int *src)
                                                   0, PRE__COMMIT, GROUP_NONE);
     lipton->depth = 0;
     for (size_t i = 0; i < lipton->num_procs; i++) {
-        fset_clear (lipton->procs[i].fset);
+        //fset_clear (lipton->procs[i].fset);
         state->proc = i;
         lipton_gen_succs (lipton, state);
     }
     dfs_stack_pop (lipton->queue[0]);
 
     lipton->emitted = 0;
+    int max_stack = lipton->max_stack;
+    int max_depth = lipton->max_depth;
+    lipton->max_stack = 0;
+    lipton->max_depth = 0;
     lipton_bfs (lipton);
+    lipton->avg_stack += lipton->max_stack;
+    lipton->avg_depth += lipton->max_depth;
+    lipton->max_stack = max (lipton->max_stack, max_stack);
+    lipton->max_depth = max (lipton->max_depth, max_depth);
+
     return lipton->emitted;
 }
 
@@ -348,6 +369,7 @@ lipton_setup (model_t model, por_context *por, TransitionCB ucb, void *uctx)
 
     lipton_ctx_t       *lipton = (lipton_ctx_t *) por->alg;
 
+    lipton->states++;
     lipton->ucb = ucb;
     lipton->uctx = uctx;
     (void) model;
@@ -381,7 +403,7 @@ lipton_create (por_context *por, model_t pormodel)
     lipton->nla[COMMUTE_RGHT] = por->not_left_accords;   // Overwritten with better version to fix after-the-fact POR
     lipton->nla[COMMUTE_LEFT] = por->not_left_accordsn;
     for (size_t i = 0; i < lipton->num_procs; i++) {
-        lipton->procs[i].fset = fset_create (sizeof(int[por->nslots]), 0, 4, 10);
+        //lipton->procs[i].fset = fset_create (sizeof(int[por->nslots]), 0, 4, 10);
     }
     if (USE_DEL) {
         lipton->del = del_create (por);
@@ -389,6 +411,11 @@ lipton_create (por_context *por, model_t pormodel)
 
     leap_add_leap_group (pormodel, por->parent);
     lipton->lipton_group = por->ngroups;
+    lipton->max_stack = 0;
+    lipton->max_depth = 0;
+    lipton->avg_stack = 0;
+    lipton->avg_depth = 0;
+    lipton->states = 0;
 
     HREassert (lipton->num_procs < (1ULL << PROC_BITS));
     lipton->visible_initialized = 0;
@@ -505,3 +532,14 @@ lipton_is_stubborn (por_context *ctx, int group)
     HREassert(false, "Unimplemented for Lipton reduction");
     (void) ctx; (void) group;
 }
+
+void
+lipton_stats (model_t model)
+{
+    por_context        *por = ((por_context*)GBgetContext(model));
+    lipton_ctx_t       *lipton = (lipton_ctx_t *) por->alg;
+    Warning (info, "LIPTON step size %zu max / %.3f avg, queues %zu max / %.3f avg",
+             lipton->max_depth, (float)(lipton->avg_depth / lipton->states),
+             lipton->max_stack, (float)(lipton->avg_stack / lipton->states))
+}
+

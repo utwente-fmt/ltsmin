@@ -15,4 +15,6 @@ extern int          tr_por_all (model_t self, int *src, TransitionCB cb,
 
 extern bool         tr_is_stubborn (por_context *ctx, int group);
 
+extern void         tr_stats (model_t model);
+
 #endif

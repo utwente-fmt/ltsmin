@@ -76,6 +76,11 @@ struct tr_ctx_s {
     size_t              depth;
     comm_e              commutes;
     ci_list            *tmp;
+    size_t              max_stack;
+    size_t              max_depth;
+    size_t              avg_stack;
+    size_t              avg_depth;
+    size_t              states;
 };
 
 static inline stack_data_t *
@@ -109,7 +114,7 @@ tr_emit_one (tr_ctx_t *tr, int *dst, int group)
     ti.por_proviso = 1; // force proviso true
     tr->ucb (tr->uctx, &ti, dst, NULL);
     tr->emitted += 1;
-    Debugf ("EMITTED\n\n");
+    Debugf ("EMITTED\n");
 }
 
 
@@ -155,17 +160,16 @@ tr_calc_del (tr_ctx_t *tr, dyn_process_t *proc, comm_e comm)
     por->not_left_accordsn = tr->nla[comm];
     del_por (tr->del, false);
     if (debug) {
-        Debugf ("TR-%d DEL in-group %d (%s)", proc->id, tr->src->group, comm==COMMUTE_LEFT?"left, outgoing":"right, incoming");
+        Debugf ("TR-%d DEL in-group %d (%s)", proc->id, tr->src->group == GROUP_NONE ? - 1 : tr->src->group, comm==COMMUTE_LEFT?"left, outgoing":"right, incoming");
         Debugf (" enabled { ");
         for (int *g = ci_begin(proc->en); g != ci_end(proc->en); g++)
             Debugf ("%3d,", *g);
-        Debugf ("}\n");
+        Debugf ("} ");
     }
 
     bool                commutes = tr_does_commute (tr, proc);
-    Debugf ("TR-%d DEL %s\n", proc->id, commutes ? "REDUCED" : "");
     if (commutes) { // add all stubborn transitions (enabled and diabled)
-        Debugf ("TR-%d adding enableds { ", proc->id);
+        Debugf ("REDUCED with { ", proc->id);
         for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
             if (!del_is_stubborn(tr->del, *g) || tr->g2p[*g] == proc->id) continue;
             HREassert (tr->g2p[*g] == -1);
@@ -175,6 +179,8 @@ tr_calc_del (tr_ctx_t *tr, dyn_process_t *proc, comm_e comm)
             Debugf ("%3d,", *g);
         }
         Debugf ("}\n");
+    } else {
+        Debugf ("CONFICT with %d\n", tr->tmp->data[0]);
     }
 
     return commutes;
@@ -268,12 +274,16 @@ tr_gen_succs (tr_ctx_t *tr, stack_data_t *state)
         }
     }
     if (phase == POST_COMMIT && !tr_comm_left(tr, proc, src)) {
+        Debugf ("TR-%d POST CONFLICT ", proc->id);
         tr_emit_one (tr, src, group);
         return false;
     }
     if (proc->en->count == 0) {
         HREassert (group != GROUP_NONE);
-        tr_emit_one (tr, src, group);
+        if (phase == POST_COMMIT) {
+            Debugf ("TR-%d END ", proc->id);
+            tr_emit_one (tr, src, group);
+        }
         return false;
     }
 
@@ -294,6 +304,8 @@ tr_bfs (tr_ctx_t *tr) // RECURSIVE
     while (dfs_stack_size(tr->queue[1])) {
         swap (tr->queue[0], tr->queue[1]);
         tr->depth++;
+        tr->max_stack = max (tr->max_stack, dfs_stack_size(tr->queue[0]));
+        tr->max_depth = max (tr->max_depth, tr->depth);
         while ((state = dfs_stack_pop (tr->queue[0]))) {
             tr_gen_succs (tr, (stack_data_t *) state);
         }
@@ -362,7 +374,15 @@ tr_lipton (por_context *por, int *src)
     dfs_stack_pop (tr->queue[0]);
 
     tr->emitted = 0;
+    int max_stack = tr->max_stack;
+    int max_depth = tr->max_depth;
+    tr->max_stack = 0;
+    tr->max_depth = 0;
     tr_bfs (tr);
+    tr->avg_stack += tr->max_stack;
+    tr->avg_depth += tr->max_depth;
+    tr->max_stack = max (tr->max_stack, max_stack);
+    tr->max_depth = max (tr->max_depth, max_depth);
     return tr->emitted;
 }
 
@@ -374,6 +394,7 @@ tr_setup (model_t model, por_context *por, TransitionCB ucb, void *uctx)
 
     tr_ctx_t               *tr = (tr_ctx_t *) por->alg;
 
+    tr->states++;
     tr->ucb = ucb;
     tr->uctx = uctx;
     (void) model;
@@ -411,6 +432,11 @@ tr_create (por_context *por, model_t pormodel)
     }
     USE_DEL = 1;
     tr->del = del_create (por);
+    tr->max_stack = 0;
+    tr->max_depth = 0;
+    tr->avg_stack = 0;
+    tr->avg_depth = 0;
+    tr->states = 0;
 
     leap_add_leap_group (pormodel, por->parent);
     tr->lipton_group = por->ngroups;
@@ -462,14 +488,14 @@ tr_create (por_context *por, model_t pormodel)
         dm_set (&tr->equiv_one, g, g);
     }
 
-    Printf1(infoLong, "Group --> group equiv_one:\n");
-    for (int g = 0; g < por->ngroups; g++) {
-        Printf1(infoLong, "%3d: ", g);
-        for (int h = 0; h < por->ngroups; h++) {
-            if (dm_is_set(&tr->equiv_one, g, h)) Printf1(infoLong, "%3d,", h);
-        }
-        Printf1(infoLong, "\n");
-    }
+//    Printf1(infoLong, "Group --> group equiv_one:\n");
+//    for (int g = 0; g < por->ngroups; g++) {
+//        Printf1(infoLong, "%3d: ", g);
+//        for (int h = 0; h < por->ngroups; h++) {
+//            if (dm_is_set(&tr->equiv_one, g, h)) Printf1(infoLong, "%3d,", h);
+//        }
+//        Printf1(infoLong, "\n");
+//    }
 
     return tr;
 }
@@ -479,4 +505,13 @@ tr_is_stubborn (por_context *ctx, int group)
 {
     HREassert(false, "Unimplemented for Lipton reduction");
     (void) ctx; (void) group;
+}
+
+void
+tr_stats (model_t model)
+{
+    por_context        *por = ((por_context*)GBgetContext(model));
+    tr_ctx_t           *tr = (tr_ctx_t *) por->alg;
+    Warning (info, "TR step size %zu max / %.3f avg, queues %zu max / %.3f avg",
+             tr->max_depth, (float)(tr->avg_depth / tr->states), tr->max_stack, (float)(tr->avg_stack / tr->states))
 }
