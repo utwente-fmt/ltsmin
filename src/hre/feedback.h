@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 #define HRE_EXIT_FAILURE    255
+#define HRE_EXIT_TIMEOUT    254
 #define HRE_EXIT_SUCCESS    0
 
 /**

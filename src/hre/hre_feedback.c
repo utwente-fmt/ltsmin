@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include <hre/internal.h>
 #include <hre/provider.h>
@@ -52,6 +53,8 @@ static const char stats_long[]="stats";
 static const char debug_long[]="debug";
 static const char where_long[]="where";
 static const char when_long[]="when";
+static const char timeout_long[]="timeout";
+static int timeout = -1;
 #define incr_short 'v'
 #define quiet_short 'q'
 
@@ -85,6 +88,31 @@ static void segv_handle (int signum)
             "Stack trace:\n");
     HREprintStack ();
     _exit (HRE_EXIT_FAILURE);
+}
+void timeout_handler (int signum) {
+  struct sigaction sao;
+  memset(&sao, 0, sizeof(sao));
+  sigaction(SIGINT, NULL, &sao);
+  if (timeout == -1 || sao.sa_handler == NULL) {
+      Warning (info, " ");
+      Warning (info, " ");
+      Warning (info, "TIMED OUT (ungraceful exit)!\n");
+      HREexit (HRE_EXIT_TIMEOUT); // ungracefuly
+  } else {
+      killpg (0, SIGINT); // try grace fully
+      Warning (info, " ");
+      Warning (info, " ");
+      Warning (info, "TIMED OUT (%d seconds)!", timeout);
+      Warning (info, " ");
+      Warning (info, " ");
+      struct sigaction sa;
+      memset(&sa, 0, sizeof(sa));
+      sa.sa_handler = timeout_handler;
+      sigaction(SIGALRM, &sa, NULL);
+      alarm(1);
+      timeout = -1;
+  }
+  (void) signum;
 }
 static void segv_setup(){
     memset(&segv_sa, 0, sizeof(segv_sa));
@@ -139,6 +167,15 @@ void popt_callback(
                 info->flags&=~LOG_PRINT;
                 return;
             }
+            IF_LONG(timeout_long) {
+                Print (infoLong,"setting timeout to %d seconds", timeout);
+                struct sigaction sa;
+                memset(&sa, 0, sizeof(sa));
+                sa.sa_handler = timeout_handler;
+                sigaction(SIGALRM, &sa, NULL);
+                alarm(timeout);
+                return;
+            }
             Abort("bad HRE feedback option %s (%c)",opt->longName,opt->shortName);
             return;
         case POPT_CALLBACK_REASON_POST:
@@ -160,6 +197,8 @@ struct poptOption hre_feedback_options[]={
     "include file and line number in debug messages", NULL},
     { when_long , 0 , POPT_ARG_NONE , NULL , 0 ,
     "include the wall time since program start in all messages" , NULL },
+    { timeout_long , 0 , POPT_ARG_INT , &timeout , 0 ,
+    "terminate after the given amount of seconds" , NULL },
     POPT_TABLEEND
 };
 
