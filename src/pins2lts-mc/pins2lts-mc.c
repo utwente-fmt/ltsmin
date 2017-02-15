@@ -32,6 +32,7 @@
 #include <signal.h>
 
 #include <lts-io/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins2lts-mc/parallel/global.h>
@@ -69,9 +70,11 @@ exit_ltsmin (int sig)
 {
     if (HREme(HREglobal()) == 0 && atomic_read(&run) != NULL) {
         if ( run_stop(run) ) {
-            Warning (info, "PREMATURE EXIT (caught signal: %d)", sig);
+            global->exit_status = LTSMIN_EXIT_TIMEOUT;
+            Warning (error, "PREMATURE EXIT (caught signal: %d)", sig);
         } else {
-            Abort ("UNGRACEFUL EXIT");
+            Warning (error, "UNGRACEFUL EXIT");
+            HREabort (LTSMIN_EXIT_TIMEOUT);
         }
     }
 }
