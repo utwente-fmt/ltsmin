@@ -119,10 +119,11 @@ tr_emit_one (tr_ctx_t *tr, int *dst, int group)
 
 
 static inline bool
-tr_same_proc_criteria (tr_ctx_t *tr, dyn_process_t *proc, int g)
+tr_same_proc_criteria (tr_ctx_t *tr, ci_list *list, int g)
 {
     if (tr->g2p[g] != -1) return false; // already claimed by another proc
-    for (int *h = ci_begin (proc->en); h != ci_end (proc->en); h++) {
+    for (int *h = ci_begin (list); h != ci_end (list); h++) {
+        if (*h == g) continue;
         if (TR_MODE == 0) {
             if (!dm_is_set (&tr->must_dis, *h, g) ||
                 !dm_is_set (&tr->must_dis, g, *h)) {
@@ -143,10 +144,15 @@ static bool
 tr_does_commute (tr_ctx_t *tr, dyn_process_t *proc)
 {
     por_context        *por = tr->por;
+    ci_clear (tr->tmp);
     for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
         if (tr->g2p[*g] == proc->id || !del_is_stubborn(tr->del, *g)) continue;
         // See if we can include the enabled transition:
-        if (!tr_same_proc_criteria(tr, proc, *g)) return false;
+        if (!tr_same_proc_criteria(tr, proc->en, *g)) { tr->tmp->data[0] = *g; return false; }
+        ci_add (tr->tmp, *g);
+    }
+    for (int *g = ci_begin(tr->tmp); g != ci_end(tr->tmp); g++) {
+        if (!tr_same_proc_criteria(tr, tr->tmp, *g)) { tr->tmp->data[0] = *g; return false; }
     }
     return true;
 }
