@@ -69,7 +69,7 @@ pins_add_edge_label_visible (model_t model, int edge, int label)
             count++;
         }
     }
-    if (count > 0) return;
+    //if (count > 0) return; // we still need to add the group in case it has multiple guards
 
     int* groups_of_edge = NULL;
     const int n = GBgroupsOfEdge(model, edge, label, &groups_of_edge);
