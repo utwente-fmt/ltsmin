@@ -323,8 +323,7 @@ leap_create_context (model_t por_model, model_t pre_por,
     leap->slots = pins_get_state_variable_count (ctx->parent);
     leap->inout[0] = dfs_stack_create (leap->slots);
     leap->inout[1] = dfs_stack_create (leap->slots);
-    if ((PINS_LTL || SAFETY))
-        leap->stack_states = dfs_stack_create (leap->slots);
+    leap->stack_states = dfs_stack_create (leap->slots);
     leap->groups = pins_get_group_count (ctx->parent);
     leap->lists = RTmalloc (sizeof(bms_t **[leap->groups]));
     for (size_t i = 0; i < leap->groups; i++)
