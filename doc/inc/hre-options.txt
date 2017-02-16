@@ -21,6 +21,9 @@ Print short usage summary.
 *--stats*::
 Enable statistics gathering/printing.
 
+*--timeout=INT*::
+Terminate after the given amount of seconds.
+
 *--where*::
 Include file and line number in debug messages.
 
