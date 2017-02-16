@@ -849,6 +849,7 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
         }
         RTfree(spec_full);
         RTdeleteTimer(trans_timer);
+        (void) graph_metrics;
     }
 }
 
