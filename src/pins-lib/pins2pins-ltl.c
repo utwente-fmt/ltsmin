@@ -639,6 +639,15 @@ is_weak (ltsmin_buchi_t *ba)
     return weak;
 }
 
+static void
+ltl_exit (model_t model)
+{
+    /* Only the first worker performs the destruction,
+     * because the spot automaton is a shared pointer.
+     */
+    ltsmin_hoa_destroy();
+}
+
 /*
  * SHARED
  * por_model: if por layer is added por_model points to the model returned by the layer,
@@ -940,6 +949,8 @@ GBaddLTL (model_t model)
     s0[ctx->ltl_idx] = (PINS_LTL == PINS_LTL_TEXTBOOK ? -1 : 0);
 
     GBsetInitialState (ltlmodel, s0);
+
+    GBsetExit(ltlmodel, ltl_exit);
 
     ctx->len = new_len;
     ctx->old_groups = groups;

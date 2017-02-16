@@ -378,3 +378,9 @@ ltsmin_hoa_buchi(ltsmin_parse_env_t env)
   ltsmin_buchi_t *ret = create_ltsmin_buchi(spot_automaton, env);
   return ret;
 }
+
+void
+ltsmin_hoa_destroy()
+{
+    spot_automaton.reset();
+}

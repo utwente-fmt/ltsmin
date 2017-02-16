@@ -12,6 +12,7 @@ extern "C" {
 
 void ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba, ltsmin_parse_env_t env);
 ltsmin_buchi_t *ltsmin_hoa_buchi(ltsmin_parse_env_t env);
+void ltsmin_hoa_destroy();
 
 #ifdef __cplusplus
 }
