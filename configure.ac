@@ -133,6 +133,7 @@ AC_LANG_POP([C++])
 ])
 
 AC_PROG_CC_C99
+AX_CXX_COMPILE_STDCXX_11
 AS_IF([test x"$ac_cv_prog_cc_c99" = xno],
   [AC_MSG_FAILURE([no acceptable C99 compiler found.])])
 AX_TRY_CFLAGS_IFELSE([-W -Wall])
@@ -221,8 +222,10 @@ AC_SUBST([BUDDY_LDFLAGS])
 ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
-ACX_SPOT([:],
-  [AC_MSG_WARN([No Spot installation found.])])
+PKG_CHECK_MODULES([SPOT], [libspot >= 2.3],[
+    acx_spot=yes],
+    [AC_MSG_WARN(No valid spot version found!)
+])
 
 ACX_CLINE_DEF([], [])
 
