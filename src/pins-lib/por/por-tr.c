@@ -28,6 +28,11 @@ typedef enum {
 } phase_e;
 
 typedef enum {
+    SCOPE__IN = 0,
+    SCOPE_OUT = 1
+} scope_e;
+
+typedef enum {
     COMMUTE_RGHT = 0,
     COMMUTE_LEFT = 1,
     COMMUTE_COUNT = 2,
@@ -67,7 +72,7 @@ struct tr_ctx_s {
     bms_t              *visible;
     int                 visible_initialized;
 
-    dfs_stack_t         queue[2];
+    dfs_stack_t         queue[3];
     dfs_stack_t         commit;
     TransitionCB        ucb;
     void               *uctx;
@@ -81,6 +86,7 @@ struct tr_ctx_s {
     size_t              avg_stack;
     size_t              avg_depth;
     size_t              states;
+    ci_list            *en;
 };
 
 static inline stack_data_t *
@@ -239,7 +245,7 @@ tr_init_proc_enabled (tr_ctx_t *tr, int *src, dyn_process_t *proc, int g_prev)
 {
     ci_clear (proc->en);
     por_context            *por = tr->por;
-    if (tr->depth > 0) por_init_transitions (por->parent, por, src);
+    por_init_transitions (por->parent, por, src);
     Debugf ("en { ");
     for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
         ci_add_if (proc->en, *g, tr->g2p[*g] == proc->id);
@@ -257,20 +263,20 @@ tr_gen_succs (tr_ctx_t *tr, stack_data_t *state)
     phase_e             phase = state->phase;
     int                *src = state->state;
     dyn_process_t      *proc = &tr->procs[state->proc];
+    HREassert (group != GROUP_NONE);
 
-    Debugf ("TR-%d in-group %3d ", proc->id, group == GROUP_NONE ? - 1 : group);
-    if (CHECK_SEEN && tr->depth != 0 && por_seen(src, group, true)) {
+    Debugf ("TR-%d in-group %3d ", proc->id, group == GROUP_NONE ? -1 : group);
+    if (CHECK_SEEN && por_seen(src, group, true)) {
         Debugf ("SEEN ");
         tr_emit_one (tr, src, group);
         return false;
     }
     tr_init_proc_enabled (tr, src, proc, group);
 
-    if (group != GROUP_NONE && phase == PRE__COMMIT && !tr_comm_rght(tr, proc, group, src)) {
+    if (phase == PRE__COMMIT && !tr_comm_rght(tr, proc, group, src)) {
         phase = state->phase = POST_COMMIT;
     }
     if (proc->en->count == 0) {
-        HREassert (group != GROUP_NONE);
         for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
             if (!dm_is_set(&tr->must_ena, group, *g)) continue;
             tr->g2p[*g] = proc->id;
@@ -285,7 +291,6 @@ tr_gen_succs (tr_ctx_t *tr, stack_data_t *state)
         return false;
     }
     if (proc->en->count == 0) {
-        HREassert (group != GROUP_NONE);
         if (phase == POST_COMMIT) {
             Debugf ("TR-%d END ", proc->id);
             tr_emit_one (tr, src, group);
@@ -359,12 +364,17 @@ tr_lipton (por_context *por, int *src)
 
     for (int i = 0; i < tr->por->ngroups; i++) tr->g2p[i] = -1;
     por_init_transitions (por->parent, por, src);
-
-    stack_data_t           *state = tr_stack (tr, tr->queue[0], src,
-                                              0, PRE__COMMIT, GROUP_NONE);
-    tr->depth = 0;
-    tr->num_procs = 0;
+    ci_clear (tr->en);
     for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
+        ci_add (tr->en, *g);
+    }
+
+    void                   *dst;
+    stack_data_t           *state = tr_stack (tr, tr->queue[2], src,
+                                              0, PRE__COMMIT, GROUP_NONE);
+    tr->depth = 1;
+    tr->num_procs = 0;
+    for (int *g = ci_begin(tr->en); g != ci_end(tr->en); g++) {
         if (tr->g2p[tr->num_procs] != -1) continue;
 
         dyn_process_t           *proc = &tr->procs[tr->num_procs];
@@ -374,11 +384,22 @@ tr_lipton (por_context *por, int *src)
         tr->g2p[*g] = tr->num_procs;
         ci_add (proc->groups, *g);
         state->proc = tr->num_procs;
-        tr_gen_succs (tr, state);
+
+        tr->src = state;
+        for (int *g = ci_begin(proc->groups); g != ci_end(proc->groups); g++) {
+            GBgetTransitionsLong (por->parent, *g, src, tr_cb, tr);
+        }
+
+        swap (tr->queue[0], tr->queue[1]);
+        while ((dst = dfs_stack_pop (tr->queue[0])))
+            tr_gen_succs (tr, (stack_data_t *) dst);
+        swap (tr->queue[0], tr->queue[1]);
+
         tr->num_procs++;
     }
-    dfs_stack_pop (tr->queue[0]);
+    dfs_stack_pop (tr->queue[2]);
 
+    swap (tr->queue[0], tr->queue[1]);
     tr->emitted = 0;
     int max_stack = tr->max_stack;
     int max_depth = tr->max_depth;
@@ -425,6 +446,7 @@ tr_create (por_context *por, model_t pormodel)
     tr_ctx_t               *tr = RTmalloc (sizeof(tr_ctx_t));
     tr->queue[0] = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
     tr->queue[1] = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
+    tr->queue[2] = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
     tr->commit   = dfs_stack_create (por->nslots + INT_SIZE(sizeof(stack_data_t)));
     tr->por = por;
     tr->g2p = RTmallocZero (sizeof(int[por->ngroups]));
@@ -437,6 +459,7 @@ tr_create (por_context *por, model_t pormodel)
         tr->procs[i].id = i;
     }
     USE_DEL = 1;
+    tr->en = ci_create (por->ngroups);
     tr->del = del_create (por);
     tr->max_stack = 0;
     tr->max_depth = 0;
