@@ -28,7 +28,7 @@ int NO_L12 = 0;
 int NO_V = 0;
 int NO_MCNDS = 0;
 int PREFER_NDS = 0;
-int CHECK_SEEN = 0;
+int CHECK_SEEN = 1;
 int NO_MC = 0;
 int USE_DEL = 0;
 int POR_WEAK = 0;
@@ -61,8 +61,9 @@ static si_map_entry por_algorithm[]={
     {"",        POR_BEAM},
     {"heur",    POR_BEAM},
     {"del",     POR_DEL},
-    {"lipton",  POR_LIPTON},
-    {"tr",      POR_TR},
+    {"tr",      POR_LIPTON},
+    {"str",     POR_LIPTON},
+    {"str2",    POR_TR},
     {"ample",   POR_AMPLE},
     {"ample1",  POR_AMPLE1},
     {NULL, 0}
@@ -89,6 +90,8 @@ por_popt (poptContext con, enum poptCallbackReason reason,
             }
             if ((PINS_POR_ALG = num) != POR_NONE)
                 PINS_POR = PINS_CORRECTNESS_CHECK ? PINS_POR_CHECK : PINS_POR_ON;
+            if (strcmp(arg, "str") == 0)
+                USE_DEL = 1;
             if (PINS_POR_ALG == POR_LIPTON || PINS_POR_ALG == POR_TR)
                 POR_WEAK = 1;
             return;
@@ -112,7 +115,7 @@ por_popt (poptContext con, enum poptCallbackReason reason,
 struct poptOption por_options[]={
     {NULL, 0, POPT_ARG_CALLBACK, (void *)por_popt, 0, NULL, NULL},
     { "por", POR_SHORT_OPT, POPT_ARG_STRING | POPT_ARGFLAG_OPTIONAL,
-      &algorithm, 0, "enable partial order reduction", "<heur|del> (default: heur)" },
+      &algorithm, 0, "enable partial order reduction / (stubborn) transaction reduction", "<heur|del|tr|str> (default: heur)" },
     { "weak" , -1, POPT_ARG_STRING  | POPT_ARGFLAG_OPTIONAL , &weak , 0 , "Weak stubborn set theory" , "[valmari] (default: uses stronger left-commutativity)" },
     { "leap" , 0, POPT_ARG_VAL  | POPT_ARGFLAG_OPTIONAL , &leap , 1 , "Leaping POR (Cartesian product of several disjoint stubborn sets)" , NULL },
 
@@ -124,8 +127,7 @@ struct poptOption por_options[]={
     { "no-commutes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_COMMUTES , 1 , "without commutes (for left-accordance)" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
-    { "seen" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &CHECK_SEEN , 1 , "Prefer visited successor states" , NULL },
-    { "del" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &USE_DEL , 1 , "Use deletion in Lipton" , NULL },
+    { "noseen" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &CHECK_SEEN , 0 , "Prefer visited successor states" , NULL },
     { "tr" , 0, POPT_ARG_INT | POPT_ARGFLAG_DOC_HIDDEN , &TR_MODE , 0 , "TR mode" , NULL },
     { "trmax" , 0, POPT_ARG_INT | POPT_ARGFLAG_DOC_HIDDEN , &TR_MAX , 0 , "TR max" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
@@ -218,7 +220,7 @@ seen_cb (void *context, transition_info_t *ti, int *dst, int *cpy)
     por_context        *ctx = context;
 
     size_t              c = ctx->enabled_list->count;
-    ci_add_if (ctx->enabled_list, ti->group, c == 0 || ci_top(ctx->enabled_list) != ti->group);
+    ci_add_if (ctx->enabled_list, ti->group, c == 0 || ci_top(ctx->enabled_list) != ti->group); //TODO: buggy
 
     if (!CHECK_SEEN) return;
     size_t              s = bms_count (ctx->include, 0);;
@@ -288,7 +290,8 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
             char vis = ctx->visible->set[i];
         }
     }
-    HREassert (ctx->enabled_list->count == enabled,
+
+    HREassert (ctx->enabled_list->count == enabled, // see TODO above
                "Guards do not agree with enabledness of group %d", ctx->enabled_list->data[enabled]);
 }
 
