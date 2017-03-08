@@ -92,7 +92,8 @@ etf_groups_of_edge(model_t model, int edge_no, int index, int** groups)
     for (int i = 0; i < n_groups; i++) {
         matrix_table_t mt = ctx->trans_table[i];
         int K = MTgetCount(mt);
-        for(int j = 0; j < K; j++){
+        int found = 0;
+        for(int j = 0; j < K && !found; j++){
             uint32_t row[3];
             MTgetRow(mt, j, row);
             switch(ctx->edge_labels){
@@ -104,11 +105,17 @@ etf_groups_of_edge(model_t model, int edge_no, int index, int** groups)
                     // groups[count++] = i;
                     break;
                 } case 1: {
-                    if (index == (int) row[2]) *groups[count++] = i;
+                    if (index == (int) row[2]) {
+                        *groups[count++] = i;
+                        found = 1;
+                    }
                     break;
                 } default: {
                     int* tl = (int*) SIgetC(ctx->label_idx, (int) row[2], NULL);
-                    if (tl[edge_no] == index) (*groups)[count++] = i;
+                    if (tl[edge_no] == index) {
+                        (*groups)[count++] = i;
+                        found = 1;
+                    }
                     break;
                 }
             }
