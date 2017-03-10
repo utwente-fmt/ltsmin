@@ -16,6 +16,7 @@
 #include <ltsmin-lib/ltl2spot.h>
 #endif
 
+#include <ltsmin-lib/ltl2spot.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <mc-lib/atomics.h>
 #include <pins-lib/pins.h>
@@ -645,7 +646,9 @@ ltl_exit (model_t model)
     /* Only the first worker performs the destruction,
      * because the spot automaton is a shared pointer.
      */
+#ifdef HAVE_SPOT
     ltsmin_hoa_destroy();
+#endif
 }
 
 /*
