@@ -82,8 +82,7 @@ pins_add_edge_label_visible (model_t model, int edge, int label)
         chunk c = pins_chunk_get(model, lts_type_get_edge_label_typeno(GBgetLTStype(model), edge), label);
         char s[c.len * 2 + 6];
         chunk2string(c, sizeof(s), s);
-        Abort("There is no group that can produce edge \"%s\"", s);
-
+        Warning(info, "There is no group that can produce edge \"%s\"", s);
     }
 }
 
