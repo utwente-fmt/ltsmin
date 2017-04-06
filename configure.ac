@@ -222,9 +222,15 @@ AC_SUBST([BUDDY_LDFLAGS])
 ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
-PKG_CHECK_MODULES([SPOT], [libspot >= 2.3],[
-    acx_spot=yes],
-    [AC_MSG_WARN(No valid spot version found!)
+
+AC_ARG_WITH([spot],
+    [AS_HELP_STRING([--without-spot], [do not include the Spot library for LTL model checking])])
+
+AS_IF([test "x$with_spot" != "xno"], [
+    PKG_CHECK_MODULES([SPOT], [libspot >= 2.3],[
+        acx_spot=yes],
+        [AC_MSG_WARN(No valid spot version found!)
+    ])
 ])
 
 ACX_CLINE_DEF([], [])
@@ -605,7 +611,7 @@ Configuration:
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc/happy/ghc-pkg/hashmap/deepseq could not be found}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
-    SPOT     = ${acx_spot:-NO, Spot not found (override with --with-spot)}
+    SPOT     = ${acx_spot:-NO, Spot not found, or disabled}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
