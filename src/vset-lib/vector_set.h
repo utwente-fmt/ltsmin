@@ -408,9 +408,46 @@ char* vdom_get_name(vdom_t dom, int i);
 
 int _cache_diff();
 
+/*
+vset visitor api, with caching mechanism.
+*/
+
+/**
+\brief Pre-order visit of a value.
+
+\param terminal Whether or not this is a terminal.
+\param val The value.
+\param cached Whether or not there is a cached result available.
+\param result The cached result (if available).
+\param context The user context.
+*/
 typedef void (*vset_visit_pre_cb) (int terminal, int val, int cached, void* result, void* context);
+
+/**
+\brief Allocates a new user context on the stack.
+
+\param context The context allocated on the stack.
+\param parent The parent context.
+\param succ Whether or not the context belongs to the same vector.
+*/
 typedef void (*vset_visit_init_context_cb) (void* context, void* parent, int succ);
+
+/**
+\brief Post-order visit of a value.
+
+\param val The value.
+\param context The user context.
+\param cache Whether or not to add a result to the cache.
+\param result The result to add to the cache.
+*/
 typedef void (*vset_visit_post_cb) (int val, void* context, int* cache, void** result);
+
+/**
+\brief Function that is called when something has been added to the cache.
+
+\param context The user context.
+\param result The data that has been added to the cache.
+*/
 typedef void (*vset_visit_cache_success_cb) (void* context, void* result);
 
 typedef struct vset_visit_callbacks_s {
@@ -420,8 +457,32 @@ typedef struct vset_visit_callbacks_s {
     vset_visit_cache_success_cb vset_visit_cache_success;
 } vset_visit_callbacks_t;
 
+/**
+\brief Visit values in parallel.
+
+\param set The set to run the visitor on.
+\param cbs The callback functions that implement the visitor.
+\param ctx_size The number of bytes to allocate on the stack for user context.
+\param context The user context.
+\param cache_op The operation number for operating the cache.
+
+\see vdom_next_cache_op()
+\see vdom_clear_cache()
+*/
 extern void vset_visit_par(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
 
+/**
+\brief Visit values sequentially.
+
+\param set The set to run the visitor on.
+\param cbs The callback functions that implement the visitor.
+\param ctx_size The number of bytes to allocate on the stack for user context.
+\param context The user context.
+\param cache_op The operation number for operating the cache.
+
+\see vdom_next_cache_op()
+\see vdom_clear_cache()
+*/
 extern void vset_visit_seq(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op);
 
 //@}
