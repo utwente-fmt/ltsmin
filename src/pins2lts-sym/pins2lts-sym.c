@@ -1033,6 +1033,7 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
             }
             vset_clear(left->container);
         } break;
+        case PRED_EN:
         case PRED_EQ:
         case PRED_NEQ:
         case PRED_LT:
@@ -3660,6 +3661,7 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
         } else c->work = NULL;
         break;
     }
+    case PRED_EN:
     case PRED_EQ:
     case PRED_NEQ:
     case PRED_LT:
