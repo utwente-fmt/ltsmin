@@ -3978,11 +3978,11 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
                 tmp = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
                 if (log_active(infoLong)) {
                     long n1, n2;
-                    double e1, e2;
-                    vset_count(mu_var[mu_expr->idx], &n1, &e1);
-                    vset_count(tmp, &n2, &e2);
-                    Warning(infoLong, "MU %s: %.0lf -> %.0lf",
-                        SIget(env->idents,mu_expr->idx), e1, e2);
+                    long double e1, e2;
+                    const int d1 = vset_count_fn (mu_var[mu_expr->idx], &n1, &e1);
+                    const int d2 = vset_count_fn (tmp, &n2, &e2);
+                    Warning(infoLong, "MU %s: %.*Lg (%ld) -> %.*Lg (%ld)",
+                        SIget(env->idents,mu_expr->idx), d1, e1, n1, d2, e2, n2);
                 }
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
 	    
@@ -4194,11 +4194,11 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
                 vset_copy(mu_var[Z],mu_rec(mu_expr->arg1, env, visited, muo, mu_var));
                 if (log_active(infoLong)) {
                     long n1, n2;
-                    double e1, e2;
-                    vset_count(result, &n1, &e1);
-                    vset_count(mu_var[Z], &n2, &e2);
-                    Warning(infoLong, "%s %s: %.0lf -> %.0lf",
-                        MU_NAME(muo->sign[Z]), SIget(env->idents,Z), e1, e2);
+                    long double e1, e2;
+                    const int d1 = vset_count_fn (result, &n1, &e1);
+                    const int d2 = vset_count_fn (mu_var[Z], &n2, &e2);
+                    Warning(infoLong, "%s %s: %.*Lg (%ld) -> %.*Lg (%ld)",
+                        MU_NAME(muo->sign[Z]), SIget(env->idents,Z), d1, e1, n1, d2, e2, n2);
                 }
 
                 // reset dependent variables with opposite sign
