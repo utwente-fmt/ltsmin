@@ -4033,7 +4033,6 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
         struct rel_expr_info ctx;
 
         int vec[N];
-        GBsetInitialState(model, vec);
         ctx.vec = vec;
         ctx.len = bitvector_n_high(&deps);
         int d[ctx.len];
@@ -4234,7 +4233,6 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
         struct rel_expr_info ctx;
 
         int vec[N];
-        GBsetInitialState(model, vec);
         ctx.vec = vec;
         ctx.len = bitvector_n_high(&deps);
         int d[ctx.len];
