@@ -910,10 +910,10 @@ void mucalc_add_proposition_values(model_t model)
 /**
  * \brief Determines action label type and position for action matching
  */
-void mucalc_add_action_labels(model_t model)
+void mucalc_add_action_labels(model_t model, model_t parent)
 {
     mucalc_context_t *ctx = GBgetContext(model);
-    lts_type_t ltstype = GBgetLTStype(model);
+    lts_type_t ltstype = GBgetLTStype(parent);
     int m = lts_type_get_edge_label_count(ltstype);
     ctx->action_label_index = -1;
     ctx->action_label_type_no = -1;
@@ -1017,7 +1017,7 @@ GBaddMucalc (model_t model)
     mucalc_node_count = ctx->groupinfo.node_count;
 
     mucalc_add_proposition_values(_model);
-    mucalc_add_action_labels(_model);
+    mucalc_add_action_labels(_model, model);
 
     // Compute dependency matrix, add mucalc node
     matrix_t *_p_dm = (matrix_t*) RTmalloc(sizeof(matrix_t));
