@@ -648,6 +648,7 @@ ltl_exit (model_t model)
      */
     ltsmin_hoa_destroy();
 #endif
+    (void)model;
 }
 
 /*
