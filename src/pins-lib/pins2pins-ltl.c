@@ -642,10 +642,13 @@ is_weak (ltsmin_buchi_t *ba)
 static void
 ltl_exit (model_t model)
 {
+#ifdef HAVE_SPOT
     /* Only the first worker performs the destruction,
      * because the spot automaton is a shared pointer.
      */
     ltsmin_hoa_destroy();
+#endif
+    (void)model;
 }
 
 /*
