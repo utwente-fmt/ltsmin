@@ -81,6 +81,8 @@ AX_CHECK_FLEX([
 ],,
 [AC_MSG_FAILURE([no compatible lexer generator found.])])
 
+AC_PROG_YACC
+
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 
@@ -544,6 +546,7 @@ AC_CONFIG_FILES([
        Makefile
        examples/Makefile
        src/Makefile
+       src/andl-lib/Makefile
        src/hre-io/Makefile
        src/hre/Makefile
        src/hre-mpi/Makefile
