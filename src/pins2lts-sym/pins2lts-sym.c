@@ -316,6 +316,7 @@ static long max_lev_count = 0;
 static long max_vis_count = 0;
 static long max_grp_count = 0;
 static long max_trans_count = 0;
+static long max_mu_count = 0;
 static model_t model;
 static vrel_t *group_next;
 static vset_t *group_explored;
@@ -3976,13 +3977,16 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
                 vset_copy(mu_var[mu_expr->idx], tmp);
                 vset_clear(tmp);
                 tmp = mu_compute(mu_expr->arg1, env, visited, mu_var, mu_var_man);
-                if (log_active(infoLong)) {
+                if (log_active(infoLong) || peak_nodes) {
                     long n1, n2;
                     long double e1, e2;
                     const int d1 = vset_count_fn (mu_var[mu_expr->idx], &n1, &e1);
                     const int d2 = vset_count_fn (tmp, &n2, &e2);
                     Warning(infoLong, "MU %s: %.*Lg (%ld) -> %.*Lg (%ld)",
                         SIget(env->idents,mu_expr->idx), d1, e1, n1, d2, e2, n2);
+
+                    if (n1 > max_mu_count) max_mu_count = n1;
+                    if (n2 > max_mu_count) max_mu_count = n1;
                 }
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
 	    
@@ -4192,13 +4196,16 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
             do {
                 vset_copy(result,mu_var[Z]);
                 vset_copy(mu_var[Z],mu_rec(mu_expr->arg1, env, visited, muo, mu_var));
-                if (log_active(infoLong)) {
+                if (log_active(infoLong) || peak_nodes) {
                     long n1, n2;
                     long double e1, e2;
                     const int d1 = vset_count_fn (result, &n1, &e1);
                     const int d2 = vset_count_fn (mu_var[Z], &n2, &e2);
                     Warning(infoLong, "%s %s: %.*Lg (%ld) -> %.*Lg (%ld)",
                         MU_NAME(muo->sign[Z]), SIget(env->idents,Z), d1, e1, n1, d2, e2, n2);
+
+                    if (n1 > max_mu_count) max_mu_count = n1;
+                    if (n2 > max_mu_count) max_mu_count = n1;                    
                 }
 
                 // reset dependent variables with opposite sign
@@ -4829,6 +4836,10 @@ VOID_TASK_1(actual_main, void*, arg)
     compute_maxsum(visited, domain);
 
     CHECK_MU(visited, src);
+
+    if (max_mu_count > 0) {
+        Print(info, "Mu-calculus peak nodes: %ld", max_mu_count);
+    }
 
     /* optionally print counts of all group_next and group_explored sets */
     long   n_count;
