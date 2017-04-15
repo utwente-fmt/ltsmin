@@ -13,6 +13,13 @@
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <pins-lib/pins-util.h>
 
+int pins_allow_undefined_edges = 0;
+
+struct poptOption pins_util_options[] = {
+    { "allow-undefined-edges", 0, POPT_ARG_NONE, &pins_allow_undefined_edges, 0,
+      "Allow undefined edges in atomic predicates." , NULL},
+    POPT_TABLEEND
+};
 
 size_t
 pins_get_state_label_count (model_t model)
@@ -82,7 +89,11 @@ pins_add_edge_label_visible (model_t model, int edge, int label)
         chunk c = pins_chunk_get(model, lts_type_get_edge_label_typeno(GBgetLTStype(model), edge), label);
         char s[c.len * 2 + 6];
         chunk2string(c, sizeof(s), s);
-        Warning(info, "There is no group that can produce edge \"%s\"", s);
+        if (pins_allow_undefined_edges) {
+            Warning(info, "There is no group that can produce edge \"%s\"", s);
+        } else {
+            Abort("There is no group that can produce edge \"%s\"", s);
+        }
     }
 }
 

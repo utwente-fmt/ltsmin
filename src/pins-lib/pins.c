@@ -1319,6 +1319,7 @@ struct poptOption greybox_options[]={
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, cache_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, guards_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, check_options, 0 , NULL, NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, pins_util_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, group_options, 0 , "Regrouping options", NULL },
 	POPT_TABLEEND
