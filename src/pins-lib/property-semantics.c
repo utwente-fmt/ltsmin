@@ -70,7 +70,11 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
             } else {
                 char s[c.len * 2 + 6];
                 chunk2string(c, sizeof(s), s);
-                Warning(info, "There is no group that can produce edge label %s", s);
+                if (pins_allow_undefined_edges) {
+                    Warning(info, "There is no group that can produce edge \"%s\"", s);
+                } else {
+                    Abort("There is no group that can produce edge \"%s\"", s);
+                }
             }            
             break;
         }
