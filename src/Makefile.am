@@ -24,9 +24,10 @@
 # pins-lib  ---->  dm-lib
 #    
 #
+SUBDIRS =
 
 # hybrid runtime environment lib
-SUBDIRS = hre-io
+SUBDIRS += hre-io
 SUBDIRS += util-lib
 SUBDIRS += hre
 if HAVE_MPI
@@ -42,6 +43,8 @@ SUBDIRS += gcf-tool
 
 # LTSmin lib with LTS data types and parsers for property languages
 SUBDIRS += ltsmin-lib
+
+SUBDIRS += andl-lib
 
 SUBDIRS += etf-convert
 
