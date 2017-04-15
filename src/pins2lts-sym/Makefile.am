@@ -129,7 +129,7 @@ nodist_EXTRA_prom2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 # pnml2lts-sym
 pnml2lts_sym_SOURCES   = pins2lts-sym.c
 pnml2lts_sym_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
-pnml2lts_sym_LDADD     = $(XML_LIBS) $(PINS_LIBS) $(VSET_LIBS) $(MAXSUM_LIBS)
+pnml2lts_sym_LDADD     = $(XML_LIBS) $(PINS_LIBS) $(VSET_LIBS) $(MAXSUM_LIBS) ../andl-lib/libandl.la
 pnml2lts_sym_CPPFLAGS  = -DPNML $(SYM_CPP_FLAGS)
 pnml2lts_sym_LDFLAGS   = $(SYM_LD_FLAGS)
 pnml2lts_sym_CFLAGS    = $(XML_CFLAGS)
