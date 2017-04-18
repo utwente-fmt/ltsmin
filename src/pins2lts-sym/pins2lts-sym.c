@@ -30,6 +30,7 @@
 #include <pins-lib/pins2pins-mucalc.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/property-semantics.h>
+#include <pins2lts-sym/maxsum/maxsum.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
@@ -288,6 +289,7 @@ static  struct poptOption options[] = {
     { "precise", 0, POPT_ARG_NONE, &precise, 0, "Compute the final number of states precisely", NULL},
     { "next-union", 0, POPT_ARG_NONE, &next_union, 0, "While computing successor states; unify simultaneously with current states", NULL },
     { "peak-nodes", 0, POPT_ARG_NONE, &peak_nodes, 0, "record peak nodes and report after reachability analysis", NULL },
+    {NULL, 0, POPT_ARG_INCLUDE_TABLE, maxsum_options, 0, "Integer arithmetic options", NULL},
     POPT_TABLEEND
 };
 
@@ -4709,6 +4711,8 @@ VOID_TASK_1(actual_main, void*, arg)
         }
     }
 
+    init_maxsum(ltstype);
+
     /* turn on Lace again (for Sylvan) */
     if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
         lace_resume();
@@ -4821,6 +4825,8 @@ VOID_TASK_1(actual_main, void*, arg)
             Print(infoShort, "Result symbolic LTS written to '%s'", files[1]);
         }
     }
+
+    compute_maxsum(visited, domain);
 
     CHECK_MU(visited, src);
 
