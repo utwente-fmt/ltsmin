@@ -1,5 +1,3 @@
-MC_LIBS	 = ../mc-lib/libmc.la
-
 noinst_LTLIBRARIES  = libvset.la
 
 # Warning overwriting user variable! (Avoid DDD warnings)
@@ -21,7 +19,7 @@ libvset_la_SOURCES  += vset_sylvan.c
 libvset_la_SOURCES  += vset_lddmc.c
 libvset_la_CPPFLAGS += $(SYLVAN_CPPFLAGS) 
 libvset_la_LDFLAGS  += $(SYLVAN_LDFLAGS) 
-libvset_la_LIBADD   += $(MC_LIBS) $(SYLVAN_LIBS)
+libvset_la_LIBADD   += $(SYLVAN_LIBS)
 endif
 
 if HAVE_LIBMCRL
