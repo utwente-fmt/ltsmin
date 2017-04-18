@@ -217,10 +217,6 @@ if test "x$acx_mcrl2" = xyes; then
      AC_MSG_WARN([mcrl2 library not found.])])
 fi
 
-AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
-AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
-AC_SUBST([BUDDY_LDFLAGS])
-
 ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
@@ -233,6 +229,24 @@ AS_IF([test "x$with_spot" != "xno"], [
         acx_spot=yes],
         [AC_MSG_WARN(No valid spot version found!)
     ])
+])
+
+AS_IF([test "x$acx_spot" = "xyes"], [
+    PKG_CHECK_MODULES([BDDX], [libbddx >= 2.3],[
+        AC_MSG_NOTICE([Because SPOT was found, the SPOT Buddy implementation will be used!])
+        AC_SUBST([BUDDY_LIBS],["$BDDX_LIBS"])
+        AC_SUBST([BUDDY_CPPFLAGS],["$BDDX_CPPFLAGS"])
+        AC_SUBST([BUDDY_LDFLAGS])
+    ],[
+       AC_MSG_ERROR(Could not find libbddx!
+                    Because both SPOT and LTSmin distribute BuDDy,
+                    we have to choose between BUDDY versions,
+                    if SPOT is found, then the SPOT version will be used,
+                    meaning libbddx must be installed.)])
+],[
+    AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
+    AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
+    AC_SUBST([BUDDY_LDFLAGS])
 ])
 
 ACX_CLINE_DEF([], [])
@@ -594,7 +608,12 @@ AC_CONFIG_FILES([
 
 AC_CONFIG_LINKS([src/ltsmin-lib/lempar.c:lemon/lempar.c])
 
-AC_CONFIG_SUBDIRS([buddy ltl2ba])
+AC_CONFIG_SUBDIRS([ltl2ba])
+
+AM_COND_IF([HAVE_SPOT],[
+    buddy="SPOT version (because SPOT was found)"],[
+    buddy="LTSmin version (because SPOT was not found)"
+    AC_CONFIG_SUBDIRS([buddy])])
 
 AC_OUTPUT
 
@@ -603,6 +622,7 @@ Configuration:
 ======================================================================
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     BIGNUM   = ${with_bignum}
+    BUDDY    = ${buddy}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
     CC       = ${CC:-NOT FOUND}
     CXX      = ${CXX:-NOT FOUND}
