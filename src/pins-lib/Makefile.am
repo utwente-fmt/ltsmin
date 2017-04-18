@@ -1,10 +1,7 @@
-
-HRE_LIB = ../hre/libhre.la
 LIBS  =
 LIBS += ../lts-io/liblts-io.la
 LIBS += ../hre-io/libhre-io.la
-LIBS += $(HRE_LIB)
-LIBS += ../util-lib/libutil.la
+LIBS += ../hre/libhre.la
 LIBS += ../ltsmin-lib/libltsmin.la
 LIBS += ../dm/libdm.la
 LIBS += por/libpor.la
