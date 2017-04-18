@@ -573,6 +573,7 @@ AC_CONFIG_FILES([
        src/pins2lts-mc/Makefile
        src/pins2lts-seq/Makefile
        src/pins2lts-sym/Makefile
+       src/pins2lts-sym/maxsum/Makefile
        src/pins-open/Makefile
        src/spg/Makefile
        src/dm/Makefile
