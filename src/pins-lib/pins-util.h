@@ -9,6 +9,9 @@
 #include <ltsmin/pins.h>
 #endif
 
+extern struct poptOption pins_util_options[];
+
+extern int          pins_allow_undefined_edges;
 
 extern size_t       pins_get_state_label_count (model_t model);
 extern size_t       pins_get_edge_label_count (model_t model);

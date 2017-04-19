@@ -1,15 +1,3 @@
-HRE_LIB = ../../hre/libhre.la
-DIST_CPPFLAGS = $(AM_CPPFLAGS)
-PINS_LIBS  =
-PINS_LIBS += ../../lts-io/liblts-io.la
-PINS_LIBS += ../../hre-io/libhre-io.la
-PINS_LIBS += $(HRE_LIB)
-PINS_LIBS += ../../pins-lib/libpins.la
-PINS_LIBS += ../../ltsmin-lib/libltsmin.la
-PINS_LIBS += ../../util-lib/libutil.la
-PINS_LIBS += ../../dm/libdm.la
-MC_LIBS = ../../mc-lib/libmc.la $(PINS_LIBS)
-
 noinst_LTLIBRARIES = libparallel.la
 
 libparallel_la_SOURCES  = color.c
