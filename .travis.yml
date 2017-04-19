@@ -8,7 +8,8 @@ os:
 - linux
 - osx
 
-dist: precise
+dist: trusty
+sudo: false
 
 cache:
   directories:
@@ -30,7 +31,7 @@ matrix:
 # --disable-dependency-tracking is necessary due to a bug in automake 1.14 i.c.w. make distclean, see:
 # https://stackoverflow.com/questions/21609580/autotools-build-fails-due-to-subdir-objects-option-in-am-init-automake
 env:
-    - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror --disable-test-all"
+    - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror --disable-test-all --enable-pkgconf-static"
       CFLAGS="-DNDEBUG -O2"
       RELEASE_BUILD="yes"
     - CONFIGURE_WITH="--disable-dependency-tracking --enable-werror --disable-test-all"
@@ -67,9 +68,8 @@ env:
 addons:
   apt:
     sources:
-      - hvr-ghc                 # for GHC dynamic packages
+#      - hvr-ghc                 # for GHC dynamic packages
       - ubuntu-toolchain-r-test # for gcc 4.9
-      - george-edison55-precise-backports # for cmake
     packages:
       - gcc-4.9
       - g++-4.9
@@ -78,16 +78,14 @@ addons:
       - xmlto
       - doxygen
       - libboost-dev
-      - ghc-7.10.3
-      - ghc-7.10.3-dyn
-      - happy-1.19.5
+#      - ghc-7.10.3
+#      - ghc-7.10.3-dyn
+#      - happy-1.19.5
       - libnuma-dev
       - liblzma-dev
       - dejagnu
       - libhwloc-dev
       - libgmp-dev
-      - cmake
-      - cmake-data
       
 before_install:
   - export CZMQ_VERSION="3.0.2" &&
@@ -122,12 +120,14 @@ before_install:
         export PROB_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/osx/$PROB_NAME" &&
         export MAKEFLAGS=-j1 &&
         export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:/usr/local/Cellar/libxml2/$(brew list --versions libxml2 | cut -d' ' -f2)/lib/pkgconfig"; fi
+  - if [ "$TRAVIS_OS_NAME" = "osx" ]; then export PATH="/usr/local/opt/bison/bin:$PATH"; fi
 
 install:  
   # update brew
   - if [ "$TRAVIS_OS_NAME" = "osx" ]; then brew update && 
     brew uninstall libtool && 
     brew install
+    bison
     asciidoc
     xmlto
     viennacl
@@ -239,11 +239,13 @@ before_script:
     mkdir "$HOME/static-libs" &&
     cp "$HOME/ltsmin-deps/lib/libzmq.a" "$HOME/static-libs" &&
     cp "$HOME/ltsmin-deps/lib/libczmq.a" "$HOME/static-libs" &&
-    cp /usr/lib/libnuma.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libpopt.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libgmp.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libltdl.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libxml2.a "$HOME/static-libs" &&
+    cp /usr/lib/x86_64-linux-gnu/liblzma.a "$HOME/static-libs" &&
+    cp /usr/lib/x86_64-linux-gnu/libhwloc.a "$HOME/static-libs" &&
+    cp /usr/lib/x86_64-linux-gnu/libnuma.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libz.a "$HOME/static-libs"; fi
   # Since Travis workers do not allow overcommitting memory,
   # we must reduce the amount of vm allocated by the chunk tables.
