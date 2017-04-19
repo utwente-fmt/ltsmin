@@ -31,6 +31,7 @@
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/property-semantics.h>
 #include <pins2lts-sym/maxsum/maxsum.h>
+#include <pins2lts-sym/options.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
@@ -46,46 +47,18 @@
 
 hre_context_t ctx;
 
-static ltsmin_expr_t* mu_exprs = NULL;
-static char** ctl_star_formulas = NULL;
-static char** ctl_formulas = NULL;
-static char** ltl_formulas = NULL;
-static int num_ctl_star = 0;
-static int num_ctl = 0;
-static int num_ltl = 0;
-static char** mu_formulas  = NULL;
-static int num_mu = 0;
-static int num_total = 0;
-static int mu_par = 0;
-static int mu_opt = 0;
-static ltsmin_parse_env_t* mu_parse_env = NULL;
-
-static char* dot_dir = NULL;
-
-static char* trc_output = NULL;
-static char* trc_type   = "gcf";
-static int   dlk_detect = 0;
-static char* act_detect = NULL;
-static char** inv_detect = NULL;
-static int   num_inv = 0;
-static int   no_exit = 0;
-static int   no_matrix = 0;
-static int   peak_nodes = 0;
-static int   no_soundness_check = 0;
-static int   act_index;
-static int   act_label;
-static int   action_typeno;
-static int   ErrorActions = 0; // count number of found errors (action/deadlock/invariant)
-static int   precise = 0;
-static int   next_union = 0;
+/*
+  The inhibit and class matrices are used for maximal progress.
+ */
+static matrix_t *inhibit_matrix=NULL;
+static matrix_t *class_matrix=NULL;
+static int inhibit_class_count=0;
+static vset_t *class_enabled = NULL;
 
 static bitvector_ll_t *seen_actions;
+static vset_t true_states;
+static vset_t false_states;
 
-static int   sat_granularity = 10;
-static int   save_sat_levels = 0;
-
-static int   pgsolve_flag = 0;
-static char* pg_output = NULL;
 static int var_pos = 0;
 static int var_type_no = 0;
 static int variable_projection = 0;
@@ -96,202 +69,9 @@ static int* player = 0; // players of variables
 static int* priority = 0; // priorities of variables
 static int min_priority = INT_MAX;
 static int max_priority = INT_MIN;
-static vset_t true_states;
-static vset_t false_states;
-static int inv_par = 0;
-static int inv_bin_par = 0;
 
-/*
-  The inhibit and class matrices are used for maximal progress.
- */
-static matrix_t *inhibit_matrix=NULL;
-static matrix_t *class_matrix=NULL;
-static int inhibit_class_count=0;
-static vset_t *class_enabled = NULL;
-
-static enum {
-    BFS_P,
-    BFS,
-    PAR,
-    PAR_P,
-    CHAIN_P,
-    CHAIN,
-    NONE
-} strategy = BFS_P;
-
-static size_t lace_n_workers = 0;
-static size_t lace_dqsize = 40960000; // can be very big, no problemo
-static size_t lace_stacksize = 0; // use default
-
-static char* order = "bfs-prev";
-static si_map_entry ORDER[] = {
-    {"bfs-prev", BFS_P},
-    {"bfs", BFS},
-    {"par", PAR},
-    {"par-prev", PAR_P},
-    {"chain-prev", CHAIN_P},
-    {"chain", CHAIN},
-    {"none", NONE},
-    {NULL, 0}
-};
-
-static enum { NO_SAT, SAT_LIKE, SAT_LOOP, SAT_FIX, SAT } sat_strategy = NO_SAT;
-
-static char* saturation = "none";
-static si_map_entry SATURATION[] = {
-    {"none", NO_SAT},
-    {"sat-like", SAT_LIKE},
-    {"sat-loop", SAT_LOOP},
-    {"sat-fix", SAT_FIX},
-    {"sat", SAT},
-    {NULL, 0}
-};
-
-static enum { UNGUIDED, DIRECTED } guide_strategy = UNGUIDED;
-
-static char *guidance = "unguided";
-static si_map_entry GUIDED[] = {
-    {"unguided", UNGUIDED},
-    {"directed", DIRECTED},
-    {NULL, 0}
-};
-
-static const char invariant_long[]="invariant";
-static const char ctl_star_long[]="ctl-star";
-static const char ctl_long[]="ctl";
-static const char ltl_long[]="ltl";
-static const char mu_long[]="mu";
-#define IF_LONG(long) if(((opt->longName)&&!strcmp(opt->longName,long)))
-
-static void
-reach_popt(poptContext con, enum poptCallbackReason reason,
-               const struct poptOption * opt, const char * arg, void * data)
-{
-    (void)con; (void)opt; (void)arg; (void)data;
-
-    switch (reason) {
-    case POPT_CALLBACK_REASON_PRE:
-        Abort("unexpected call to reach_popt");
-    case POPT_CALLBACK_REASON_POST: {
-        int res;
-
-        res = linear_search(ORDER, order);
-        if (res < 0) {
-            Warning(error, "unknown exploration order %s", order);
-            HREexitUsage(LTSMIN_EXIT_FAILURE);
-        } else if (HREme(HREglobal())==0) {
-            Warning(info, "Exploration order is %s", order);
-        }
-        strategy = res;
-
-        res = linear_search(SATURATION, saturation);
-        if (res < 0) {
-            Warning(error, "unknown saturation strategy %s", saturation);
-            HREexitUsage(LTSMIN_EXIT_FAILURE);
-        } else if (HREme(HREglobal())==0) {
-            Warning(info, "Saturation strategy is %s", saturation);
-        }
-        sat_strategy = res;
-
-        res = linear_search(GUIDED, guidance);
-        if (res < 0) {
-            Warning(error, "unknown guided search strategy %s", guidance);
-            HREexitUsage(LTSMIN_EXIT_FAILURE);
-        } else if (HREme(HREglobal())==0) {
-            Warning(info, "Guided search strategy is %s", guidance);
-        }
-        guide_strategy = res;
-
-        if (trc_output != NULL && !dlk_detect && act_detect == NULL && HREme(HREglobal())==0)
-            Warning(info, "Ignoring trace output");
-
-        if (inv_bin_par == 1 && inv_par == 0) {
-            Warning(error, "--inv-bin-par requires --inv-par");
-            HREexitUsage(LTSMIN_EXIT_FAILURE);
-        }
-
-        return;
-    }
-    case POPT_CALLBACK_REASON_OPTION:
-        IF_LONG(invariant_long) {
-            num_inv++;
-            inv_detect = (char**) RTrealloc(inv_detect, sizeof(char*) * num_inv);
-            inv_detect[num_inv - 1] = (char*) RTmalloc(strlen(arg) + 1);
-            memcpy(inv_detect[num_inv - 1], arg, strlen(arg) + 1);
-        }
-        IF_LONG(ctl_star_long) {
-            num_ctl_star++;
-            ctl_star_formulas = (char**) RTrealloc(ctl_star_formulas, sizeof(char*) * num_ctl_star);
-            ctl_star_formulas[num_ctl_star - 1] = (char*) RTmalloc(strlen(arg) + 1);
-            memcpy(ctl_star_formulas[num_ctl_star - 1], arg, strlen(arg) + 1);
-        }
-        IF_LONG(ctl_long) {
-            num_ctl++;
-            ctl_formulas = (char**) RTrealloc(ctl_formulas, sizeof(char*) * num_ctl);
-            ctl_formulas[num_ctl - 1] = (char*) RTmalloc(strlen(arg) + 1);
-            memcpy(ctl_formulas[num_ctl - 1], arg, strlen(arg) + 1);
-        }
-        IF_LONG(ltl_long) {
-            num_ltl++;
-            ltl_formulas = (char**) RTrealloc(ltl_formulas, sizeof(char*) * num_ltl);
-            ltl_formulas[num_ltl - 1] = (char*) RTmalloc(strlen(arg) + 1);
-            memcpy(ltl_formulas[num_ltl - 1], arg, strlen(arg) + 1);
-        }
-        IF_LONG(mu_long) {
-            num_mu++;
-            mu_formulas = (char**) RTrealloc(mu_formulas, sizeof(char*) * num_mu);
-            mu_formulas[num_mu - 1] = (char*) RTmalloc(strlen(arg) + 1);
-            memcpy(mu_formulas[num_mu - 1], arg, strlen(arg) + 1);
-        }
-        return;
-    }
-}
-
-static struct poptOption lace_options[] = {
-    { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
-    { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
-    { "lace-stacksize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_stacksize, 0, "set size of program stack in kilo bytes (0=default stack size)", "<stacksize>"},
-POPT_TABLEEND
-};
-
-static  struct poptOption options[] = {
-    { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST , (void*)reach_popt , 0 , NULL , NULL },
-    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par|none>" },
-    { "inv-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize invariant detection", NULL },
-    { "inv-bin-par", 0, POPT_ARG_VAL, &inv_bin_par, 1, "also parallelize every binary operand, may be slow when lots of state labels are to be evaluated (requires --inv-par)", NULL },
-    { "mu-par", 0, POPT_ARG_VAL, &mu_par, 1, "parallelize mu-calculus", NULL },
-    { "mu-opt", 0, POPT_ARG_VAL, &mu_opt, 1, "optimize fix-point calculations in mu-calculus", NULL },
-
-    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
-    { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
-    { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
-    { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
-    { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
-    { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
-    { invariant_long , 'i' , POPT_ARG_STRING , NULL , 0, "detect invariant violations (can be given multiple times)", NULL },
-    { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
-    { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },
-    { "type", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT, &trc_type, 0, "trace type to write", "<aut|gcd|gcf|dir|fsm|bcg>" },
-    { mu_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a MU-calculus formula  (can be given multiple times)" , "<mu-file>.mu" },
-    { ctl_star_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL* formula  (can be given multiple times)" , "<ctl-star-file>.ctl" },
-    { ctl_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL formula  (can be given multiple times)" , "<ctl-file>.ctl" },
-    { ltl_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with an LTL formula  (can be given multiple times)" , "<ltl-file>.ltl" },
-    { "dot", 0, POPT_ARG_STRING, &dot_dir, 0, "directory to write dot representation of vector sets to", NULL },
-    { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
-    { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
-    { "no-matrix" , 0 , POPT_ARG_VAL , &no_matrix , 1 , "do not print the dependency matrix when -v (verbose) is used" , NULL},
-    SPEC_POPT_OPTIONS,
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
-    { "no-soundness-check", 0, POPT_ARG_VAL, &no_soundness_check, 1, "disable checking whether the model specification is sound for guards", NULL },
-    { "precise", 0, POPT_ARG_NONE, &precise, 0, "Compute the final number of states precisely", NULL},
-    { "next-union", 0, POPT_ARG_NONE, &next_union, 0, "While computing successor states; unify simultaneously with current states", NULL },
-    { "peak-nodes", 0, POPT_ARG_NONE, &peak_nodes, 0, "record peak nodes and report after reachability analysis", NULL },
-    {NULL, 0, POPT_ARG_INCLUDE_TABLE, maxsum_options, 0, "Integer arithmetic options", NULL},
-    POPT_TABLEEND
-};
+ltsmin_expr_t* mu_exprs = NULL;
+ltsmin_parse_env_t* mu_parse_env = NULL;
 
 typedef struct {
     int len;
@@ -720,7 +500,7 @@ VOID_TASK_2(eval_label, int, label, vset_t, set)
     if (log_active(infoLong)) {
         double elem_count;
         vset_count(label_tmp[label], NULL, &elem_count);
-        if (elem_count >= 10000.0 * SPEC_REL_PERF) {
+        if (elem_count >= 10000.0 * REL_PERF) {
             Print(infoLong, "expanding label %d for %.*g states.", label, DBL_DIG, elem_count);
         }
     }
@@ -942,7 +722,7 @@ VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, v
             if (log_active(infoLong)) {
                 double elem_count;
                 vset_count(rel->tmp, NULL, &elem_count);
-                if (elem_count >= 10000.0 * SPEC_REL_PERF) {                    
+                if (elem_count >= 10000.0 * REL_PERF) {
                     char* p = LTSminPrintExpr(e, env);
                     Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
                     RTfree(p);
@@ -1063,7 +843,7 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
             if (log_active(infoLong)) {
                 double elem_count;
                 vset_count(rel->tmp, NULL, &elem_count);
-                if (elem_count >= 10000.0 * SPEC_REL_PERF) {                    
+                if (elem_count >= 10000.0 * REL_PERF) {
                     const char* p = LTSminPrintExpr(e, env);
                     Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
                 }
@@ -1350,7 +1130,7 @@ VOID_TASK_2(expand_group_next, int, group, vset_t, set)
         double elem_count;
         vset_count(group_tmp[group], NULL, &elem_count);
 
-        if (elem_count >= 10000.0 * SPEC_REL_PERF) {
+        if (elem_count >= 10000.0 * REL_PERF) {
             Print(infoLong, "expanding group %d for %.*g states.", group, DBL_DIG, elem_count);
         }
     }
@@ -1415,7 +1195,7 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
                 vset_copy(guard_maybe[guards->guard[g]], label_true[guards->guard[g]]);
                 vset_intersect(guard_maybe[guards->guard[g]], label_false[guards->guard[g]]);
 
-                if (!SPEC_MAYBE_AND_FALSE_IS_FALSE) {
+                if (!MAYBE_AND_FALSE_IS_FALSE) {
                     // If we have Promela, Java etc. then if we encounter a maybe guard then this is an error.
                     // Because every guard is evaluated in order.
                     if (!vset_is_empty(guard_maybe[guards->guard[g]])) {
@@ -1436,7 +1216,7 @@ learn_guards_reduce(vset_t true_states, int t, long *guard_count, vset_t *guard_
             vset_join(true_states, true_states, label_true[guards->guard[g]]);
         }
 
-        if (!no_soundness_check && SPEC_MAYBE_AND_FALSE_IS_FALSE) {
+        if (!no_soundness_check && MAYBE_AND_FALSE_IS_FALSE) {
             vset_copy(tmp, maybe_states);
             vset_minus(tmp, false_states);
             if (!vset_is_empty(tmp)) {
@@ -1729,18 +1509,18 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
 /**
  * Tree structure to evaluate the condition of a transition group.
  * If we disable the soundness check of guard-splitting then if we
- * have SPEC_MAYBE_AND_FALSE_IS_FALSE (like mCRL(2) and SCOOP) then
+ * have MAYBE_AND_FALSE_IS_FALSE (like mCRL(2) and SCOOP) then
  * (maybe && false == false) or (false && maybe == false) is not checked.
- * If we have !SPEC_MAYBE_AND_FALSE_IS_FALSE (like Java, Promela and DVE) then only
+ * If we have !MAYBE_AND_FALSE_IS_FALSE (like Java, Promela and DVE) then only
  * (maybe && false == false) is not checked.
  * For guard-splitting ternary logic is used; i.e. (false,true,maybe) = (0,1,2) = (0,1,?).
- * Truth table for SPEC_MAYBE_AND_FALSE_IS_FALSE:
+ * Truth table for MAYBE_AND_FALSE_IS_FALSE:
  *      0 1 ?
  *      -----
  *  0 | 0 0 0
  *  1 | 0 1 ?
  *  ? | 0 ? ?
- * Truth table for !SPEC_MAYBE_AND_FALSE_IS_FALSE:
+ * Truth table for !MAYBE_AND_FALSE_IS_FALSE:
  *      0 1 ?
  *      -----
  *  0 | 0 0 0
@@ -1753,8 +1533,8 @@ static inline void add_variable_subset(vset_t dst, vset_t src, vdom_t domain, in
  *  \bigcap X = Y \cap Z = (Fy,Ty) \cap (Fz,Tz):
  *   - T = (Ty \cap Tz) U M
  *   - F = Fy U Fz U M
- *   - M = SPEC_MAYBE_AND_FALSE_IS_FALSE  => ((Fy \cap Ty) \ Fz) U ((Fz \cap Tz) \ Fy) &&
- *         !SPEC_MAYBE_AND_FALSE_IS_FALSE => (Fy \cap Ty) U ((Fz \cap Tz) \ Fy)
+ *   - M = MAYBE_AND_FALSE_IS_FALSE  => ((Fy \cap Ty) \ Fz) U ((Fz \cap Tz) \ Fy) &&
+ *         !MAYBE_AND_FALSE_IS_FALSE => (Fy \cap Ty) U ((Fz \cap Tz) \ Fy)
  */
 struct reach_red_s
 {
@@ -1900,7 +1680,7 @@ VOID_TASK_1(reach_bfs_reduce, struct reach_red_s *, dummy)
             // compute maybe set
             vset_copy(dummy->left_maybe, dummy->left->false_container);
             vset_intersect(dummy->left_maybe, dummy->left->true_container);
-            if (SPEC_MAYBE_AND_FALSE_IS_FALSE) vset_minus(dummy->left_maybe, dummy->right->false_container);
+            if (MAYBE_AND_FALSE_IS_FALSE) vset_minus(dummy->left_maybe, dummy->right->false_container);
 
             vset_copy(dummy->right_maybe, dummy->right->false_container);
             vset_intersect(dummy->right_maybe, dummy->right->true_container);
@@ -2316,7 +2096,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 VOID_TASK_3(compute_left_maybe, vset_t, left_maybe, vset_t, left_true, vset_t, right_false)
 {
     vset_intersect(left_maybe, left_true);
-    if (SPEC_MAYBE_AND_FALSE_IS_FALSE) vset_minus(left_maybe, right_false);
+    if (MAYBE_AND_FALSE_IS_FALSE) vset_minus(left_maybe, right_false);
 }
 
 VOID_TASK_3(compute_right_maybe, vset_t, right_maybe, vset_t, right_true, vset_t, left_false)
@@ -4054,7 +3834,7 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
         if (log_active(infoLong)) {
             double elem_count;
             vset_count(tmp, NULL, &elem_count);
-            if (elem_count >= 10000.0 * SPEC_REL_PERF) {
+            if (elem_count >= 10000.0 * REL_PERF) {
                 const char* p = LTSminPrintExpr(mu_expr, env);
                 Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
             }
@@ -4257,7 +4037,7 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
         if (log_active(infoLong)) {
             double elem_count;
             vset_count(tmp, NULL, &elem_count);
-            if (elem_count >= 10000.0 * SPEC_REL_PERF) {
+            if (elem_count >= 10000.0 * REL_PERF) {
                 const char* p = LTSminPrintExpr(mu_expr, env);
                 Print(infoLong, "evaluating subformula %s for %.*g states.", p, DBL_DIG, elem_count);
             }
