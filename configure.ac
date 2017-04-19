@@ -1,8 +1,8 @@
-AC_PREREQ(2.60)
+AC_PREREQ(2.65)
 AC_INIT([ltsmin],[3.0],[ltsmin-support@lists.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
-AM_INIT_AUTOMAKE([foreign subdir-objects])
+AM_INIT_AUTOMAKE([1.14 foreign subdir-objects])
 AC_CONFIG_SRCDIR([src/pins-lib/pins.c])
 AC_CONFIG_HEADERS([src/hre/config.h])
 
@@ -81,8 +81,6 @@ AX_CHECK_FLEX([
 ],,
 [AC_MSG_FAILURE([no compatible lexer generator found.])])
 
-AC_PROG_YACC
-
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
 
@@ -125,6 +123,9 @@ AC_ARG_ENABLE([pkgconf_static],
     [:],
     [enable_pkgconf_static=no])
 AS_IF([test x"$enable_pkgconf_static" = "xyes"], [PKG_CONFIG="$PKG_CONFIG --static"])
+
+AX_PROG_BISON([BISON="$YACC"],[AC_MSG_FAILURE([Please install Bison])])
+AX_PROG_BISON_VERSION([3.0.2],,[AC_MSG_FAILURE([Please install Bison >= 3.0.2])])
 
 dnl Checks for programs.
 ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
