@@ -15,7 +15,6 @@ pkginclude_HEADERS = dm.h bitvector.h
 # libdm_boost
 libdm_boost_la_SOURCES  = dm_boost.cpp dm_boost.h
 libdm_boost_la_CXXFLAGS = $(AM_CXXFLAGS) $(BOOST_CPPFLAGS)
-libdm_boost_la_LIBADD   = ../hre/libhre.la
 # libdm_boost_la_LDFLAGS  = $(BOOST_LDFLAGS)
 # above line is commented because BOOST_LDFLAGS always contains an -L flag,
 # which does not allow is to properly use -L by ourselves.
@@ -27,7 +26,7 @@ libdm_boost_la_LIBADD   = ../hre/libhre.la
 # libdm_viennacl
 libdm_viennacl_la_SOURCES   = dm_viennacl.cpp dm_viennacl.h
 libdm_viennacl_la_CXXFLAGS  = $(AM_CXXFLAGS) $(VIENNACL_CPPFLAGS)
-libdm_viennacl_la_LIBADD    = ../hre/libhre.la $(VIENNACL_LIBS)
+libdm_viennacl_la_LIBADD    = $(VIENNACL_LIBS)
 
 # libdm
 libdm_la_SOURCES       	= dm.c dm.h bitvector.c bitvector.h

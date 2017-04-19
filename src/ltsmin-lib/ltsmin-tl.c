@@ -93,7 +93,7 @@ MU_NAME(MU mu)
     }
 }
 
-static stream_t
+stream_t
 read_formula (const char *file)
 {
     FILE *in=fopen( file, "r" );

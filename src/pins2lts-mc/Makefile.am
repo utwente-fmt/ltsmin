@@ -1,17 +1,8 @@
-HRE_LIB = ../hre/libhre.la
 MC_CPPFLAGS = $(AM_CPPFLAGS)
-PINS_LIBS  =
-PINS_LIBS += ../lts-io/liblts-io.la
-PINS_LIBS += ../hre-io/libhre-io.la
-PINS_LIBS += $(HRE_LIB)
-PINS_LIBS += ../pins-lib/libpins.la
-PINS_LIBS += ../ltsmin-lib/libltsmin.la
-PINS_LIBS += ../util-lib/libutil.la
-PINS_LIBS += ../dm/libdm.la
-MC_LIBS	 = ../mc-lib/libmc.la
-MC_LIBS	+= parallel/libparallel.la
-MC_LIBS	+= algorithm/libalgorithm.la
-MC_LIBS	+= $(PINS_LIBS)
+
+MC_LIBS	 = algorithm/libalgorithm.la
+MC_LIBS += ../pins-lib/libpins.la
+MC_LIBS += ../mc-lib/libmc.la
 
 PROB_LIBS = ../prob-lib/libprob.la
 
@@ -119,7 +110,7 @@ nodist_EXTRA_opaal2lts_mc_SOURCES = automake-force-linker.cxx # required by Boos
 # pnml2lts-mc
 pnml2lts_mc_SOURCES   = $(mc_sources)
 pnml2lts_mc_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
-pnml2lts_mc_LDADD     = $(XML_LIBS) $(MC_LIBS)
+pnml2lts_mc_LDADD     = $(XML_LIBS) $(MC_LIBS) ../andl-lib/libandl.la
 pnml2lts_mc_CPPFLAGS  = -DPNML $(MC_CPPFLAGS)
 pnml2lts_mc_CFLAGS    = $(XML_CFLAGS)
 nodist_EXTRA_pnml2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL

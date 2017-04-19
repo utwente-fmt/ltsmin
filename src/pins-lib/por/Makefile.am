@@ -1,13 +1,3 @@
-
-HRE_LIB = ../../hre/libhre.la
-LIBS  =
-LIBS += ../../lts-io/liblts-io.la
-LIBS += ../../hre-io/libhre-io.la
-LIBS += $(HRE_LIB)
-LIBS += ../../util-lib/libutil.la
-LIBS += ../../ltsmin-lib/libltsmin.la
-LIBS += ../../dm/libdm.la
-
 noinst_LTLIBRARIES  = libpor.la
 
 # libpor
@@ -27,5 +17,3 @@ libpor_la_SOURCES += pins2pins-por-check.h
 libpor_la_SOURCES += pins2pins-por-check.c
 
 libpor_la_CPPFLAGS = $(AM_CPPFLAGS)
-libpor_la_LIBADD   =
-libpor_la_LIBADD  += $(LIBS)

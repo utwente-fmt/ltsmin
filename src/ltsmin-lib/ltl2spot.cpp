@@ -59,15 +59,7 @@ ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, in
       case LTL_EQUIV:     n += snprintf(at + (at?n:0), max_buffer, " <-> "); break;
       case LTL_IMPLY:     n += snprintf(at + (at?n:0), max_buffer, " -> "); break;
       case LTL_EN:
-      case LTL_EQ:{
-        char *buffer = LTSminPrintExpr(le->lin_expr[i], env);
-        // store the predicate (only once)
-        if (at) ltsmin_expr_lookup(le->lin_expr[i], buffer, &le_list);
-        // add temporary '#' to mark predicates for Spot
-        n += snprintf(at + (at?n:0), max_buffer, "#%s#", buffer);
-        RTfree(buffer);
-        break;
-      }
+      case LTL_EQ:
       case LTL_SVAR:
       case LTL_VAR:
       case LTL_NEQ:
@@ -79,9 +71,17 @@ ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, in
       case LTL_DIV:
       case LTL_REM:
       case LTL_ADD:
-      case LTL_SUB: 
+      case LTL_SUB: {
+        char *buffer = LTSminPrintExpr(le->lin_expr[i], env);
+        // store the predicate (only once)
+        if (at) ltsmin_expr_lookup(le->lin_expr[i], buffer, &le_list);
+        // add temporary '#' to mark predicates for Spot
+        n += snprintf(at + (at?n:0), max_buffer, "#%s#", buffer);
+        RTfree(buffer);
+        break;
+      }
       default:
-        Abort("unhandled LTL_TOKEN: %d\n", le->lin_expr[i]->token); 
+        Abort("unhandled LTL_TOKEN: %d\n", le->lin_expr[i]->token);
         break;
     }
   }

@@ -1,8 +1,8 @@
-AC_PREREQ(2.60)
+AC_PREREQ(2.65)
 AC_INIT([ltsmin],[3.0],[ltsmin-support@lists.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
-AM_INIT_AUTOMAKE([foreign subdir-objects])
+AM_INIT_AUTOMAKE([1.14 foreign subdir-objects])
 AC_CONFIG_SRCDIR([src/pins-lib/pins.c])
 AC_CONFIG_HEADERS([src/hre/config.h])
 
@@ -116,6 +116,17 @@ m4_pattern_forbid([^PKG_[A-Z_]+$], [missing some pkgconf macros (pkgconf package
 
 AS_IF([test x"$PKG_CONFIG" = x], [AC_MSG_FAILURE([Please install pkgconf])])
 
+AC_ARG_ENABLE([pkgconf_static],
+    [AS_HELP_STRING([--enable-pkgconf-static], [
+        Configure pkgconf to search for private libs too.
+        This is necessary when you want to statically link binaries.])],
+    [:],
+    [enable_pkgconf_static=no])
+AS_IF([test x"$enable_pkgconf_static" = "xyes"], [PKG_CONFIG="$PKG_CONFIG --static"])
+
+AX_PROG_BISON([BISON="$YACC"],[AC_MSG_FAILURE([Please install Bison])])
+AX_PROG_BISON_VERSION([3.0.2],,[AC_MSG_FAILURE([Please install Bison >= 3.0.2])])
+
 dnl Checks for programs.
 ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
@@ -215,16 +226,36 @@ if test "x$acx_mcrl2" = xyes; then
      AC_MSG_WARN([mcrl2 library not found.])])
 fi
 
-AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
-AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
-AC_SUBST([BUDDY_LDFLAGS])
-
 ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
-PKG_CHECK_MODULES([SPOT], [libspot >= 2.3],[
-    acx_spot=yes],
-    [AC_MSG_WARN(No valid spot version found!)
+
+AC_ARG_WITH([spot],
+    [AS_HELP_STRING([--without-spot], [do not include the Spot library for LTL model checking])])
+
+AS_IF([test "x$with_spot" != "xno"], [
+    PKG_CHECK_MODULES([SPOT], [libspot >= 2.3],[
+        acx_spot=yes],
+        [AC_MSG_WARN(No valid spot version found!)
+    ])
+])
+
+AS_IF([test "x$acx_spot" = "xyes"], [
+    PKG_CHECK_MODULES([BDDX], [libbddx >= 2.3],[
+        AC_MSG_NOTICE([Because SPOT was found, the SPOT Buddy implementation will be used!])
+        AC_SUBST([BUDDY_LIBS],["$BDDX_LIBS"])
+        AC_SUBST([BUDDY_CPPFLAGS],["$BDDX_CPPFLAGS"])
+        AC_SUBST([BUDDY_LDFLAGS])
+    ],[
+       AC_MSG_ERROR(Could not find libbddx!
+                    Because both SPOT and LTSmin distribute BuDDy,
+                    we have to choose between BUDDY versions,
+                    if SPOT is found, then the SPOT version will be used,
+                    meaning libbddx must be installed.)])
+],[
+    AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
+    AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
+    AC_SUBST([BUDDY_LDFLAGS])
 ])
 
 ACX_CLINE_DEF([], [])
@@ -538,6 +569,7 @@ AC_CONFIG_FILES([
        Makefile
        examples/Makefile
        src/Makefile
+       src/andl-lib/Makefile
        src/hre-io/Makefile
        src/hre/Makefile
        src/hre-mpi/Makefile
@@ -567,6 +599,7 @@ AC_CONFIG_FILES([
        src/pins2lts-mc/Makefile
        src/pins2lts-seq/Makefile
        src/pins2lts-sym/Makefile
+       src/pins2lts-sym/maxsum/Makefile
        src/pins-open/Makefile
        src/spg/Makefile
        src/dm/Makefile
@@ -584,7 +617,12 @@ AC_CONFIG_FILES([
 
 AC_CONFIG_LINKS([src/ltsmin-lib/lempar.c:lemon/lempar.c])
 
-AC_CONFIG_SUBDIRS([buddy ltl2ba])
+AC_CONFIG_SUBDIRS([ltl2ba])
+
+AM_COND_IF([HAVE_SPOT],[
+    buddy="SPOT version (because SPOT was found)"],[
+    buddy="LTSmin version (because SPOT was not found)"
+    AC_CONFIG_SUBDIRS([buddy])])
 
 AC_OUTPUT
 
@@ -593,6 +631,7 @@ Configuration:
 ======================================================================
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     BIGNUM   = ${with_bignum}
+    BUDDY    = ${buddy}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
     CC       = ${CC:-NOT FOUND}
     CXX      = ${CXX:-NOT FOUND}
@@ -605,7 +644,7 @@ Configuration:
     PBES     = ${acx_pbes:-NOT FOUND, building without PBES support}
     SCOOP    = ${have_scoop:-NO, either scoop was disabled or ghc/happy/ghc-pkg/hashmap/deepseq could not be found}
     SPINS    = ${acx_spins:-NO, JDK or Ant not found (override with --with-spins)}
-    SPOT     = ${acx_spot:-NO, Spot not found (override with --with-spot)}
+    SPOT     = ${acx_spot:-NO, Spot not found, or disabled}
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
