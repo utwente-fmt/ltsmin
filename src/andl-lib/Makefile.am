@@ -4,6 +4,9 @@ noinst_LTLIBRARIES  = libandl.la
 
 libandl_la_YFLAGS   = -d
 
+EXTRA_DIST  = andl-lexer.c andl-lexer.h
+EXTRA_DIST += libandl_la-andl-parser.c libandl_la-andl-parser.h
+
 BUILT_SOURCES  = andl-lexer.c andl-lexer.h
 BUILT_SOURCES += libandl_la-andl-parser.c libandl_la-andl-parser.h
 
