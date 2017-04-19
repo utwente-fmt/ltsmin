@@ -3,6 +3,7 @@
 
 #include <popt.h>
 
+#include <ltsmin-lib/lts-type.h>
 #include <vset-lib/vector_set.h>
 
 extern struct poptOption maxsum_options[];
