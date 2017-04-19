@@ -118,6 +118,14 @@ m4_pattern_forbid([^PKG_[A-Z_]+$], [missing some pkgconf macros (pkgconf package
 
 AS_IF([test x"$PKG_CONFIG" = x], [AC_MSG_FAILURE([Please install pkgconf])])
 
+AC_ARG_ENABLE([pkgconf_static],
+    [AS_HELP_STRING([--enable-pkgconf-static], [
+        Configure pkgconf to search for private libs too.
+        This is necessary when you want to statically link binaries.])],
+    [:],
+    [enable_pkgconf_static=no])
+AS_IF([test x"$enable_pkgconf_static" = "xyes"], [PKG_CONFIG="$PKG_CONFIG --static"])
+
 dnl Checks for programs.
 ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
