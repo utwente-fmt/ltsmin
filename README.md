@@ -263,11 +263,6 @@ Download zlib from <http://www.zlib.net/>.
 
 Download GNU make from <http://www.gnu.org/software/make/>.
 
-#### Flex
-
-Download Flex (>= 2.5.35) from <http://flex.sourceforge.net/>.  We
-tested with flex 2.5.35.
-
 #### Apache Ant
 
 Download Apache Ant from <http://ant.apache.org/>.  We tested with ant
@@ -447,6 +442,11 @@ If Sylvan is installed in a non-standard location please refer to
 [this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
 and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).
 
+#### Spot
+
+To use Büchi automata created by Spot, download Spot (>=2.3.1) 
+from <https://spot.lrde.epita.fr/index.html>.
+
 ## Building from a Git Repository
 
 Before building the software as described above, the following commands
@@ -471,22 +471,27 @@ extra tools to be installed:
 
 #### GNU automake
 
-Download automake (>= 1.10) from
-<http://www.gnu.org/software/automake/>. We tested with automake-1.10.
+Download automake (>= 1.14) from
+<http://www.gnu.org/software/automake/>. We tested with automake-1.14.
 
 #### GNU autoconf
 
-Download autoconf (>= 2.60) from
-<http://www.gnu.org/software/autoconf/>. We tested with autoconf-2.68.
+Download autoconf (>= 2.65) from
+<http://www.gnu.org/software/autoconf/>. We tested with autoconf-2.69.
 
 #### GNU libtool
 
 Download libtool (>= 2.2.6) from
 <http://www.gnu.org/software/libtool/>. We tested with libtool-2.4.
 
-#### Apache Ant
+#### Flex
 
-See above.
+Download Flex (>= 2.5.35) from <http://flex.sourceforge.net/>.  We
+tested with flex 2.5.35.
+
+#### Bison
+
+Download Bison from (>= 3.0.2) from <https://www.gnu.org/software/bison/>.
 
 ## Contact
 
