@@ -276,6 +276,14 @@ Download pkgconf from <https://github.com/pkgconf/pkgconf>.
 
 ### Optional Dependencies
 
+#### Sylvan
+
+To build the parallel symbolic algorithms, [Sylvan](https://github.com/trolando/sylvan)
+(>=1.1, < 1.2) is required.
+If Sylvan is installed in a non-standard location please refer to
+[this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
+and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).
+
 #### muCRL
 
 Download muCRL (>= 2.18.5) from <http://www.cwi.nl/~mcrl/mutool.html>.
@@ -434,14 +442,6 @@ To build the ProB front-end, [CZMQ](http://czmq.zeromq.org/) is required.
 #### libxml2
 
 To build the Petri net front-end, [libxml2](http://xmlsoft.org/) is required.
-
-#### Sylvan
-
-To build the symbolic back-end, [Sylvan](https://github.com/trolando/sylvan)
-(>=1.1, < 1.2) is required.
-If Sylvan is installed in a non-standard location please refer to
-[this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
-and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).
 
 #### Spot
 

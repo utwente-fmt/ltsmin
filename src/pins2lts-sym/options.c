@@ -68,8 +68,10 @@ static char* order = "bfs-prev";
 static si_map_entry ORDER[] = {
     {"bfs-prev", BFS_P},
     {"bfs", BFS},
+#ifdef HAVE_SYLVAN
     {"par", PAR},
     {"par-prev", PAR_P},
+#endif
     {"chain-prev", CHAIN_P},
     {"chain", CHAIN},
     {"none", NONE},
@@ -193,10 +195,17 @@ POPT_TABLEEND
 
 struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST , (void*)reach_popt , 0 , NULL , NULL },
-    { "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , "<bfs-prev|bfs|chain-prev|chain|par-prev|par|none>" },
+    {   "order" , 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &order , 0 , "set the exploration strategy to a specific order" , 
+        "<bfs-prev|bfs|chain-prev|chain"
+#ifdef HAVE_SYLVAN
+            "|par-prev|par" 
+#endif
+            "|none>" },
+#ifdef HAVE_SYLVAN
     { "inv-par", 0, POPT_ARG_VAL, &inv_par, 1, "parallelize invariant detection", NULL },
     { "inv-bin-par", 0, POPT_ARG_VAL, &inv_bin_par, 1, "also parallelize every binary operand, may be slow when lots of state labels are to be evaluated (requires --inv-par)", NULL },
     { "mu-par", 0, POPT_ARG_VAL, &mu_par, 1, "parallelize mu-calculus", NULL },
+#endif
     { "mu-opt", 0, POPT_ARG_VAL, &mu_opt, 1, "optimize fix-point calculations in mu-calculus", NULL },
 
     { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
@@ -217,7 +226,9 @@ struct poptOption options[] = {
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
+#ifdef HAVE_SYLVAN
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, lace_options , 0 , "Lace options",NULL},
+#endif
     { "no-matrix" , 0 , POPT_ARG_VAL , &no_matrix , 1 , "do not print the dependency matrix when -v (verbose) is used" , NULL},
     SPEC_POPT_OPTIONS,
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options",NULL},
