@@ -437,7 +437,8 @@ To build the Petri net front-end, [libxml2](http://xmlsoft.org/) is required.
 
 #### Sylvan
 
-To build the symbolic back-end, [Sylvan](https://github.com/trolando/sylvan) is required.
+To build the symbolic back-end, [Sylvan](https://github.com/trolando/sylvan)
+(>=1.1, < 1.2) is required.
 If Sylvan is installed in a non-standard location please refer to
 [this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
 and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).
