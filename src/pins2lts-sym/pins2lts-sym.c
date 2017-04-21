@@ -43,7 +43,13 @@
 #include <hre/stringindex.h>
 #include <mc-lib/atomics.h>
 
+#ifdef HAVE_SYLVAN
 #include <sylvan.h>
+#else
+#define LACE_ME
+#define lace_suspend()
+#define lace_resume()
+#endif
 
 hre_context_t ctx;
 
@@ -176,6 +182,7 @@ vset_next_union_src(vset_t dst, vset_t src, vrel_t rel)
     vset_next_union(dst, src, rel, src);
 }
 
+#ifdef HAVE_SYLVAN
 /*
  * Add parallel operations
  */
@@ -194,6 +201,7 @@ VOID_TASK_2(vset_intersect_par, vset_t, dst, vset_t, src) { vset_intersect(dst, 
 // minus
 #define vset_minus_par(dst, src) SPAWN(vset_minus_par, dst, src)
 VOID_TASK_2(vset_minus_par, vset_t, dst, vset_t, src) { vset_minus(dst, src); }
+#endif
 
 static inline void
 reduce(int group, vset_t set)
@@ -488,8 +496,12 @@ static void eval_cb (vset_t set, void *context, int *src)
     }
 }
 
+#ifdef HAVE_SYLVAN
 #define eval_label(l, s) CALL(eval_label, (l), (s))
 VOID_TASK_2(eval_label, int, label, vset_t, set)
+#else
+static void eval_label(int label, vset_t set)    
+#endif
 {
     // get the short vectors we need to evaluate
     // minus what we have already evaluated
@@ -544,6 +556,7 @@ learn_guards(vset_t states, long *guard_count) {
     }
 }
 
+#ifdef HAVE_SYLVAN
 static inline void
 learn_guards_par(vset_t states, long *guard_count)
 {
@@ -558,6 +571,7 @@ learn_guards_par(vset_t states, long *guard_count)
         for (int g = 0; g < nGuards; g++) SYNC(eval_label);
     }
 }
+#endif
 
 static inline void
 learn_labels(vset_t states)
@@ -568,6 +582,7 @@ learn_labels(vset_t states)
     }
 }
 
+#ifdef HAVE_SYLVAN
 static inline void
 learn_labels_par(vset_t states)
 {
@@ -579,6 +594,7 @@ learn_labels_par(vset_t states)
         if (bitvector_is_set(&state_label_used, i)) SYNC(eval_label);
     }
 }
+#endif
 
 struct inv_info_s {
     vset_t container;
@@ -643,6 +659,7 @@ rel_expr_cb(vset_t set, void *context, int *e)
     if (eval_state_predicate(model, ctx->e, vec, ctx->env)) vset_add(set, e);
 }
 
+#ifdef HAVE_SYLVAN
 #define eval_predicate_set_par(e, env, s) CALL(eval_predicate_set_par, (e), (env), (s))
 VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, vset_t, states)
 {
@@ -741,6 +758,7 @@ VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, v
             HREabort (LTSMIN_EXIT_FAILURE);
     }
 }
+#endif
 
 static void
 eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
@@ -751,7 +769,6 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
     if (e->node_type == UNARY_OP || e->node_type == BINARY_OP) left = (struct inv_info_s*) e->arg1->context;
     if (e->node_type == BINARY_OP) right = (struct inv_info_s*) e->arg2->context;
     
-    LACE_ME;
     switch (e->token) {
         case PRED_TRUE: {
             // do nothing (c->container already contains everything)
@@ -766,6 +783,8 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
                 /* following join is necessary because vset does not yet support
                  * set projection of a projected set. */
                 vset_join(svar, c->container, states);
+#ifdef HAVE_SYLVAN
+                LACE_ME;
                 if (inv_par) {
                     volatile int* ptr = &label_locks[e->idx - N];
                     while (!cas(ptr, 0, 1)) {
@@ -773,7 +792,7 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
                         ptr = &label_locks[e->idx - N];
                     }
                 }
-
+#endif
                 eval_label(e->idx - N, svar);
                 if (inv_par) label_locks[e->idx - N] = 0;
                 vset_join(c->container, c->container, label_true[e->idx - N]);
@@ -942,6 +961,7 @@ check_inv(vset_t states, const int level)
     }
 }
 
+#ifdef HAVE_SYLVAN
 TASK_3(int, check_inv_par_go, vset_t, states, int, i, int, level)
 {
     int res = 0;
@@ -1001,6 +1021,9 @@ check_inv_par(vset_t states, const int level)
         if (iv) inv_cleanup();
     }
 }
+#else
+#define check_inv_par(s,l)
+#endif
 
 static inline void
 check_invariants(vset_t set, int level)
@@ -1117,8 +1140,12 @@ explore_cb(vrel_t rel, void *context, int *src)
     }
 }
 
+#ifdef HAVE_SYLVAN
 #define expand_group_next(g, s) CALL(expand_group_next, (g), (s))
 VOID_TASK_2(expand_group_next, int, group, vset_t, set)
+#else
+static void expand_group_next(int group, vset_t set)
+#endif
 {
     struct group_add_info ctx;
     ctx.group = group;
@@ -1649,8 +1676,12 @@ reach_destroy(struct reach_s *s)
     RTfree(s);
 }
 
+#ifdef HAVE_SYLVAN
 #define reach_bfs_reduce(dummy) CALL(reach_bfs_reduce, dummy)
 VOID_TASK_1(reach_bfs_reduce, struct reach_red_s *, dummy)
+#else
+static void reach_bfs_reduce(struct reach_red_s *dummy)
+#endif
 {
     if (dummy->index >= 0) { // base case
         // check if no states which satisfy other guards
@@ -1707,8 +1738,12 @@ VOID_TASK_1(reach_bfs_reduce, struct reach_red_s *, dummy)
     }
 }
 
+#ifdef HAVE_SYLVAN
 #define reach_bfs_next(dummy, reach_groups, maybe) CALL(reach_bfs_next, dummy, reach_groups, maybe)
 VOID_TASK_3(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups, vset_t*, maybe)
+#else
+static void reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t *maybe)
+#endif
 {
     if (dummy->index >= 0) {
         if (!bitvector_is_set(reach_groups, dummy->index)) {
@@ -2092,7 +2127,7 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
 /**
  * Parallel reachability implementation
  */
-
+#ifdef HAVE_SYLVAN
 VOID_TASK_3(compute_left_maybe, vset_t, left_maybe, vset_t, left_true, vset_t, right_false)
 {
     vset_intersect(left_maybe, left_true);
@@ -2524,6 +2559,7 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
     }
 }
+#endif
 
 static void
 reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
@@ -4295,8 +4331,12 @@ parity_game* compute_symbolic_parity_game(vset_t visited, int* src)
     if (mu_par) check_mu_par((s), (i)); \
     else check_mu((s), (i));
 
+#ifdef HAVE_SYLVAN
 #define check_mu_go(v, i, s) CALL(check_mu_go, (v), (i), (s))
 VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
+#else
+static void check_mu_go(vset_t visited, int i, int *init)
+#endif
 {
     vset_t x;
     if (mu_opt) {
@@ -4343,6 +4383,7 @@ check_mu(vset_t visited, int* init)
     }
 }
 
+#ifdef HAVE_SYLVAN
 static void
 check_mu_par(vset_t visited, int* init)
 {
@@ -4357,8 +4398,16 @@ check_mu_par(vset_t visited, int* init)
         for (int i = 0; i < num_total; i++) SYNC(check_mu_go);
     }
 }
+#else
+#define check_mu_par(v,i)
+#endif
 
+#ifdef HAVE_SYLVAN
+#define run_reachability(s,e) CALL(run_reachability,s,e)
 VOID_TASK_2(run_reachability, vset_t, states, char*, etf_output)
+#else
+static void run_reachability(vset_t states, char *etf_output)
+#endif
 {
     sat_proc_t sat_proc = NULL;
     reach_proc_t reach_proc = NULL;
@@ -4368,12 +4417,14 @@ VOID_TASK_2(run_reachability, vset_t, states, char*, etf_output)
     case BFS_P:
         reach_proc = reach_bfs_prev;
         break;
+#ifdef HAVE_SYLVAN
     case PAR:
         reach_proc = reach_par;
         break;
     case PAR_P:
         reach_proc = reach_par_prev;
         break;
+#endif
     case BFS:
         reach_proc = reach_bfs;
         break;
@@ -4428,6 +4479,8 @@ struct args_t
     char **argv;
 };
 
+#ifdef HAVE_SYLVAN
+#define init_hre(c) TOGETHER(init_hre, c)
 VOID_TASK_1(init_hre, hre_context_t, context)
 {
     if (LACE_WORKER_ID != 0) {
@@ -4435,8 +4488,20 @@ VOID_TASK_1(init_hre, hre_context_t, context)
         HREglobalSet(context);
     }
 }
+#else
+static void 
+init_hre(hre_context_t context)
+{       
+    HREprocessSet(context);
+    HREglobalSet(context); 
+}
+#endif
 
+#ifdef HAVE_SYLVAN
 VOID_TASK_1(actual_main, void*, arg)
+#else
+static void actual_main(void *arg)
+#endif
 {
     int argc = ((struct args_t*)arg)->argc;
     char **argv = ((struct args_t*)arg)->argv;
@@ -4450,7 +4515,7 @@ VOID_TASK_1(actual_main, void*, arg)
     HREinitStart(&argc,&argv,1,2,files,"<model> [<etf>]");
 
     /* initialize HRE on other workers */
-    TOGETHER(init_hre, HREglobal());
+    init_hre(HREglobal());
 
     /* check for unsupported options */
     if (PINS_POR != PINS_POR_NONE) Abort("Partial-order reduction and symbolic model checking are not compatible.");
@@ -4469,7 +4534,7 @@ VOID_TASK_1(actual_main, void*, arg)
         }
     }
 
-#if !SPEC_MT_SAFE
+#if !SPEC_MT_SAFE && HAVE_SYLVAN
     if (strategy == PAR_P) {
         strategy = BFS_P;
         Print(info, "Front-end not thread-safe; using --order=bfs-prev instead of --order=par-prev.");
@@ -4557,7 +4622,7 @@ VOID_TASK_1(actual_main, void*, arg)
     check_invariants(visited, 0);
 
     /* run reachability */
-    CALL(run_reachability, visited, files[1]);
+    run_reachability(visited, files[1]);
 
     /* report states */
     final_stat_reporting(visited);
@@ -4716,12 +4781,14 @@ VOID_TASK_1(actual_main, void*, arg)
         }
     }
 
+#ifdef HAVE_SYLVAN
     /* in case other Lace threads were still suspended... */
     if (vset_default_domain!=VSET_Sylvan && vset_default_domain!=VSET_LDDmc) {
         lace_resume();
     } else if (SYLVAN_STATS) {
         sylvan_stats_report(stderr);
     }
+#endif
 
     GBExit(model);
 }
@@ -4729,6 +4796,8 @@ VOID_TASK_1(actual_main, void*, arg)
 int
 main (int argc, char *argv[])
 {
+    struct args_t args = (struct args_t){argc, argv};
+#ifdef HAVE_SYLVAN
     poptContext optCon = poptGetContext(NULL, argc, (const char**)argv, lace_options, 0);
     while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
     poptFreeContext(optCon);
@@ -4738,9 +4807,10 @@ main (int argc, char *argv[])
     Warning(info, "Falling back to 1 LACE worker, since the ProB front-end is not yet compatible with HRE.");
 #endif
 
-    struct args_t args = (struct args_t){argc, argv};
     lace_init(lace_n_workers, lace_dqsize);
     lace_startup(lace_stacksize, TASK(actual_main), (void*)&args);
-
+#else
+    actual_main((void*)&args);
+#endif
     return 0;
 }

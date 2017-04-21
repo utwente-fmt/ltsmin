@@ -15,8 +15,10 @@ extern int MAYBE_AND_FALSE_IS_FALSE;
 typedef enum {
     BFS_P,
     BFS,
+#ifdef HAVE_SYLVAN
     PAR,
     PAR_P,
+#endif
     CHAIN_P,
     CHAIN,
     NONE

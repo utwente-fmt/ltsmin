@@ -33,9 +33,11 @@ extern vdom_t vdom_create_sylvan_from_file(FILE *f);
 extern struct poptOption lddmc_options[];
 extern vdom_t vdom_create_lddmc(int n);
 extern vdom_t vdom_create_lddmc_from_file(FILE *f);
-#endif
 
 vset_implementation_t vset_default_domain = VSET_LDDmc;
+#else
+vset_implementation_t vset_default_domain = VSET_ListDD;
+#endif
 
 int vset_cache_diff = 0;
 
@@ -88,8 +90,19 @@ struct poptOption vset_options[]={
     { "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
       "select a vector set implementation from native ListDD (32-bit or 64-bit),"
       " ATermDD with *list* encoding,"
-      " ATermDD with *tree* encoding, BuDDy using the *fdd* feature,"
-      " DDD, Sylvan BDDs, or Sylvan LDDs (default: first available)" , "<lddmc|ldd64|ldd|list|tree|fdd|ddd|sylvan>" },
+      " ATermDD with *tree* encoding, BuDDy using the *fdd* feature"
+#ifdef HAVE_SYLVAN
+      ", DDD, Sylvan BDDs, or Sylvan LDDs"
+#endif
+      " (default: first available)", "<"
+#ifdef HAVE_SYLVAN
+      "lddmc|"
+#endif
+      "ldd|ldd64|list|tree|fdd|ddd"
+#ifdef HAVE_SYLVAN
+      "|sylvan"
+#endif
+      ">" },
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd_options , 0 , "ListDD options" , NULL},
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , listdd64_options , 0 , "ListDD64 options" , NULL},
 #ifdef HAVE_ATERM2_H
@@ -113,8 +126,8 @@ vdom_create_domain(int n, vset_implementation_t impl)
 #ifdef HAVE_SYLVAN
     case VSET_LDDmc: return vdom_create_lddmc(n);
 #endif
-    case VSET_ListDD64: return vdom_create_list64_native(n);
     case VSET_ListDD: return vdom_create_list_native(n);
+    case VSET_ListDD64: return vdom_create_list64_native(n);
 #ifdef HAVE_ATERM2_H
     case VSET_AtermDD_list: return vdom_create_list(n);
     case VSET_AtermDD_tree: return vdom_create_tree(n);

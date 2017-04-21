@@ -86,8 +86,8 @@ SUBDIRS += spg
 # multi-core lib, lockless data structures and a load balancer
 SUBDIRS += mc-lib
 
-if HAVE_SYLVAN
 SUBDIRS += pins2lts-sym
+if HAVE_SYLVAN
 SUBDIRS += ldd2bdd
 endif
 SUBDIRS += pins2lts-mc
