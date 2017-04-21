@@ -16,10 +16,6 @@
 #include <sylvan_cache.h>
 #include <sylvan.h>
 
-struct poptOption lddmc_options[]= {
-    POPT_TABLEEND
-};
-
 struct vector_domain {
     struct vector_domain_shared shared;
 };
