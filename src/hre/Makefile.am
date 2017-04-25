@@ -1,5 +1,8 @@
 noinst_LTLIBRARIES = libhre.la
 
+# export to install folder
+pkginclude_HEADERS = feedback.h
+
 # libhre
 libhre_la_SOURCES  = user.h internal.h provider.h
 libhre_la_SOURCES += hre_context.c context.h
