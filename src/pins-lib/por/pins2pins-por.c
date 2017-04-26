@@ -149,9 +149,6 @@ init_visible_labels (por_context* ctx)
     if (ctx->visible_initialized) return;
     ctx->visible_initialized = 1;
 
-    model_t             model = ctx->parent;
-    int                 groups = dm_nrows (GBgetDMInfo(model));
-
     for (int i = 0; i < ctx->nlabels; i++)
         bms_push_if (ctx->visible_labels, 0, i, ctx->label_visibility[i]);
     for (int i = 0; i < ctx->ngroups; i++) {
@@ -160,9 +157,8 @@ init_visible_labels (por_context* ctx)
             bms_push_new (ctx->visible_labels, 0, *l);
         }
     }
-    Print1 (infoLong, "POR visible labels: %zu / %zu", bms_count(ctx->visible_labels, 0), ctx->nlabels);
+    Print1 (infoLong, "POR visible labels: %d / %d", bms_count(ctx->visible_labels, 0), ctx->nlabels);
 
-    int c = 0;
     ci_list            *vis = bms_list (ctx->visible_labels, 0);
     for (int *l = ci_begin(vis); l != ci_end(vis); l++) {
         for (int j = 0; j < ctx->label_nes[*l]->count; j++) {
@@ -287,7 +283,6 @@ por_init_transitions (model_t model, por_context *ctx, int *src)
             HREassert (ctx->enabled_list->data[enabled++] == i,
                        "Guards do not agree with enabledness of group %d", i);
             ctx->visible_enabled += is_visible (ctx, i);
-            char vis = ctx->visible->set[i];
         }
     }
 

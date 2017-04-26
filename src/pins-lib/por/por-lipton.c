@@ -348,8 +348,8 @@ lipton_lipton (por_context *por, int *src)
     dfs_stack_pop (lipton->queue[0]);
 
     lipton->emitted = 0;
-    int max_stack = lipton->max_stack;
-    int max_depth = lipton->max_depth;
+    size_t max_stack = lipton->max_stack;
+    size_t max_depth = lipton->max_depth;
     lipton->max_stack = 0;
     lipton->max_depth = 0;
     lipton_bfs (lipton);

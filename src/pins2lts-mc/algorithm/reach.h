@@ -175,7 +175,6 @@ action_detect (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
         return;
 
     alg_local_t        *loc = ctx->local;
-    alg_global_t       *sm = ctx->global;
 
     loc->counters.errors++;
     if ((!no_exit || trc_output) && !ctx->counter_example) { // once

@@ -214,6 +214,7 @@ tr_calc_del (tr_ctx_t *tr, dyn_process_t *proc, comm_e comm)
 static bool
 tr_comm_rght (tr_ctx_t *tr, dyn_process_t *proc, int group, int *src)
 {
+    (void)src;
     por_context        *por = tr->por;
     if (SAFETY && bms_has(tr->visible, COMMUTE_RGHT, group)) return false;
     bms_clear_all (por->fix);
@@ -228,6 +229,7 @@ tr_comm_rght (tr_ctx_t *tr, dyn_process_t *proc, int group, int *src)
 static bool
 tr_comm_left (tr_ctx_t *tr, dyn_process_t *proc, int *src)
 {
+    (void)src;
     por_context        *por = tr->por;
     for (int *g = ci_begin (proc->en); SAFETY && g != ci_end (proc->en); g++)
         if (bms_has(tr->visible, COMMUTE_LEFT, *g)) return false;
@@ -401,8 +403,8 @@ tr_lipton (por_context *por, int *src)
 
     swap (tr->queue[0], tr->queue[1]);
     tr->emitted = 0;
-    int max_stack = tr->max_stack;
-    int max_depth = tr->max_depth;
+    size_t max_stack = tr->max_stack;
+    size_t max_depth = tr->max_depth;
     tr->max_stack = 0;
     tr->max_depth = 0;
     tr_bfs (tr);
@@ -452,7 +454,7 @@ tr_create (por_context *por, model_t pormodel)
     tr->g2p = RTmallocZero (sizeof(int[por->ngroups]));
     tr->procs = RTmallocZero (sizeof(dyn_process_t[por->ngroups]));
     tr->tmp = ci_create (por->ngroups);
-    for (size_t i = 0; i < por->ngroups; i++) {
+    for (int i = 0; i < por->ngroups; i++) {
 //       // tr->procs[i].fset = fset_create (sizeof(int[por->nslots]), 0, 4, 10);
         tr->procs[i].groups = ci_create (por->ngroups);
         tr->procs[i].en = ci_create (por->ngroups);

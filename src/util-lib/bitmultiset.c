@@ -44,7 +44,7 @@ bms_clear_all (bms_t *bms)
     bms->corrupt_stack = 0;
     if (bms->types == 1) {
         int c = bms->lists[0]->count;
-        for (size_t i = 0; i < c; i++) {
+        for (int i = 0; i < c; i++) {
             bms_pop (bms, 0);
         }
     } else {
