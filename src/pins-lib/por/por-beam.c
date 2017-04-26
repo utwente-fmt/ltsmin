@@ -308,8 +308,6 @@ beam_add_all_for_enabled (por_context *ctx, search_context_t *s, int group)
         }
         Debugf ("visible=[ ");
 
-        bool            nes = (vis & (1 << VISIBLE_NES)) != 0;
-        bool            nds = (vis & (1 << VISIBLE_NDS)) != 0;
         select_all (ctx, s, ctx->visible->lists[VISIBLE]);
         Debugf ("] ");
     }

@@ -348,7 +348,7 @@ leap_is_stubborn (por_context *ctx, int group)
 void
 leap_stats (model_t model)
 {
-    por_context         *ctx = GBgetContext (model);
+    (void)model;
     leap_t             *leap = RTmalloc (sizeof(leap_t));
     Warning (info, "LEAPING POR avg. levels: %f%% / avg. seen: %f%%\n",
             (float) (leap->levels / leap->states),
