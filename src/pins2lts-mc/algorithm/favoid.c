@@ -27,6 +27,8 @@
 #include <gperftools/profiler.h>
 #endif
 
+#define     PATH_IDX    DUMMY_IDX
+
 /**
  * local counters
  */
@@ -196,8 +198,6 @@ favoid_handle (void *arg, state_info_t *successor, transition_info_t *ti,
             return;
         }
         // continue normally with I transitions
-        if (loc->rabin_pair_i & acc_set) {
-        }
     }
 
     ctx->counters->trans++;
@@ -265,6 +265,7 @@ explore_state (wctx_t *ctx)
     run_maybe_report1 (ctx->run, ctx->counters, "");
 
     return trans;
+    (void) pair_id;
 }
 
 
@@ -287,7 +288,7 @@ favoid_init  (wctx_t *ctx, ref_t init_state)
     state_info_set (loc->target, init_state, LM_NULL_LATTICE);
 
     // make sure that state -> initial doesn't get recognized as a self loop
-    ctx->state->ref = init_state + 1;
+    ctx->state->ref = DUMMY_IDX;
     favoid_handle (ctx, loc->target, &ti, 0);
     claim = uf_make_claim (shared->pairs[pair_struct_id].uf, init_state + 1, ctx->id);
     
@@ -577,7 +578,10 @@ favoid_check_pair (wctx_t *ctx, run_t *run)
             return false;
         
         ref_t new_init;
-        iterset_pick_state (shared->pairs[pair_struct_id].is, &new_init);
+        is_pick_e pick = iterset_pick_state (shared->pairs[pair_struct_id].is, &new_init);
+        if (pick != IS_PICK_SUCCESS) { // list got empty while picking a state
+            return false;
+        }
         new_init --; // iterset uses ref_t + 1
 
         if (uf_is_dead (shared->pairs[pair_struct_id].uf, new_init+1)) {
