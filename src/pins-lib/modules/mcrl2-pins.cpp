@@ -8,6 +8,7 @@
 #include <set>
 #include <vector>
 #include <stack>
+#include <utility>
 
 #include <mcrl2/utilities/logger.h>
 #include <mcrl2/lps/ltsmin.h>
@@ -47,7 +48,7 @@ public:
     }
 
     template <typename callback>
-    void next_state_long(state_vector const& src, std::size_t group, callback& f,
+    void next_state_long(state_vector const& src, std::size_t group, callback&& f,
                          state_vector const& dest, label_vector const& labels)
     {
         int state[process_parameter_count()];
@@ -56,12 +57,12 @@ public:
             int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
             state[i] = find_mcrl2_index (mt, pt, src[i]);
         }
-        mcrl2::lps::pins::next_state_long (state, group, f, dest, labels);
+        mcrl2::lps::pins::next_state_long (state, group, std::forward<callback>(f), dest, labels);
     }
 
 #ifdef MCRL2_GUARDS
     template <typename callback>
-    void update_long(state_vector const& src, std::size_t group, callback& f,
+    void update_long(state_vector const& src, std::size_t group, callback&& f,
                          state_vector const& dest, label_vector const& labels)
     {
         int state[process_parameter_count()];
@@ -70,7 +71,7 @@ public:
             int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
             state[i] = find_mcrl2_index (mt, pt, src[i]);
         }
-        mcrl2::lps::pins::update_long (state, group, f, dest, labels);
+        mcrl2::lps::pins::update_long (state, group, std::forward<callback>(f), dest, labels);
     }
 
     guard_evaluation_t eval_guard_long(state_vector const& src, std::size_t guard)
@@ -86,7 +87,7 @@ public:
 #endif
 
     template <typename callback>
-    void next_state_all(state_vector const& src, callback& f,
+    void next_state_all(state_vector const& src, callback&& f,
                         state_vector const& dest, label_vector const& labels)
     {
         int state[process_parameter_count()];
@@ -95,7 +96,7 @@ public:
             int pt = lts_type_get_state_typeno (GBgetLTStype (model_), i);
             state[i] = find_mcrl2_index (mt, pt, src[i]);
         }
-        mcrl2::lps::pins::next_state_all (state, f, dest, labels);
+        mcrl2::lps::pins::next_state_all (state, std::forward<callback>(f), dest, labels);
     }
 
     void make_pins_edge_labels(label_vector const& src, label_vector const& dst)

@@ -3,7 +3,7 @@
  */
 
 #include <hre/config.h>
-
+#include <utility>
 #include <mcrl2/pbes/pbes.h>
 #include <mcrl2/pbes/detail/pbes_greybox_interface.h>
 #include <mcrl2/pbes/pbes_explorer.h>
@@ -171,24 +171,24 @@ public:
     }
 
     template <typename callback>
-    void next_state_long(int* const& src, std::size_t group, callback& f)
+    void next_state_long(int* const& src, std::size_t group, callback&& f)
     {
         if (this->check_group(src, group))
         {
             int state_length = lts_type_get_state_length(GBgetLTStype(model_));
             int local_src[state_length];
             this->global_to_local(src, local_src);
-            mcrl2::pbes_system::explorer::next_state_long(local_src, group, f);
+            mcrl2::pbes_system::explorer::next_state_long(local_src, group, std::forward<callback>(f));
         }
     }
 
     template <typename callback>
-    void next_state_all(int* const& src, callback& f)
+    void next_state_all(int* const& src, callback&& f)
     {
         int state_length = lts_type_get_state_length(GBgetLTStype(model_));
         int local_src[state_length];
         this->global_to_local(src, local_src);
-        mcrl2::pbes_system::explorer::next_state_all(local_src, f);
+        mcrl2::pbes_system::explorer::next_state_all(local_src, std::forward<callback>(f));
     }
 
     void initial_state(int* state)
