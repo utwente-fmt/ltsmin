@@ -4004,7 +4004,7 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, vset_t
                     double e1, e2;
                     vset_count(mu_var[mu_expr->idx], &n1, &e1);
                     vset_count(tmp, &n2, &e2);
-                    Warning(infoLong, "MU %s: %.0lf -> %.0lf",
+                    Warning(infoLong, "NU %s: %.0lf -> %.0lf",
                         SIget(env->idents,mu_expr->idx), e1, e2);
                 }
             } while (!vset_equal(mu_var[mu_expr->idx], tmp));
