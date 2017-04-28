@@ -4,7 +4,6 @@
 
 #include <hre/config.h>
 
-#include <mcrl2/atermpp/aterm_init.h>
 #include <mcrl2/pbes/pbes.h>
 #include <mcrl2/pbes/detail/pbes_greybox_interface.h>
 #include <mcrl2/pbes/pbes_explorer.h>
