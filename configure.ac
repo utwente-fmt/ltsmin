@@ -527,9 +527,9 @@ AM_CONDITIONAL([TEST_LPS], [test x"$enable_test_LPS" = xyes])
 AC_ARG_ENABLE([test-PBES], [AS_HELP_STRING([--disable-test-PBES],
                [do not test the PBES front-end])],, enable_test_PBES=$enable_test_all)
 AM_CONDITIONAL([TEST_PBES], [test x"$enable_test_PBES" = xyes])
-AC_ARG_ENABLE([test-OPPAAL], [AS_HELP_STRING([--disable-test-OPPAAL],
-               [do not test the OPPAAL front-end])],, enable_test_OPPAAL=$enable_test_all)
-AM_CONDITIONAL([TEST_OPPAAL], [test x"$enable_test_OPPAAL" = xyes])
+AC_ARG_ENABLE([test-OPAAL], [AS_HELP_STRING([--disable-test-OPAAL],
+               [do not test the OPAAL front-end])],, enable_test_OPAAL=$enable_test_all)
+AM_CONDITIONAL([TEST_OPAAL], [test x"$enable_test_OPAAL" = xyes])
 AC_ARG_ENABLE([test-PNML], [AS_HELP_STRING([--disable-test-PNML],
                [do not test the PNML front-end])],, enable_test_PNML=$enable_test_all)
 AM_CONDITIONAL([TEST_PNML], [test x"$enable_test_PNML" = xyes])
@@ -556,6 +556,9 @@ AM_CONDITIONAL([TEST_DFS_FIFO], [test x"$enable_test_DFS_FIFO" = xyes])
 AC_ARG_ENABLE([test-SCC], [AS_HELP_STRING([--disable-test-SCC],
                [do not test the SCC algorithms])],, enable_test_SCC=$enable_test_all)
 AM_CONDITIONAL([TEST_SCC], [test x"$enable_test_SCC" = xyes])
+AC_ARG_ENABLE([test-MU], [AS_HELP_STRING([--disable-test-MU],
+               [do not test the mu-calculus algorithms])],, enable_test_MU=$enable_test_all)
+AM_CONDITIONAL([TEST_MU], [test x"$enable_test_MU" = xyes])
 AC_ARG_ENABLE([test-LTS-generation], [AS_HELP_STRING([--disable-test-LTS-generation],
                [do not test LTS generation])],, enable_test_LTS_generation=$enable_test_all)
 AM_CONDITIONAL([TEST_LTS_GENERATION], [test x"$enable_test_LTS_generation" = xyes])

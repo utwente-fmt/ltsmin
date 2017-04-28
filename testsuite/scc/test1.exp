@@ -59,3 +59,4 @@ foreach testcase [dict keys $commands] {
     runmytest $testcase $command $exp
 }
 
+cd ".."

@@ -1,0 +1,25 @@
+source $srcdir/lib/include.tcl
+
+if { [file exists $binpaths(out) ] != 1 } {
+    file mkdir $binpaths(out)
+}
+cd $binpaths(out)
+
+
+puts "\n----------------------------------------------"
+puts   "TESTING: mu-calculus algorithms"
+puts   "----------------------------------------------\n"
+
+set commands [dict create]
+
+
+foreach testcase [dict keys $commands] {
+    set command [dict get $commands $testcase cmd]
+    set exp [dict get $commands $testcase exp]
+
+#    puts "$command"
+
+    runmytest $testcase $command $exp
+}
+
+cd ".."
