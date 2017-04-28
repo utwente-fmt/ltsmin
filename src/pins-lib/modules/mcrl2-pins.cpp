@@ -9,7 +9,6 @@
 #include <vector>
 #include <stack>
 
-#include <mcrl2/atermpp/aterm_init.h>
 #include <mcrl2/utilities/logger.h>
 #include <mcrl2/lps/ltsmin.h>
 
