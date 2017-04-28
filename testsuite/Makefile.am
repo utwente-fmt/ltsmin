@@ -21,7 +21,8 @@ EXTRA_DIST =	ltsmin.exp \
 		lts_generation/test1.exp \
 		partial_order_reduction/test1.exp \
 		safety_model_checking/test1.exp \
-		scc/test1.exp
+		scc/test1.exp \
+		mu/test1.exp
 
 CLEANFILES = out/* *.log *.sum
 
@@ -63,6 +64,10 @@ if TEST_SCC
 DEJATOOL +=	scc
 endif
 
+if TEST_MU
+DEJATOOL +=	mu
+endif
+
 if HAVE_SPINS_COMPILER 
 if TEST_PROMELA
 DEJATOOL +=	alg_backends_prom
@@ -78,7 +83,7 @@ endif
 endif
 
 if HAVE_OPAAL_COMPILER
-if TEST_OPPAAL
+if TEST_OPAAL
 DEJATOOL +=	alg_backends_opaal
 endif
 endif
