@@ -494,6 +494,10 @@ tested with flex 2.5.35.
 
 Download Bison from (>= 3.0.2) from <https://www.gnu.org/software/bison/>.
 
+#### pkgconf
+
+See above.
+
 ## Contact
 
  - For support/questions, email: <ltsmin-support@lists.utwente.nl>.
