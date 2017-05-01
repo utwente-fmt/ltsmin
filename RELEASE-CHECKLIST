@@ -8,15 +8,10 @@ Release Checklist
   Having this sym link means we remain compatible with 
   autoconf.
 
-* Verify the version (v<MAJOR><MINOR><PATH>) in configure.ac.
-
-* Verify the LTSmin version (v<MAJOR><MINOR><PATCH>)
-  in the website config: _config.yml.
-
-* Copy the new HTML manpages to assets/man.
+* Verify the version (<MAJOR><MINOR><PATCH>) in configure.ac.
 
 * Tag release
-  git tag v<MAJOR><MINOR><PATCH>
+  git tag <MAJOR><MINOR><PATCH>
 
 * make distcheck (creates tarball and checks whether it builds)
   To test specific configurations:
@@ -24,6 +19,5 @@ Release Checklist
 
 * Push the tag to origin, Travis will perform the release for you :)
 
-* Bump the version in configure.ac, and _config.yml, 
-  and commit to master.
+* Bump the version in configure.ac, and commit to master.
 
