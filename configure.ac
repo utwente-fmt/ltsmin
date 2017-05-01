@@ -566,6 +566,7 @@ AC_CONFIG_COMMANDS_POST(
                                          --libdir='$(eval echo "$pkglibdir")'"])
 
 AC_CONFIG_FILES([
+       www/_config.yml
        Makefile
        examples/Makefile
        src/Makefile

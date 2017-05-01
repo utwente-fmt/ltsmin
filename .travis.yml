@@ -108,7 +108,7 @@ before_install:
     export SYLVAN_URL="https://github.com/trolando/sylvan/archive/v$SYLVAN_VERSION.tar.gz" &&
     export SYLVAN_NAME="sylvan-$SYLVAN_VERSION" &&
     export MCRL2_NAME="mCRL2.tar.gz" &&
-    export MCRL2_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/$TRAVIS_OS_NAME/$MCRL2_NAME"
+    export MCRL2_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/$TRAVIS_OS_NAME/$MCRL2_NAME" &&
     export PKG_CONFIG_PATH="$HOME/ltsmin-deps/lib/pkgconfig"
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then        
         export PROB_NAME="ProB.linux64.tar.gz" &&
@@ -277,14 +277,37 @@ script:
 notifications:
   email: false
 
+before_deploy:
+  - export OLD_WEBSITE_VERSION=$(git --no-pager show gh-pages:_config.yml | grep "version" || echo "version 0.0.0" | cut -d" " -f2)
+  - export NEW_WEBSITE_VERSION=$(cat "www/_config.yml" | grep "version" | cut -d" " -f2)
+  - echo "Old website version is $OLD_WEBSITE_VERSION, new website version is $NEW_WEBSITE_VERSION"
+  # If the LTSmin version is larger than the website version,
+  # we need to deploy a new website.
+  - ./deploy-web "$NEW_WEBSITE_VERSION" "$OLD_WEBSITE_VERSION" &&
+        test -n "$TRAVIS_TAG" -a "x$RELEASE_BUILD" = "xyes" -a "$TRAVIS_OS_NAME" = "linux" &&
+    export DEPLOY_WEBSITE="yes" && echo "The website will be deployed" ; true
+  - if [ "x$DEPLOY_WEBSITE" = "xyes" ]; then
+    mkdir -p www/assets/man && cp doc/*.html www/assets/man &&
+    cp README.md www && 
+    pushd www && gem install jekyll bundler && bundle install && 
+    jekyll b && popd; fi
+
 deploy:
-  provider: releases
-  # define $GITHUB_TOKEN in Travis CI build environment.
-  api_key: $GITHUB_TOKEN
-  file: 
-    - "ltsmin-$TRAVIS_TAG-source.tgz"
-    - "/tmp/dist/$distname.tgz"
-  skip_cleanup: true
-  on:
-    tags: true
-    condition: "x$RELEASE_BUILD = xyes"
+  - provider: releases
+    # define $GITHUB_TOKEN in Travis CI build environment.
+    api_key: $GITHUB_TOKEN
+    file:
+      - "ltsmin-$TRAVIS_TAG-source.tgz"
+      - "/tmp/dist/$distname.tgz"
+    skip_cleanup: true
+    on:
+      tags: true
+      condition: "x$RELEASE_BUILD = xyes"
+  - provider: pages
+    # define $GITHUB_TOKEN in Travis CI build environment.
+    github_token: $GITHUB_TOKEN
+    local_dir: www/_site
+    skip_cleanup: true
+    on:
+      tags: true
+      condition: "x$DEPLOY_WEBSITE = xyes"

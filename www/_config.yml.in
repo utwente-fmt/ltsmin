@@ -2,5 +2,10 @@ theme: jekyll-theme-cayman
 title: LTSmin
 description: "Model Checking and Minimization of Labelled Transition Systems"
 show_downloads: true
-version: 3.0
+version: @PACKAGE_VERSION@
+exclude:
+  - .gitignore
+  - Gemfile
+  - _config.yml.in
+baseurl: "/ltsmin"
 

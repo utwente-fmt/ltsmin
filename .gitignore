@@ -37,4 +37,3 @@ include/
 /examples/*.lps
 /examples/abp.pbes
 nbproject
-_site
