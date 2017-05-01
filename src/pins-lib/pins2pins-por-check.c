@@ -556,7 +556,14 @@ bs_emit_dlk_check (model_t model, por_context *pctx, int *src, TransitionCB cb,
 
     bool same = ctx->ss_en_list->count == ctx->por_emitted_list->count;
     for (int i = 0; i < ctx->ss_en_list->count && same; i++) {
-        same &= (ctx->ss_en_list->data[i] == ctx->por_emitted_list->data[i]);
+      bool found = false;
+      for (int j = 0; j < ctx->ss_en_list->count ; j++) {
+	    if (ctx->ss_en_list->data[i] == ctx->por_emitted_list->data[j]) {
+	        found = true;
+	        break;
+	    }
+      }
+      same &= found;
     }
     if (!same) {
         Abort ("POR layer emitted (%s) conflicts with stubborn set (%s)",
