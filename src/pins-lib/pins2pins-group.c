@@ -252,6 +252,7 @@ group_groups_of_edge (model_t self, int edgeno, int index, int** groups)
         
         duplicate:;
     }
+    RTfree(groups_parent);
     
     if (c > 0) RTrealloc(*groups, sizeof(int) * c);
     else {
