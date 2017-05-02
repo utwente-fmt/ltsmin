@@ -26,4 +26,6 @@ include::inc/pnml.txt[]
 
 include::inc/pins2lts-mc-options.txt[]
 
+include::inc/pnml-options.txt[]
+
 include::inc/pins2lts-mc.txt[]

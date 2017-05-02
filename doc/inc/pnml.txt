@@ -8,3 +8,4 @@ found at: http://www.pnml.org/version-2009/version-2009.php.
 
   . After reachability analysis the *{manname}* will report the maximum number of tokens over all places.
   . Support for 1-safe Petri nets, by means of the NUPN toolspecific syntax: http://cadp.inria.fr/man/nupn.html.
+
