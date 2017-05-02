@@ -21,16 +21,21 @@ typedef struct {
     int start;
     int in_arcs;
     int out_arcs;
+    int label;
 } transition_t;
 
 typedef struct {
     char *name;
+    int num_transitions;
     transition_t *transitions;
     int num_arcs;
     arc_t *arcs;
 
     string_index_t place_names;
-    string_index_t trans_names;
+    string_index_t edge_labels;
+
+    int *groups_of_edges;
+    int *groups_of_edges_begin;
 
     guard_t* *guards_info;
     int num_guards;
@@ -48,7 +53,6 @@ typedef struct {
     array_manager_t arc_man;
     array_manager_t trans_man;
     array_manager_t init_man;
-    int current_trans;
 } andl_context_t;
 
 extern struct poptOption pnml_options[];

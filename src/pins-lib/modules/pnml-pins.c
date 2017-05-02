@@ -20,10 +20,19 @@
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/pins-util.h>
 
-#define NUM_TRANSS SIgetCount(pn_context->trans_names)
+#define NUM_TRANSS pn_context->num_transitions
 #define NUM_PLACES SIgetCount(pn_context->place_names)
 
 static int noack = 0;
+
+typedef enum { ID, NAME } edge_label_t;
+static edge_label_t edge_label = ID;
+static char *edge_label_option = "id";
+static si_map_entry EDGE_LABEL[] = {
+    {"id", ID},
+    {"name", NAME},
+    {NULL, 0}
+};
 
 static void
 pnml_popt(poptContext con,
@@ -43,6 +52,13 @@ pnml_popt(poptContext con,
             Abort("Option --noack only accepts value 1 or 2");
         }
 
+        const int res = linear_search(EDGE_LABEL, edge_label_option);
+        if (res < 0) {
+            Warning(error, "unknown edge label %s", edge_label_option);
+            HREexitUsage(LTSMIN_EXIT_FAILURE);
+        }
+        edge_label = res;
+
         return;
     case POPT_CALLBACK_REASON_OPTION:
         break;
@@ -52,7 +68,11 @@ pnml_popt(poptContext con,
 
 struct poptOption pnml_options[]= {
     { NULL, 0 , POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION , (void*)&pnml_popt, 0 , NULL , NULL },
-    { "noack" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &noack , 0 , "Set Noack order to apply","<[1|2]>" },
+    { "noack" , 0 , POPT_ARG_INT, &noack , 0 , "Set Noack order to apply","<1|2>" },
+    { "edge-label", 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT,
+        &edge_label_option, 0,
+        "Select what to use for edge labels (only affects PNML, not ANDL)",
+        "<id|name>" },
     POPT_TABLEEND
 };
 
@@ -115,7 +135,8 @@ get_successor_long(void *model, int t, int *in, TransitionCB cb, void *arg)
     if (overflown) Abort ("max token count exceeded");
     update_max (max);
 
-    transition_info_t transition_info = { (int[1]) { t }, t, 0 };
+    int lbl[1] = { pn_context->transitions[t].label };
+    transition_info_t transition_info = { lbl, t, 0 };
     cb (arg, &transition_info, out, NULL);
 
     return 1;
@@ -167,7 +188,8 @@ get_successor_short(void *model, int t, int *in, TransitionCB cb, void *arg)
     if (overflown) Abort ("max token count exceeded");
     update_max (max);
 
-    transition_info_t transition_info = { (int[1]) { t }, t, 0 };
+    int lbl[1] = { pn_context->transitions[t].label };
+    transition_info_t transition_info = { lbl, t, 0 };
     cb (arg, &transition_info, out, NULL);
 
     return 1;
@@ -216,7 +238,8 @@ get_update_long(void *model, int t, int *in, TransitionCB cb, void *arg)
     if (overflown) Abort ("max token count exceeded");
     update_max (max);
 
-    transition_info_t transition_info = { (int[1]) { t }, t, 0 };
+    int lbl[1] = { pn_context->transitions[t].label };
+    transition_info_t transition_info = { lbl, t, 0 };
     cb (arg, &transition_info, out, NULL);
 
     return 1;
@@ -272,7 +295,8 @@ get_update_short(void *model, int t, int *in, void
     if (overflown) Abort ("max token count exceeded");
     update_max (max);
 
-    transition_info_t transition_info = { (int[1]) { t }, t, 0 };
+    int lbl[1] = { pn_context->transitions[t].label };
+    transition_info_t transition_info = { lbl, t, 0 };
     callback (arg, &transition_info, out, NULL);
 
     return 1;
@@ -311,19 +335,24 @@ groups_of_edge(model_t model, int edgeno, int index, int* *groups)
 
     const chunk c = pins_chunk_get(model, lts_type_get_edge_label_typeno(GBgetLTStype(model), edgeno), index);
 
-    const int group = SIlookup(pn_context->trans_names, c.data);
+    const int label = SIlookup(pn_context->edge_labels, c.data);
 
-    if (group == SI_INDEX_FAILED) return 0;
+    if (label == SI_INDEX_FAILED) return 0;
 
-    *groups = (int*) RTmalloc(sizeof(int));
+    const int num_labels = SIgetCount(pn_context->edge_labels);
+    int len;
+    const int begin = pn_context->groups_of_edges_begin[index];
+    if (index + 1 == num_labels) len = NUM_TRANSS - begin;
+    else len = pn_context->groups_of_edges_begin[index + 1] - begin;
 
-    (*groups)[0] = group;
+    *groups = (int*) RTmalloc(sizeof(int[len]));
+    memcpy(*groups, pn_context->groups_of_edges + begin, sizeof(int[len]));
 
-    return 1;
+    return len;
 }
 
 static void
-find_ids(xmlNode *a_node, pn_context_t *pn_context, string_index_t arc_names, xmlNode **toolspecific)
+find_ids(xmlNode *a_node, pn_context_t *pn_context, string_index_t trans_names, string_index_t arc_names, xmlNode **toolspecific)
 {
     for (xmlNode *node = a_node; node; node = node->next) {
         if (node->type == XML_ELEMENT_NODE) {
@@ -332,7 +361,7 @@ find_ids(xmlNode *a_node, pn_context_t *pn_context, string_index_t arc_names, xm
                 if (SIput(pn_context->place_names, (char*) id) == SI_INDEX_FAILED) Abort("duplicate place");
             } else if (xmlStrcmp(node->name, (const xmlChar*) "transition") == 0) {
                 const xmlChar *id = xmlGetProp(node, (const xmlChar*) "id");
-                if (SIput(pn_context->trans_names, (char*) id) == SI_INDEX_FAILED) Abort("duplicate transition");
+                if (SIput(trans_names, (char*) id) == SI_INDEX_FAILED) Abort("duplicate transition");
             } else if (xmlStrcmp(node->name, (const xmlChar*) "arc") == 0) {
                 const xmlChar *id = xmlGetProp(node, (const xmlChar*) "id");
                 if (SIput(arc_names, (char*) id) == SI_INDEX_FAILED) Abort("duplicate arc");
@@ -350,7 +379,7 @@ find_ids(xmlNode *a_node, pn_context_t *pn_context, string_index_t arc_names, xm
                 continue;
             }
         }
-        find_ids(node->children, pn_context, arc_names, toolspecific);
+        find_ids(node->children, pn_context, trans_names, arc_names, toolspecific);
     }
 }
 
@@ -384,7 +413,7 @@ parse_toolspecific(xmlNode *a_node, pn_context_t *pn_context, int safe, bitvecto
 }
 
 static void
-parse_net(xmlNode *a_node, pn_context_t *pn_context, string_index_t arc_names, bitvector_t *safe_places)
+parse_net(xmlNode *a_node, pn_context_t *pn_context, string_index_t trans_names, string_index_t arc_names, bitvector_t *safe_places)
 {
     for (xmlNode *node = a_node; node; node = node->next) {
         if (node->type == XML_ELEMENT_NODE) {
@@ -392,6 +421,15 @@ parse_net(xmlNode *a_node, pn_context_t *pn_context, string_index_t arc_names, b
                 const xmlChar *id = xmlGetProp(node->parent->parent, (const xmlChar*) "id");
                 if (xmlStrcmp(node->parent->name, (const xmlChar*) "name") == 0) {
                     if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "net") == 0) pn_context->name = (char*) xmlStrdup(xmlNodeGetContent(node));
+                    else {
+                        if (edge_label == NAME) {
+                            if (xmlStrcmp(node->parent->parent->name, (const xmlChar*) "transition") == 0) {
+                                int num;
+                                if ((num = SIlookup(trans_names, (char*) id)) == SI_INDEX_FAILED) Abort("missing transition");
+                                pn_context->transitions[num].label = SIput(pn_context->edge_labels, (char*) xmlNodeGetContent(node));
+                            }
+                        }
+                    }
                 } else if (xmlStrcmp(node->parent->name, (const xmlChar*) "initialMarking") == 0) {
                     int num;
                     if ((num = SIlookup(pn_context->place_names, (char*) id)) == SI_INDEX_FAILED) Abort("missing place");
@@ -430,14 +468,14 @@ parse_net(xmlNode *a_node, pn_context_t *pn_context, string_index_t arc_names, b
                 int source_num;
                 int target_num;
                 if ((source_num = SIlookup(pn_context->place_names, (char*) source)) != SI_INDEX_FAILED &&
-                    (target_num = SIlookup(pn_context->trans_names, (char*) target)) != SI_INDEX_FAILED) {
+                    (target_num = SIlookup(trans_names, (char*) target)) != SI_INDEX_FAILED) {
                     // this is an in arc
                     pn_context->arcs[num].transition = target_num;
                     pn_context->arcs[num].place = source_num;
                     pn_context->arcs[num].type = ARC_IN;
                     pn_context->transitions[target_num].in_arcs++;
                     pn_context->num_in_arcs++;
-                } else if ((source_num = SIlookup(pn_context->trans_names, (char*) source)) != SI_INDEX_FAILED &&
+                } else if ((source_num = SIlookup(trans_names, (char*) source)) != SI_INDEX_FAILED &&
                     (target_num = SIlookup(pn_context->place_names, (char*) target)) != SI_INDEX_FAILED) {
                     // this is an out arc
                     pn_context->arcs[num].transition = source_num;
@@ -448,7 +486,7 @@ parse_net(xmlNode *a_node, pn_context_t *pn_context, string_index_t arc_names, b
                 pn_context->arcs[num].safe = bitvector_is_set(safe_places, pn_context->arcs[num].place);
             }
         }
-        parse_net (node->children, pn_context, arc_names, safe_places);
+        parse_net (node->children, pn_context, trans_names, arc_names, safe_places);
     }
 }
 
@@ -714,7 +752,7 @@ initGreyboxModel(model_t model)
     RTstartTimer(pn_context->timer);
 
     pn_context->place_names = SIcreate();
-    pn_context->trans_names = SIcreate();
+    pn_context->edge_labels = SIcreate();
 
     pn_context->has_safe_places = 0;
 
@@ -763,11 +801,39 @@ create_lts_type(model_t model)
     GBsetLTStype (model, ltstype); // must set ltstype before setting initial state
                                   // creates tables for types!
 
-    for (int i = 0; i < NUM_TRANSS; i++) {
-        pins_chunk_put_at(model, act_type, chunk_str(SIget(pn_context->trans_names, i)), i);
-    }
-
     Print1 (infoLong, "Analyzing Petri net behavior");
+}
+
+static int
+compare_transition_label(const void *a, const void *b, void *arg)
+{
+    transition_t *transitions = (transition_t*) arg;
+    const int *t1 = (const int*) a;
+    const int *t2 = (const int*) b;
+
+    return transitions[*t1].label - transitions[*t2].label;
+}
+
+static void
+init_groups_of_edge(pn_context_t *pn_context)
+{
+    pn_context->groups_of_edges = RTmalloc(sizeof(int[NUM_TRANSS]));
+    for (int i = 0; i < NUM_TRANSS; i++) pn_context->groups_of_edges[i] = i;
+    qsort_r(pn_context->groups_of_edges, NUM_TRANSS, sizeof(int),
+            compare_transition_label, pn_context->transitions);
+
+    const int num_labels = SIgetCount(pn_context->edge_labels);
+    pn_context->groups_of_edges_begin = RTmalloc(sizeof(int[num_labels]));
+
+    int current_label = -1;
+    for (int i = 0; i < NUM_TRANSS; i++) {
+        const int t = pn_context->groups_of_edges[i];
+        const transition_t transition = pn_context->transitions[t];
+        if (current_label != transition.label) {
+            current_label = transition.label;
+            pn_context->groups_of_edges_begin[current_label] = i;
+        }
+    }
 }
 
 static void
@@ -778,6 +844,11 @@ set_dependencies(model_t model)
     lts_type_t ltstype = GBgetLTStype(model);
 
     Print1 (info, "Petri net %s analyzed", pn_context->name);
+
+    const int act_type = lts_type_find_type(ltstype, "action");
+    for (int i = 0; i < SIgetCount(pn_context->edge_labels); i++) {
+        pins_chunk_put_at(model, act_type, chunk_str(SIget(pn_context->edge_labels, i)), i);
+    }
 
     GBsetInitialState (model, pn_context->init_state);
     RTfree (pn_context->init_state);
@@ -871,6 +942,8 @@ set_dependencies(model_t model)
         GBsetNextStateShortR2W (model, (next_method_grey_t) get_successor_short);
         GBsetActionsShortR2W (model, (next_method_grey_t) get_update_short);
     } else Print1 (infoLong, "Since this net has 1-safe places, short next-state functions are not used");
+
+    init_groups_of_edge(pn_context);
 
     GBsetGroupsOfEdge (model, groups_of_edge);
 
@@ -987,6 +1060,10 @@ ANDLloadGreyboxModel(model_t model, const char *name)
 void
 PNMLloadGreyboxModel(model_t model, const char *name)
 {
+    if (HREme(HREglobal())==0) {
+        Warning(info, "Edge label is %s", edge_label_option);
+    }
+
     xmlDoc *doc = NULL;
 
     LIBXML_TEST_VERSION
@@ -996,12 +1073,16 @@ PNMLloadGreyboxModel(model_t model, const char *name)
     initGreyboxModel(model);
     pn_context_t *pn_context = GBgetContext(model);
 
+    string_index_t trans_names;
+    if (edge_label == NAME) trans_names = SIcreate();
+    else /* if edge_label == ID */ trans_names = pn_context->edge_labels;
     string_index_t arc_names = SIcreate();
     xmlNode *toolspecific = NULL;
     
     xmlNode *node = xmlDocGetRootElement(doc);
-    find_ids(node, pn_context, arc_names, &toolspecific);
+    find_ids(node, pn_context, trans_names, arc_names, &toolspecific);
 
+    pn_context->num_transitions = SIgetCount(trans_names);
     pn_context->num_arcs = SIgetCount(arc_names);
 
     pn_context->arcs = RTalignZero(CACHE_LINE_SIZE, sizeof(arc_t[pn_context->num_arcs + 1]));
@@ -1009,6 +1090,11 @@ PNMLloadGreyboxModel(model_t model, const char *name)
     pn_context->arcs[pn_context->num_arcs].transition = -1;
     pn_context->arcs[pn_context->num_arcs].place = -1;
     pn_context->transitions = RTmallocZero(sizeof(transition_t[NUM_TRANSS]));
+    if (edge_label == ID) {
+        for (int i = 0; i < NUM_TRANSS; i++) {
+            pn_context->transitions[i].label = i;
+        }
+    }
     pn_context->init_state = RTmallocZero(sizeof(int[NUM_PLACES]));
 
     create_lts_type(model);
@@ -1018,9 +1104,10 @@ PNMLloadGreyboxModel(model_t model, const char *name)
     bitvector_t safe_places;
     bitvector_create(&safe_places, NUM_PLACES);
     if (toolspecific != NULL) parse_toolspecific(toolspecific, pn_context, 0, &safe_places);
-    parse_net(node, pn_context, arc_names, &safe_places);
+    parse_net(node, pn_context, trans_names, arc_names, &safe_places);
     bitvector_free(&safe_places);
 
+    if (edge_label == NAME) SIdestroy(&trans_names);
     SIdestroy(&arc_names);
 
     set_dependencies(model);

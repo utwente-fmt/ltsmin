@@ -101,7 +101,9 @@ discrete
     ;
 
 transitions
-    :   TRANSITIONS COLON tdecs {
+    :   TRANSITIONS COLON {
+            andl_context->pn_context->num_transitions = 0;
+        } tdecs {
             ensure_access(andl_context->arc_man, andl_context->pn_context->num_arcs);
             arc_t * const arc = andl_context->pn_context->arcs + andl_context->pn_context->num_arcs;
             arc->type = ARC_LAST;
@@ -140,15 +142,13 @@ tdecs
 
 tdec
     :   IDENT COLON conditions COLON {     
-            int i = SIlookup(andl_context->pn_context->trans_names, $1);
-            if (i != SI_INDEX_FAILED) {
-                andl_context->error = 1;
-                Warning(info, "Duplicate transition: %s", $1);
-            } else i = SIput(andl_context->pn_context->trans_names, $1);
-            ensure_access(andl_context->trans_man, i);
-            andl_context->pn_context->transitions[i].in_arcs = 0;
-            andl_context->pn_context->transitions[i].out_arcs = 0;
-            andl_context->current_trans = i;
+            ensure_access(andl_context->trans_man, andl_context->pn_context->num_transitions);
+            transition_t *const t = andl_context->pn_context->transitions +
+                andl_context->pn_context->num_transitions;
+            t->label = SIput(andl_context->pn_context->edge_labels, $1);
+            t->in_arcs = 0;
+            t->out_arcs = 0;
+            andl_context->pn_context->num_transitions++;
             RTfree($1);
         } arcs transition_function SEMICOLON
     |   IDENT error SEMICOLON {
@@ -181,7 +181,7 @@ arc
                 arc->place = i;
                 arc->num = $4;
                 arc->type = $3;
-                arc->transition = andl_context->current_trans;
+                arc->transition = andl_context->pn_context->num_transitions;
 
                 if ($3 == ARC_IN) {
                     andl_context->pn_context->num_in_arcs++;
