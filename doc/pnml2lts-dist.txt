@@ -28,4 +28,6 @@ include::inc/pnml.txt[]
 
 include::inc/pins2lts-dist-options.txt[]
 
+include::inc/pnml-options.txt[]
+
 include::inc/pins2lts-dist.txt[]
