@@ -120,6 +120,7 @@ extra_ASCIIDOC += inc/pins2lts-sym.txt
 extra_ASCIIDOC += inc/pins2torx.txt
 extra_ASCIIDOC += inc/plugin-options.txt
 extra_ASCIIDOC += inc/pnml.txt
+extra_ASCIIDOC += inc/pnml-options.txt
 extra_ASCIIDOC += inc/prob.txt
 extra_ASCIIDOC += inc/prob-options.txt
 extra_ASCIIDOC += inc/prom.txt
