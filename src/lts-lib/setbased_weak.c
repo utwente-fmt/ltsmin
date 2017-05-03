@@ -39,7 +39,7 @@ static void dfs_weak_tau(lts_t lts,int tau,int*map,int*newmap,int s,int id){
 	for(i=lts->begin[s];i<lts->begin[s+1];i++){
 		a=lts->label[i];
 		t=lts->src[i];
-		if(a==tau){
+		if(a==(uint32_t)tau){
 			if (map[t]!=id) {
 				sig=SetInsert(newmap[t],tau,id);
 				if(sig!=newmap[t]){
@@ -78,7 +78,7 @@ static int weak_essential(int*sig,int*repr,int src,int label,int dest,int tau){
 }
 
 void setbased_weak_reduce(lts_t lts){
-	int tau,count,i,*tmp,iter,s,l,d,setcount,j,set,*repr,t_count,tag,num_states,last_trans;
+	int tau,count,i,iter,setcount,set,*repr,t_count,num_states;
 	int *map,*newmap;
 
 	tau=lts->tau;
@@ -131,7 +131,7 @@ void setbased_weak_reduce(lts_t lts){
 		repr[i]=-1;
 	}
 	t_count=0;
-	for(i=0;i<lts->states;i++){
+	for(i=0;i<(int)lts->states;i++){
 		if(repr[map[i]]==-1){
 			repr[map[i]]=i;
 			t_count+=SetGetSize(newmap[i]);
@@ -140,7 +140,7 @@ void setbased_weak_reduce(lts_t lts){
 	lts_set_type(lts,LTS_BLOCK);
 	lts_set_size(lts,lts->root_count,count,t_count);
 	uint32_t r_count=0;
- 	for(i=0;i<lts->root_count;i++){
+ 	for(i=0;i<(int)lts->root_count;i++){
 	  uint32_t tmp=map[lts->root_list[i]];
 	  uint32_t j=0;
 	  for(;j<r_count;j++){
@@ -154,7 +154,7 @@ void setbased_weak_reduce(lts_t lts){
       }
 	}
 	lts->begin[0]=0;
-	for(i=0;i<lts->states;i++){
+	for(i=0;i<(int)lts->states;i++){
 		count=lts->begin[i];
 		set=newmap[repr[i]];
 		while(set!=EMPTY_SET){
