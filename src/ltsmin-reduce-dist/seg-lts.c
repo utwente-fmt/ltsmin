@@ -9,8 +9,6 @@
 #include <ltsmin-reduce-dist/seg-lts.h>
 #include <util-lib/dynamic-array.h>
 
-#define Debug(...) Warning(info,__VA_ARGS__)
-
 struct seg_lts_s {
     lts_type_t sig;
     seg_lts_layout_t layout;
@@ -166,13 +164,8 @@ seg_lts_t SLTSload(const char*name,hre_task_queue_t task_queue){
         uint32_t *dst_ofs=row+2;
         *dst_seg=HREme(TQcontext(task_queue));
         Debug("reading in edges");
-        //size_t count=0;
         while(lts_read_edge(input,(int*)src_seg,src_ofs,(int*)dst_seg,dst_ofs,lbl)){
             MTaddRow(lts->in_edges,row);
-            //count++;
-            //if (count%10000==0){
-            //  Debug("got %zu edges",count);
-            //}
         }
         break;
         }

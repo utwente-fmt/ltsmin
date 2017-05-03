@@ -8,9 +8,6 @@
 
 #define MBLOCK 16
 
-#define DEBUG(...) Warning(info,__VA_ARGS__)
-//define DEBUG Debug
-
 struct array {
 	int e_size;
 	array_resize_cb callback;
@@ -57,7 +54,7 @@ static void fix_array(struct array ref,size_t old_size,size_t new_size){
 	void*old=*ref.ar;
 	tmp=RTrealloc(*ref.ar,new_size*ref.e_size);
 	HREassert (tmp, "realloc from %zu to %zu * %d failed",old_size,new_size,ref.e_size);
-    DEBUG("%x -> %x",*ref.ar,tmp);
+    Debug("%x -> %x",*ref.ar,tmp);
     *ref.ar=tmp;
     if (ref.callback) {
         ref.callback(ref.cbarg,old,old_size,tmp,new_size);
@@ -83,7 +80,7 @@ void add_array(array_manager_t man,void**ar,int e_size,array_resize_cb callback,
 	man->arrays[man->managed].cbarg=cbarg;
 	fix_array(man->arrays[man->managed],0,man->size);
 	man->managed++;
-	DEBUG("added array with e_size %d",e_size);
+	Debug("added array with e_size %d",e_size);
 }
 
 void ensure_access(array_manager_t man,size_t index){
@@ -91,7 +88,7 @@ void ensure_access(array_manager_t man,size_t index){
 	if (index/man->block > 10) man->block=man->block*2;
 	size_t old=man->size;
 	man->size=((index+man->block)/man->block)*man->block;
-	DEBUG("resize from %zu to %zu",old,man->size);
+	Debug("resize from %zu to %zu",old,man->size);
 	for(int i=0;i<man->managed;i++){
 		fix_array(man->arrays[i],old,man->size);
 	}
