@@ -8,7 +8,7 @@
 #include <lts-lib/lowmem.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 
-typedef enum {Undefined=0,Strong,Branching,Cycle,Determinize,Copy,Silent,Lumping,Merge} task_t;
+typedef enum {Undefined=0,Strong,Branching,Cycle,Determinize,Copy,Silent,Lumping,Merge,Weak} task_t;
 
 static task_t task=Undefined;
 static int segments=1;
@@ -88,9 +88,10 @@ static void lts_merge_hyperedges(lts_t lts){
 
 
 static  struct poptOption options[] = {
-    { "strong" , 's' , POPT_ARG_VAL , &task , Strong , "minimize module strong bisimulation" , NULL },
-    { "branching" , 'b' , POPT_ARG_VAL , &task, Branching , "minimize module branching bisimulation" , NULL },
+    { "strong" , 's' , POPT_ARG_VAL , &task , Strong , "minimize modulo strong bisimulation" , NULL },
+    { "branching" , 'b' , POPT_ARG_VAL , &task, Branching , "minimize modulo branching bisimulation" , NULL },
     { "divergence" , 0 , POPT_ARG_VAL , &divergence_sensitive , 1 , "make branching bisimulation divergence sensitive" , NULL },
+    { "weak", 'w' , POPT_ARG_VAL , &task , Weak , "minimize modulo weak bisimulation" , NULL },
     { "copy" , 'c' , POPT_ARG_VAL , &task , Copy , "perform a load/store copy"  , NULL },
     { "lump" , 'l' , POPT_ARG_VAL , &task, Lumping , "minimize modulo lumping of CTMC" , NULL },
     { "silent" , 0 , POPT_ARG_VAL , &task, Silent  , "silent step bisimulation" , NULL },
@@ -128,6 +129,10 @@ int main(int argc, char *argv[]){
                 lts_find_divergent(lts,tau_step,NULL,divergence);
             }
             lowmem_branching_reduce(lts,divergence);
+            break;
+        }
+        case Weak:{
+            setbased_weak_reduce(lts);
             break;
         }
         case Lumping:{
