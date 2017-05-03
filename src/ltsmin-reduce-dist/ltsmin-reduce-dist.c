@@ -43,8 +43,6 @@ static  struct poptOption options[] = {
 static int mpi_nodes;
 static int mpi_me;
 
-#define Debug(...) Warning(info,__VA_ARGS__);
-
 int main(int argc, char*argv[]){
     char *files[2]={NULL,NULL};
     HREinitBegin(argv[0]);

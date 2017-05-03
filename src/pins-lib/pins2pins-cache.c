@@ -23,8 +23,8 @@ typedef struct state_data {
 } state_data_t;
 
 static void
-init_state_info (void *arg, void *old_array, int old_size, void *new_array,
-                 int new_size)
+init_state_info (void *arg, void *old_array, size_t old_size, void *new_array,
+                 size_t new_size)
 {
     state_data_t       *array = (state_data_t *) new_array;
     while (old_size < new_size) {
