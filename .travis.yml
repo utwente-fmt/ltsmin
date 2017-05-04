@@ -229,6 +229,7 @@ before_script:
   - export PATH=$HOME/ltsmin-deps/bin:$HOME/ProB:$PATH
   # include    
   - export C_INCLUDE_PATH="$HOME/ltsmin-deps/include:$C_INCLUDE_PATH"
+  - export CPLUS_INCLUDE_PATH="$HOME/ltsmin-deps/include:$CPLUS_INCLUDE_PATH"
   # lib (linux)
   - if [ "$TRAVIS_OS_NAME" = "linux" -a "x$RELEASE_BUILD" != "xyes" ]; then
     export LD_LIBRARY_PATH="$HOME/ltsmin-deps/lib:$HOME/ProB/lib:$LD_LIBRARY_PATH"; fi
