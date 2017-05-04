@@ -27,8 +27,7 @@ libltsmin_la_SOURCES += ltsmin-type-system.c ltsmin-type-system.h
 libltsmin_la_LIBADD   = $(top_builddir)/ltl2ba/libltl2ba.la
 libltsmin_la_LIBADD  += ../dm/libdm.la
 
-libltsmin_la_CFLAGS   =
-libltsmin_la_CXXFLAGS =
+libltsmin_la_CXXFLAGS = $(AM_CXXFLAGS)
 
 libltsmin_la_CPPFLAGS = -DNXT
 libltsmin_la_CPPFLAGS+= -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS) 
