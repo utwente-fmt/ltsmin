@@ -46,7 +46,8 @@ SUBDIRS += ltsmin-lib
 
 SUBDIRS += andl-lib
 
-SUBDIRS += etf-convert
+#JM: disabled, causes a name clash with clang.
+#SUBDIRS += etf-convert
 
 SUBDIRS += lts-io
 SUBDIRS += lts-lib
