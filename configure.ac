@@ -245,6 +245,7 @@ AS_IF([test "x$acx_spot" = "xyes"], [
         AC_MSG_NOTICE([Because SPOT was found, the SPOT Buddy implementation will be used!])
         AC_SUBST([BUDDY_LIBS],["$BDDX_LIBS"])
         AC_SUBST([BUDDY_CPPFLAGS],["$BDDX_CPPFLAGS"])
+        AC_SUBST([BUDDY_CFLAGS],["$BDDX_CFLAGS"])
         AC_SUBST([BUDDY_LDFLAGS])
     ],[
        AC_MSG_ERROR(Could not find libbddx!
@@ -255,6 +256,7 @@ AS_IF([test "x$acx_spot" = "xyes"], [
 ],[
     AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
     AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
+    AC_SUBST([BUDDY_CFLAGS],['-I${top_srcdir}/buddy/src']) 
     AC_SUBST([BUDDY_LDFLAGS])
 ])
 

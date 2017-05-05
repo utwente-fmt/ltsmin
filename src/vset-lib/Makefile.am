@@ -9,6 +9,7 @@ libvset_la_SOURCES  += vset_listdd.c
 libvset_la_SOURCES  += vset_listdd64.c
 libvset_la_SOURCES  += vset_buddy.c
 libvset_la_CPPFLAGS  = $(BUDDY_CPPFLAGS)
+libvset_la_CFLAGS    = $(AM_CFLAGS) $(BUDDY_CFLAGS)
 libvset_la_LDFLAGS   = $(BUDDY_LDFLAGS)
 libvset_la_LIBADD    = $(BUDDY_LIBS)
 libvset_la_LIBADD   += ../util-lib/libutil.la
