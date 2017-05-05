@@ -4,7 +4,11 @@
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef HAVE_SPOT
+#include <fddx.h>
+#else
 #include <fdd.h>
+#endif
 #include <hre/user.h>
 #include <vset-lib/vdom_object.h>
 
