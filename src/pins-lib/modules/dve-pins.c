@@ -134,7 +134,7 @@ DVEexit()
     // close dveC library
     if (dlHandle == NULL)
         return;
-    dlclose(dlHandle);
+    //dlclose(dlHandle);
 
     if (strlen (templatename) == 0)
         return;
