@@ -28,7 +28,7 @@ int NO_L12 = 0;
 int NO_V = 0;
 int NO_MCNDS = 0;
 int PREFER_NDS = 0;
-int CHECK_SEEN = 1;
+int CHECK_SEEN = 0;
 int NO_MC = 0;
 int USE_DEL = 0;
 int POR_WEAK = 0;
@@ -127,7 +127,7 @@ struct poptOption por_options[]={
     { "no-commutes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_COMMUTES , 1 , "without commutes (for left-accordance)" , NULL },
     { "no-nes" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NES , 1 , "without NES" , NULL },
     { "no-mds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_MDS , 1 , "without MDS" , NULL },
-    { "noseen" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &CHECK_SEEN , 0 , "Prefer visited successor states" , NULL },
+    { "seen" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &CHECK_SEEN , 1 , "Prefer visited successor states" , NULL },
     { "tr" , 0, POPT_ARG_INT | POPT_ARGFLAG_DOC_HIDDEN , &TR_MODE , 0 , "TR mode" , NULL },
     { "trmax" , 0, POPT_ARG_INT | POPT_ARGFLAG_DOC_HIDDEN , &TR_MAX , 0 , "TR max" , NULL },
     { "no-nds" , 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN , &NO_NDS , 1 , "without NDS (for dynamic label info)" , NULL },
