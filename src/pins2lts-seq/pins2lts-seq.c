@@ -1506,6 +1506,29 @@ set_strategy (const char *output)
     }
 }
 
+static int
+state_find_tree (int *state, transition_info_t *ti, void *t)
+{
+    int idx;
+    return TreeFold_ret(gc.store.tree.dbs, state, &idx);
+    (void) ti;
+}
+
+static int
+state_find_table (int *state, transition_info_t *ti, void *t)
+{
+    dbs_ref_t idx;
+    return DBSLLlookup_ret(gc.store.table.dbs, state, &idx);
+    (void) ti;
+}
+
+static int
+state_find_vset (int *state, transition_info_t *ti, void *t)
+{
+    return vset_member(gc.store.vset.closed_set, state);
+    (void) ti;
+}
+
 static void
 gsea_setup(const char *output)
 {
@@ -1710,6 +1733,20 @@ gsea_setup(const char *output)
     case Strategy_None: Abort ("No strategy selected?");
     default:
         Abort ("unimplemented strategy");
+    }
+
+    switch (opt.state_db) {
+    case DB_TreeDBS:
+        if (PINS_POR) por_set_find_state (state_find_tree, &gc);
+        break;
+    case DB_Vset:
+        if (PINS_POR) por_set_find_state (state_find_vset, &gc);
+        break;
+    case DB_DBSLL:
+        if (PINS_POR) por_set_find_state (state_find_table, &gc);
+        break;
+    default:
+        Abort ("unimplemented storage %s", opt.arg_state_db );
     }
 }
 

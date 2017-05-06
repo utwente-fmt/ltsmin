@@ -571,6 +571,14 @@ empty_cost_list (void*arg,void*old_array,int old_size,struct cost_meta *new_arra
     (void) old_array; (void) arg;
 }
 
+static int
+state_find (int *state, transition_info_t *ti, void *t)
+{
+    struct dist_thread_context *ctx = (struct dist_thread_context *) t;
+    int idx;
+    return TreeFold_ret(ctx->dbs, state, &idx);
+}
+
 int main(int argc, char*argv[]){
     char *files[2];
     HREinitBegin(argv[0]);
@@ -738,6 +746,7 @@ int main(int argc, char*argv[]){
     /***************************************************/
     if (size<2) Fatal(1,error,"there must be at least 2 parameters");
     ctx.dbs=TreeDBScreate(size);
+    if (PINS_POR) por_set_find_state (state_find, &ctx);
     int src[size];
     Warning(info,"there are %d state labels and %d edge labels",state_labels,edge_labels);
     int labels[state_labels];
