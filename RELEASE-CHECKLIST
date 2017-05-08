@@ -8,10 +8,23 @@ Release Checklist
   Having this sym link means we remain compatible with 
   autoconf.
 
-* Verify the version (<MAJOR><MINOR><PATCH>) in configure.ac.
+* Verify the version (<MAJOR>.<MINOR>.<PATCH>) in configure.ac.
 
 * Tag release
-  git tag <MAJOR><MINOR><PATCH>
+  git tag v<MAJOR>.<MINOR>.<PATCH>. Here the v prefix is important, because 1)
+  it is suggested by Github releases, under "Tagging suggestions", and 2)
+  it allows you to publish LTSmin's website too. Travis is configured (through
+  .travis.yml) to publish a new website only if the tag matches
+  v<MAJOR>.<MINOR>.<PATCH>. The reason is that if you want to publish a paper,
+  based on an LTSmin version that is older than what the current website refers
+  to, you will not "overwrite" the website. So it is perfectly fine to push
+  a tag with a name, say "NFM2016" to Github, it will even perform a binary
+  release, but it will not update the website. This is because NFM2016 is not
+  prefixed with v. Even if you change the LTSmin version in configure.ac to
+  NFM2016, you will still not update the website. Prefixing a tag
+  with v may only be done when performing an LTSmin release, based on
+  semantic versioning, e.g. it is recommended to push tags like v3.0.0, but not
+  vNFM2016 (if NFM2016 is the version in configure.ac).
 
 * make distcheck (creates tarball and checks whether it builds)
   To test specific configurations:

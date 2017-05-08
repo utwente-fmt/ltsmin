@@ -292,14 +292,11 @@ notifications:
   email: false
 
 before_deploy:
-  - export OLD_WEBSITE_VERSION=$(git --no-pager show gh-pages:_config.yml | grep "version" || echo "version 0.0.0" | cut -d" " -f2)
-  - export NEW_WEBSITE_VERSION=$(cat "www/_config.yml" | grep "version" | cut -d" " -f2)
-  - echo "Old website version is $OLD_WEBSITE_VERSION, new website version is $NEW_WEBSITE_VERSION"
-  # If the LTSmin version is larger than the website version,
-  # we need to deploy a new website.
-  - ./deploy-web "$NEW_WEBSITE_VERSION" "$OLD_WEBSITE_VERSION" &&
-        test -n "$TRAVIS_TAG" -a "x$RELEASE_BUILD" = "xyes" -a "$TRAVIS_OS_NAME" = "linux" &&
-    export DEPLOY_WEBSITE="yes" && echo "The website will be deployed" ; true
+  # we will deploy the website if the tag is prefixed with a v,
+  # and only when we do a release build, since it build the documentation,
+  # and only once on linux, not also on OSX.
+  - if [ "x$TRAVIS_TAG" = "xv$LTSMIN_VERSION" -a "x$RELEASE_BUILD" = "xyes" -a "$TRAVIS_OS_NAME" = "linux" ]; then
+    export DEPLOY_WEBSITE="yes"; fi
   - if [ "x$DEPLOY_WEBSITE" = "xyes" ]; then
     mkdir -p www/assets/man && cp doc/*.html www/assets/man &&
     cp README.md www && 
@@ -325,3 +322,4 @@ deploy:
     on:
       tags: true
       condition: "x$DEPLOY_WEBSITE = xyes"
+
