@@ -14,10 +14,13 @@
 #include <pins-lib/pins-util.h>
 
 int pins_allow_undefined_edges = 0;
+int pins_allow_undefined_values = 0;
 
 struct poptOption pins_util_options[] = {
     { "allow-undefined-edges", 0, POPT_ARG_NONE, &pins_allow_undefined_edges, 0,
       "Allow undefined edges in atomic predicates." , NULL},
+    { "allow-undefined-values", 0, POPT_ARG_NONE, &pins_allow_undefined_values,
+        0, "Allow undefined enum values in atomic predicates", NULL},
     POPT_TABLEEND
 };
 
