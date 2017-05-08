@@ -309,6 +309,26 @@ treedbs_t TreeDBScreate(int nPars){
 	return dbs;
 }
 
+void
+TreeDBSclear(treedbs_t dbs)
+{
+    int nPars=dbs->nPars;
+    if (nPars==1) {
+        dbs->count=0;
+        for(int i=0;i<BLOCKSIZE;i++) {
+            memset (dbs->map, 0, dbs->range*sizeof(int));
+        }
+    } else {
+        for (int i=1;i<dbs->nPars;i++){
+            for(int j=0;j<dbs->db_hash_size[i];j++) {
+                dbs->db_hash[i][j] = -1;
+            }
+            dbs->db_next[i]=0;
+        }
+    }
+}
+
+
 void TreeDBSfree(treedbs_t dbs){
 	if(dbs->nPars==1){
 		RTfree(dbs->map);
