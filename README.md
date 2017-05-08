@@ -175,9 +175,9 @@ If you have installed dependencies (e.g. Sylvan) in a non-standard location,
 you may need to tell `pkgconf` to search for `*.pc` files in this non standard
 location. E.g. if Sylvan is installed in `/opt/local/` and Sylvan's `sylvan.pc`
 is located in `/opt/local/lib/pkgconfig`, 
-you need to set `PKG_CONFIG_LIBDIR` to `/opt/local/lib/pkgconfig`:
+you need to set `PKG_CONFIG_PATH` to `/opt/local/lib/pkgconfig`:
 
-    $ ./configure --disable-dependency-tracking --prefix /path/ PKG_CONFIG_LIBDIR="/opt/local/lib/pkgconfig"
+    $ ./configure --disable-dependency-tracking --prefix /path/ PKG_CONFIG_PATH="/opt/local/lib/pkgconfig"
 
 Note that as usual, you can separate multiple paths to `*.pc` files with `:`.
 
