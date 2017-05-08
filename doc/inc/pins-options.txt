@@ -20,6 +20,12 @@ substantial speedups.
 *--pins-guards*::
     Use guards in combination with the long next-state function to speed up the next-state function.
 
+*--allow-undefined-edges*::
+    Allow values for edge variables in atomic predicates to be unreachable.
+
+*--allow-undefined-values*::
+    Allow undefined values in atomic predicates for enums.
+
 *-r*, *--regroup*='SPEC'::
     Enable regrouping optimizations on the dependency matrix.
 +
