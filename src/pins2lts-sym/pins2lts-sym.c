@@ -3154,23 +3154,59 @@ output_types(FILE *tbl_file)
     int type_count = lts_type_get_type_count(ltstype);
 
     for (int i = 0; i < type_count; i++) {
-        Warning(info, "dumping type %s", lts_type_get_type(ltstype, i));
-        fprintf(tbl_file, "begin sort ");
-        fprint_ltsmin_ident(tbl_file, lts_type_get_type(ltstype, i));
-        fprintf(tbl_file, "\n");
+        const data_format_t df = lts_type_get_format(ltstype, i);
+        switch (df) {
+            case LTStypeEnum: case LTStypeChunk: case LTStypeBool:
+            case LTStypeTrilean: {
+                Warning(info, "dumping type %s", lts_type_get_type(ltstype, i));
+                fprintf(tbl_file, "begin sort ");
+                fprint_ltsmin_ident(tbl_file, lts_type_get_type(ltstype, i));
+                fprintf(tbl_file, "\n");
 
-        int values = pins_chunk_count (model,i);
+                switch (df) {
+                    case LTStypeEnum: case LTStypeChunk: {
+                        int values = pins_chunk_count (model,i);
 
-        for (int j = 0; j < values; j++) {
-            chunk c    = pins_chunk_get (model, i, j);
-            size_t len = c.len * 2 + 6;
-            char str[len];
+                        for (int j = 0; j < values; j++) {
+                            chunk c    = pins_chunk_get (model, i, j);
+                            size_t len = c.len * 2 + 6;
+                            char str[len];
 
-            chunk2string(c, len, str);
-            fprintf(tbl_file, "%s\n", str);
+                            chunk2string(c, len, str);
+                            fprintf(tbl_file, "%s\n", str);
+                        }
+                        break;
+                    }
+                    case LTStypeBool: case LTStypeTrilean: {
+                        fprintf(tbl_file, "%% This enum used to be a '%s'.\n",
+                                data_format_string_generic(df));
+                        fprintf(tbl_file, "%% To access the values below in "
+                                "atomic predicates, use quotes,\n"
+                                "%% e.g. instead of writing 'var == true', "
+                                "write 'var == \"true\"'.\n");
+                        fprintf(tbl_file, "\"false\"\n");
+                        fprintf(tbl_file, "\"true\"\n");
+                        if (df == LTStypeBool) break;
+                        fprintf(tbl_file, "\"maybe\"\n");
+                        break;
+                    }
+                    default: HREassert(false);
+                }
+                fprintf(tbl_file,"end sort\n");
+                break;
+            }
+            default: {
+                Warning(info, "skipping type %s", lts_type_get_type(ltstype, i));
+                fprintf(tbl_file, "%% Type '%s' not exported, because '%s' "
+                        "is not converted to enum.\n",
+                        lts_type_get_type(ltstype, i),
+                        data_format_string_generic(df));
+                fprintf(tbl_file, "%% This means you can not use variables of "
+                        "type '%s' in atomic predicates.\n",
+                        lts_type_get_type(ltstype, i));
+                break;
+            }
         }
-
-        fprintf(tbl_file,"end sort\n");
     }
 }
 
