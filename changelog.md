@@ -1,4 +1,5 @@
-# Unreleased - Release 3.0.0 of the LTSmin toolset
+# Changelog
+## Unreleased: 3.0.0
 
 - Improvements to the symbolic back-end (*2lts-sym):
     - Precise counting of sets using the bignum interface. Meaning you
@@ -99,7 +100,7 @@
  5. Multi-core SCC-Based LTL Model Checking
      http://dx.doi.org/10.1007/978-3-319-49052-6_2
 
-# January 23, 2015 - Release 2.1 of the LTSmin toolset
+## January 23, 2015: 2.1
 
 This release is accompanied by the tool paper:
 LTSmin: High-Performance Language-Independent Model Checking [6].
@@ -156,7 +157,7 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
 1. Sylvan: Multi-core Decision Diagrams -
     http://www.tvandijk.nl/wp-content/uploads/2015/01/sylvan_tacas15.pdf
 
-# March 4, 2013 - Release 2.0 of the LTSmin toolset
+## March 4, 2013: 2.0
 
 - Refactored runtime and IO libraries, organized source and renamed tools:
     - *-reach       -> *2lts-sym  (Symbolic CTL/mu model checking, ETF output)
@@ -226,7 +227,7 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
         model checking of weak LTL properties
 1. G.J. Holzmann - Parallelizing the Spin Model Checker
 
-# February 22, 2012 - Release 1.8 of the LTSmin toolset
+## February 22, 2012: 1.8
 
  - Implementation of Evangelista et al.'s parallel NDFS and variations, see:
    http://eprints.eemcs.utwente.nl/20618/ (Variations on Multi-Core NDFS)
@@ -244,14 +245,14 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
    o ltscmp-one for sequential comparison of labeled transition systems
    o <spec>2lts-hre for distributed state space generation
 
-# July 24, 2011 - Release 1.7.1 of the LTSmin toolset
+## July 24, 2011: 1.7.1
 
  - Fix for Multi-Core NDFS algorithm: introduced wait counter
    (<spec>2lts-mc)
  - Introduced/improved color counters and option no-all-red
    (<spec>2lts-mc)
 
-# June, 24, 2011 - Release 1.7 of the LTSmin toolset
+## June, 24, 2011: 1.7
 
  - New tools <spec>2lts-gsea
    (General State Exploring Algorithms)
@@ -271,7 +272,7 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
  - Connection to the libDDD decision diagram package
  - Conversion from ETF to DVE (etf-convert)
 
-# November 1, 2010 - Release 1.6 of the LTSmin toolset.
+## November 1, 2010: 1.6
 
  - New frontend DVE2 (requires DiVinE 2.2)
  - Enumerative Multi-Core backend
@@ -283,7 +284,7 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
  - Faster trace generation for <spec>-reach
  - BDD reordering for BuDDy vset
 
-# December 1, 2009 - Release 1.5 of the LTSmin toolset.
+## December 1, 2009: 1.5
 
  - New frontend DVE (requires DiVinE-cluster)
  - Bignum support for state counts in spec-reach tools
@@ -291,7 +292,7 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
  - spec-reach clean-up
  - 'tree' vector set implementation based on AtermDD
 
-# September 17, 2009 - Release 1.4 of the LTSmin toolset.
+## September 17, 2009: 1.4
 
  - New tool ce-mpi for distributed cycle elimination
    (Simona Orzan)
@@ -304,7 +305,7 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
  - Reworked ETF support (non-backwards compatible)
  - bash completion for LTSmin tools (see contrib/)
 
-# July 10, 2009 - Release 1.3 of the LTSmin toolset.
+## July 10, 2009: 1.3
 
  - Regrouping optimizations of the PINS matrix
  - Connection to the CADP toolkit via pins_open
@@ -312,7 +313,7 @@ LTSmin: High-Performance Language-Independent Model Checking [6].
  - Significant performance improvements
  - Symbolic deadlock detection and trace output
 
-# March 31, 2009 - Release 1.2 of the LTSmin toolset.
+## March 31, 2009: 1.2
 
 The main improvements in this release are:
  - Option parsing is now performed using the popt library. Thus, all
@@ -325,5 +326,4 @@ The main improvements in this release are:
    in the form of an ETF (Enumerated Table Format) file. This ETF file
    can be used as input for the reachabilty tools and can be directly
    translated to DVE.
-
 
