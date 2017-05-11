@@ -293,13 +293,14 @@ notifications:
 
 before_deploy:
   # we will deploy the website if the tag is prefixed with a v,
-  # and only when we do a release build, since it build the documentation,
+  # and only when we do a release build, since it builds the documentation,
   # and only once on linux, not also on OSX.
   - if [ "x$TRAVIS_TAG" = "xv$LTSMIN_VERSION" -a "x$RELEASE_BUILD" = "xyes" -a "$TRAVIS_OS_NAME" = "linux" ]; then
     export DEPLOY_WEBSITE="yes"; fi
   - if [ "x$DEPLOY_WEBSITE" = "xyes" ]; then
     mkdir -p www/assets/man && cp doc/*.html www/assets/man &&
-    cp README.md www && 
+    cp README.md www &&
+    cp changelog.md www &&
     pushd www && gem install jekyll bundler && bundle install && 
     jekyll b && popd; fi
 
