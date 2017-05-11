@@ -1,4 +1,4 @@
-# Unreleased - Release 3.0 of the LTSmin toolset
+# Unreleased - Release 3.0.0 of the LTSmin toolset
 
 - Improvements to the symbolic back-end (*2lts-sym):
     - Precise counting of sets using the bignum interface. Meaning you
@@ -48,13 +48,13 @@
 
 - The mCRL2 front-end now accepts files with .txt extension.
 
-- Added support for SPOT's LTL to Buechi translation [5]
+- Added support for SPOT's LTL to Büchi translation [5]
 
 - Improvements to the multi-core backend (*2lts-mc):
     - Added a parallel Strongly Connected Components algorithm [4]
       (--strategy=ufscc).
     - Added Renault's parallel SCC algorithm (--strategy=renault).
-    - Added support for transition-based general buechi automata (TGBAs)
+    - Added support for transition-based general büchi automata (TGBAs)
       via UFSCC/Renault and SPOT.
     - Added Bosnacki's closed-set proviso to preserve safety under POR.
     - Support for weak LTS formulae in DFS-FIFO. Simply combine --ltl with
