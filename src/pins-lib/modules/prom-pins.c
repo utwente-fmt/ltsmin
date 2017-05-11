@@ -118,6 +118,7 @@ struct poptOption prom_options[]= {
 
 typedef struct grey_box_context {
     int todo;
+    int *groups_of_edge;
 } *gb_context_t;
 
 static void* dlHandle = NULL;
@@ -273,21 +274,22 @@ sl_all (model_t model, int*src, int *label)
 }
 
 static int
-groups_of_edge (model_t model, int edgeno, int index, int **groups)
+groups_of_edge (model_t model, int edgeno, int index, const int **groups)
 {
     if (prom_transition_has_edge == NULL)
         Abort ("spins_transition_has_edge() not available, update Spins and recompile model");
+    gb_context_t ctx = (gb_context_t) GBgetContext(model);
     int             nr_groups = pins_get_group_count (model);
     int             count = 0;
     for (int i = 0; i < nr_groups; i++)
         count += prom_transition_has_edge(i, edgeno, index);
-    *groups = (int*) RTmalloc(sizeof(int[count]));
     count = 0;
     for (int i = 0; i < nr_groups; i++) {
         if (prom_transition_has_edge(i, edgeno, index)) {
-            groups[0][count++] = i;
+            ctx->groups_of_edge[count++] = i;
         }
     }
+    *groups = ctx->groups_of_edge;
     return count;
 }
 
@@ -322,7 +324,7 @@ PromLoadGreyboxModel(model_t model, const char *filename)
     // get ltstypes
     ltstype=lts_type_create();
     int state_length = prom_get_state_size();
-
+    ctx->groups_of_edge = RTmalloc(sizeof(int[state_length]));
     // adding types
     int ntypes = prom_get_type_count();
     for (int i = 0; i < ntypes; i++) {

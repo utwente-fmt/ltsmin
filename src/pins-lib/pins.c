@@ -68,6 +68,7 @@ struct grey_box_model {
 
 	int *var_perm;
 	int *group_perm;
+    int *groups_of_edge_default;
 };
 
 struct static_info_matrix{
@@ -336,11 +337,10 @@ state_labels_default_all(model_t model, int *state, int *labels)
 }
 
 static int
-groups_of_edge_default(model_t model, int edgeno, int index, int** groups)
+groups_of_edge_default(model_t model, int edgeno, int index, const int **groups)
 {
     (void) edgeno; (void) index;
-    *groups = RTmalloc(sizeof(int) * pins_get_group_count(model));
-    for (size_t i = 0; i < pins_get_group_count(model); i++) (*groups)[i] = i;
+    *groups = model->groups_of_edge_default;
 
     return pins_get_group_count(model);
 }
@@ -418,7 +418,7 @@ wrapped_exit_default(model_t model)
 }
 
 static int
-wrapped_default_groups_of_edge(model_t model, int edgeno, int index, int** groups)
+wrapped_default_groups_of_edge(model_t model, int edgeno, int index, const int **groups)
 {
     return GBgroupsOfEdge(GBgetParent(model), edgeno, index, groups);
 }
@@ -663,6 +663,11 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     model->group_perm = default_src->group_perm;
 
     if (model->groups_of_edge == groups_of_edge_default) {
+        model->groups_of_edge_default =
+            RTmalloc(sizeof(int[pins_get_state_variable_count(model)]));
+        for (size_t i = 0; i < pins_get_state_variable_count(model); i++) {
+            model->groups_of_edge_default[i] = i;
+        }
         GBsetGroupsOfEdge(model, wrapped_default_groups_of_edge);
     }
 }
@@ -1010,7 +1015,7 @@ void GBsetGroupsOfEdge(model_t model,groups_of_edge_t method){
     model->groups_of_edge=method;
 }
 
-int GBgroupsOfEdge(model_t model, int edgeno, int index, int** groups){
+int GBgroupsOfEdge(model_t model, int edgeno, int index, const int **groups){
     return model->groups_of_edge(model,edgeno,index,groups);
 }
 
