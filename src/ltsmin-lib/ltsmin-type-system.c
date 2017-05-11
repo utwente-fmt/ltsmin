@@ -26,13 +26,13 @@ get_data_format_binary(const format_table_t f[DATA_FORMAT_SIZE][DATA_FORMAT_SIZE
 {
     const format_table_t entry = f[l][r];
     if (entry.error == -1) {
-        const char* ex = LTSminPrintExpr(e, env);
         char hint[hint_binary(f, NULL, 0) + 1];
         hint_binary(f, hint, sizeof(hint));
-        Abort(
-            "Incompatible type formats (LHS = \"%s\", RHS = \"%s\") for expression: \"%s\", "
-            "expecting format pair (LHS, RHS) to be any pair in {%s}",
-            data_format_string_generic(l), data_format_string_generic(r), ex, hint);
+        Warning(infoLong, "Error: expecting format pair (LHS, RHS) to be any pair in {%s}", hint);
+
+        const char* ex = LTSminPrintExpr(e, env);
+        Abort("Incompatible type formats (LHS = \"%s\", RHS = \"%s\") for expression: \"%s\".",
+            data_format_string_generic(l), data_format_string_generic(r), ex);
     } else return entry.df;
 }
 
@@ -55,13 +55,13 @@ get_data_format_unary(const format_table_t f[DATA_FORMAT_SIZE],
 {
     const format_table_t entry = f[c];
     if (entry.error == -1) {
-        const char* ex = LTSminPrintExpr(e, env);
         char hint[hint_unary(f, NULL, 0) + 1];
         hint_unary(f, hint, sizeof(hint));
-        Abort(
-            "Incompatible type format (\"%s\") for expression: \"%s\", "
-            "expecting format to be any of {%s}",
-            data_format_string_generic(c), ex, hint);
+        Warning(infoLong, "Error: expecting format to be any of {%s}", hint);
+
+        const char* ex = LTSminPrintExpr(e, env);
+        Abort("Incompatible type format (\"%s\") for expression: \"%s\"",
+            data_format_string_generic(c), ex);
     }
     return entry.df;
 }
@@ -180,6 +180,14 @@ check_type_format_atom(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
                     HREabort(LTSMIN_EXIT_FAILURE);
                 }
             }
+        }
+        case VAR: {
+            const char *v = LTSminPrintExpr(e, env);
+            Warning(error, "Invalid identifier: '%s' is not a state variable "
+                    "or edge variable. If you meant to write a string "
+                    "constant, surround it with double quotes, i.e. '\"%s\"'.",
+                    v, v);
+            HREabort(LTSMIN_EXIT_FAILURE);
         }
         default: {
             LTSminLogExpr(error, "Unsupported expression: ", e, env);
