@@ -60,7 +60,7 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
     
             e->chunk_cache = pins_chunk_put(model, type, c);
     
-            int* groups = NULL;
+            const int *groups = NULL;
             const int n = GBgroupsOfEdge(model, e->idx, e->chunk_cache, &groups);
             if (n > 0) {
                 for (int k = 0; k < n; k++) {
@@ -68,7 +68,6 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
                     if (PINS_POR) pins_add_group_visible(model, group);
                     if (deps != NULL) dm_row_union(deps, GBgetDMInfoRead(model), group);
                 }
-                RTfree(groups);
             } else {
                 char s[c.len * 2 + 6];
                 chunk2string(c, sizeof(s), s);
@@ -158,14 +157,13 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
                 ctx.num = e->chunk_cache;
                 ctx.exists = 0;
 
-                int* groups = NULL;
+                const int *groups = NULL;
                 const int n = GBgroupsOfEdge(model, e->idx, ctx.num, &groups);
 
                 if (n > 0) {
                     for (int i = 0; i < n && ctx.exists == 0; i++) {
                         GBgetTransitionsLong(model, groups[i], state, evar_cb, &ctx);
                     }
-                    RTfree(groups);
                     return ctx.exists ? ctx.num : -1;
                 } else return -1;
             } else if (edge_labels != NULL) {

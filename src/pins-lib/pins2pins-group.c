@@ -88,6 +88,7 @@ typedef struct group_context {
     void               *user_context;
     int                **group_cpy;
     int                *cpy;
+    int                *groups_of_edge;
 }                  *group_context_t;
 
 
@@ -232,33 +233,24 @@ group_state_labels_all(model_t self, int *state, int *labels)
 
 /* map groups and delete duplicates, because groups may be subsumed */
 static int
-group_groups_of_edge (model_t self, int edgeno, int index, int** groups)
+group_groups_of_edge (model_t self, int edgeno, int index, const int **groups)
 {
     group_context_t ctx = (group_context_t) GBgetContext(self);
 
-    int* groups_parent = NULL;
+    const int *groups_parent = NULL;
     const int n = GBgroupsOfEdge(GBgetParent(self), edgeno, index, &groups_parent);
     
     if (n == 0) return 0;    
-
-    *groups = RTmalloc(sizeof(int) * n);
     
     int c = 0;
     for (int i = 0; i < n; i++) {
         for (int k = 0; k < c; k++) {
-            if (*groups[k] == groups_parent[i]) goto duplicate;
+            if (ctx->groups_of_edge[k] == groups_parent[i]) continue;
         }
-        (*groups)[c++] = ctx->groupmap[groups_parent[i]];
-        
-        duplicate:;
+        ctx->groups_of_edge[c++] = ctx->groupmap[groups_parent[i]];
     }
-    RTfree(groups_parent);
-    
-    if (c > 0) RTrealloc(*groups, sizeof(int) * c);
-    else {
-        RTfree(*groups);
-        *groups = NULL;
-    }
+
+    *groups = ctx->groups_of_edge;
 
     return c;
 }
@@ -276,7 +268,7 @@ typedef struct {
     int tgt;
 } pair_t;
 
-typedef struct __attribute__((__packed__)) {
+typedef struct {
     matrix_t*   r;
     matrix_t*   mayw;
     matrix_t*   mustw;
@@ -1179,6 +1171,7 @@ GBregroup (model_t model)
     GBcopyChunkMaps (group, model);
 
     struct group_context *ctx = RTmalloc (sizeof *ctx);
+    ctx->groups_of_edge = RTmalloc(sizeof(int[dm_ncols(r)]));
 
     GBsetContext (group, ctx);
 

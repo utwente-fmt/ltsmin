@@ -189,7 +189,7 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
 }
 
 static int
-cached_groups_of_edge (model_t self, int edgeno, int index, int** groups)
+cached_groups_of_edge (model_t self, int edgeno, int index, const int **groups)
 {
     return GBgroupsOfEdge(GBgetParent(self), edgeno, index, groups);
 }

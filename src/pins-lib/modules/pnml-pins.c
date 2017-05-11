@@ -329,7 +329,7 @@ get_labels(model_t model, sl_group_enum_t group, int *src, int *label) {
 }
 
 static int
-groups_of_edge(model_t model, int edgeno, int index, int* *groups)
+groups_of_edge(model_t model, int edgeno, int index, const int **groups)
 {
     pn_context_t *pn_context = GBgetContext(model);
 
@@ -345,8 +345,7 @@ groups_of_edge(model_t model, int edgeno, int index, int* *groups)
     if (index + 1 == num_labels) len = NUM_TRANSS - begin;
     else len = pn_context->groups_of_edges_begin[index + 1] - begin;
 
-    *groups = (int*) RTmalloc(sizeof(int[len]));
-    memcpy(*groups, pn_context->groups_of_edges + begin, sizeof(int[len]));
+    *groups = pn_context->groups_of_edges + begin;
 
     return len;
 }
