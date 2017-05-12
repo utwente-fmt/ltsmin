@@ -301,6 +301,7 @@ before_deploy:
     mkdir -p www/assets/man && cp doc/*.html www/assets/man &&
     cp README.md www &&
     cp changelog.md www &&
+    ls www/assets/man | perl -e 'print "<html><body><ul>"; while(<>) { chop $_; print "<li><a href=\"./$_\">$_</a></li>";} print "</ul></body></html>"' > www/assets/man/index.html &&
     pushd www && gem install jekyll bundler && bundle install && 
     jekyll b && popd; fi
 
