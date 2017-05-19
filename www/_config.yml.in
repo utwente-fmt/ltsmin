@@ -7,5 +7,4 @@ exclude:
   - .gitignore
   - Gemfile
   - _config.yml.in
-baseurl: "/ltsmin"
 
