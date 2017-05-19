@@ -247,6 +247,7 @@ before_script:
     cp "$HOME/ltsmin-deps/lib/libczmq.a" "$HOME/static-libs" &&
     cp /usr/local/lib/libgmp.a "$HOME/static-libs" &&
     cp /usr/local/lib/libpopt.a "$HOME/static-libs" &&
+    cp "/usr/local/Cellar/hwloc/$(brew list --versions hwloc | cut -d' ' -f2)/lib/libhwloc.a" "$HOME/static-libs" &&
     cp "/usr/local/Cellar/libxml2/$(brew list --versions libxml2 | cut -d' ' -f2)/lib/libxml2.a" "$HOME/static-libs"; fi
   # Now do the same on Linux.
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
