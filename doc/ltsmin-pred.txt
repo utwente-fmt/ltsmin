@@ -55,3 +55,4 @@ For variable naming consult the +--labels+ option in the PINS tools.
 manpage:ltsmin[7],
 manpage:etf2lts-seq[1],
 manpage:etf2lts-mc[1]
+manpage:ltsmin-type-system[5]

@@ -53,3 +53,4 @@ manpage:etf2lts-seq[1],
 manpage:etf2lts-mc[1],
 manpage:prom2lts-seq[1],
 manpage:prom2lts-mc[1]
+manpage:ltsmin-type-system[5]
