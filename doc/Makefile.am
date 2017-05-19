@@ -17,6 +17,7 @@ MANPAGES += ltsmin.7
 MANPAGES += ltsmin-ctl.5
 MANPAGES += ltsmin-ltl.5
 MANPAGES += ltsmin-pred.5
+MANPAGES += ltsmin-type-system.5
 MANPAGES += ltsmin-mu.5
 MANPAGES += ltsmin-mucalc.5
 MANPAGES += ltsmin-printtrace.1
