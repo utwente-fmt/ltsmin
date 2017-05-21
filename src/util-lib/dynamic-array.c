@@ -54,7 +54,7 @@ static void fix_array(struct array ref,size_t old_size,size_t new_size){
 	void*old=*ref.ar;
 	tmp=RTrealloc(*ref.ar,new_size*ref.e_size);
 	HREassert (tmp, "realloc from %zu to %zu * %d failed",old_size,new_size,ref.e_size);
-    Debug("%x -> %x",*ref.ar,tmp);
+    Debug("%p -> %p",*ref.ar,tmp);
     *ref.ar=tmp;
     if (ref.callback) {
         ref.callback(ref.cbarg,old,old_size,tmp,new_size);

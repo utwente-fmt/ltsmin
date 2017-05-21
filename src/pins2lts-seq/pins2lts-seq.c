@@ -1523,7 +1523,7 @@ state_find_tree (int *state, transition_info_t *ti, void *t)
 {
     int idx;
     return TreeFold_ret(gc.store.tree.dbs, state, &idx);
-    (void) ti;
+    (void) ti; (void) t;
 }
 
 static int
@@ -1531,14 +1531,14 @@ state_find_table (int *state, transition_info_t *ti, void *t)
 {
     dbs_ref_t idx;
     return DBSLLlookup_ret(gc.store.table.dbs, state, &idx);
-    (void) ti;
+    (void) ti; (void) t;
 }
 
 static int
 state_find_vset (int *state, transition_info_t *ti, void *t)
 {
     return vset_member(gc.store.vset.closed_set, state);
-    (void) ti;
+    (void) ti; (void) t;
 }
 
 static void
