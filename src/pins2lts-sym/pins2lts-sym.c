@@ -1252,24 +1252,48 @@ struct expand_info {
     long *eg_count;
 };
 
+/**
+ * On-the-fly learning for the "sat" and "sat-fix" strategies.
+ * Given a set of short states...
+ */
 static inline void
 expand_group_next_projected(vrel_t rel, vset_t set, void *context)
 {
     struct expand_info *expand_ctx = (struct expand_info*)context;
+
+    // Update "group checks" count
     (*expand_ctx->eg_count)++;
 
+    // Remove explored (short) states from <set>
     vset_t group_explored = expand_ctx->group_explored;
-    vset_zip(group_explored, set);
+    vset_minus(set, group_explored);
 
+    // Prepare struct
     struct group_add_info group_ctx;
     int group = expand_ctx->group;
     group_ctx.group = group;
     group_ctx.set = NULL;
+
+    // Call appropriate vrel_update function
 #if SPEC_MT_SAFE
     vrel_update(rel, set, explore_cb, &group_ctx);
 #else
     vrel_update_seq(rel, set, explore_cb, &group_ctx);
 #endif
+
+    // Add source (short) states to explored
+    vset_union(group_explored, set);
+
+    /*
+     * NOTE: We add the processed source states AFTER updating the relation.
+     * This has to do with the case where multiple threads call expand_group_next_projected
+     * for the same transition group.
+     * Currently this is only the case for the Sylvan VSet.
+     * Sylvan's vrel_update and vset_union are thread-safe with compare_and_swap:
+     * if another thread already updated, they read the new value, and add the new values again.
+     * This avoids the case where a thread is not updating the relation because another thread
+     * is already doing it, but then doesn't find the new transitions.
+     */
 }
 
 static void
