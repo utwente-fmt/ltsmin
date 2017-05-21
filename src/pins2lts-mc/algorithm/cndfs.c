@@ -568,7 +568,9 @@ cndfs_local_setup   (run_t *run, wctx_t *ctx)
     cloc->in_stack = dfs_stack_create (len);
     cloc->out_stack = dfs_stack_create (len);
 
-    cloc->pink = fset_create (sizeof(ref_t), sizeof(size_t), FSET_MIN_SIZE, 24);
+    if ((get_strategy(run->alg) & Strat_TA) == 0) {
+        cloc->pink = fset_create (sizeof(ref_t), sizeof(size_t), FSET_MIN_SIZE, 24);
+    }
 
     if (get_strategy(run->alg) & Strat_CNDFS) return;
 

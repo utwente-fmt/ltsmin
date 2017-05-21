@@ -601,7 +601,7 @@ check_por_all (model_t check_model, int *src, TransitionCB cb, void *user_contex
 model_t
 GBaddPORCheck (model_t model)
 {
-    HREassert (PINS_LTL == PINS_LTL_NONE, "Use --por-check without LTL");
+    HREassert (PINS_LTL == PINS_LTL_NONE, "Use --check without LTL");
 
     Print1 (info, "POR checking layer activated.");
 
