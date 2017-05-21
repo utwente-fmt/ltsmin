@@ -100,6 +100,7 @@ static long max_grp_count = 0;
 static long max_trans_count = 0;
 static long max_mu_count = 0;
 static model_t model;
+static vset_t initial, visited;
 static vrel_t *group_next;
 static vset_t *group_explored;
 static vset_t *group_tmp;
@@ -468,6 +469,45 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
     }
 
     find_trace(trace_end, 2, global_level, levels, action);
+}
+
+
+static void
+save_snapshot_vset(FILE *f)
+{
+    /* Call hook */
+    vset_pre_save(f, domain);
+
+    /* Write domain */
+    vdom_save(f, domain);
+
+    /* Write initial state */
+    vset_save(f, initial);
+
+    /* Write number of transitions and all transitions */
+    fwrite(&nGrps, sizeof(int), 1, f);
+    for (int i=0; i<nGrps; i++) vrel_save_proj(f, group_next[i]);
+    for (int i=0; i<nGrps; i++) vrel_save(f, group_next[i]);
+
+    /* Write reachable states */
+    int save_reachable = 1;
+    fwrite(&save_reachable, sizeof(int), 1, f);
+    vset_save(f, visited);
+
+    /* Call hook */
+    vset_post_save(f, domain);
+
+    /* Now write action labels */
+    int action_count = 0;
+    if (act_label != -1) action_count = pins_chunk_count(model, action_typeno);
+    fwrite(&action_count, sizeof(int), 1, f);
+    for (int i=0; i<action_count; i++) {
+        chunk ch = pins_chunk_get(model, action_typeno, i);
+        uint32_t len = ch.len;
+        char *action = ch.data;
+        fwrite(&len, sizeof(uint32_t), 1, f);
+        fwrite(action, sizeof(char), len, f);
+    }
 }
 
 struct label_add_info
@@ -1425,6 +1465,15 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
                 if (n_count > max_grp_count) max_grp_count = n_count;
             }
         }
+    }
+
+    if (vset_dir != NULL) {
+        char *file = "%s/level%03d.dd";
+        char fcbuf[snprintf(NULL, 0, file, vset_dir, level)];
+        sprintf(fcbuf, file, vset_dir, level);
+        FILE *fp = fopen(fcbuf, "w");
+        save_snapshot_vset(fp);
+        fclose(fp);
     }
     
     if (dot_dir != NULL) {
@@ -4646,7 +4695,6 @@ static void actual_main(void *arg)
     }
 
     int *src;
-    vset_t initial;
 
     if (next_union) vset_next_fn = vset_next_union_src;
 
@@ -4671,6 +4719,17 @@ static void actual_main(void *arg)
         }
     }
 
+    if (vset_dir != NULL) {
+        DIR *dir = opendir(vset_dir);
+        if (dir) {
+            closedir(dir);
+        } else if (errno == ENOENT) {
+            Abort("Option 'save-levels': directory '%s' does not exist", vset_dir);
+        } else {
+            Abort("Option 'save-levels': failed opening directory '%s'", vset_dir);
+        }
+    }
+
     init_mu_calculus();
 
     /* determine if we need to generate a symbolic parity game */
@@ -4690,7 +4749,7 @@ static void actual_main(void *arg)
     reach_timer = RTcreateTimer();
 
     /* fix level 0 */
-    vset_t visited = vset_create(domain, -1, NULL);
+    visited = vset_create(domain, -1, NULL);
     vset_copy(visited, initial);
 
     /* check the invariants at level 0 */
@@ -4712,39 +4771,7 @@ static void actual_main(void *arg)
             FILE *f = fopen(files[1], "w");
             if (f == NULL) Abort("Cannot open '%s' for writing!", files[1]);
 
-            /* Call hook */
-            vset_pre_save(f, domain);
-
-            /* Write domain */
-            vdom_save(f, domain);
-
-            /* Write initial state */
-            vset_save(f, initial);
-
-            /* Write number of transitions and all transitions */
-            fwrite(&nGrps, sizeof(int), 1, f);
-            for (int i=0; i<nGrps; i++) vrel_save_proj(f, group_next[i]);
-            for (int i=0; i<nGrps; i++) vrel_save(f, group_next[i]);
-
-            /* Write reachable states */
-            int save_reachable = 1;
-            fwrite(&save_reachable, sizeof(int), 1, f);
-            vset_save(f, visited);
-
-            /* Call hook */
-            vset_post_save(f, domain);
-
-            /* Now write action labels */
-            int action_count = 0;
-            if (act_label != -1) action_count = pins_chunk_count(model, action_typeno);
-            fwrite(&action_count, sizeof(int), 1, f);
-            for (int i=0; i<action_count; i++) {
-                chunk ch = pins_chunk_get(model, action_typeno, i);
-                uint32_t len = ch.len;
-                char *action = ch.data;
-                fwrite(&len, sizeof(uint32_t), 1, f);
-                fwrite(action, sizeof(char), len, f);
-            }
+            save_snapshot_vset(f);
 
             /* Done! */
             fclose(f);
