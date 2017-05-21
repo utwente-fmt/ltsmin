@@ -239,7 +239,7 @@ por_seen_groups (por_context *ctx, int *src, int src_changed)
     ctx->src_changed = src_changed;
     bms_clear_all (ctx->include);
     GBgetTransitionsAll (ctx->parent, src, seen_cb, ctx);
-    Debug("Found %zu 'seen' groups", bms_count(ctx->include, 0));
+    Debug("Found %d 'seen' groups", bms_count(ctx->include, 0));
 }
 
 bool
@@ -253,7 +253,7 @@ por_seen_group (por_context *ctx, int *src, int group, int src_changed)
     int ret = bms_count (ctx->include, 0) != 0;
     bms_clear_all (ctx->include);
     return ret;
-    Debug("Found %zu 'seen' groups", bms_count(ctx->include, 0));
+    Debug("Found %d 'seen' groups", bms_count(ctx->include, 0));
 }
 
 void

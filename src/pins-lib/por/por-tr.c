@@ -181,7 +181,7 @@ tr_calc_del (tr_ctx_t *tr, dyn_process_t *proc, comm_e comm)
 
     bool                commutes = tr_does_commute (tr, proc);
     if (commutes) { // add all stubborn transitions (enabled and diabled)
-        Debugf ("REDUCED with { ", proc->id);
+        Debugf ("REDUCED with %d { ", proc->id);
         for (int *g = ci_begin(por->enabled_list); g != ci_end(por->enabled_list); g++) {
             if (!del_is_stubborn(tr->del, *g) || tr->g2p[*g] == proc->id) continue;
             HREassert (tr->g2p[*g] == -1);

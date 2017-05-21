@@ -67,8 +67,6 @@ typedef struct search_context {
     int             score_visible;  // selected number of visible transitions
     int             score_vis_en;   // selected number of visible and enabled transitions
     key_type_t      has_key;        // key transitions type
-    int             visible_nes;    // set of visible NESs included
-    int             visible_nds;    // set of visible NDSs included
     int             score_en;       // score of enabled trans (used as comparison in case transitions are excluded)
 } search_context_t;
 
@@ -151,7 +149,7 @@ por_transition_costs (por_context *ctx)
  * It takes care of updating the heuristic function for the nes based on the new group selection
  */
 static inline void
-update_ns_scores (por_context* ctx, search_context_t *s, int group)
+update_ns_scores (por_context *ctx, search_context_t *s, int group)
 {
     if (NO_HEUR) return;
     // change the heuristic function according to selected group
@@ -168,7 +166,7 @@ update_ns_scores (por_context* ctx, search_context_t *s, int group)
  * Mark a group selected, update counters and NS scores.
  */
 static inline bool
-select_group (por_context* ctx, search_context_t *s, int group)
+select_group (por_context *ctx, search_context_t *s, int group)
 {
     if (s->emit_status[group] & (ES_QUEUED | ES_VISITED)) { // already selected
         Debugf ("(%d), ", group);
@@ -684,8 +682,6 @@ beam_setup (model_t model, por_context *ctx, int *src)
 
         search_context_t *search = beam->search[beam->beam_used];
         search->has_key = KEY_NONE;
-        search->visible_nds = 0;
-        search->visible_nes = 0;
         search->work_disabled->count = 0;
         search->work_enabled->count = 0;
         search->enabled->count = 0;

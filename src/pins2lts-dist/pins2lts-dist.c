@@ -577,6 +577,7 @@ state_find (int *state, transition_info_t *ti, void *t)
     struct dist_thread_context *ctx = (struct dist_thread_context *) t;
     int idx;
     return TreeFold_ret(ctx->dbs, state, &idx);
+    (void) ti;
 }
 
 int main(int argc, char*argv[]){
