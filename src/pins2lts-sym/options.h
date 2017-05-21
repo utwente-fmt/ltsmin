@@ -47,6 +47,7 @@ extern int mu_par;
 extern int mu_opt;
 
 extern char* dot_dir;
+extern char* vset_dir;
 
 extern char* trc_output;
 extern char* trc_type;

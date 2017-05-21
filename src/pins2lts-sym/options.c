@@ -33,6 +33,7 @@ int mu_par = 0;
 int mu_opt = 0;
 
 char* dot_dir = NULL;
+char* vset_dir = NULL;
 
 char* trc_output = NULL;
 char* trc_type   = "gcf";
@@ -223,6 +224,7 @@ struct poptOption options[] = {
     { ctl_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with a CTL formula  (can be given multiple times)" , "<ctl-file>.ctl" },
     { ltl_long , 0 , POPT_ARG_STRING , NULL , 0 , "file with an LTL formula  (can be given multiple times)" , "<ltl-file>.ltl" },
     { "dot", 0, POPT_ARG_STRING, &dot_dir, 0, "directory to write dot representation of vector sets to", NULL },
+    { "save-levels", 0, POPT_ARG_STRING, &vset_dir, 0, "directory to write vset snapshots of all levels to", NULL },
     { "pg-solve" , 0 , POPT_ARG_NONE , &pgsolve_flag, 0, "Solve the generated parity game (only for symbolic tool).","" },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, spg_solve_options , 0, "Symbolic parity game solver options", NULL},
     { "pg-write" , 0 , POPT_ARG_STRING , &pg_output, 0, "file to write symbolic parity game to","<pg-file>.spg" },
