@@ -376,7 +376,6 @@ check_commute (dlk_check_context_t *ctx, int *dst)
             HREassert (false, "Newly introduced stubborn transition %d/%d "
                         "after NS transition %d/%d",
                        s1[ctx->len], s1[ctx->len+1], nsgroup, nsgroup_idx);
-            (void) s1;
         }
     }
 
