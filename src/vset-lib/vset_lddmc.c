@@ -23,68 +23,444 @@ struct vector_domain {
 struct vector_set {
     vdom_t dom;
 
-    MDD mdd;
-    int size;
-    MDD proj; // for set_project
+    MDD mdd;          // LDD of the set
+    int k;            // projection size or -1 if not projecting
+    int *proj;        // if projecting, the variables in the set
+
+    // The following variables are computed based on k and proj
+
+    int size;         // size of state vectors in this set
+    MDD meta;         // "meta" for set_project (vs full vector)
 };
 
 struct vector_relation {
     vdom_t dom;
-    expand_cb expand;
-    void *expand_ctx;
 
-    MDD mdd;
-    int size;
-    MDD meta; // for set_next, set_prev
+    expand_cb expand; // callback for on-the-fly learning in saturation
+    void *expand_ctx; // callback parameter
+
+    MDD mdd;          // LDD of the relation
+
+    int r_k, w_k;     // number of read/write in this relation
+    int *r_proj;
+    int *w_proj;
+
+    // The following variables are computed based on the above variables
+
+    int size;         // depth of the LDD
+    MDD meta;         // "meta" for set_next, set_prev
 };
 
-static int
-calculate_size(MDD meta)
-{
-    int result = 0;
-    uint32_t val = lddmc_getvalue(meta);
-    while (val != (uint32_t)-1) {
-        if (val != 0) result += 1;
-        meta = lddmc_follow(meta, val);
-        assert(meta != lddmc_true && meta != lddmc_false);
-        val = lddmc_getvalue(meta);
-    }
-    return result;
-}
-
+/**
+ * Create a vset holding <k>-sized vectors according to <proj>.
+ */
 static vset_t
 set_create(vdom_t dom, int k, int *proj)
 {
     LACE_ME;
 
-    assert(k <= dom->shared.size);
+    assert(k == -1 || (k >= 0 && k <= dom->shared.size));
     vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set));
 
     set->dom  = dom;
     set->mdd  = lddmc_false;
-    set->size = k < 0 ? dom->shared.size : k;
+    set->k    = k;
+    set->proj = k == -1 ? NULL : (int*)RTmalloc(sizeof(int[k]));
+    if (k != -1) memcpy(set->proj, proj, sizeof(int[k]));
 
-    int _proj[dom->shared.size+1];
-    if (k < 0) {
-        // set _proj to [-1] (= keep rest)
-        _proj[0] = -1;
-        set->proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, 1));
+    // compute size
+    set->size = k == -1 ? dom->shared.size : k;
+
+    // compute meta
+    if (k == -1) {
+        // set meta to [-1] (= keep rest)
+        uint32_t meta = (uint32_t)-1;
+        set->meta = lddmc_cube(&meta, 1);
     } else if (k == 0) {
-        _proj[0] = -2;
-        set->proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, 1));
+        // set meta to [-2] (= quantify rest)
+        uint32_t meta = (uint32_t)-2;
+        set->meta = lddmc_cube(&meta, 1);
     } else {
-        // fill _proj with 0 (= quantify)
-        memset(_proj, 0, sizeof(int[dom->shared.size+1]));
-        // set _proj to 1 (= keep) for every variable in proj
-        for (int i=0; i<k; i++) _proj[proj[i]] = 1;
+        // set meta to 1 (= keep) for every variable in proj
+        uint32_t meta[dom->shared.size+1];
+        memset(meta, 0, sizeof(int[dom->shared.size+1]));
+        for (int i=0; i<k; i++) meta[proj[i]] = 1;
         // end sequence with -2 (= quantify rest)
-        _proj[proj[k-1]+1] = -2;
-        set->proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, proj[k-1]+2));
+        meta[proj[k-1]+1] = (uint32_t)-2;
+        set->meta = lddmc_cube(meta, proj[k-1]+2);
     }
+
+    lddmc_protect(&set->mdd);
+    lddmc_protect(&set->meta);
 
     return set;
 }
 
+/**
+ * Destroy a vset
+ */
+static void
+set_destroy(vset_t set)
+{
+    lddmc_unprotect(&set->mdd);
+    lddmc_unprotect(&set->meta);
+    if (set->k != -1) RTfree(set->proj);
+    RTfree(set);
+}
+
+/**
+ * Add an element to the set.
+ * If the set is a projected vector, then <e> is a projected state.
+ */
+static void
+set_add(vset_t set, const int* e)
+{
+    LACE_ME;
+    set->mdd = lddmc_union_cube(set->mdd, (uint32_t*)e, set->size);
+}
+
+/**
+ * Returns nonzero if the given set contains no elements.
+ */
+static int
+set_is_empty(vset_t set)
+{
+    return set->mdd == lddmc_false;
+}
+
+/**
+ * Returns nonzero if the given sets are identical (same proj and dd)
+ */
+static int
+set_equal(vset_t set1, vset_t set2)
+{
+    assert(set1->meta == set2->meta);
+    return set1->mdd == set2->mdd;
+}
+
+/**
+ * Empties the given set.
+ */
+static void
+set_clear(vset_t set)
+{
+    set->mdd = lddmc_false;
+}
+
+/**
+ * Copies the set <src> to <dst>.
+ */
+static void
+set_copy(vset_t dst, vset_t src)
+{
+    assert(dst->meta == src->meta);
+    dst->mdd = src->mdd;
+}
+
+/**
+ * Returns nonzero if the given set contains the given element.
+ */
+static int
+set_member(vset_t set, const int* e)
+{
+    return lddmc_member_cube(set->mdd, (uint32_t*)e, set->size);
+}
+
+/**
+ * Count the number of elements and nodes of the given set.
+ */
+static void
+set_count(vset_t set, long *nodes, double *elements)
+{
+    LACE_ME;
+    if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
+    if (elements != NULL) *elements = lddmc_satcount_cached(set->mdd);
+}
+
+/**
+ * Count the number of elements and nodes of the given set.
+ */
+static void
+set_ccount(vset_t set, long *nodes, long double *elements)
+{
+    LACE_ME;
+    if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
+    if (elements != NULL) *elements = lddmc_satcount(set->mdd);
+}
+
+/**
+ * Add all elements of <src> to <dst>.
+ * (Thread-safe version for if multiple threads add to dst)
+ */
+static void
+set_union(vset_t dst, vset_t src)
+{
+    LACE_ME;
+    assert(src->meta == dst->meta);
+    if (dst != src) {
+        MDD cur = dst->mdd;
+        MDD res = src->mdd;
+        lddmc_refs_pushptr(&cur);
+        lddmc_refs_pushptr(&res);
+        for (;;) {
+            res = lddmc_union(cur, res);
+            MDD test = __sync_val_compare_and_swap(&dst->mdd, cur, res);
+            if (test == cur) break;
+            else cur = test;
+        }
+        lddmc_refs_popptr(2);
+    }
+}
+
+/**
+ * Add all elements of src to dst and remove all elements that were in dst from src
+ * i.e.: newDst = dst + src; newSrc = src - dst
+ */
+static void
+set_zip(vset_t dst, vset_t src)
+{
+    LACE_ME;
+    assert(src->meta == dst->meta);
+    dst->mdd = lddmc_zip(dst->mdd, src->mdd, &src->mdd);
+}
+
+/**
+ * Remove all elements in <src> from <dst>.
+ */
+static void
+set_minus(vset_t dst, vset_t src)
+{
+    LACE_ME;
+    assert(src->meta == dst->meta);
+    dst->mdd = lddmc_minus(dst->mdd, src->mdd);
+}
+
+/**
+ * Intersect <dst> with <src>.
+ */
+static void
+set_intersect(vset_t dst, vset_t src)
+{
+    LACE_ME;
+    assert(src->meta == dst->meta);
+    dst->mdd = lddmc_intersect(dst->mdd, src->mdd);
+}
+
+/**
+ * Compute the match of <src> with short vector <match> into <dst>.
+ */
+static void
+set_copy_match(vset_t dst, vset_t src, int p_len, int *proj, int *match)
+{
+    LACE_ME;
+
+    assert(dst->meta == src->meta); // for now, require same meta
+
+    if (p_len == 0) {
+        dst->mdd = src->mdd;
+    } else {
+        const int vector_size = src->dom->shared.size;
+        uint32_t meta[vector_size+1];
+        int j=0; // current index in src proj
+        int k=0; // current index in match proj
+        for (int i=0; i<vector_size; i++) {
+            if (k == p_len) break; // end of match
+            if (src->k == -1 || src->proj[j] == i) {
+                if (proj[k] == i) meta[j++] = 1;
+                else meta[j++] = 0;
+            }
+        }
+        meta[j++] = -1; // = rest not in match
+        MDD meta_mdd = lddmc_refs_push(lddmc_cube(meta, j));
+        MDD cube = lddmc_refs_push(lddmc_cube((uint32_t*)match, p_len));
+        dst->mdd = lddmc_match(src->mdd, cube, meta_mdd);
+        lddmc_refs_pop(2);
+    }
+}
+
+struct enum_context
+{
+    vset_element_cb cb;
+    void* context;
+};
+
+VOID_TASK_3(enumer, uint32_t*, values, size_t, count, struct enum_context*, ctx)
+{
+    ctx->cb(ctx->context, (int*)values);
+    (void)count;
+}
+
+/**
+ * Enumerate (sequentially) all elements in <set> by callback.
+ */
+static void
+set_enum(vset_t set, vset_element_cb cb, void* context)
+{
+    LACE_ME;
+    struct enum_context ctx = (struct enum_context){cb, context};
+    lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
+}
+
+struct set_update_context
+{
+    vset_t set;
+    vset_update_cb cb;
+    void* context;
+};
+
+TASK_3(MDD, set_updater, uint32_t*, values, size_t, count, struct set_update_context*, ctx)
+{
+    struct vector_set dummyset;
+    memcpy(&dummyset, ctx->set, sizeof(struct vector_set));
+    dummyset.mdd = lddmc_false; // start with empty set
+    lddmc_refs_pushptr(&dummyset.mdd);
+    ctx->cb(&dummyset, ctx->context, (int*)values);
+    lddmc_refs_popptr(1);
+    return dummyset.mdd;
+    (void)count;
+}
+
+/**
+ * For every element in <set>, call the callback, and
+ * collect all results via union into <dst>.
+ */
+static void
+set_update(vset_t dst, vset_t set, vset_update_cb cb, void* context)
+{
+    LACE_ME;
+    struct set_update_context ctx = (struct set_update_context){dst, cb, context};
+    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(set_updater), &ctx);
+    lddmc_refs_push(result);
+    dst->mdd = lddmc_union(dst->mdd, result);
+    lddmc_refs_pop(1);
+}
+
+/**
+ * Enumerate all states matching a certain (short) state
+ */
+static void
+set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb, void *context)
+{
+    assert(p_len >= 0); // sanity check
+
+    // compute the match projection relative to the set projection
+    const int vector_size = set->dom->shared.size;
+    uint32_t meta[vector_size+1];
+    int j=0; // current index in set proj
+    int k=0; // current index in match proj
+    for (int i=0; i<vector_size; i++) {
+        if (k == p_len) break; // end of match
+        if (set->k == -1 || set->proj[j] == i) {
+            if (proj[k] == i) meta[j++] = 1;
+            else meta[j++] = 0;
+        }
+    }
+    meta[j++] = -1; // = rest not in match
+
+    LACE_ME;
+    MDD meta_mdd = lddmc_refs_push(lddmc_cube(meta, j));
+
+    MDD cube = lddmc_refs_push(lddmc_cube((uint32_t*)match, p_len));
+    struct enum_context ctx = (struct enum_context){.cb=cb, .context=context};
+    lddmc_match_sat_par(set->mdd, cube, meta_mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
+    lddmc_refs_pop(2);
+}
+
+/**
+ * Project vector <src> into vector <dst>
+ * The projection of src must be >= the projection of dst.
+ */
+static void
+set_project(vset_t dst, vset_t src)
+{
+    if (dst->meta == src->meta) {
+        dst->mdd = src->mdd;
+    } else if (src->k == -1) {
+        LACE_ME;
+        dst->mdd = lddmc_project(src->mdd, dst->meta);
+    } else {
+        // compute a custom meta
+        assert(src->k >= dst->k);
+        uint32_t meta[src->dom->shared.size+1];
+        int i=0; // index of src->proj
+        int j=0; // index of dst->proj
+        while (i<src->k && j<dst->k) {
+            if (src->proj[i] < dst->proj[j]) {
+                meta[i++] = 0;
+            } else if (src->proj[i] == dst->proj[j]) {
+                meta[i++] = 1;
+                j++;
+            } else {
+                assert(src->proj[i] <= dst->proj[j]);
+            }
+        }
+        meta[i++] = -2; // = quantify rest
+        LACE_ME;
+        MDD mdd_meta = lddmc_cube(meta, i);
+        lddmc_refs_push(mdd_meta);
+        dst->mdd = lddmc_project(src->mdd, mdd_meta);
+        lddmc_refs_pop(1);
+    }
+}
+
+/**
+ * Project full vector <src> into short vector <dst> except (short) <minus>.
+ */
+static void
+set_project_minus(vset_t dst, vset_t src, vset_t minus)
+{
+    if (dst->meta == src->meta) {
+        set_minus(dst, minus);
+    } else if (src->k == -1) {
+        LACE_ME;
+        assert(dst->meta == minus->meta);
+        dst->mdd = lddmc_project_minus(src->mdd, dst->meta, minus->mdd);
+    } else {
+        // compute a custom meta
+        assert(src->k >= dst->k);
+        assert(dst->meta == minus->meta);
+        uint32_t meta[src->dom->shared.size+1];
+        int i=0, j=0;
+        while (i<src->k && j<dst->k) {
+            if (src->proj[i] < dst->proj[j]) {
+                meta[i++] = 0;
+            } else if (src->proj[i] == dst->proj[j]) {
+                meta[i++] = 1;
+                j++;
+            } else {
+                assert(src->proj[i] <= dst->proj[j]);
+            }
+        }
+        meta[i++] = -2; // = quantify rest
+        LACE_ME;
+        MDD mdd_meta = lddmc_cube(meta, i);
+        lddmc_refs_push(mdd_meta);
+        dst->mdd = lddmc_project_minus(src->mdd, mdd_meta, minus->mdd);
+        lddmc_refs_pop(1);
+    }
+}
+
+static void
+set_example(vset_t set, int *e)
+{
+    if (set->mdd == lddmc_false) Abort("set_example: empty set");
+    lddmc_sat_one(set->mdd, (uint32_t*)e, set->size);
+}
+
+/**
+ * Compute the intersection of two short vectors into <dst>.
+ * The vectors can be different projections.
+ */
+static void
+set_join(vset_t dst, vset_t left, vset_t right)
+{
+    LACE_ME;
+    dst->mdd = lddmc_join(left->mdd, right->mdd, left->meta, right->meta);
+}
+
+/**
+ * Create a transition relation, with r_k read variables and w_k write variables.
+ */
 static vrel_t
 rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
 {
@@ -97,11 +473,24 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
     rel->dom  = dom;
     rel->mdd  = lddmc_false;
     rel->size = r_k + w_k;
+    rel->meta = lddmc_false;
 
+    lddmc_protect(&rel->mdd);
+    lddmc_protect(&rel->meta);
+
+    rel->r_k = r_k;
+    rel->w_k = w_k;
+    rel->r_proj = (int*)RTmalloc(sizeof(int)*r_k);
+    rel->w_proj = (int*)RTmalloc(sizeof(int)*w_k);
+    memcpy(rel->r_proj, r_proj, sizeof(int)*r_k);
+    memcpy(rel->w_proj, w_proj, sizeof(int)*w_k);
+
+    /* Compute the meta for set_next, set_prev */
     uint32_t meta[dom->shared.size*2+2];
     memset(meta, 0, sizeof(uint32_t[dom->shared.size*2+2]));
     int r_i=0, w_i=0, i=0, j=0;
     for (;;) {
+        /* determine type (flags) 1=read, 2=write */
         int type = 0;
         if (r_i < r_k && r_proj[r_i] == i) {
             r_i++;
@@ -111,10 +500,12 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
             w_i++;
             type += 2; // write
         }
+        /* now that we have type, set meta */
         if (type == 0) meta[j++] = 0;
         else if (type == 1) { meta[j++] = 3; }
         else if (type == 2) { meta[j++] = 4; }
         else if (type == 3) { meta[j++] = 1; meta[j++] = 2; }
+        /* detect end */
         if (r_i == r_k && w_i == w_k) {
             meta[j++] = 5; // action label
             meta[j++] = (uint32_t)-1;
@@ -123,34 +514,27 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
         i++;
     }
 
-    rel->meta = lddmc_ref(lddmc_cube((uint32_t*)meta, j));
+    rel->meta = lddmc_cube((uint32_t*)meta, j);
 
     return rel;
 }
 
-static vrel_t
-rel_create(vdom_t dom, int k, int *proj)
-{
-    return rel_create_rw(dom, k, proj, k, proj);
-}
-
+/**
+ * Destroy a relation.
+ */
 static void
-set_destroy(vset_t set)
+rel_destroy(vrel_t rel)
 {
-    lddmc_deref(set->mdd);
-    lddmc_deref(set->proj);
-    RTfree(set);
+    lddmc_unprotect(&rel->mdd);
+    lddmc_unprotect(&rel->meta);
+    RTfree(rel->r_proj);
+    RTfree(rel->w_proj);
+    RTfree(rel);
 }
 
-static void
-set_add(vset_t set, const int* e)
-{
-    LACE_ME;
-    MDD old = set->mdd;
-    set->mdd = lddmc_ref(lddmc_union_cube(set->mdd, (uint32_t*)e, set->size));
-    lddmc_deref(old);
-}
-
+/**
+ * Add a new transition (with action label and copy vector) to <rel>.
+ */
 static void
 rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const int act)
 {
@@ -181,9 +565,7 @@ rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const in
     assert(k == rel->size + 1); // plus 1, because action label
 
     LACE_ME;
-    MDD old = rel->mdd;
-    rel->mdd = lddmc_ref(lddmc_union_cube_copy(rel->mdd, (uint32_t*)vec, cpy_vec, k));
-    lddmc_deref(old);
+    rel->mdd = lddmc_union_cube_copy(rel->mdd, (uint32_t*)vec, cpy_vec, k);
 }
 
 static void
@@ -198,192 +580,15 @@ rel_add(vrel_t rel, const int *src, const int *dst)
     return rel_add_cpy(rel, src, dst, NULL);
 }
 
-static int
-set_is_empty(vset_t set)
-{
-    return (set->mdd == lddmc_false);
-}
-
-static int
-set_equal(vset_t set1, vset_t set2)
-{
-    assert(set1->proj == set2->proj);
-    assert(set1->size == set2->size);
-    return set1->mdd == set2->mdd;
-}
-
-static void
-set_clear(vset_t set)
-{
-    lddmc_deref(set->mdd);
-    set->mdd = lddmc_false;
-}
-
-static void
-set_copy(vset_t dst, vset_t src)
-{
-    assert(dst->size == src->size);
-    lddmc_deref(dst->mdd);
-    dst->mdd = lddmc_ref(src->mdd);
-}
-
-static int
-set_member(vset_t set, const int* e)
-{
-    return lddmc_member_cube(set->mdd, (uint32_t*)e, set->size);
-}
-
-static void
-set_count(vset_t set, long *nodes, double *elements)
-{
-    LACE_ME;
-    if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
-    if (elements != NULL) *elements = lddmc_satcount_cached(set->mdd);
-}
-
-static void
-set_ccount(vset_t set, long *nodes, long double *elements)
-{
-    LACE_ME;
-    if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
-    if (elements != NULL) *elements = lddmc_satcount(set->mdd);
-}
-
+/**
+ * Compute the number of transitions and nodes in the relation <rel>.
+ */
 static void
 rel_count(vrel_t rel, long *nodes, double *elements)
 {
     LACE_ME;
     if (nodes != NULL) *nodes = lddmc_nodecount(rel->mdd);
     if (elements != NULL) *elements = lddmc_satcount(rel->mdd);
-}
-
-static void
-set_union(vset_t dst, vset_t src)
-{
-    LACE_ME;
-    assert(dst->size == src->size);
-    MDD old = dst->mdd;
-    dst->mdd = lddmc_ref(lddmc_union(dst->mdd, src->mdd));
-    lddmc_deref(old);
-}
-
-/**
- * Add all elements of src to dst and remove all elements that were in dst already from src
- * in other words: newDst = dst + src
- *                 newSrc = src - dst
- */
-static void
-set_zip(vset_t dst, vset_t src)
-{
-    LACE_ME;
-    assert(dst->size == src->size);
-    MDD old1 = dst->mdd;
-    MDD old2 = src->mdd;
-    dst->mdd = lddmc_ref(lddmc_zip(dst->mdd, src->mdd, &src->mdd));
-    lddmc_ref(src->mdd);
-    lddmc_deref(old1);
-    lddmc_deref(old2);
-}
-
-static void
-set_minus(vset_t dst, vset_t src)
-{
-    LACE_ME;
-    assert(dst->size == src->size);
-    MDD old = dst->mdd;
-    dst->mdd = lddmc_ref(lddmc_minus(dst->mdd, src->mdd));
-    lddmc_deref(old);
-}
-
-static void
-set_intersect(vset_t dst, vset_t src)
-{
-    LACE_ME;
-    assert(dst->size == src->size);
-    MDD old = dst->mdd;
-    dst->mdd = lddmc_ref(lddmc_intersect(dst->mdd, src->mdd));
-    lddmc_deref(old);
-}
-
-static void
-set_copy_match(vset_t dst, vset_t src, int p_len, int *proj, int *match)
-{
-    LACE_ME;
-    assert(dst->size == src->dom->shared.size);
-    assert(src->size == src->dom->shared.size);
-
-    lddmc_deref(dst->mdd);
-
-    if (p_len == 0) dst->mdd = lddmc_ref(src->mdd);
-    else {
-        vdom_t dom = src->dom;
-        int _proj[dom->shared.size+1];
-        // fill _proj with 0 (= not in match)
-        memset(_proj, 0, sizeof(int[dom->shared.size+1]));
-        // set _proj to 1 (= match) for every variable in proj
-        for (int i=0; i<p_len; i++) _proj[proj[i]] = 1;
-        // end sequence with -1 (= rest not in match)
-        _proj[proj[p_len-1]+1] = -1;
-        MDD mdd_proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, proj[p_len-1]+2));
-
-        MDD cube = lddmc_ref(lddmc_cube((uint32_t*)match, p_len));
-
-        dst->mdd = lddmc_ref(lddmc_match(src->mdd, cube, mdd_proj));
-        lddmc_deref(cube);
-        lddmc_deref(mdd_proj);
-    }
-}
-
-struct enum_context
-{
-    vset_element_cb cb;
-    void* context;
-};
-
-VOID_TASK_3(enumer, uint32_t*, values, size_t, count, struct enum_context*, ctx)
-{
-    ctx->cb(ctx->context, (int*)values);
-    (void)count;
-}
-
-static void
-set_enum(vset_t set, vset_element_cb cb, void* context)
-{
-    LACE_ME;
-    struct enum_context ctx = (struct enum_context){cb, context};
-    lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
-}
-
-struct set_update_context
-{
-    vset_t set;
-    vset_update_cb cb;
-    void* context;
-};
-
-TASK_3(MDD, set_updater, uint32_t*, values, size_t, count, struct set_update_context*, ctx)
-{
-    struct vector_set dummyset;
-    dummyset.dom = ctx->set->dom;
-    dummyset.mdd = lddmc_false; // start with empty set
-    dummyset.size = ctx->set->size; // same as result
-    dummyset.proj = ctx->set->proj;
-    ctx->cb(&dummyset, ctx->context, (int*)values);
-    lddmc_deref(dummyset.mdd); // return without ref
-    return dummyset.mdd;
-    (void)count;
-}
-
-static void
-set_update(vset_t dst, vset_t set, vset_update_cb cb, void* context)
-{
-    LACE_ME;
-    struct set_update_context ctx = (struct set_update_context){dst, cb, context};
-    MDD old = dst->mdd;
-    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(set_updater), &ctx));
-    dst->mdd = lddmc_ref(lddmc_union(dst->mdd, result));
-    lddmc_deref(old);
-    lddmc_deref(result);
 }
 
 struct rel_update_context
@@ -400,8 +605,9 @@ TASK_3(MDD, rel_updater, uint32_t*, values, size_t, count, struct rel_update_con
     dummyrel.mdd = lddmc_false; // start with empty set
     dummyrel.size = ctx->rel->size; // same as result
     dummyrel.meta = ctx->rel->meta;
+    lddmc_refs_pushptr(&dummyrel.mdd);
     ctx->cb(&dummyrel, ctx->context, (int*)values);
-    lddmc_deref(dummyrel.mdd); // return without ref
+    lddmc_refs_popptr(1);
     return dummyrel.mdd;
     (void)count;
 }
@@ -411,138 +617,67 @@ rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void* context)
 {
     LACE_ME;
     struct rel_update_context ctx = (struct rel_update_context){rel, cb, context};
-    MDD old = rel->mdd;
-    MDD result = lddmc_ref(lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(rel_updater), &ctx));
-    rel->mdd = lddmc_ref(lddmc_union(rel->mdd, result));
-    lddmc_deref(old);
-    lddmc_deref(result);
-}
+    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(rel_updater), &ctx);
 
-static void
-set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb, void *context)
-{
-    LACE_ME;
-    assert(set->size == set->dom->shared.size);
-    assert(p_len > 0);
-
-    vdom_t dom = set->dom;
-    int _proj[dom->shared.size+1];
-    // fill _proj with 0 (= not in match)
-    memset(_proj, 0, sizeof(int[dom->shared.size+1]));
-    // set _proj to 1 (= match) for every variable in proj
-    for (int i=0; i<p_len; i++) _proj[proj[i]] = 1;
-    // end sequence with -1 (= rest not in match)
-    _proj[proj[p_len-1]+1] = -1;
-
-    MDD mdd_proj = lddmc_ref(lddmc_cube((uint32_t*)_proj, proj[p_len-1]+2));
-    MDD cube = lddmc_ref(lddmc_cube((uint32_t*)match, p_len));
-
-    struct enum_context ctx = (struct enum_context){cb, context};
-    lddmc_match_sat_par(set->mdd, cube, mdd_proj, (lddmc_enum_cb)TASK(enumer), &ctx);
-    lddmc_deref(cube);
-    lddmc_deref(mdd_proj);
-}
-
-static void
-set_project(vset_t dst, vset_t src)
-{
-    if (dst->proj == src->proj) {
-        lddmc_deref(dst->mdd);
-        dst->mdd = src->mdd;
-    } else {
-        LACE_ME;
-        assert(src->size == dst->dom->shared.size);
-        lddmc_deref(dst->mdd);
-        dst->mdd = lddmc_ref(lddmc_project(src->mdd, dst->proj));
+    MDD cur = rel->mdd;
+    lddmc_refs_pushptr(&cur);
+    lddmc_refs_pushptr(&result);
+    for (;;) {
+        result = lddmc_union(cur, result);
+        MDD test = __sync_val_compare_and_swap(&rel->mdd, cur, result);
+        if (test == cur) break;
+        else cur = test;
     }
+    lddmc_refs_popptr(2);
 }
 
-static void
-set_project_minus(vset_t dst, vset_t src, vset_t minus)
-{
-    if (dst->proj == src->proj) {
-        set_minus(dst, minus);
-    } else {
-        LACE_ME;
-        assert(src->size == dst->dom->shared.size);
-        lddmc_deref(dst->mdd);
-        dst->mdd = lddmc_ref(lddmc_project_minus(src->mdd, dst->proj, minus->mdd));
-    }
-}
-
+/**
+ * Compute the successors of <src> and transitions <rel> into <dst>.
+ */
 static void
 set_next(vset_t dst, vset_t src, vrel_t rel)
 {
     LACE_ME;
-    assert(dst->size == src->size);
-    if (dst == src) {
-        MDD old = dst->mdd;
-        dst->mdd = lddmc_ref(lddmc_relprod(src->mdd, rel->mdd, rel->meta));
-        lddmc_deref(old);
-    } else {
-        lddmc_deref(dst->mdd);
-        dst->mdd = lddmc_ref(lddmc_relprod(src->mdd, rel->mdd, rel->meta));
-    }
+    assert(dst->meta == src->meta);
+    dst->mdd = lddmc_relprod(src->mdd, rel->mdd, rel->meta);
 }
 
+/**
+ * Compute as rel_next but also take the union with <uni>.
+ */
 static void
 set_next_union(vset_t dst, vset_t src, vrel_t rel, vset_t uni)
 {
     LACE_ME;
-    assert(dst->size == src->size && uni->size == dst->size);
-    if (dst == src || dst == uni) {
-        MDD old = dst->mdd;
-        dst->mdd = lddmc_ref(lddmc_relprod_union(src->mdd, rel->mdd, rel->meta, uni->mdd));
-        lddmc_deref(old);
-    } else {
-        lddmc_deref(dst->mdd);
-        dst->mdd = lddmc_ref(lddmc_relprod_union(src->mdd, rel->mdd, rel->meta, uni->mdd));
-    }
+    assert(dst->meta == src->meta);
+    assert(dst->meta == uni->meta);
+    dst->mdd = lddmc_relprod_union(src->mdd, rel->mdd, rel->meta, uni->mdd);
 }
 
+/**
+ * Compute the predecessors of <src> and transitions <rel> into <dst>.
+ */
 static void
 set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t universe)
 {
     LACE_ME;
-    assert(dst->size == src->size);
-    assert(dst->size == universe->size);
-    if (dst == src || dst == universe) {
-        MDD old = dst->mdd;
-        dst->mdd = lddmc_ref(lddmc_relprev(src->mdd, rel->mdd, rel->meta, universe->mdd));
-        lddmc_deref(old);
-    } else {
-        lddmc_deref(dst->mdd);
-        dst->mdd = lddmc_ref(lddmc_relprev(src->mdd, rel->mdd, rel->meta, universe->mdd));
-    }
+    assert(dst->meta == src->meta);
+    assert(dst->meta == universe->meta);
+    dst->mdd = lddmc_relprev(src->mdd, rel->mdd, rel->meta, universe->mdd);
 }
 
-static void
-set_example(vset_t set, int *e)
-{
-    if (set->mdd == lddmc_false) Abort("set_example: empty set");
-    lddmc_sat_one(set->mdd, (uint32_t*)e, set->size);
-}
-
-static void
-set_join(vset_t dst, vset_t left, vset_t right)
-{
-    LACE_ME;
-    if (dst == left || dst == right) {
-        MDD old = dst->mdd;
-        dst->mdd = lddmc_ref(lddmc_join(left->mdd, right->mdd, left->proj, right->proj));
-        lddmc_deref(old);
-    } else {
-        lddmc_deref(dst->mdd);
-        dst->mdd = lddmc_ref(lddmc_join(left->mdd, right->mdd, left->proj, right->proj));
-    }
-}
-
+/**
+ * Write a .dot file of the LDD of <src> to <fp>.
+ */
 static void
 set_dot(FILE* fp, vset_t src)
 {
     lddmc_fprintdot(fp, src->mdd);
 }
 
+/**
+ * Write a .dot file of the LDD of <src> to <fp>.
+ */
 static void
 rel_dot(FILE* fp, vrel_t src)
 {
@@ -568,46 +703,50 @@ serialize_reset(FILE* f, vdom_t dom)
 static void
 set_save(FILE* f, vset_t set)
 {
+    fwrite(&set->k, sizeof(int), 1, f);
+    if (set->k != -1) fwrite(set->proj, sizeof(int), set->k, f);
     size_t mdd = lddmc_serialize_add(set->mdd);
-    size_t proj = lddmc_serialize_add(set->proj);
     lddmc_serialize_tofile(f);
     fwrite(&mdd, sizeof(size_t), 1, f);
-    fwrite(&proj, sizeof(size_t), 1, f);
-    fwrite(&set->size, sizeof(int), 1, f);;
 }
 
 static void
 rel_save_proj(FILE* f, vrel_t rel)
 {
-    return; // ignore
-    (void)f;
-    (void)rel;
+    fwrite(&rel->r_k, sizeof(int), 1, f);
+    fwrite(&rel->w_k, sizeof(int), 1, f);
+    fwrite(rel->r_proj, sizeof(int), rel->r_k, f);
+    fwrite(rel->w_proj, sizeof(int), rel->w_k, f);
 }
 
 static void
 rel_save(FILE* f, vrel_t rel)
 {
     size_t mdd = lddmc_serialize_add(rel->mdd);
-    size_t meta = lddmc_serialize_add(rel->meta);
     lddmc_serialize_tofile(f);
     fwrite(&mdd, sizeof(size_t), 1, f);
-    fwrite(&meta, sizeof(size_t), 1, f);
 }
 
 static vset_t
 set_load(FILE* f, vdom_t dom)
 {
-    vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set));
-    set->dom = dom;
+    int k;
+    if (fread(&k, sizeof(int), 1, f) != 1) Abort("Invalid file format.");
+
+    vset_t set;
+    if (k == -1) {
+        set = set_create(dom, -1, NULL);
+    } else {
+        int proj[k];
+        if (fread(proj, sizeof(int), k, f) != (size_t)k) Abort("Invalid file format.");
+        set = set_create(dom, k, proj);
+    }
 
     lddmc_serialize_fromfile(f);
 
-    size_t mdd, proj;
-    if (fread(&mdd, sizeof(size_t), 1, f) < 1) Abort("invalid read");
-    if (fread(&proj, sizeof(size_t), 1, f) < 1) Abort("invalid read");
-    if (fread(&set->size, sizeof(int), 1, f) < 1) Abort("invalid read");
-    set->mdd = lddmc_ref(lddmc_serialize_get_reversed(mdd));
-    set->proj = lddmc_ref(lddmc_serialize_get_reversed(proj));
+    size_t mdd;
+    if (fread(&mdd, sizeof(size_t), 1, f) < 1) Abort("Invalid file format.");
+    set->mdd = lddmc_serialize_get_reversed(mdd);
 
     return set;
 }
@@ -615,34 +754,30 @@ set_load(FILE* f, vdom_t dom)
 static vrel_t
 rel_load_proj(FILE* f, vdom_t dom)
 {
-    vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation));
-    memset(rel, 0, sizeof(struct vector_relation));
-    rel->dom = dom;
-    return rel;
-    (void)f;
+    int r_k, w_k;
+    if (fread(&r_k, sizeof(int), 1, f) != 1) Abort("Invalid file format.");
+    if (fread(&w_k, sizeof(int), 1, f) != 1) Abort("Invalid file format.");
+    int r_proj[r_k], w_proj[w_k];
+    if (fread(r_proj, sizeof(int), r_k, f) != (size_t)r_k) Abort("Invalid file format.");
+    if (fread(w_proj, sizeof(int), w_k, f) != (size_t)w_k) Abort("Invalid file format.");
+    return rel_create_rw(dom, r_k, r_proj, w_k, w_proj);
 }
 
 static void
 rel_load(FILE* f, vrel_t rel)
 {
-    if (rel->mdd) lddmc_deref(rel->mdd);
-    if (rel->meta) lddmc_deref(rel->meta);
-
     lddmc_serialize_fromfile(f);
 
-    size_t mdd, meta;
-    if (fread(&mdd, sizeof(size_t), 1, f) < 1) Abort("invalid read");
-    if (fread(&meta, sizeof(size_t), 1, f) < 1) Abort("invalid read");
-    rel->mdd = lddmc_ref(lddmc_serialize_get_reversed(mdd));
-    rel->meta = lddmc_ref(lddmc_serialize_get_reversed(meta));
-    rel->size = calculate_size(rel->meta);
+    size_t mdd;
+    if (fread(&mdd, sizeof(size_t), 1, f) < 1) Abort("Invalid file format.");
+    rel->mdd = lddmc_serialize_get_reversed(mdd);
 }
 
 static void
 dom_save(FILE* f, vdom_t dom)
 {
-    size_t vector_size = dom->shared.size;
-    fwrite(&vector_size, sizeof(size_t), 1, f);
+    int vector_size = dom->shared.size;
+    fwrite(&vector_size, sizeof(int), 1, f);
 }
 
 static int
@@ -732,7 +867,7 @@ set_visit_prepare(vset_t set, vset_visit_callbacks_t* cbs, size_t user_ctx_size,
     context->global->cbs = cbs;
     context->global->user_ctx_size = user_ctx_size;
 
-    context->proj = set->proj;
+    context->proj = set->meta;
     context->user_context = user_ctx;
 
     lddmc_cbs->lddmc_visit_pre = TASK(lddmc_visit_pre);
@@ -787,6 +922,9 @@ static void
 set_function_pointers(vdom_t dom)
 {
     /* Set function pointers */
+    dom->shared.dom_clear_cache=dom_clear_cache;
+    dom->shared.dom_next_cache_op=dom_next_cache_op;
+
     dom->shared.set_create=set_create;
     dom->shared.set_destroy=set_destroy;
     dom->shared.set_is_empty=set_is_empty;
@@ -801,16 +939,6 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_intersect=set_intersect;
     dom->shared.set_minus=set_minus;
     dom->shared.set_zip=set_zip;
-
-    dom->shared.rel_create=rel_create;
-    dom->shared.rel_create_rw=rel_create_rw;
-    //dom->shared.rel_destroy=rel_destroy;
-    dom->shared.rel_add=rel_add;
-    dom->shared.rel_add_cpy=rel_add_cpy;
-    dom->shared.rel_add_act=rel_add_act;
-    dom->shared.rel_count=rel_count;
-    dom->shared.rel_update=rel_update;
-
     dom->shared.set_add=set_add;
     dom->shared.set_update=set_update;
     dom->shared.set_member=set_member;
@@ -818,20 +946,23 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_enum=set_enum;
     dom->shared.set_enum_match=set_enum_match;
     dom->shared.set_copy_match=set_copy_match;
+    dom->shared.set_join=set_join;
+    dom->shared.set_visit_par=set_visit_par;
+    dom->shared.set_visit_seq=set_visit_seq;
 
     dom->shared.set_next=set_next;
     dom->shared.set_next_union=set_next_union;
     dom->shared.set_prev=set_prev;
-    dom->shared.set_join=set_join;
-    dom->shared.set_visit_par=set_visit_par;
-    dom->shared.set_visit_seq=set_visit_seq;
-    dom->shared.dom_clear_cache=dom_clear_cache;
-    dom->shared.dom_next_cache_op=dom_next_cache_op;
     //dom->shared.set_least_fixpoint=set_least_fixpoint;
 	//void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
 
-	//void (*set_copy_match_proj)(vset_t src,vset_t dst,int p_len,int* proj,int p_id,int*match);
-	//int (*proj_create)(int p_len,int* proj);
+    dom->shared.rel_create_rw=rel_create_rw;
+    dom->shared.rel_destroy=rel_destroy;
+    dom->shared.rel_add=rel_add;
+    dom->shared.rel_add_cpy=rel_add_cpy;
+    dom->shared.rel_add_act=rel_add_act;
+    dom->shared.rel_count=rel_count;
+    dom->shared.rel_update=rel_update;
 
     dom->shared.reorder=set_reorder;
 
@@ -876,7 +1007,7 @@ vdom_create_lddmc(int n)
 vdom_t
 vdom_create_lddmc_from_file(FILE *f)
 {
-    size_t vector_size;
-    if (fread(&vector_size, sizeof(size_t), 1, f) < 1) Abort("invalid read");
-    return vdom_create_lddmc((int)vector_size);
+    int vector_size;
+    if (fread(&vector_size, sizeof(int), 1, f) < 1) Abort("Invalid file format.");
+    return vdom_create_lddmc(vector_size);
 }
