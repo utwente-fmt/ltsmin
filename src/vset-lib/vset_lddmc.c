@@ -49,6 +49,13 @@ struct vector_relation {
 
     int size;         // depth of the LDD
     MDD meta;         // "meta" for set_next, set_prev
+
+    // The following variables are for the Saturation implementation
+
+    int topvar;       // top variable depth (vs full vector)
+    MDD topmeta;      // "meta" for set_next, set_prev (at <topvar>)
+    MDD topread;      // "meta" for getting short read vectors (at <topvar>)
+    MDD r_meta;       // meta of read vector (relative to full)
 };
 
 /**
@@ -473,10 +480,17 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
     rel->dom  = dom;
     rel->mdd  = lddmc_false;
     rel->size = r_k + w_k;
+    rel->topvar = -1;
     rel->meta = lddmc_false;
+    rel->topmeta = lddmc_false;
+    rel->topread = lddmc_false;
+    rel->r_meta = lddmc_false;
 
     lddmc_protect(&rel->mdd);
     lddmc_protect(&rel->meta);
+    lddmc_protect(&rel->topmeta);
+    lddmc_protect(&rel->topread);
+    lddmc_protect(&rel->r_meta);
 
     rel->r_k = r_k;
     rel->w_k = w_k;
@@ -505,6 +519,8 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
         else if (type == 1) { meta[j++] = 3; }
         else if (type == 2) { meta[j++] = 4; }
         else if (type == 3) { meta[j++] = 1; meta[j++] = 2; }
+        /* also set topvar (for saturation variables) */
+        if (type != 0 && rel->topvar == -1) rel->topvar = i;
         /* detect end */
         if (r_i == r_k && w_i == w_k) {
             meta[j++] = 5; // action label
@@ -515,6 +531,26 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
     }
 
     rel->meta = lddmc_cube((uint32_t*)meta, j);
+
+    if (r_k != 0 || w_k != 0) {
+        /* Compute topmeta for saturation */
+        assert(rel->topvar != -1);
+        rel->topmeta = lddmc_cube((uint32_t*)meta+rel->topvar, j-rel->topvar);
+
+        /* Compute topread for saturation */
+        uint32_t readmeta[dom->shared.size+1];
+        memset(readmeta, 0, sizeof(uint32_t[dom->shared.size+1]));
+        // set readmeta to 1 (= keep) for every variable in proj
+        for (int i=0; i<r_k; i++) readmeta[r_proj[i]] = 1;
+        // end sequence with -2 (= quantify rest)
+        readmeta[r_proj[r_k-1]+1] = -2;
+        rel->topread = lddmc_cube((uint32_t*)readmeta+rel->topvar, r_proj[r_k-1]+2-rel->topvar);
+        rel->r_meta = lddmc_cube(readmeta, r_proj[r_k-1]+2);
+    } else {
+        rel->topmeta = lddmc_false;
+        rel->topread = lddmc_false;
+        rel->r_meta = lddmc_false;
+    }
 
     return rel;
 }
@@ -527,6 +563,9 @@ rel_destroy(vrel_t rel)
 {
     lddmc_unprotect(&rel->mdd);
     lddmc_unprotect(&rel->meta);
+    lddmc_unprotect(&rel->topmeta);
+    lddmc_unprotect(&rel->topread);
+    lddmc_unprotect(&rel->r_meta);
     RTfree(rel->r_proj);
     RTfree(rel->w_proj);
     RTfree(rel);
@@ -918,6 +957,108 @@ dom_next_cache_op(vdom_t dom)
     return (int) op;
 }
 
+/**
+ * Implementation of (parallel) saturation
+ * (assumes relations are ordered on first variable)
+ */
+TASK_5(MDD, lddmc_go_sat, MDD, set, vrel_t*, rels, int, depth, int, count, int, id)
+{
+    /* Terminal cases */
+    if (set == lddmc_false) return lddmc_false;
+    if (count == 0) return set;
+    assert(set != lddmc_true);
+
+    /* Consult the cache */
+    MDD result;
+    MDD _set = set;
+    if (cache_get3(201LL<<40, _set, (uint64_t)rels, id, &result)) return result;
+    lddmc_refs_pushptr(&_set);
+
+    /* Check if the relation should be applied */
+    int var = rels[0]->topvar;
+    assert(depth <= var);
+    if (depth == var) {
+        /* Count the number of relations starting here */
+        int n = 1;
+        while (n < count && var == rels[n]->topvar) n++;
+        /*
+         * Compute until fixpoint:
+         * - SAT deeper
+         * - learn and chain-apply all current level once
+         */
+        MDD prev = lddmc_false;
+        struct vector_set dummy;
+        lddmc_refs_pushptr(&set);
+        lddmc_refs_pushptr(&prev);
+        while (prev != set) {
+            prev = set;
+            // SAT deeper
+            set = CALL(lddmc_go_sat, set, rels+n, depth, count-n, id);
+            // learn and chain-apply all current level once
+            for (int i=0;i<n;i++) {
+                if (rels[i]->expand != NULL) {
+                    // project set
+                    dummy.dom = rels[i]->dom;
+                    dummy.size = rels[i]->r_k;
+                    dummy.meta = rels[i]->r_meta;
+                    dummy.k = rels[i]->r_k;
+                    dummy.proj = rels[i]->r_proj;
+                    dummy.mdd = lddmc_project(set, rels[i]->topread);
+                    // call expand callback
+                    lddmc_refs_pushptr(&dummy.mdd);
+                    rels[i]->expand(rels[i], &dummy, rels[i]->expand_ctx);
+                    lddmc_refs_popptr(1);
+                }
+                // and then step
+                set = lddmc_relprod_union(set, rels[i]->mdd, rels[i]->topmeta, set);
+            }
+        }
+        lddmc_refs_popptr(2);
+        result = set;
+    } else {
+        /* Recursive computation */
+        lddmc_refs_spawn(SPAWN(lddmc_go_sat, lddmc_getright(set), rels, depth, count, id));
+        MDD down = lddmc_refs_push(CALL(lddmc_go_sat, lddmc_getdown(set), rels, depth+1, count, id));
+        MDD right = lddmc_refs_sync(SYNC(lddmc_go_sat));
+        lddmc_refs_pop(1);
+        result = lddmc_makenode(lddmc_getvalue(set), down, right);
+    }
+    // Store in cache
+    cache_put3(201LL<<40, _set, (uint64_t)rels, id, result);
+    lddmc_refs_popptr(1);
+    return result;
+}
+
+static void
+set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
+{
+    // Create copy of rels
+    vrel_t rels[rel_count];
+    memcpy(rels, _rels, sizeof(vrel_t[rel_count]));
+
+    // Sort the rels (using gnome sort)
+    int i = 1, j = 2;
+    vrel_t t;
+    while (i < rel_count) {
+        vrel_t *p = rels+i, *q = p-1;
+        if ((*q)->topvar > (*p)->topvar) {
+            t = *q;
+            *q = *p;
+            *p = t;
+            if (--i) continue;
+        }
+        i = j++;
+    }
+
+    // Get next id (for cache)
+    static volatile int id = 0;
+    int _id = __sync_fetch_and_add(&id, 1);
+
+    // Go!
+    LACE_ME;
+    dst->mdd = CALL(lddmc_go_sat, src->mdd, rels, 0, rel_count, _id);
+}
+
 static void
 set_function_pointers(vdom_t dom)
 {
@@ -953,8 +1094,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_next=set_next;
     dom->shared.set_next_union=set_next_union;
     dom->shared.set_prev=set_prev;
-    //dom->shared.set_least_fixpoint=set_least_fixpoint;
-	//void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
+    dom->shared.set_least_fixpoint=set_least_fixpoint;
 
     dom->shared.rel_create_rw=rel_create_rw;
     dom->shared.rel_destroy=rel_destroy;
