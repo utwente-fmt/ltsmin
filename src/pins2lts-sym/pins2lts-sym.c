@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 
 #include <dm/dm.h>
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <lts-io/user.h>
 #include <pins-lib/pg-types.h>
@@ -31,13 +32,12 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
+#include <mc-lib/atomics.h>
 #include <mc-lib/bitvector-ll.h>
 #include <spg-lib/spg-solve.h>
 #include <vset-lib/vector_set.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/bitset.h>
-#include <hre/stringindex.h>
-#include <mc-lib/atomics.h>
 
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
@@ -49,101 +49,14 @@
 
 hre_context_t ctx;
 
-/*
-  The inhibit and class matrices are used for maximal progress.
- */
-static matrix_t *inhibit_matrix=NULL;
-static matrix_t *class_matrix=NULL;
-static int inhibit_class_count=0;
-static vset_t *class_enabled = NULL;
+int vset_count_dbl(vset_t set, long* nodes, long double* elements);
+int vset_count_ldbl(vset_t set, long* nodes, long double* elements);
 
-static bitvector_ll_t *seen_actions;
-static vset_t true_states;
-static vset_t false_states;
+vset_count_t vset_count_fn = &vset_count_dbl;
 
-static int var_pos = 0;
-static int var_type_no = 0;
-static int variable_projection = 0;
-static size_t true_index = 0;
-static size_t false_index = 1;
-static size_t num_vars = 0;
-static int* player = 0; // players of variables
-static int* priority = 0; // priorities of variables
-static int min_priority = INT_MAX;
-static int max_priority = INT_MIN;
+vset_next_t vset_next_fn = vset_next;
 
-ltsmin_expr_t* mu_exprs = NULL;
-ltsmin_parse_env_t* mu_parse_env = NULL;
-
-typedef struct {
-    int len;
-    int *proj;
-} proj_info;
-
-static lts_type_t ltstype;
-static int N;
-static int eLbls;
-static int sLbls;
-static int nGuards;
-static int nGrps;
-static int max_sat_levels;
-static proj_info *r_projs = NULL;
-static proj_info *w_projs = NULL;
-static proj_info *l_projs = NULL;
-static vdom_t domain;
-static vset_t *levels = NULL;
-static int max_levels = 0;
-static int global_level;
-static long max_lev_count = 0;
-static long max_vis_count = 0;
-static long max_grp_count = 0;
-static long max_trans_count = 0;
-static long max_mu_count = 0;
-static model_t model;
-static vset_t initial, visited;
-static vrel_t *group_next;
-static vset_t *group_explored;
-static vset_t *group_tmp;
-static vset_t *label_false = NULL; // 0
-static vset_t *label_true = NULL;  // 1
-static vset_t *label_tmp;
-static rt_timer_t reach_timer;
-
-static int* label_locks = NULL;
-
-static ltsmin_parse_env_t* inv_parse_env;
-static ltsmin_expr_t* inv_expr;
-static proj_info* inv_proj = NULL;
-static vset_t* inv_set = NULL;
-static int* inv_violated = NULL;
-static bitvector_t* inv_deps = NULL;
-static bitvector_t* inv_sl_deps = NULL;
-static int num_inv_violated = 0;
-static bitvector_t state_label_used;
-
-typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
-                             bitvector_t *reach_groups,
-                             long *eg_count, long *next_count, long *guard_count);
-
-typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
-                           bitvector_t *reach_groups,
-                           long *eg_count, long *next_count, long *guard_count);
-
-typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
-                              vset_t visited, char *etf_output);
-
-typedef int (*transitions_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
-
-static transitions_t transitions_short = NULL; // which function to call for the next states.
-
-typedef int(*vset_count_t)(vset_t set, long* nodes, long double* elements);
-
-static int vset_count_dbl(vset_t set, long* nodes, long double* elements);
-static int vset_count_ldbl(vset_t set, long* nodes, long double* elements);
-
-static vset_count_t vset_count_fn = &vset_count_dbl;
-
-static int
+int
 vset_count_dbl(vset_t set, long* nodes, long double* elements)
 {
     if (elements != NULL) {
@@ -162,7 +75,7 @@ vset_count_dbl(vset_t set, long* nodes, long double* elements)
     return DBL_DIG;
 }
 
-static int
+int
 vset_count_ldbl(vset_t set, long* nodes, long double* elements)
 {
     vset_ccount(set, nodes, elements);
@@ -170,8 +83,6 @@ vset_count_ldbl(vset_t set, long* nodes, long double* elements)
 }
 
 typedef void(*vset_next_t)(vset_t dst, vset_t src, vrel_t rel);
-
-static vset_next_t vset_next_fn = vset_next;
 
 static void
 vset_next_union_src(vset_t dst, vset_t src, vrel_t rel)
