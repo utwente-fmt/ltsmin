@@ -352,6 +352,7 @@ vset_t vset_load(FILE* f, vdom_t dom){
 }
 
 vrel_t vrel_create(vdom_t dom,int k,int* proj){
+    if (dom->shared.rel_create == NULL) return vrel_create_rw(dom, k, proj, k, proj);
     vrel_t rel = dom->shared.rel_create(dom, k, proj);
     rel->expand = NULL;
     rel->expand_ctx = NULL;
