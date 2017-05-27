@@ -2,13 +2,8 @@
 
 #include <popt.h>
 
-#include <hre/user.h>
-#include <ltsmin-lib/ltsmin-standard.h>
-#include <pins2lts-sym/maxsum/maxsum.h>
 #include <pins2lts-sym/options.h>
-#include <pins-lib/pins-impl.h>
-#include <spg-lib/spg-options.h>
-#include <vset-lib/vector_set.h>
+
 
 int REL_PERF = SPEC_REL_PERF;
 
@@ -242,3 +237,76 @@ struct poptOption options[] = {
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, maxsum_options, 0, "Integer arithmetic options", NULL},
     POPT_TABLEEND
 };
+
+
+/// GLOBALS
+
+/*
+  The inhibit and class matrices are used for maximal progress.
+ */
+matrix_t *inhibit_matrix=NULL;
+matrix_t *class_matrix=NULL;
+int inhibit_class_count=0;
+vset_t *class_enabled = NULL;
+
+bitvector_ll_t *seen_actions;
+vset_t true_states;
+vset_t false_states;
+
+int var_pos = 0;
+int var_type_no = 0;
+int variable_projection = 0;
+size_t true_index = 0;
+size_t false_index = 1;
+size_t num_vars = 0;
+int* player = 0; // players of variables
+int* priority = 0; // priorities of variables
+int min_priority = INT_MAX;
+int max_priority = INT_MIN;
+
+ltsmin_expr_t* mu_exprs = NULL;
+ltsmin_parse_env_t* mu_parse_env = NULL;
+
+lts_type_t ltstype;
+int N;
+int eLbls;
+int sLbls;
+int nGuards;
+int nGrps;
+int max_sat_levels;
+proj_info *r_projs = NULL;
+proj_info *w_projs = NULL;
+proj_info *l_projs = NULL;
+vdom_t domain;
+vset_t *levels = NULL;
+int max_levels = 0;
+int global_level;
+long max_lev_count = 0;
+long max_vis_count = 0;
+long max_grp_count = 0;
+long max_trans_count = 0;
+long max_mu_count = 0;
+model_t model;
+vset_t initial, visited;
+vrel_t *group_next;
+vset_t *group_explored;
+vset_t *group_tmp;
+vset_t *label_false = NULL; // 0
+vset_t *label_true = NULL;  // 1
+vset_t *label_tmp;
+rt_timer_t reach_timer;
+
+int* label_locks = NULL;
+
+ltsmin_parse_env_t* inv_parse_env;
+ltsmin_expr_t* inv_expr;
+proj_info* inv_proj = NULL;
+vset_t* inv_set = NULL;
+int* inv_violated = NULL;
+bitvector_t* inv_deps = NULL;
+bitvector_t* inv_sl_deps = NULL;
+int num_inv_violated = 0;
+bitvector_t state_label_used;
+
+transitions_t transitions_short = NULL; // which function to call for the next states.
+
