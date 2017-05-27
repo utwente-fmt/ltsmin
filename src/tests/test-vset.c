@@ -2,6 +2,9 @@
 
 #include <hre/user.h>
 #include <vset-lib/vector_set.h>
+#if HAVE_SYLVAN
+#include <lace.h>
+#endif
 
 static void
 test_vset_popt(poptContext con, enum poptCallbackReason reason,
@@ -360,6 +363,11 @@ main(int argc, char *argv[])
     HREinitBegin(argv[0]); // the organizer thread is called after the binary
     HREaddOptions(options,"Vector set test\n\nOptions");
     HREinitStart(&argc,&argv,0,0,NULL,NULL);
+
+#if HAVE_SYLVAN
+    lace_init(1, 0);
+    lace_startup(0, 0, 0);
+#endif
 
     vset_implementation_t vset_impl = VSET_IMPL_AUTOSELECT;
 
