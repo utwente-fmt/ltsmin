@@ -1,8 +1,21 @@
-#ifndef REACH_OPTIONS_H
-#define REACH_OPTIONS_H
+#ifndef SYM_OPTIONS_H
+#define SYM_OPTIONS_H
 
 #include <limits.h>
 #include <popt.h>
+
+
+#include <dm/dm.h>
+#include <hre/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
+#include <ltsmin-lib/ltsmin-syntax.h>
+#include <ltsmin-lib/ltsmin-tl.h>
+#include <mc-lib/bitvector-ll.h>
+#include <pins2lts-sym/maxsum/maxsum.h>
+#include <pins2lts-sym/options.h>
+#include <pins-lib/pins-impl.h>
+#include <spg-lib/spg-options.h>
+#include <vset-lib/vector_set.h>
 
 extern struct poptOption lace_options[];
 
@@ -79,5 +92,101 @@ extern size_t lace_n_workers;
 extern size_t lace_dqsize; // can be very big, no problemo
 extern size_t lace_stacksize; // use default
 
-#endif
+
+/// GLOBALS
+
+
+extern matrix_t *inhibit_matrix;
+extern matrix_t *class_matrix;
+extern int inhibit_class_count;
+extern vset_t *class_enabled;
+
+extern bitvector_ll_t *seen_actions;
+extern vset_t true_states;
+extern vset_t false_states;
+
+extern int var_pos;
+extern int var_type_no;
+extern int variable_projection;
+extern size_t true_index;
+extern size_t false_index;
+extern size_t num_vars;
+extern int* player; // players of variables
+extern int* priority; // priorities of variables
+extern int min_priority;
+extern int max_priority;
+
+ltsmin_expr_t* mu_exprs;
+ltsmin_parse_env_t* mu_parse_env;
+
+typedef struct {
+    int len;
+    int *proj;
+} proj_info;
+
+extern lts_type_t ltstype;
+extern int N;
+extern int eLbls;
+extern int sLbls;
+extern int nGuards;
+extern int nGrps;
+extern int max_sat_levels;
+extern proj_info *r_projs;
+extern proj_info *w_projs;
+extern proj_info *l_projs;
+extern vdom_t domain;
+extern vset_t *levels;
+extern int max_levels;
+extern int global_level;
+extern long max_lev_count;
+extern long max_vis_count;
+extern long max_grp_count;
+extern long max_trans_count;
+extern long max_mu_count;
+extern model_t model;
+extern vset_t initial, visited;
+extern vrel_t *group_next;
+extern vset_t *group_explored;
+extern vset_t *group_tmp;
+extern vset_t *label_false; // 0
+extern vset_t *label_true;  // 1
+extern vset_t *label_tmp;
+extern rt_timer_t reach_timer;
+
+extern int* label_locks;
+
+extern ltsmin_parse_env_t* inv_parse_env;
+extern ltsmin_expr_t* inv_expr;
+extern proj_info* inv_proj;
+extern vset_t* inv_set;
+extern int* inv_violated;
+extern bitvector_t* inv_deps;
+extern bitvector_t* inv_sl_deps;
+extern int num_inv_violated;
+extern bitvector_t state_label_used;
+
+typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
+                             bitvector_t *reach_groups,
+                             long *eg_count, long *next_count, long *guard_count);
+
+typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
+                           bitvector_t *reach_groups,
+                           long *eg_count, long *next_count, long *guard_count);
+
+typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
+                              vset_t visited, char *etf_output);
+
+typedef int (*transitions_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
+
+extern transitions_t transitions_short; // which function to call for the next states.
+
+typedef int(*vset_count_t)(vset_t set, long* nodes, long double* elements);
+
+extern vset_count_t vset_count_fn;
+
+typedef void(*vset_next_t)(vset_t dst, vset_t src, vrel_t rel);
+
+extern vset_next_t vset_next_fn;
+
+#endif // SYM_OPTIONS_H
 
