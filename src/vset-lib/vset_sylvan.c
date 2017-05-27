@@ -727,7 +727,17 @@ set_union(vset_t dst, vset_t src)
     LACE_ME;
 
     if (dst != src) {
-        dst->bdd = sylvan_or(dst->bdd, src->bdd);
+        BDD cur = dst->bdd;
+        BDD res = src->bdd;
+        mtbdd_refs_pushptr(&cur);
+        mtbdd_refs_pushptr(&res);
+        for (;;) {
+            res = sylvan_or(cur, res);
+            BDD test = __sync_val_compare_and_swap(&dst->bdd, cur, res);
+            if (test == cur) break;
+            else cur = test;
+        }
+        mtbdd_refs_popptr(2);
     }
 }
 
@@ -1053,9 +1063,17 @@ rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
     LACE_ME;
     struct rel_update_context ctx = (struct rel_update_context){dst, src, src->k == -1 ? src->dom->vectorsize : src->k, cb, context};
     BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_rel_updater), (void*)&ctx);
-    mtbdd_refs_push(result);
-    dst->bdd = sylvan_or(dst->bdd, result);
-    mtbdd_refs_pop(1);
+
+    BDD cur = dst->bdd;
+    mtbdd_refs_pushptr(&cur);
+    mtbdd_refs_pushptr(&result);
+    for (;;) {
+        result = sylvan_or(cur, result);
+        BDD test = __sync_val_compare_and_swap(&dst->bdd, cur, result);
+        if (test == cur) break;
+        else cur = test;
+    }
+    mtbdd_refs_popptr(2);
 }
 
 static void
