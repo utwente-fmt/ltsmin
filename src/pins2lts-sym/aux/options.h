@@ -12,7 +12,7 @@
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <mc-lib/bitvector-ll.h>
 #include <pins2lts-sym/maxsum/maxsum.h>
-#include <pins2lts-sym/options.h>
+#include <pins2lts-sym/aux/options.h>
 #include <pins-lib/pins-impl.h>
 #include <spg-lib/spg-options.h>
 #include <vset-lib/vector_set.h>
@@ -164,17 +164,6 @@ extern bitvector_t* inv_deps;
 extern bitvector_t* inv_sl_deps;
 extern int num_inv_violated;
 extern bitvector_t state_label_used;
-
-typedef void (*reach_proc_t)(vset_t visited, vset_t visited_old,
-                             bitvector_t *reach_groups,
-                             long *eg_count, long *next_count, long *guard_count);
-
-typedef void (*sat_proc_t)(reach_proc_t reach_proc, vset_t visited,
-                           bitvector_t *reach_groups,
-                           long *eg_count, long *next_count, long *guard_count);
-
-typedef void (*guided_proc_t)(sat_proc_t sat_proc, reach_proc_t reach_proc,
-                              vset_t visited, char *etf_output);
 
 typedef int (*transitions_t)(model_t model,int group,int*src,TransitionCB cb,void*context);
 
