@@ -2,7 +2,7 @@
 
 #include <popt.h>
 
-#include <pins2lts-sym/options.h>
+#include <pins2lts-sym/aux/options.h>
 
 
 int REL_PERF = SPEC_REL_PERF;
