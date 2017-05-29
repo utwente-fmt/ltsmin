@@ -31,6 +31,7 @@
 #include <pins2lts-sym/alg/chain.h>
 #include <pins2lts-sym/alg/pg.h>
 #include <pins2lts-sym/alg/mu.h>
+#include <pins2lts-sym/alg/pdr.h>
 #include <pins2lts-sym/alg/reach.h>
 #include <pins2lts-sym/alg/sat.h>
 #include <pins2lts-sym/alg/scc.h>
@@ -491,6 +492,9 @@ static void actual_main(void *arg)
     check_invariants(visited, 0);
 
     switch (sccs) {
+    case -1:
+        run_pdr (initial, visited);
+        break;
     default:
         /* run reachability */
         run_reachability(visited, files[1]);
