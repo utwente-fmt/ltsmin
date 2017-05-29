@@ -30,6 +30,7 @@
 #include <pins2lts-sym/alg/bfs.h>
 #include <pins2lts-sym/alg/chain.h>
 #include <pins2lts-sym/alg/pg.h>
+#include <pins2lts-sym/alg/local.h>
 #include <pins2lts-sym/alg/mu.h>
 #include <pins2lts-sym/alg/pdr.h>
 #include <pins2lts-sym/alg/reach.h>
@@ -494,6 +495,9 @@ static void actual_main(void *arg)
     switch (sccs) {
     case -1:
         run_pdr (initial, visited);
+        break;
+    case -2:
+        run_local (initial, visited);
         break;
     default:
         /* run reachability */

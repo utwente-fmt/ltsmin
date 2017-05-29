@@ -12,6 +12,7 @@ libpins2lts_sym_la_SOURCES  = pins2lts-sym.c aux/options.h
 libpins2lts_sym_la_SOURCES  += alg/aux.c alg/aux.h
 libpins2lts_sym_la_SOURCES  += alg/bfs.c alg/bfs.h
 libpins2lts_sym_la_SOURCES  += alg/chain.c alg/chain.h
+libpins2lts_sym_la_SOURCES  += alg/local.c alg/local.h
 libpins2lts_sym_la_SOURCES  += alg/pdr.c alg/pdr.h
 libpins2lts_sym_la_SOURCES  += alg/pg.c alg/pg.h
 libpins2lts_sym_la_SOURCES  += alg/mu.c alg/mu.h
