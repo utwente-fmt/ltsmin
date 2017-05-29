@@ -16,6 +16,7 @@ libpins2lts_sym_la_SOURCES  += alg/pg.c alg/pg.h
 libpins2lts_sym_la_SOURCES  += alg/mu.c alg/mu.h
 libpins2lts_sym_la_SOURCES  += alg/reach.c alg/reach.h
 libpins2lts_sym_la_SOURCES  += alg/sat.c alg/sat.h
+libpins2lts_sym_la_SOURCES  += alg/scc.c alg/scc.h
 libpins2lts_sym_la_SOURCES  += aux/output.c aux/output.h
 libpins2lts_sym_la_SOURCES  += aux/prop.c aux/prop.h
 libpins2lts_sym_la_CPPFLAGS = $(SYM_CPP_FLAGS)

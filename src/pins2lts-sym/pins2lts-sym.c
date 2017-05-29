@@ -33,6 +33,7 @@
 #include <pins2lts-sym/alg/mu.h>
 #include <pins2lts-sym/alg/reach.h>
 #include <pins2lts-sym/alg/sat.h>
+#include <pins2lts-sym/alg/scc.h>
 #include <pins2lts-sym/aux/options.h>
 #include <pins2lts-sym/aux/output.h>
 #include <pins2lts-sym/aux/prop.h>
@@ -489,8 +490,12 @@ static void actual_main(void *arg)
     /* check the invariants at level 0 */
     check_invariants(visited, 0);
 
-    /* run reachability */
-    run_reachability(visited, files[1]);
+    switch (sccs) {
+    default:
+        /* run reachability */
+        run_reachability(visited, files[1]);
+        if (sccs) detect_sccs (visited);
+    }
 
     /* report states */
     final_stat_reporting(visited);

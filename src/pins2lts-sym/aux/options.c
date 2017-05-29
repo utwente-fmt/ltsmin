@@ -39,6 +39,8 @@ char* vset_dir = NULL;
 char* trc_output = NULL;
 char* trc_type   = "gcf";
 int   dlk_detect = 0;
+int   sccs = 0;
+int   trimming = 0;
 char* act_detect = NULL;
 char** inv_detect = NULL;
 int   num_inv = 0;
@@ -215,7 +217,9 @@ struct poptOption options[] = {
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
     { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
-    { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
+    { "trim" , 0 , POPT_ARG_VAL , &trimming , 1 , "apply trimming on SCCs" , NULL },
+    { "scc" , 0 , POPT_ARG_INT , &sccs , 0 , "detect sccs" , NULL },
+   { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
     { invariant_long , 'i' , POPT_ARG_STRING , NULL , 0, "detect invariant violations (can be given multiple times)", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },

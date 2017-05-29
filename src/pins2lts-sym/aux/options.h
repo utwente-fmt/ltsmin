@@ -12,7 +12,6 @@
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <mc-lib/bitvector-ll.h>
 #include <pins2lts-sym/maxsum/maxsum.h>
-#include <pins2lts-sym/aux/options.h>
 #include <pins-lib/pins-impl.h>
 #include <spg-lib/spg-options.h>
 #include <vset-lib/vector_set.h>
@@ -68,6 +67,8 @@ extern char* vset_dir;
 extern char* trc_output;
 extern char* trc_type;
 extern int   dlk_detect;
+extern int   sccs;
+extern int   trimming;
 extern char* act_detect;
 extern char** inv_detect;
 extern int   num_inv;
