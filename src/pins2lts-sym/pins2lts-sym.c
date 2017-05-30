@@ -410,13 +410,15 @@ static void actual_main(void *arg)
         }
     }
 
-#if !SPEC_MT_SAFE && defined(HAVE_SYLVAN)
-    if (strategy == PAR_P) {
-        strategy = BFS_P;
-        Print(info, "Front-end not thread-safe; using --order=bfs-prev instead of --order=par-prev.");
-    } else if (strategy == PAR) {
-        strategy = BFS;
-        Print(info, "Front-end not thread-safe; using --order=bfs instead of --order=par.");
+#ifdef HAVE_SYLVAN
+    if (!USE_PARALLELISM) {
+        if (strategy == PAR_P) {
+            strategy = BFS_P;
+            Print(info, "Front-end not thread-safe; using --order=bfs-prev instead of --order=par-prev.");
+        } else if (strategy == PAR) {
+            strategy = BFS;
+            Print(info, "Front-end not thread-safe; using --order=bfs instead of --order=par.");
+        }
     }
 #endif
 
