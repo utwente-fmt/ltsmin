@@ -197,11 +197,12 @@ static void do_expand_group_next(int group, vset_t set)
         }
     }
 
-#if SPEC_MT_SAFE
-    vrel_update(group_next[group], group_tmp[group], explore_cb, &ctx);
-#else
-    vrel_update_seq(group_next[group], group_tmp[group], explore_cb, &ctx);
-#endif
+    if (USE_PARALLELISM) {
+        vrel_update(group_next[group], group_tmp[group], explore_cb, &ctx);
+    } else {
+        vrel_update_seq(group_next[group], group_tmp[group], explore_cb, &ctx);
+    }
+
     vset_clear(group_tmp[group]);
 }
 
@@ -225,11 +226,11 @@ expand_group_next_projected(vrel_t rel, vset_t set, void *context)
     int group = expand_ctx->group;
     group_ctx.group = group;
     group_ctx.set = NULL;
-#if SPEC_MT_SAFE
-    vrel_update(rel, set, explore_cb, &group_ctx);
-#else
-    vrel_update_seq(rel, set, explore_cb, &group_ctx);
-#endif
+    if (USE_PARALLELISM) {
+        vrel_update(rel, set, explore_cb, &group_ctx);
+    } else {
+        vrel_update_seq(rel, set, explore_cb, &group_ctx);
+    }
 }
 
 void
@@ -341,11 +342,11 @@ static void do_eval_label(int label, vset_t set)
     ctx_false.result = 0;
 
     // evaluate labels and add to label_false[guard] when false
-#if SPEC_MT_SAFE
-    vset_update(label_false[label], label_tmp[label], eval_cb, &ctx_false);
-#else
-    vset_update_seq(label_false[label], label_tmp[label], eval_cb, &ctx_false);
-#endif
+    if (USE_PARALLELISM) {
+        vset_update(label_false[label], label_tmp[label], eval_cb, &ctx_false);
+    } else {
+        vset_update_seq(label_false[label], label_tmp[label], eval_cb, &ctx_false);
+    }
 
     struct label_add_info ctx_true;
 
@@ -353,11 +354,11 @@ static void do_eval_label(int label, vset_t set)
     ctx_true.result = 1;
 
     // evaluate labels and add to label_true[label] when true
-#if SPEC_MT_SAFE
-    vset_update(label_true[label], label_tmp[label], eval_cb, &ctx_true);
-#else
-    vset_update_seq(label_true[label], label_tmp[label], eval_cb, &ctx_true);
-#endif
+    if (USE_PARALLELISM) {
+        vset_update(label_true[label], label_tmp[label], eval_cb, &ctx_true);
+    } else {
+        vset_update_seq(label_true[label], label_tmp[label], eval_cb, &ctx_true);
+    }
 
     vset_clear(label_tmp[label]);
 }
