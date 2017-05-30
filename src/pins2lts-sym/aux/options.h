@@ -21,6 +21,8 @@ extern struct poptOption lace_options[];
 
 extern struct poptOption options[];
 
+extern int USE_PARALLELISM;
+
 extern int REL_PERF;
 
 extern int MAYBE_AND_FALSE_IS_FALSE;
