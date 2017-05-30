@@ -89,17 +89,17 @@ dict set commands test18_color exp "accepting cycle found"
 dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=cndfs \
 	--por --check --proviso=cndfs \
 	-s22 $EXAMPLES_PATH/elevator.3.dve --ltl=$EXAMPLES_PATH/elevator.3.ltl --threads=2"]
-dict set commands test19_mc exp "State space has 4"
+dict set commands test19_mc exp "78528 are accepting"
 
 dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	$EXAMPLES_PATH/elevator.3.dve --ltl=$EXAMPLES_PATH/elevator.3.ltl \
 	--por --check"
-dict set commands test19_seq exp "475764 states"
+dict set commands test19_seq exp "493859 states"
 
 dict set commands test19_color cmd "$binpaths(dve2lts-seq) --strategy=scc --por --check \
 	--proviso=color \
 	$EXAMPLES_PATH/elevator.3.dve --ltl=$EXAMPLES_PATH/elevator.3.ltl"
-dict set commands test19_color exp "475623 states"
+dict set commands test19_color exp "493735 states"
 
 foreach testcase [dict keys $commands] {
     set command [dict get $commands $testcase cmd]

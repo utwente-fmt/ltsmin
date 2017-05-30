@@ -35,6 +35,8 @@ static const char      *buchi_type = "ba";
 pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
 pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
 
+static const int        TEXTBOOK_INIT = (1UL << 30);
+
 static si_map_entry db_ltl_semantics[]={
     {"none",    PINS_LTL_NONE},
     {"spin",    PINS_LTL_SPIN},
@@ -134,7 +136,7 @@ static inline int
 is_accepting (ltl_context_t *ctx, int *state)
 {
     // state[0] must be the buchi automaton, because it's necessarily dependent
-    int val = state[ctx->ltl_idx] == -1 ? 0 : state[ctx->ltl_idx];
+    int val = state[ctx->ltl_idx] == TEXTBOOK_INIT ? 0 : state[ctx->ltl_idx];
     HREassert(val < ctx->ba->state_count);
     return ctx->ba->states[val]->accept;
 }
@@ -382,7 +384,7 @@ void ltl_textbook_cb (void *c, transition_info_t *ti, int *dst, int *cpy) {
     int dst_pred = eval (infoctx, dst, ti->labels);
 
     int i = infoctx->src[ctx->ltl_idx];
-    if (i == -1) { i=0; } /* textbook: extra initial state */
+    if (i == TEXTBOOK_INIT) { i=0; } /* textbook: extra initial state */
     HREassert (i < ctx->ba->state_count );
     if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA) {
         HREassert (ctx->edge_labels_old == ctx->el_idx_accept_set);
@@ -431,7 +433,7 @@ ltl_textbook_all (model_t self, int *src, TransitionCB cb, void *user_context)
 {
     ltl_context_t *ctx = GBgetContext(self);
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
-    if (src[ctx->ltl_idx] == -1) {
+    if (src[ctx->ltl_idx] == TEXTBOOK_INIT) {
         int labels[ctx->edge_labels];
         memset (labels, 0, sizeof(int[ctx->edge_labels]));
         transition_info_t ti = GB_TI(labels, ctx->old_groups);
@@ -793,6 +795,8 @@ GBaddLTL (model_t model)
         break;
     case PINS_LTL_TEXTBOOK:
         new_ngroups = groups + 1;
+        HREassert (ba->state_count < TEXTBOOK_INIT, "Only up to %u Buchi states supported with text-book semantics.",
+                   TEXTBOOK_INIT - 1);
         break;
     default: Abort("Unknown LTL semantics.");
     }
@@ -950,7 +954,7 @@ GBaddLTL (model_t model)
     int             s0[new_len];
     GBgetInitialState (model, s0+1);
     // set buchi initial state
-    s0[ctx->ltl_idx] = (PINS_LTL == PINS_LTL_TEXTBOOK ? -1 : 0);
+    s0[ctx->ltl_idx] = (PINS_LTL == PINS_LTL_TEXTBOOK ? TEXTBOOK_INIT : 0);
 
     GBsetInitialState (ltlmodel, s0);
 
