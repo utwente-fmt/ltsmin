@@ -759,7 +759,7 @@ mdd_load_bin(FILE* f)
 static vset_t
 set_create_mdd(vdom_t dom, int k, int *proj)
 {
-    assert(k <= dom->shared.size);
+    HREassert (k <= dom->shared.size, "Invalid projection.");
     int l = (k < 0)?0:k;
     vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set) + sizeof(int[l]));
     set->dom  = dom;
@@ -770,9 +770,13 @@ set_create_mdd(vdom_t dom, int k, int *proj)
     protected_sets = set;
     set->p_len = k;
     set->p_id  = 1;
+    int             last = INT_MAX;
     for(int i = k - 1; i >= 0; i--) {
         set->proj[i] = proj[i];
         set->p_id    = mdd_create_node(proj[i], set->p_id, 0);
+        HREassert (last > proj[i] && proj[i] < dom->shared.size,
+                   "Invalid projection."); // projections should be mono
+        last = proj[i];
     }
     return set;
 }
@@ -1020,11 +1024,20 @@ rel_add_mdd(vrel_t rel, const int *src, const int *dst)
     rel->mdd = mdd_put(rel->mdd, vec, 2*N, NULL);
 }
 
+/**
+ * The vset src of mdd is passed along to reference its projection.
+ * If src == NULL, the mdd is over the full domain.
+ */
 static uint32_t
-mdd_project(uint32_t p_id, uint32_t mdd, int idx, int *proj, int len)
+mdd_project(uint32_t p_id, vset_t src, uint32_t mdd, int idx, int *proj, int len)
 {
     if(mdd == 0) return 0; //projection of empty is empty.
     if(len == 0) return 1; //projection of non-empty is epsilon.
+
+    int slen = src == NULL || src->p_len ? src->dom->shared.size : src->p_len;
+    HREassert (idx < slen, "Invalid projection: %d is not in the source set (not projecting to a subset of source set's projection?).", proj[0]);
+    int svar = src == NULL || src->p_len < 0 ? idx : src->proj[idx];
+    HREassert (svar <= proj[0], "Invalid projection: %d is not in the source set (not projecting to a subset of source set's projection?).", proj[0]);
 
     uint32_t slot_hash=hash(OP_PROJECT,mdd,p_id);
     uint32_t slot=slot_hash%cache_size;
@@ -1036,15 +1049,16 @@ mdd_project(uint32_t p_id, uint32_t mdd, int idx, int *proj, int len)
     uint32_t res = 0;
     uint32_t mdd_original = mdd;
 
-    if (proj[0]==idx){
-        mdd_push(mdd_project(p_id,node_table[mdd].right,idx,proj,len));
-        uint32_t tmp=mdd_project(node_table[p_id].down, node_table[mdd].down,
-                                 idx+1, proj+1, len-1);
-        res=mdd_create_node(node_table[mdd].val,tmp,mdd_pop());
+    if (proj[0] == svar) {
+        mdd_push(mdd_project(p_id, src, node_table[mdd].right, idx, proj, len));
+        uint32_t tmp = mdd_project(node_table[p_id].down, src,
+                                   node_table[mdd].down, idx+1, proj+1, len-1);
+        res = mdd_create_node(node_table[mdd].val,tmp,mdd_pop());
     } else {
         while(mdd>1){
             mdd_push(res);
-            uint32_t tmp=mdd_project(p_id,node_table[mdd].down,idx+1,proj,len);
+            uint32_t tmp = mdd_project(p_id, src, node_table[mdd].down, idx+1,
+                                       proj, len);
             mdd_push(tmp);
             res=mdd_union(res,tmp);
             mdd_pop();mdd_pop();
@@ -1118,11 +1132,13 @@ mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
 static void
 set_project_mdd(vset_t dst, vset_t src)
 {
-    if (src->p_len != -1 || dst->p_len == -1) {
+    HREassert (src->p_len == -1 || dst->p_len <= src->p_len, "Invalid projection (introducing variables).");
+    HREassert (dst->p_len != src->p_len || src->p_id == dst->p_id, "Invalid projection (introducing variables).");
+    if (src->p_id == dst->p_id) {
         dst->mdd = src->mdd;
     } else {
         dst->mdd = 0;
-        dst->mdd = mdd_project(dst->p_id, src->mdd, 0, dst->proj, dst->p_len);
+        dst->mdd = mdd_project(dst->p_id, src, src->mdd, 0, dst->proj, dst->p_len);
     }
 }
 
@@ -1429,8 +1445,8 @@ sat_fixpoint(int level, uint32_t set)
             assert(rel_set[grp]->p_len != 0);
 
             if (rel_set[grp]->expand != NULL) {
-                proj_set[grp]->mdd = mdd_project(rel_set[grp]->p_id, new_set,
-                                                 level, proj_set[grp]->proj,
+                proj_set[grp]->mdd = mdd_project(rel_set[grp]->p_id, NULL,
+                                                 new_set, level, proj_set[grp]->proj,
                                                  proj_set[grp]->p_len);
                 rel_set[grp]->expand(rel_set[grp], proj_set[grp],
                                      rel_set[grp]->expand_ctx);
@@ -1534,7 +1550,7 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     // Clean-up
     for (int grp = 0; grp < rel_count; grp++) {
         if (rels[grp]->p_len == 0 && rels[grp]->expand != NULL) {
-            proj_set[grp]->mdd = mdd_project(rels[grp]->p_id, dst->mdd,
+            proj_set[grp]->mdd = mdd_project(rels[grp]->p_id, NULL, dst->mdd,
                                              0, NULL, 0);
             rel_set[grp]->expand(rel_set[grp], proj_set[grp],
                                  rel_set[grp]->expand_ctx);

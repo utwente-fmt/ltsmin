@@ -842,11 +842,17 @@ set_create_mdd(vdom_t dom, int k, int *proj)
     protected_sets = set;
     set->p_len = l;
     set->p_id  = 1;
+    int             last = INT_MAX;
     for(int i = l - 1; i >= 0; i--) {
         set->proj[i] = k < 0 ? i : proj[i];
         set->p_id    = mdd_create_node(k < 0 ? i : proj[i], set->p_id, 0, COPY_DONT_CARE);
         // The p_id of a relation is shifted in hash keys; check this is ok
         if ((set->p_id >> 32) > 0) Abort("set_create_mdd: projection identifier too large");
+        if (k >= 0) {
+            HREassert (last > proj[i] && proj[i] < dom->shared.size,
+                       "Invalid projection."); // projections should be mono
+            last = proj[i];
+        }
     }
     return set;
 }
@@ -1167,10 +1173,15 @@ rel_add_mdd(vrel_t rel, const int *src, const int *dst) {
 }
 
 static uint64_t
-mdd_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
+mdd_project(uint64_t p_id, vset_t src, uint64_t mdd, int idx, int *proj, int len)
 {
     if(mdd == 0) return 0; //projection of empty is empty.
     if(len == 0) return 1; //projection of non-empty is epsilon.
+
+    int slen = src == NULL ? src->dom->shared.size : src->p_len;
+    HREassert (idx < slen, "Invalid projection: %d is not in the source set (not projecting to a subset of source set's projection?).", proj[0]);
+    int svar = src == NULL ? idx : src->proj[idx];
+    HREassert (svar <= proj[0], "Invalid projection: %d is not in the source set (not projecting to a subset of source set's projection?).", proj[0]);
 
     uint64_t slot_hash=hash3(OP_PROJECT,mdd,p_id);
     uint64_t slot=slot_hash%cache_size;
@@ -1182,15 +1193,16 @@ mdd_project(uint64_t p_id, uint64_t mdd, int idx, int *proj, int len)
     uint64_t res = 0;
     uint64_t mdd_original = mdd;
 
-    if (proj[0]==idx){
-        mdd_push(mdd_project(p_id,node_table[mdd].right,idx,proj,len));
-        uint64_t tmp=mdd_project(node_table[p_id].down, node_table[mdd].down,
-                                 idx+1, proj+1, len-1);
+    if (proj[0] == svar) {
+        mdd_push(mdd_project(p_id, src, node_table[mdd].right, idx, proj, len));
+        uint64_t tmp=mdd_project(node_table[p_id].down, src,
+                                 node_table[mdd].down, idx+1, proj+1, len-1);
         res=mdd_create_node(node_table[mdd].val,tmp,mdd_pop(),COPY_DONT_CARE);
     } else {
         while(mdd>1){
             mdd_push(res);
-            uint64_t tmp=mdd_project(p_id,node_table[mdd].down,idx+1,proj,len);
+            uint64_t tmp=mdd_project(p_id, src, node_table[mdd].down,
+                                     idx+1, proj, len);
             mdd_push(tmp);
             res=mdd_union(res,tmp);
             mdd_pop();mdd_pop();
@@ -1337,11 +1349,13 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
 static void
 set_project_mdd(vset_t dst, vset_t src)
 {
-    if (src->p_len != src->dom->shared.size || dst->p_len == dst->dom->shared.size) {
+    HREassert (dst->p_len <= src->p_len, "Invalid projection (introducing variables).");
+    HREassert (dst->p_len != src->p_len || src->p_id == dst->p_id, "Invalid projection (introducing variables).");
+    if (src->p_id == dst->p_id) {
         dst->mdd = src->mdd;
     } else {
         dst->mdd = 0;
-        dst->mdd = mdd_project(dst->p_id, src->mdd, 0, dst->proj, dst->p_len);
+        dst->mdd = mdd_project(dst->p_id, src, src->mdd, 0, dst->proj, dst->p_len);
     }
 }
 
@@ -1903,7 +1917,7 @@ sat_fixpoint(int level, uint64_t set)
             assert(rel_set[grp]->r_p_len != 0 || rel_set[grp]->w_p_len != 0);
 
             if (rel_set[grp]->expand != NULL) {
-                proj_set[grp]->mdd = mdd_project(rel_set[grp]->p_id, new_set,
+                proj_set[grp]->mdd = mdd_project(rel_set[grp]->p_id, NULL, new_set,
                                                  level, proj_set[grp]->proj,
                                                  proj_set[grp]->p_len);
                 rel_set[grp]->expand(rel_set[grp], proj_set[grp],
@@ -2010,7 +2024,7 @@ set_least_fixpoint_mdd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     // Clean-up
     for (int grp = 0; grp < rel_count; grp++) {
         if (rels[grp]->r_p_len == 0 && rels[grp]->expand != NULL) {
-            proj_set[grp]->mdd = mdd_project(rels[grp]->p_id, dst->mdd,
+            proj_set[grp]->mdd = mdd_project(rels[grp]->p_id, NULL, dst->mdd,
                                              0, NULL, 0);
             rel_set[grp]->expand(rel_set[grp], proj_set[grp],
                                  rel_set[grp]->expand_ctx);
