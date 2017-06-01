@@ -60,7 +60,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t maybe_states = NULL;
     if (!no_soundness_check && PINS_USE_GUARDS) {
         for(int i=0;i<nGuards;i++) {
-            guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
+            guard_maybe[i] = vset_create(domain, l_projs[i]->count, l_projs[i]->data);
         }
         false_states = vset_create(domain, -1, NULL);
         maybe_states = vset_create(domain, -1, NULL);
@@ -148,7 +148,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_t maybe_states = NULL;
     if (!no_soundness_check && PINS_USE_GUARDS) {
         for(int i=0;i<nGuards;i++) {
-            guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
+            guard_maybe[i] = vset_create(domain, l_projs[i]->count, l_projs[i]->data);
         }
         false_states = vset_create(domain, -1, NULL);
         maybe_states = vset_create(domain, -1, NULL);

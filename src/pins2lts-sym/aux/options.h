@@ -16,6 +16,7 @@
 #include <pins-lib/pins-impl.h>
 #include <spg-lib/spg-options.h>
 #include <vset-lib/vector_set.h>
+#include <util-lib/util.h>
 
 extern struct poptOption lace_options[];
 
@@ -121,11 +122,6 @@ extern int max_priority;
 ltsmin_expr_t* mu_exprs;
 ltsmin_parse_env_t* mu_parse_env;
 
-typedef struct {
-    int len;
-    int *proj;
-} proj_info;
-
 extern lts_type_t ltstype;
 extern int N;
 extern int eLbls;
@@ -133,10 +129,12 @@ extern int sLbls;
 extern int nGuards;
 extern int nGrps;
 extern int max_sat_levels;
-extern proj_info *r_projs;
-extern proj_info *w_projs;
-extern proj_info *l_projs;
+extern ci_list **r_projs;
+extern ci_list **w_projs;
+extern ci_list **l_projs;
 extern vdom_t domain;
+extern matrix_t *read_matrix;
+extern matrix_t *write_matrix;
 extern vset_t *levels;
 extern int max_levels;
 extern int global_level;
@@ -159,7 +157,7 @@ extern int* label_locks;
 
 extern ltsmin_parse_env_t* inv_parse_env;
 extern ltsmin_expr_t* inv_expr;
-extern proj_info* inv_proj;
+extern ci_list **inv_proj;
 extern vset_t* inv_set;
 extern int* inv_violated;
 extern bitvector_t* inv_deps;
