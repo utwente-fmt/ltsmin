@@ -242,23 +242,12 @@ do_output(char *etf_output, vset_t visited)
         Warning(info, "Note: ETF format does not yet support read, write and copy.");
         transitions_short = GBgetTransitionsShort;
 
+        RTfree (r_projs);
+        RTfree (w_projs);
+        w_projs = r_projs = (ci_list **) dm_rows_to_idx_table (GBgetDMInfo(model));
         for (int i = 0; i < nGrps; i++) {
             vset_destroy(group_explored[i]);
-
-            RTfree(r_projs[i].proj);
-            r_projs[i].len   = dm_ones_in_row(GBgetDMInfo(model), i);
-            r_projs[i].proj  = (int*)RTmalloc(r_projs[i].len * sizeof(int));
-            RTfree(w_projs[i].proj);
-            w_projs[i].len   = dm_ones_in_row(GBgetDMInfo(model), i);
-            w_projs[i].proj  = (int*)RTmalloc(w_projs[i].len * sizeof(int));
-
-            for(int j = 0, k = 0; j < dm_ncols(GBgetDMInfo(model)); j++) {
-                if (dm_is_set(GBgetDMInfo(model), i, j)) {
-                    r_projs[i].proj[k] = j;
-                    w_projs[i].proj[k++] = j;
-                }
-            }
-            group_explored[i] = vset_create(domain,r_projs[i].len,r_projs[i].proj);
+            group_explored[i] = vset_create(domain, r_projs[i]->count, r_projs[i]->data);
             vset_project(group_explored[i], visited);
         }
     }

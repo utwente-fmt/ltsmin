@@ -111,13 +111,7 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
     }
 
     if (act_detect && (no_exit || ErrorActions == 0)) {
-        // note: in theory, it might be possible that ti->labels == NULL,
-        // even though we are using action detection and act_label != -1,
-        // which was checked earlier in init_action_detection().
-        // this indicates an incorrect implementation of the pins model
-        if (ti->labels == NULL) {
-            Abort("ti->labels is null");
-        }
+        HREassert (ti->labels != NULL, "ti->labels is null (incorrect implementation of the pins model)");
         if (seen_actions_test(act_index)) { // is this the first time we encounter this action?
             char *action=pins_chunk_get (model,action_typeno,act_index).data;
 
@@ -126,20 +120,18 @@ group_add(void *context, transition_info_t *ti, int *dst, int *cpy)
 
                 if (trc_output) {
 
-                    size_t vec_bytes = sizeof(int[w_projs[ctx->group].len]);
+                    size_t vec_bytes = sizeof(int[w_projs[ctx->group]->count]);
 
-                    ctx->trace_action = (struct trace_action*) RTrealloc(ctx->trace_action, sizeof(struct trace_action) * (ctx->trace_count+1));
-                    ctx->trace_action[ctx->trace_count].dst = (int*) RTmalloc(vec_bytes);
-                    if (cpy != NULL) {
-                        ctx->trace_action[ctx->trace_count].cpy = (int*) RTmalloc(vec_bytes);
-                    } else {
-                        ctx->trace_action[ctx->trace_count].cpy = NULL;
-                    }
+                    ctx->trace_action = RTrealloc (ctx->trace_action,
+                                                   sizeof(trace_action_t[ctx->trace_count+1]));
 
                     // set the required values in order to find the trace after the next-state call
-                    memcpy(ctx->trace_action[ctx->trace_count].dst, dst, vec_bytes);
-                    if (cpy != NULL) memcpy(ctx->trace_action[ctx->trace_count].cpy, cpy, vec_bytes);
-                    ctx->trace_action[ctx->trace_count].action = action;
+                    trace_action_t *ta = &ctx->trace_action[ctx->trace_count];
+                    ta->dst = (int*) RTmalloc (vec_bytes);
+                    memcpy (ta->dst, dst, vec_bytes);
+                    ta->cpy = cpy != NULL ? RTmalloc(vec_bytes) : NULL;
+                    if (cpy != NULL) memcpy (ta->cpy, cpy, vec_bytes);
+                    ta->action = action;
 
                     ctx->trace_count++;
                 }
@@ -165,10 +157,12 @@ explore_cb(vrel_t rel, void *context, int *src)
     if (ctx.trace_count > 0) {
         int long_src[N];
         for (int i = 0; i < ctx.trace_count; i++) {
-            vset_example_match(ctx.set,long_src,r_projs[ctx.group].len, r_projs[ctx.group].proj,src);
-            find_action(long_src,ctx.trace_action[i].dst,ctx.trace_action[i].cpy,ctx.group,ctx.trace_action[i].action);
-            RTfree(ctx.trace_action[i].dst);
-            if (ctx.trace_action[i].cpy != NULL) RTfree(ctx.trace_action[i].cpy);
+            trace_action_t *ta = &ctx.trace_action[i];
+            vset_example_match (ctx.set, long_src, r_projs[ctx.group]->count,
+                                r_projs[ctx.group]->data, src);
+            find_action (long_src, ta->dst, ta->cpy, ctx.group, ta->action);
+            RTfree (ta->dst);
+            if (ta->cpy != NULL) RTfree(ta->cpy);
         }
 
         RTfree(ctx.trace_action);
