@@ -166,16 +166,13 @@ init_domain(vset_implementation_t impl) {
     group_next     = (vrel_t*)RTmalloc(nGrps * sizeof(vrel_t));
     group_explored = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
     group_tmp      = (vset_t*)RTmalloc(nGrps * sizeof(vset_t));
-    r_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
-    w_projs        = (proj_info*)RTmalloc(nGrps * sizeof(proj_info));
+    r_projs        = (ci_list **)RTmalloc(sizeof(ci_list *[nGrps]));
+    w_projs        = (ci_list **)RTmalloc(sizeof(ci_list *[nGrps]));
 
-    l_projs        = (proj_info*) RTmalloc(sLbls * sizeof(proj_info));
+    l_projs        = (ci_list **)RTmalloc(sizeof(ci_list *[sLbls]));
     label_false    = (vset_t*)RTmalloc(sLbls * sizeof(vset_t));
     label_true     = (vset_t*)RTmalloc(sLbls * sizeof(vset_t));
     label_tmp      = (vset_t*)RTmalloc(sLbls * sizeof(vset_t));
-
-    matrix_t* read_matrix;
-    matrix_t* write_matrix;
 
     if (!vdom_separates_rw(domain) && !PINS_USE_GUARDS) {
         read_matrix = GBgetDMInfo(model);
@@ -207,30 +204,20 @@ init_domain(vset_implementation_t impl) {
         }
     }
 
+    r_projs = (ci_list **) dm_rows_to_idx_table (read_matrix);
+    w_projs = (ci_list **) dm_rows_to_idx_table (write_matrix);
     for(int i = 0; i < nGrps; i++) {
-        r_projs[i].len   = dm_ones_in_row(read_matrix, i);
-        r_projs[i].proj  = (int*)RTmalloc(r_projs[i].len * sizeof(int));
-        w_projs[i].len   = dm_ones_in_row(write_matrix, i);
-        w_projs[i].proj  = (int*)RTmalloc(w_projs[i].len * sizeof(int));
-
-        for(int j = 0, k = 0; j < dm_ncols(read_matrix); j++) {
-            if (dm_is_set(read_matrix, i, j)) r_projs[i].proj[k++] = j;
-        }
-
-        for(int j = 0, k = 0; j < dm_ncols(write_matrix); j++) {
-            if (dm_is_set(write_matrix, i, j)) w_projs[i].proj[k++] = j;
-        }
 
         if (HREme(HREglobal())==0)
         {
             if (vdom_separates_rw(domain)) {
-                group_next[i]     = vrel_create_rw(domain,r_projs[i].len,r_projs[i].proj,w_projs[i].len,w_projs[i].proj);
+                group_next[i] = vrel_create_rw (domain, r_projs[i]->count, r_projs[i]->data, w_projs[i]->count, w_projs[i]->data);
             } else {
-                group_next[i]     = vrel_create(domain,r_projs[i].len,r_projs[i].proj);
+                group_next[i] = vrel_create (domain, r_projs[i]->count, r_projs[i]->data);
             }
 
-            group_explored[i] = vset_create(domain,r_projs[i].len,r_projs[i].proj);
-            group_tmp[i]      = vset_create(domain,r_projs[i].len,r_projs[i].proj);
+            group_explored[i] = vset_create (domain, r_projs[i]->count, r_projs[i]->data);
+            group_tmp[i]      = vset_create (domain, r_projs[i]->count, r_projs[i]->data);
 
             if (inhibit_matrix != NULL) {
                 inhibit_class_count = dm_nrows(inhibit_matrix);
@@ -242,22 +229,17 @@ init_domain(vset_implementation_t impl) {
         }
     }
 
+    l_projs = (ci_list **) dm_rows_to_idx_table (GBgetStateLabelInfo(model));
     for (int i = 0; i < sLbls; i++) {
 
         /* Indeed, we skip unused state labels, but allocate memory for pointers
          * (to vset_t's). Is this bad? Maybe a hashmap is worse. */
         if (bitvector_is_set(&state_label_used, i)) {
-            l_projs[i].len     = dm_ones_in_row(GBgetStateLabelInfo(model), i);
-            l_projs[i].proj    = (int*) RTmalloc(l_projs[i].len * sizeof(int));
-
-            for (int j = 0, k = 0; j < dm_ncols(GBgetStateLabelInfo(model)); j++) {
-                if (dm_is_set(GBgetStateLabelInfo(model), i, j)) l_projs[i].proj[k++] = j;
-            }
 
             if (HREme(HREglobal()) == 0) {
-                label_false[i]  = vset_create(domain, l_projs[i].len, l_projs[i].proj);
-                label_true[i]   = vset_create(domain, l_projs[i].len, l_projs[i].proj);
-                label_tmp[i]    = vset_create(domain, l_projs[i].len, l_projs[i].proj);
+                label_false[i]  = vset_create(domain, l_projs[i]->count, l_projs[i]->data);
+                label_true[i]   = vset_create(domain, l_projs[i]->count, l_projs[i]->data);
+                label_tmp[i]    = vset_create(domain, l_projs[i]->count, l_projs[i]->data);
             }
         } else {
             label_false[i]  = NULL;
@@ -266,10 +248,10 @@ init_domain(vset_implementation_t impl) {
         }
     }
 
-    inv_set = (vset_t*) RTmalloc(sizeof(vset_t) * num_inv);
+    inv_set = (vset_t *) RTmalloc(sizeof(vset_t[num_inv]));
     for (int i = 0; i < num_inv; i++) {
-        inv_set[i] = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
-        inv_info_prepare(inv_expr[i], inv_parse_env[i], i);
+        inv_set[i] = vset_create (domain, inv_proj[i]->count, inv_proj[i]->data);
+        inv_info_prepare (inv_expr[i], inv_parse_env[i], i);
     }
 }
 
@@ -448,14 +430,12 @@ static void actual_main(void *arg)
         lace_resume();
     }
 
-    int *src;
-
     if (next_union) vset_next_fn = vset_next_union_src;
 
     init_domain(VSET_IMPL_AUTOSELECT);
 
-    initial = vset_create(domain, -1, NULL);
-    src = (int*)alloca(sizeof(int)*N);
+    vset_t initial = vset_create(domain, -1, NULL);
+    int *src = RTmalloc (sizeof(int[N]));
     GBgetInitialState(model, src);
     vset_add(initial, src);
 
@@ -588,6 +568,7 @@ static void actual_main(void *arg)
     }
 #endif
 
+    RTfree (src);
     GBExit(model);
 }
 
