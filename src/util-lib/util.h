@@ -48,6 +48,12 @@ ci_get (ci_list *list, int index)
     return list->data[index];
 }
 
+static inline void
+ci_set (ci_list *list, int index, int val)
+{
+    list->data[index] = val;
+}
+
 /* begin iterator */
 static inline int *
 ci_begin (ci_list *list)
