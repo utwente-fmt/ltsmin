@@ -261,7 +261,7 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* f
 }
 
 void
-find_action(int* src, int* dst, int* cpy, int group, char* action)
+find_action(int *src, int *dst, int *cpy, int group, char *action)
 {
     int trace_end[2][N];
 
@@ -271,15 +271,14 @@ find_action(int* src, int* dst, int* cpy, int group, char* action)
     }
 
     // Set dst of the last step of the trace to its proper value
-    for (int i = 0; i < w_projs[group].len; i++) {
-        int is_read = 0;
-        for (int j=0; j<r_projs[group].len; j++) if (w_projs[group].proj[i] == r_projs[group].proj[j]) is_read = 1;
-        if (is_read || cpy == NULL || cpy[i] == 0) {
-            trace_end[0][w_projs[group].proj[i]] = dst[i];
+    for (int i = 0; i < w_projs[group]->count; i++) {
+        int w = ci_get (w_projs[group], i);
+        if (cpy == NULL || cpy[i] == 0 || ci_binary_search(r_projs[group], w) != -1) {
+            trace_end[0][w] = dst[i];
         }
     }
 
-    find_trace(trace_end, 2, global_level, levels, action);
+    find_trace (trace_end, 2, global_level, levels, action);
 }
 
 struct inv_info_s {
@@ -378,7 +377,7 @@ init_action_detection()
 void
 init_invariant_detection()
 {
-    inv_proj = (proj_info*) RTmalloc(sizeof(proj_info) * num_inv);
+    inv_proj = (ci_list **) RTmalloc(sizeof(ci_list *[num_inv]));
     inv_expr = (ltsmin_expr_t*) RTmalloc(sizeof(ltsmin_expr_t) * num_inv);
     inv_violated = (int*) RTmallocZero(sizeof(int) * num_inv);
     inv_parse_env = (ltsmin_parse_env_t*) RTmalloc(sizeof(ltsmin_parse_env_t) * num_inv);
@@ -394,15 +393,14 @@ init_invariant_detection()
             sprintf(buf, s, i + 1);
             LTSminLogExpr(infoLong, buf, inv_expr[i], inv_parse_env[i]);
         }
-        bitvector_create(&inv_deps[i], N);
-        bitvector_create(&inv_sl_deps[i], sLbls);
-        set_pins_semantics(model, inv_expr[i], inv_parse_env[i], &inv_deps[i], &inv_sl_deps[i]);
-        inv_proj[i].len = bitvector_n_high(&inv_deps[i]);
-        inv_proj[i].proj = (int*) RTmalloc(inv_proj[i].len * sizeof(int));
-        bitvector_high_bits(&inv_deps[i], inv_proj[i].proj);
+        bitvector_create (&inv_deps[i], N);
+        bitvector_create (&inv_sl_deps[i], sLbls);
+        set_pins_semantics (model, inv_expr[i], inv_parse_env[i], &inv_deps[i], &inv_sl_deps[i]);
+        inv_proj[i] = ci_create (bitvector_n_high(&inv_deps[i]));
+        bitvector_high_bits (&inv_deps[i], inv_proj[i]->data);
     }
 
-    inv_cleanup();
+    inv_cleanup ();
 
     if (inv_par) label_locks = (int*) RTmallocZero(sizeof(int[sLbls]));
 }
@@ -494,7 +492,7 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
         HREabort (LTSMIN_EXIT_FAILURE);
     }
     e->context = c;
-    c->container = vset_create(domain, inv_proj[i].len, inv_proj[i].proj);
+    c->container = vset_create(domain, inv_proj[i]->count, inv_proj[i]->data);
 }
 
 void
@@ -877,7 +875,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
     vset_t maybe_states = NULL;
     if (!no_soundness_check && PINS_USE_GUARDS) {
         for(int i=0;i<nGuards;i++) {
-            guard_maybe[i] = vset_create(domain, l_projs[i].len, l_projs[i].proj);
+            guard_maybe[i] = vset_create(domain, l_projs[i]->count, l_projs[i]->data);
         }
         false_states = vset_create(domain, -1, NULL);
         maybe_states = vset_create(domain, -1, NULL);
