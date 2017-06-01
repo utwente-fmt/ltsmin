@@ -327,6 +327,41 @@ inv_svar_destroy(void* context)
     inv_info_destroy(info);
 }
 
+static inline void
+inv_cleanup()
+{
+    bitvector_clear(&state_label_used);
+
+    int n_violated = 0;
+    for (int i = 0; i < num_inv; i++) {
+        if (!inv_violated[i]) {
+            bitvector_union(&state_label_used, &inv_sl_deps[i]);
+        } else n_violated++;
+    }
+
+    if (n_violated == num_inv) RTfree(inv_detect);
+
+    if (PINS_USE_GUARDS) {
+        for (int i = 0; i < nGuards; i++) {
+            bitvector_set(&state_label_used, i);
+        }
+    }
+
+    if (label_true != NULL) {
+        for (int i = 0; i < sLbls; i++) {
+            if (!bitvector_is_set(&state_label_used, i)) {
+                if (label_true[i] != NULL) {
+                    vset_destroy(label_false[i]);
+                    vset_destroy(label_true[i]);
+                    vset_destroy(label_tmp[i]);
+                    label_false[i] = NULL;
+                    label_true[i] = NULL;
+                    label_tmp[i] = NULL;
+                }
+            }
+        }
+    }
+}
 
 void
 init_action_detection()
@@ -361,13 +396,13 @@ init_invariant_detection()
         }
         bitvector_create(&inv_deps[i], N);
         bitvector_create(&inv_sl_deps[i], sLbls);
-        //set_pins_semantics(model, inv_expr[i], inv_parse_env[i], &inv_deps[i], &inv_sl_deps[i]);
-        //inv_proj[i].len = bitvector_n_high(&inv_deps[i]);
+        set_pins_semantics(model, inv_expr[i], inv_parse_env[i], &inv_deps[i], &inv_sl_deps[i]);
+        inv_proj[i].len = bitvector_n_high(&inv_deps[i]);
         inv_proj[i].proj = (int*) RTmalloc(inv_proj[i].len * sizeof(int));
-        //bitvector_high_bits(&inv_deps[i], inv_proj[i].proj);
+        bitvector_high_bits(&inv_deps[i], inv_proj[i].proj);
     }
 
-    //inv_cleanup();
+    inv_cleanup();
 
     if (inv_par) label_locks = (int*) RTmallocZero(sizeof(int[sLbls]));
 }
@@ -691,42 +726,6 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
         default:
             LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);
-    }
-}
-
-static inline void
-inv_cleanup()
-{
-    bitvector_clear(&state_label_used);
-
-    int n_violated = 0;
-    for (int i = 0; i < num_inv; i++) {
-        if (!inv_violated[i]) {
-            bitvector_union(&state_label_used, &inv_sl_deps[i]);
-        } else n_violated++;
-    }
-
-    if (n_violated == num_inv) RTfree(inv_detect);
-
-    if (PINS_USE_GUARDS) {
-        for (int i = 0; i < nGuards; i++) {
-            bitvector_set(&state_label_used, i);
-        }
-    }
-
-    if (label_true != NULL) {
-        for (int i = 0; i < sLbls; i++) {
-            if (!bitvector_is_set(&state_label_used, i)) {
-                if (label_true[i] != NULL) {
-                    vset_destroy(label_false[i]);
-                    vset_destroy(label_true[i]);
-                    vset_destroy(label_tmp[i]);
-                    label_false[i] = NULL;
-                    label_true[i] = NULL;
-                    label_tmp[i] = NULL;
-                }
-            }
-        }
     }
 }
 
