@@ -432,7 +432,7 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
         e->destroy_context = inv_svar_destroy;
         if (e->idx < N) { // state variable
             // make sure the state variable is a Boolean
-            assert(lts_type_get_format(
+            HREassert(lts_type_get_format(
                 ltstype,
                 lts_type_get_state_typeno(ltstype, e->idx)) == LTStypeBool);
             /* create vset_t where this state variable is true. */
