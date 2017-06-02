@@ -30,6 +30,7 @@
 #include <util-lib/dfs-stack.h>
 #include <util-lib/util.h>
 
+#ifdef HAVE_SYLVAN
 #include <sylvan.h>
 
 vset_t
@@ -489,3 +490,12 @@ detect_sccs (vset_t P)
     Warning (info, " ");
 }
 
+#else // HAVE_SYLVAN
+
+void
+detect_sccs (vset_t P)
+{
+       (void) P;
+}
+
+#endif // HAVE_SYLVAN
