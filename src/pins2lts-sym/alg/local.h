@@ -11,7 +11,10 @@
  * all reading component's. Taken together these component sets overestimate
  * the reachable state space.
  *
+ * NOTE: This requires a proper next-state _function_.
+ *
  * Uses:
+ * --- Speedier PINS transition learning
  * --- CEGAR
  * --- Extraction POR relations (which can be overestimated)
  */

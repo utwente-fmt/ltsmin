@@ -18,8 +18,9 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
-#include <pins2lts-sym/alg/pdr.h>
+#include <pins2lts-sym/alg/local.h>
 #include <pins2lts-sym/aux/options.h>
+#include <pins2lts-sym/aux/output.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
@@ -320,6 +321,7 @@ find_domain_intersections ()
         }
         HREassert (c == wg->num_readers);
     }
+    RTfree (group_w2r);
 
     Printf (infoLong, "\n");
     size_t total = 0;
@@ -343,8 +345,6 @@ find_domain_intersections ()
         Printf (infoLong, "\n");
     }
     Printf (infoLong, "\nTotal: %zu\n", total);
-
-    RTfree (group_w2r);
 }
 
 void
@@ -367,12 +367,59 @@ init_local (vset_t I)
             vset_project (Q_r[i], I);       // init read queue
             vset_project (V_w[i], I);       // init write visited
         }
+
         p_all = ci_create (N);
         for (int l = 0; l < N; l++) ci_set (p_all, l, l);
 
         find_domain_intersections ();
     }
+
     HREbarrier (HREglobal());
+}
+
+void
+deinit_local ()
+{
+    if (HREme (HREglobal()) == 0) {
+        vset_destroy (X);
+        for (int i = 0; i < nGrps; i++) {
+            vset_destroy (V_w[i]);
+            vset_destroy (Q_w[i]);
+            vset_destroy (X_r[i]);
+            vset_destroy (Y_r[i]);
+        }
+        RTfree (V_w);
+        RTfree (Q_w);
+        RTfree (X_r);
+        RTfree (Y_r);
+
+        ci_free (p_all);
+
+        for (write_group_t *wg = w_bgn(); wg <  w_end(); wg++) {
+            for (reader_t *r = r_bgn(wg); r <  r_end(wg); r++) {
+                if (r->compl)       ci_free (r->compl);
+                if (r->slots)       ci_free (r->slots);
+                if (r->complement)  vset_destroy (r->complement);
+                if (r->tmp)         vset_destroy (r->tmp);
+            }
+            RTfree (wg->readers);
+            vset_destroy (wg->complement);
+        }
+        RTfree (writers);
+
+        find_domain_intersections ();
+    }
+    HREbarrier (HREglobal());
+}
+
+void
+print_local (vset_t V, int level)
+{
+    RTprintTimer (info, reach_timer, "Local reach took");
+    long int n;
+    double e;
+    vset_count (V, &n, &e);
+    Warning (info, "Local Levels: %d  %.0f", level, e);
 }
 
 void
@@ -386,12 +433,13 @@ run_local (vset_t I, vset_t V)
     int level = reach_local (V);
     RTstopTimer(reach_timer);
 
-    long int n;
-    double e;
-    vset_count(V, &n, &e);
-    Warning (info, "Levels: %d  %.0f", level, e);
+    print_local (V, level);
 
-    (void) V;
+    deinit_local ();
+
+    final_final_stats_reporting ();
+
+    RTresetTimer(reach_timer);
 }
 
 

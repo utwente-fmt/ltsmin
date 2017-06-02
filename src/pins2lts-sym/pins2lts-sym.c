@@ -492,18 +492,12 @@ static void actual_main(void *arg)
     /* check the invariants at level 0 */
     check_invariants(visited, 0);
 
-    switch (sccs) {
-    case -1:
-        run_pdr (initial, visited);
-        break;
-    case -2:
-        run_local (initial, visited);
-        break;
-    default:
-        /* run reachability */
-        run_reachability(visited, files[1]);
-        if (sccs) detect_sccs (visited);
-    }
+    if (local) run_local (initial, visited);
+
+    /* run reachability */
+    run_reachability(visited, files[1]);
+
+    if (sccs) detect_sccs (visited);
 
     /* report states */
     final_stat_reporting(visited);

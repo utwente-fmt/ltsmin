@@ -40,6 +40,7 @@ char* trc_output = NULL;
 char* trc_type   = "gcf";
 int   dlk_detect = 0;
 int   sccs = 0;
+int   local = 0;
 int   trimming = 0;
 char* act_detect = NULL;
 char** inv_detect = NULL;
@@ -219,7 +220,8 @@ struct poptOption options[] = {
     { "deadlock" , 'd' , POPT_ARG_VAL , &dlk_detect , 1 , "detect deadlocks" , NULL },
     { "trim" , 0 , POPT_ARG_VAL , &trimming , 1 , "apply trimming on SCCs" , NULL },
     { "scc" , 0 , POPT_ARG_INT , &sccs , 0 , "detect sccs" , NULL },
-   { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
+    { "local" , 0 , POPT_ARG_VAL , &local , 1 , "Use local group exploration to learn transition relations." , NULL },
+    { "action" , 0 , POPT_ARG_STRING , &act_detect , 0 , "detect action prefix" , "<action prefix>" },
     { invariant_long , 'i' , POPT_ARG_STRING , NULL , 0, "detect invariant violations (can be given multiple times)", NULL },
     { "no-exit", 'n', POPT_ARG_VAL, &no_exit, 1, "no exit on error, just count (for error counters use -v)", NULL },
     { "trace" , 0 , POPT_ARG_STRING , &trc_output , 0 , "file to write trace to" , "<lts-file>" },

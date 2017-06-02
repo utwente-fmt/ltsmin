@@ -68,6 +68,7 @@ extern char* trc_output;
 extern char* trc_type;
 extern int   dlk_detect;
 extern int   sccs;
+extern int   local;
 extern int   trimming;
 extern char* act_detect;
 extern char** inv_detect;
