@@ -1,4 +1,4 @@
-LIBS = ../../pins-lib/libpins.la
+LIBS = ../../pins-lib/libpins.la $(HRE_LIB)
 
 PROB_LIBS = ../../prob-lib/libprob.la
 
