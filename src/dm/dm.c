@@ -1773,6 +1773,13 @@ dm_FORCE(matrix_t* m)
     double old_span = 0.0;
     double new_span = dm_nrows(m) * (double) dm_ncols(m);
 
+    /* Piece of memory to back up the old permutation.
+     * This is necessary because the last iteration of FORCE
+     * will always produce a worse permutation than the second last.
+     */
+    matrix_t old_perm;
+    dm_create(&old_perm, dm_nrows(m), dm_ncols(m));
+
     // Paper says c*log10(dm_ncols(m)); we pick dm_ncols(m)
     int iterations = dm_ncols(m);
     do {
@@ -1793,6 +1800,9 @@ dm_FORCE(matrix_t* m)
             perm[i] = tents[i].column;
         }
 
+        // backup the current permutation
+        dm_copy_col_info(m, &old_perm);
+
         // create permutation groups and permute columns
         permutation_group_t* groups;
         int n;
@@ -1807,6 +1817,12 @@ dm_FORCE(matrix_t* m)
         new_span = dm_event_span(m, NULL);
         iterations--;
     } while (iterations > 0 && old_span > new_span);
+
+    // Use the permutation of the previous iteration.
+    if (old_span < new_span) dm_copy_col_info(&old_perm, m);
+
+    dm_free(&old_perm);
+
     Warning(infoLong, "FORCE took %d iterations", dm_ncols(m) - iterations);
 }
 
