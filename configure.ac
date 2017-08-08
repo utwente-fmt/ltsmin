@@ -185,7 +185,6 @@ dnl some autotools/libtool versions appear to lose dependencies to -lm
 dnl when linking .la files with CXXLD, hence add it here
 AC_SEARCH_LIBS([pow], [m])
 AC_CHECK_LIB([dl], [dlsym],,[AC_MSG_FAILURE([libdl not found.])])
-AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
 AC_CHECK_LIB([z], [inflateEnd],,[AC_MSG_FAILURE([zlib not found.])])
 
 AC_ARG_WITH([bignum],
@@ -330,8 +329,6 @@ AS_IF([test x"$have_libgmp" = xyes],
 AS_IF([test x"$have_libtommath" = xyes], 
   [AC_CHECK_HEADERS([tommath.h],,[AC_MSG_FAILURE([tommath.h not found.])])])
 
-AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
-
 AC_CACHE_SAVE
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -428,6 +425,10 @@ fi
 
 PKG_CHECK_MODULES([XML], [libxml-2.0], [have_xml2=yes],[
     AC_MSG_WARN(libxml2 is not installed. Not building PNML front-end)
+])
+
+PKG_CHECK_MODULES([POPT], [popt],,[
+    AC_MSG_ERROR(Missing required package popt please install popt.)
 ])
 
 AC_ARG_ENABLE([prob],[AS_HELP_STRING([--enable-prob],[Compile ProB front-end])],[],[with_prob=yes])
