@@ -278,6 +278,7 @@ script:
     make distcheck DISTCHECK_CONFIGURE_FLAGS="-with-viennacl=$HOME/ltsmin-deps/include --without-scoop $CONFIGURE_WITH"; fi
   - if [ -n $TRAVIS_TAG -a "x$RELEASE_BUILD" = "xyes" ]; then
     make install &&
+    strip -s /tmp/dist/bin/* || true &&
     cp "$HOME/ltsmin-deps/bin/divine" /tmp/dist/bin &&
     cp "$HOME/ltsmin-deps/bin/txt2lps" /tmp/dist/bin &&
     cp "$HOME/ltsmin-deps/bin/txt2pbes" /tmp/dist/bin &&
