@@ -4,7 +4,7 @@ MC_LIBS	 = algorithm/libalgorithm.la
 MC_LIBS += ../pins-lib/libpins.la
 MC_LIBS += ../mc-lib/libmc.la
 
-PROB_LIBS = ../prob-lib/libprob.la
+PROB_LIB_LIBS = ../prob-lib/libprob.la
 
 SUBDIRS  = parallel
 SUBDIRS += algorithm
@@ -110,14 +110,14 @@ nodist_EXTRA_opaal2lts_mc_SOURCES = automake-force-linker.cxx # required by Boos
 # pnml2lts-mc
 pnml2lts_mc_SOURCES   = $(mc_sources)
 pnml2lts_mc_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
-pnml2lts_mc_LDADD     = $(XML_LIBS) $(MC_LIBS) ../andl-lib/libandl.la
+pnml2lts_mc_LDADD     = $(PNML_LIBS) $(MC_LIBS) ../andl-lib/libandl.la
 pnml2lts_mc_CPPFLAGS  = -DPNML $(MC_CPPFLAGS)
-pnml2lts_mc_CFLAGS    = $(XML_CFLAGS)
+pnml2lts_mc_CFLAGS    = $(PNML_CFLAGS)
 nodist_EXTRA_pnml2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # prob2lts-mc
 prob2lts_mc_SOURCES   = $(mc_sources)
 prob2lts_mc_SOURCES  += ../pins-lib/modules/prob-pins.c ../pins-lib/modules/prob-pins.h
-prob2lts_mc_LDADD     = $(PROB_LIBS) $(MC_LIBS)
+prob2lts_mc_LDADD     = $(PROB_LIB_LIBS) $(MC_LIBS)
 prob2lts_mc_CPPFLAGS  = -DPROB $(MC_CPPFLAGS)
 nodist_EXTRA_prob2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
