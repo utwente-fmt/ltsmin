@@ -14,16 +14,11 @@ puts "\n----------------------------------------------"
 puts   "TESTING: Algorithmic backends for PNML language"
 puts   "----------------------------------------------\n"
 
-
-# the number of threads to use in multithreaded backends
-set num_threads 2
-
 # Language PNML-frontends:
 # -------------------
 set langs [dict create]
 # a model per language
 dict set langs pnml model "Philosophers-5.pnml" 
-dict set langs pnml options mc "--threads=$num_threads"
 
 dict set langs pnml exp_output "243 states 945 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]

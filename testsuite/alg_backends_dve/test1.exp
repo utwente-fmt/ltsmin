@@ -13,9 +13,6 @@ puts "\n-----------------------------"
 puts   "TESTING: Algorithmic backend for the DVE language"
 puts   "-----------------------------\n"
 
-# the number of threads to use in multithreaded backends
-set num_threads 2
-
 set langs [dict create]
 
 # Language frontends:
@@ -26,7 +23,7 @@ compile_DVE $DVE_model
 
 # dve:
 dict set langs dve model "${DVE_model}2C"
-dict set langs dve options mc "--threads=$num_threads"
+dict set langs dve options mc
 
 dict set langs dve exp_output "2689 states 3567 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]

@@ -13,9 +13,6 @@ puts "\n-----------------------------"
 puts   "TESTING: Algorithmic backends for PBES"
 puts   "-----------------------------\n"
 
-# the number of threads to use in multithreaded backends
-set num_threads 2
-
 set langs [dict create]
 
 # Language frontends:
@@ -23,7 +20,7 @@ set langs [dict create]
 
 # pbes:
 dict set langs pbes model "abp.pbes"
-dict set langs pbes options mc "--procs=$num_threads --mcrl2-rewriter=jitty"
+dict set langs pbes options mc "--mcrl2-rewriter=jitty"
 dict set langs pbes options dist "--mcrl2-rewriter=jitty"
 dict set langs pbes options seq "--mcrl2-rewriter=jitty"
 dict set langs pbes options sym "--mcrl2-rewriter=jitty"
