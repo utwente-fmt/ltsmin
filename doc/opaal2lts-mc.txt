@@ -29,6 +29,8 @@ to http://eprints.eemcs.utwente.nl/21972/[Multi-Core Reachability for Timed Auto
 
 == OPTIONS
 
+include::inc/threads-option.txt[]
+
 include::inc/pins2lts-mc-ta-options.txt[]
 
 include::inc/pins2lts-mc.txt[]
