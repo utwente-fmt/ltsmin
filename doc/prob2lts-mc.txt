@@ -23,6 +23,8 @@ include::inc/prob.txt[]
 
 == OPTIONS
 
+include::inc/threads-option.txt[]
+
 include::inc/pins2lts-mc-options.txt[]
 
 include::inc/prob-options.txt[]

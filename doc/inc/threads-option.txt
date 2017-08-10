@@ -1,0 +1,4 @@
+*--threads*='NUMBER'::
+        Number of threads to use for state space exploration
+        (default: NUMBER=NUM_CORES). Maximum is 64.
+
