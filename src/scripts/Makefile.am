@@ -12,19 +12,9 @@ pins-open: pins-open.in Makefile subst_pins_open.mk
 	$(subst_pins_open) < $< > $@
 	chmod +x $@
 
-# spins
-spins: spins.in Makefile subst_pins_open.mk
-	$(subst_pins_open) < $< > $@
-	chmod +x $@
-
--include subst_pins_open.mk
-
-subst_pins_open.mk: spins.in Makefile config.munge.pl
-	perl $(srcdir)/config.munge.pl subst_pins_open < $< > $@
-
-CLEANFILES 		= pins-open spins
+CLEANFILES 		= pins-open
 DISTCLEANFILES  = subst_pins_open.mk
 
 EXTRA_DIST  = pins-open.in spins.in
-EXTRA_DIST += config.munge.pl subst_pins_open.mk
-	
+EXTRA_DIST += subst_pins_open.mk
+
