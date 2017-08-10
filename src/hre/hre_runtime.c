@@ -7,8 +7,12 @@
 #include <hre/config.h>
 
 #include <dlfcn.h>
+#include <errno.h>
+#include <inttypes.h>
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <hre/feedback.h>
@@ -99,10 +103,46 @@ int RTcacheLineSize(){
 
 #else
 
+static int mem_size_warned = 0;
+
 size_t RTmemSize(){
-    long res=sysconf(_SC_PHYS_PAGES);
-    size_t pagesz=RTpageSize();
-    return pagesz*((size_t)res);
+    const long res=sysconf(_SC_PHYS_PAGES);
+    const long pagesz=sysconf(_SC_PAGESIZE);
+    size_t limit = pagesz*((size_t)res);
+
+    /* Now try to determine whether this program runs in a cgroup.
+     * If this is the case, we will pick the minimum of the previously computed
+     * limit.
+     */
+    const char *file = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
+    FILE *fp = fopen(file, "r");
+    if (fp != NULL) {
+        size_t cgroup_limit = 0;
+        /* If there is no limit then the value scanned for will be larger than
+         * SIZE_T_MAX, and thus fscanf will not return 1.
+         */
+        int ret = fscanf(fp, "%zu", &cgroup_limit);
+        if (ret == 1 && cgroup_limit > 0) {
+            if (cgroup_limit < limit) {
+                limit = cgroup_limit;
+                if (!mem_size_warned) {
+                    Warning(infoLong,
+                            "Using cgroup limit of %zu bytes", limit);
+                }
+            }
+        } else if (!mem_size_warned) {
+            Warning(error, "Unable to get cgroup memory limit in file %s: %s",
+                    file, errno != 0 ? strerror(errno) : "unknown error");
+        }
+        fclose(fp);
+    } else if (!mem_size_warned) {
+        Warning(error, "Unable to open cgroup memory limit file %s: %s", file,
+                strerror(errno));
+    }
+
+    mem_size_warned = 1;
+
+    return limit;
 }
 
 #if defined(__linux__)
@@ -123,12 +163,13 @@ int RTcacheLineSize(){
 #endif
 
 int RTnumCPUs(){
-    long res=sysconf(_SC_NPROCESSORS_ONLN);
-    return (size_t)res;
-}
-
-size_t RTpageSize(){
-    long res=sysconf(_SC_PAGESIZE);
-    return (size_t)res;
+#if defined(sched_getaffinity)
+    cpu_set_t cs;
+    CPU_ZERO(&cs);
+    sched_getaffinity(0, sizeof(cs), &cs);
+    return CPU_COUNT(&cs);
+#else
+    return sysconf(_SC_NPROCESSORS_ONLN);
+#endif
 }
 

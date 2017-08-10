@@ -262,9 +262,9 @@ before_script:
     cp /usr/lib/x86_64-linux-gnu/libhwloc.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libnuma.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libz.a "$HOME/static-libs"; fi
-  # Since Travis workers do not allow overcommitting memory,
-  # we must reduce the amount of vm allocated by the chunk tables.
-  - export SLABS_RATIO=8
+  # configure LTSmin to use a maximum of 4GB of memory, this is neccessary
+  # because sysconf does not work in docker.
+  - export LTSMIN_MEM_SIZE=$((4<<30))
 
 script:
   - ./ltsminreconf &&

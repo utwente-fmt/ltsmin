@@ -13,9 +13,6 @@ puts "\n-----------------------------"
 puts   "TESTING: Algorithmic backends for Promela"
 puts   "-----------------------------\n"
 
-# the number of threads to use in multithreaded backends
-set num_threads 2
-
 set langs [dict create]
 
 # Language frontends:
@@ -26,7 +23,6 @@ compile_promela $prom_model
 
 # prom:
 dict set langs prom model [subst "$prom_model.spins"]
-dict set langs prom options mc "--threads=$num_threads"
 dict set langs prom exp_output "354 states 828 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
 run_test_for_alg_backends $alg_be $langs $backends
