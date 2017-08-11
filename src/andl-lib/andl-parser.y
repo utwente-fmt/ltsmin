@@ -32,6 +32,7 @@
 #include <hre/user.h>
 
     void yy_fatal_error(yyconst char* msg , yyscan_t yyscanner) {
+        (void) msg; (void) yyscanner;
     }
 
     void yyerror(YYLTYPE *loc, void *scanner, andl_context_t *andl_context, const char* c) {
