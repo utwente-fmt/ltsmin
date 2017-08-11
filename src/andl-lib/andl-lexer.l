@@ -6,10 +6,6 @@
 %top{
 #include <hre/config.h>
 #include <andl-lib/libandl_la-andl-parser.h>
-#pragma GCC diagnostic ignored "-Wsign-compare"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
-#pragma GCC diagnostic ignored "-Wtype-limits"
 #define YYSTYPE ANDL_STYPE
 #define YYLTYPE ANDL_LTYPE
 }
