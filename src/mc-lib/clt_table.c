@@ -121,14 +121,13 @@ cas_ret_table (const clt_dbs_t* dbs, size_t pos, clt_bucket_t currval,
 static inline bool
 clt_try_lock (const clt_dbs_t* dbs, size_t pos)
 {
-	clt_bucket_t currval, newval;
-	currval = newval = read_table (dbs, pos);
-    if (currval.locked)
-        return false;
-	currval.occupied = 0;
-	currval.locked = 0;
-	newval.locked = 1;
-	return cas_table (dbs, pos, currval, newval);
+    clt_bucket_t currval, newval;
+    currval = newval = read_table (dbs, pos);
+    if (currval.locked) return false;
+    currval.occupied = 0;
+    currval.locked = 0;
+    newval.locked = 1;
+    return cas_table (dbs, pos, currval, newval);
 }
 
 static inline void
@@ -164,19 +163,19 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k, bool insert)
     size_t          t_left = clt_find_left_from (dbs, idx);
     size_t          t_right = clt_find_right_from (dbs, idx);
 
-    if (t_right - t_left >= dbs->thresh)
-        return DB_FULL;
+    if (t_right - t_left >= dbs->thresh) return DB_FULL;
 
-	if (!clt_try_lock(dbs, t_left)) {
+    if (!clt_try_lock(dbs, t_left)) {
         nanosleep (&BO, NULL);
-		return clt_find_or_put (dbs, k, insert);
+        return clt_find_or_put (dbs, k, insert);
     }
-	if (!clt_try_lock(dbs, t_right)) {
-		clt_unlock (dbs, t_left);
-		nanosleep (&BO, NULL);
-		return clt_find_or_put (dbs, k, insert);
-	}
-	/* Start of CS */
+
+    if (!clt_try_lock(dbs, t_right)) {
+        clt_unlock (dbs, t_left);
+        nanosleep (&BO, NULL);
+        return clt_find_or_put (dbs, k, insert);
+    }
+    /* Startof CS */
     /* =========== */
 
     int count = 0;
