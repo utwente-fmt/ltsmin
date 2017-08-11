@@ -1807,11 +1807,11 @@ gsea_finished(void *arg) {
         Warning (info, "state space %zu levels, %zu states %zu transitions",
              global.max_depth, global.explored, global.n_transitions);
     }
-    
-    if (opt.no_exit || log_active(infoLong))
-        HREprintf (info, "\nDeadlocks: %zu\nInvariant violations: %zu\n"
-             "Error actions: %zu\n", global.deadlocks,global.violations,
-             global.errors);
+
+    if (opt.dlk_detect) Warning(info, "Deadlocks: %s%zu", opt.no_exit ? "" : ">= ", global.deadlocks);
+    if (opt.inv_detect) Warning(info, "Invariant violations: %s%zu", opt.no_exit ? "" : ">= ", global.violations);
+    if (opt.act_detect) Warning(info, "Error actions: %s%zu", opt.no_exit ? "" : ">= ", global.errors);
+
     (void)arg;
 }
 
