@@ -631,7 +631,7 @@ Configuration:
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
-    PNML     = ${have_xml2:-NO, not building pnml (Petri net) front-end}
+    PNML     = ${acx_pnml:-NO, not building pnml (Petri net) front-end}
     PROB     = ${acx_prob:-NO, either ProB was disabled or CZMQ could not be found}
     Sylvan   = ${have_sylvan:-NOT FOUND, not including parallel symbolic algorithms}
 ======================================================================
