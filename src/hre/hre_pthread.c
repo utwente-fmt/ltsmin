@@ -7,9 +7,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef __APPLE__
-#define _DARWIN_C_SOURCE
-#endif
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
