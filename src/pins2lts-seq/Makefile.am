@@ -1,5 +1,6 @@
 HRE_LIB = ../hre/libhre.la
 SEQ_CPPFLAGS = $(AM_CPPFLAGS)
+SEQ_CFLAGS   = $(AM_CFLAGS)
 
 LIBS  = ../pins-lib/libpins.la
 LIBS += ../vset-lib/libvset.la
@@ -100,7 +101,7 @@ pnml2lts_seq_SOURCES   = pins2lts-seq.c
 pnml2lts_seq_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
 pnml2lts_seq_LDADD     = $(PNML_LIBS) $(LIBS) ../andl-lib/libandl.la
 pnml2lts_seq_CPPFLAGS  = -DPNML $(SEQ_CPPFLAGS)
-pnml2lts_seq_CFLAGS    = $(PNML_CFLAGS)
+pnml2lts_seq_CFLAGS    = $(SEQ_CFLAGS) $(PNML_CFLAGS)
 nodist_EXTRA_pnml2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prob2lts-seq

@@ -24,7 +24,7 @@ libhre_la_SOURCES += stringindex.c stringindex.h
 libhre_la_SOURCES += qsortex.c
 
 libhre_la_CPPFLAGS = $(AM_CPPFLAGS)
-libhre_la_CFLAGS   = $(POPT_CFLAGS)
+libhre_la_CFLAGS   = $(AM_CFLAGS) $(POPT_CFLAGS)
 
 ##libhre_la_LIBADD   = ../hre-io/libhre-io.la
 libhre_la_LIBADD   = ../util-lib/libutil.la
