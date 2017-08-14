@@ -21,6 +21,7 @@
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-store.h>
 #include <pins2lts-mc/parallel/worker.h>
+#include <util-lib/sort_r.h>
 #include <util-lib/util.h>
 
 
@@ -294,19 +295,19 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
             perm_do (perm, perm->rand[perm->nstored][i]);
         break;
     case Perm_Dynamic:
-        qsortr (perm->tosort, perm->nstored, sizeof(int), dyn_cmp, perm);
+        sort_r (perm->tosort, perm->nstored, sizeof(int), dyn_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_RR:
-        qsortr (perm->tosort, perm->nstored, sizeof(int), rr_cmp, perm);
+        sort_r (perm->tosort, perm->nstored, sizeof(int), rr_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_SR:
-        qsortr (perm->tosort, perm->nstored, sizeof(int), rand_cmp, perm);
+        sort_r (perm->tosort, perm->nstored, sizeof(int), rand_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_Sort:
-        qsortr (perm->tosort, perm->nstored, sizeof(int), sort_cmp, perm);
+        sort_r (perm->tosort, perm->nstored, sizeof(int), sort_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_Shift:

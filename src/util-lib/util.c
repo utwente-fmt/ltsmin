@@ -112,16 +112,15 @@ ci_print (ci_list *list)
 }
 
 static int
-compint (const void *a, const void *b, void *ctx)
+compint (const void *a, const void *b)
 {
     return *(int *)a - *(int *)b;
-    (void) ctx;
 }
 
 void
 ci_sort (ci_list *list)
 {
-    qsortr (list->data, list->count, sizeof(int), compint, NULL);
+    qsort (list->data, list->count, sizeof(int), compint);
 }
 
 int long_mult_overflow(const long si_a, const long si_b) {
