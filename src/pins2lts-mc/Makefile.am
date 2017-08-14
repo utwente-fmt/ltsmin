@@ -1,4 +1,5 @@
 MC_CPPFLAGS = $(AM_CPPFLAGS)
+MC_CFLAGS   = $(AM_CFLAGS)
 
 MC_LIBS	 = algorithm/libalgorithm.la
 MC_LIBS += ../pins-lib/libpins.la
@@ -112,7 +113,7 @@ pnml2lts_mc_SOURCES   = $(mc_sources)
 pnml2lts_mc_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
 pnml2lts_mc_LDADD     = $(PNML_LIBS) $(MC_LIBS) ../andl-lib/libandl.la
 pnml2lts_mc_CPPFLAGS  = -DPNML $(MC_CPPFLAGS)
-pnml2lts_mc_CFLAGS    = $(PNML_CFLAGS)
+pnml2lts_mc_CFLAGS    = $(MC_CFLAGS) $(PNML_CFLAGS)
 nodist_EXTRA_pnml2lts_mc_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # prob2lts-mc

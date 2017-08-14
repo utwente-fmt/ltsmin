@@ -2,6 +2,7 @@ SUBDIRS = maxsum
 
 SYM_CPP_FLAGS = $(AM_CPPFLAGS) $(PROFILER_CPPFLAGS)
 SYM_LD_FLAGS = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
+SYM_C_FLAGS = $(AM_CFLAGS) $(PROFILER_CFLAGS)
 
 noinst_LTLIBRARIES  = libpins2lts_sym.la
 
@@ -9,6 +10,7 @@ noinst_LTLIBRARIES  = libpins2lts_sym.la
 libpins2lts_sym_la_SOURCES  = pins2lts-sym.c options.h
 libpins2lts_sym_la_CPPFLAGS = $(SYM_CPP_FLAGS)
 libpins2lts_sym_la_LDFLAGS  = $(SYM_LD_FLAGS)
+libpins2lts_sym_la_CFLAGS   = $(SYM_C_FLAGS)
 
 LIBZZZ  = libpins2lts_sym.la
 LIBZZZ += ../pins-lib/libpins.la
@@ -129,7 +131,7 @@ pnml2lts_sym_SOURCES  += ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnm
 pnml2lts_sym_LDADD     = $(PNML_LIBS) $(LIBZZZ) ../andl-lib/libandl.la
 pnml2lts_sym_CPPFLAGS  = -DPNML $(SYM_CPP_FLAGS)
 pnml2lts_sym_LDFLAGS   = $(SYM_LD_FLAGS)
-pnml2lts_sym_CFLAGS    = $(PNML_CFLAGS)
+pnml2lts_sym_CFLAGS    = $(SYM_C_FLAGS) $(PNML_CFLAGS)
 nodist_EXTRA_pnml2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prob2lts-sym

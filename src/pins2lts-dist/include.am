@@ -110,7 +110,7 @@ pnml2lts_dist_SOURCES  += ../../pins-lib/modules/pnml-pins.c ../../pins-lib/modu
 pnml2lts_dist_LDADD     = $(PNML_LIBS) $(LIBS) ../../andl-lib/libandl.la
 pnml2lts_dist_CPPFLAGS  = -DPNML $(DIST_CPPFLAGS)
 pnml2lts_dist_LDFLAGS   = $(AM_LDFLAGS)
-pnml2lts_dist_CFLAGS    = $(PNML_CFLAGS)
+pnml2lts_dist_CFLAGS    = $(DIST_CFLAGS) $(PNML_CFLAGS)
 nodist_EXTRA_pnml2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # prob2lts-dist
