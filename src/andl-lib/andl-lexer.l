@@ -27,6 +27,9 @@ void yyfree(void *ptr, void *yyscanner){
     RTfree(ptr);
 }
 
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 %}
 
 white_space [ \t]+
