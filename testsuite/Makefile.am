@@ -6,23 +6,23 @@ EXTRA_DIST =	ltsmin.exp \
 		lib/include.tcl \
 		lib/default.exp \
 		lib/unix.exp \
-		alg_backends_dve/test1.exp \
-		alg_backends_etf/test1.exp \
-		alg_backends_lpo/test1.exp \
-		alg_backends_lps/test1.exp \
-		alg_backends_mapa/test1.exp \
-		alg_backends_opaal/test1.exp \
-		alg_backends_pbes/test1.exp \
-		alg_backends_pnml/test1.exp \
-		alg_backends_prob/test1.exp \
-		alg_backends_prom/test1.exp \
-		dfs_fifo/test1.exp \
-		ltl_model_checking/test1.exp \
-		lts_generation/test1.exp \
-		partial_order_reduction/test1.exp \
-		safety_model_checking/test1.exp \
-		scc/test1.exp \
-		mu/test1.exp
+		check-DVE/test1.exp \
+		check-ETF/test1.exp \
+		check-LPO/test1.exp \
+		check-LPS/test1.exp \
+		check-MAPA/test1.exp \
+		check-OPAAL/test1.exp \
+		check-PBES/test1.exp \
+		check-PNML/test1.exp \
+		check-ProB/test1.exp \
+		check-Promela/test1.exp \
+		check-DFS-FIFO/test1.exp \
+		check-LTL/test1.exp \
+		check-LTS/test1.exp \
+		check-POR/test1.exp \
+		check-safety/test1.exp \
+		check-SCC/test1.exp \
+		check-MU/test1.exp
 
 CLEANFILES = out/* *.log *.sum
 
@@ -34,88 +34,10 @@ DISTCLEANFILES = site.exp
 
 export DEJAGNU
 
-DEJATOOL  =
+.NOTPARALLEL:
+.PHONY: $(EXTRA_CHECKS) check-long
+$(EXTRA_CHECKS):
+	$(MAKE) $(AM_MAKEFLAGS) check DEJATOOL="$@"
 
-if TEST_DVE
-DEJATOOL +=	alg_backends_dve
-endif
+check-long: $(EXTRA_CHECKS)
 
-if TEST_ETF
-DEJATOOL +=	alg_backends_etf
-endif
-
-if TEST_LTL
-DEJATOOL +=	ltl_model_checking
-endif
-
-if TEST_SAFETY
-DEJATOOL +=	safety_model_checking
-endif
-
-if TEST_POR
-DEJATOOL +=	partial_order_reduction
-endif
-
-if TEST_DFS_FIFO
-DEJATOOL +=	dfs_fifo
-endif
-
-if TEST_SCC	
-DEJATOOL +=	scc
-endif
-
-if TEST_MU
-DEJATOOL +=	mu
-endif
-
-if HAVE_SPINS_COMPILER 
-if TEST_PROMELA
-DEJATOOL +=	alg_backends_prom
-endif
-endif
-
-if HAVE_LIBMCRL2 
-if TEST_LTS_GENERATION
-#if HAVE_CADP
-DEJATOOL +=	lts_generation
-#endif
-endif
-endif
-
-if HAVE_OPAAL_COMPILER
-if TEST_OPAAL
-DEJATOOL +=	alg_backends_opaal
-endif
-endif
-
-if HAVE_LIBMCRL2
-if TEST_LPS
-DEJATOOL +=	alg_backends_lps
-endif
-if TEST_PBES
-DEJATOOL +=	alg_backends_pbes
-endif
-endif
-
-if HAVE_LIBMCRL
-# Test disabled due to bug in mcrl path parsing
-DEJATOOL +=	alg_backends_lpo
-endif
-
-if HAVE_PNML
-if  TEST_PNML
-DEJATOOL +=	alg_backends_pnml
-endif
-endif
-
-if HAVE_PROB 
-if TEST_PROB
-DEJATOOL +=	alg_backends_prob
-endif
-endif
-
-if HAVE_SCOOP
-if TEST_MAPA
-DEJATOOL +=	alg_backends_mapa
-endif
-endif

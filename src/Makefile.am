@@ -96,9 +96,7 @@ SUBDIRS += pins2lts-seq
 
 SUBDIRS += scripts
 
-if TEST_UNIT
 SUBDIRS += tests
-endif
 
 # make
 .DELETE_ON_ERROR:

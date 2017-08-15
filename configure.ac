@@ -479,72 +479,26 @@ AM_COND_IF([HAVE_SPOT], [AC_DEFINE([HAVE_SPOT],, [Define if using Spot.])])
 AM_CONDITIONAL([HAVE_BUDDY], [test x"$acx_buddy" != x])
 AM_COND_IF([HAVE_BUDDY], [AC_DEFINE([HAVE_BUDDY],, [Define if using BuDDy.])])
 
+EXTRA_CHECKS="check-DVE check-ETF"
+AM_COND_IF([HAVE_LIBMCRL], [EXTRA_CHECKS="$EXTRA_CHECKS check-LPO"])
+AM_COND_IF([HAVE_LIBMCRL2], [EXTRA_CHECKS="$EXTRA_CHECKS check-LPS"])
+AM_COND_IF([HAVE_SCOOP], [EXTRA_CHECKS="$EXTRA_CHECKS check-MAPA"])
+AM_COND_IF([HAVE_OPAAL_COMPILER], [EXTRA_CHECKS="$EXTRA_CHECKS check-OPAAL"])
+AM_COND_IF([HAVE_LIBMCRL2], [EXTRA_CHECKS="$EXTRA_CHECKS check-PBES"])
+AM_COND_IF([HAVE_PNML], [EXTRA_CHECKS="$EXTRA_CHECKS check-PNML"])
+AM_COND_IF([HAVE_PROB], [EXTRA_CHECKS="$EXTRA_CHECKS check-ProB"])
+AM_COND_IF([HAVE_SPINS_COMPILER], [EXTRA_CHECKS="$EXTRA_CHECKS check-Promela"])
+EXTRA_CHECKS="$EXTRA_CHECKS check-DFS-FIFO check-LTL"
+AM_COND_IF([HAVE_LIBMCRL2], [EXTRA_CHECKS="$EXTRA_CHECKS check-LTS"])
+EXTRA_CHECKS="$EXTRA_CHECKS check-MU check-POR check-safety check-SCC"
+AC_SUBST([EXTRA_CHECKS])
+
 AM_CONDITIONAL(BUILD_OS_IS_DARWIN,
 [case "${build_os}" in
   darwin*)  true ;;
   *)        false ;;
 esac])
 
-# all tests
-AC_ARG_ENABLE([test-all], [AS_HELP_STRING([--disable-test-all],
-               [do not run any tests (so specific tests can be enabled)])],, enable_test_all=yes)
-
-# unit tests
-AC_ARG_ENABLE([test-unit], [AS_HELP_STRING([--disable-test-unit],
-               [do not run the unit tests])],, enable_test_unit=$enable_test_all)
-AM_CONDITIONAL([TEST_UNIT], [test x"$enable_test_unit" = xyes])
-
-# front-ends
-AC_ARG_ENABLE([test-DVE], [AS_HELP_STRING([--disable-test-DVE],
-               [do not test the DVE front-end])],, enable_test_DVE=$enable_test_all)
-AM_CONDITIONAL([TEST_DVE], [test x"$enable_test_DVE" = xyes])
-AC_ARG_ENABLE([test-ETF], [AS_HELP_STRING([--disable-test-ETF],
-               [do not test the ETF front-end])],, enable_test_ETF=$enable_test_all)
-AM_CONDITIONAL([TEST_ETF], [test x"$enable_test_ETF" = xyes])
-AC_ARG_ENABLE([test-Promela], [AS_HELP_STRING([--disable-test-Promela],
-               [do not test the Promela front-end])],, enable_test_Promela=$enable_test_all)
-AM_CONDITIONAL([TEST_PROMELA], [test x"$enable_test_Promela" = xyes])
-AC_ARG_ENABLE([test-LPS], [AS_HELP_STRING([--disable-test-LPS],
-               [do not test the LPS front-end])],, enable_test_LPS=$enable_test_all)
-AM_CONDITIONAL([TEST_LPS], [test x"$enable_test_LPS" = xyes])
-AC_ARG_ENABLE([test-PBES], [AS_HELP_STRING([--disable-test-PBES],
-               [do not test the PBES front-end])],, enable_test_PBES=$enable_test_all)
-AM_CONDITIONAL([TEST_PBES], [test x"$enable_test_PBES" = xyes])
-AC_ARG_ENABLE([test-OPAAL], [AS_HELP_STRING([--disable-test-OPAAL],
-               [do not test the OPAAL front-end])],, enable_test_OPAAL=$enable_test_all)
-AM_CONDITIONAL([TEST_OPAAL], [test x"$enable_test_OPAAL" = xyes])
-AC_ARG_ENABLE([test-PNML], [AS_HELP_STRING([--disable-test-PNML],
-               [do not test the PNML front-end])],, enable_test_PNML=$enable_test_all)
-AM_CONDITIONAL([TEST_PNML], [test x"$enable_test_PNML" = xyes])
-AC_ARG_ENABLE([test-ProB], [AS_HELP_STRING([--disable-test-ProB],
-               [do not test the ProB front-end])],, enable_test_ProB=$enable_test_all)
-AM_CONDITIONAL([TEST_PROB], [test x"$enable_test_ProB" = xyes])
-AC_ARG_ENABLE([test-MAPA], [AS_HELP_STRING([--disable-test-MAPA],
-               [do not test the MAPA front-end])],, enable_test_MAPA=$enable_test_all)
-AM_CONDITIONAL([TEST_MAPA], [test x"$enable_test_MAPA" = xyes])
-
-# other algorithms
-AC_ARG_ENABLE([test-LTL], [AS_HELP_STRING([--disable-test-LTL],
-               [do not test LTL model checking])],, enable_test_LTL=$enable_test_all)
-AM_CONDITIONAL([TEST_LTL], [test x"$enable_test_LTL" = xyes])
-AC_ARG_ENABLE([test-safety], [AS_HELP_STRING([--disable-test-safety],
-               [do not test safety model checking])],, enable_test_safety=$enable_test_all)
-AM_CONDITIONAL([TEST_SAFETY], [test x"$enable_test_safety" = xyes])
-AC_ARG_ENABLE([test-POR], [AS_HELP_STRING([--disable-test-POR],
-               [do not test Partial Order Reduction])],, enable_test_POR=$enable_test_all)
-AM_CONDITIONAL([TEST_POR], [test x"$enable_test_POR" = xyes])
-AC_ARG_ENABLE([test-DFS_FIFO], [AS_HELP_STRING([--disable-test-DFS-FIFO],
-               [do not test the DFS_FIFO algorithm])],, enable_test_DFS_FIFO=$enable_test_all)
-AM_CONDITIONAL([TEST_DFS_FIFO], [test x"$enable_test_DFS_FIFO" = xyes])
-AC_ARG_ENABLE([test-SCC], [AS_HELP_STRING([--disable-test-SCC],
-               [do not test the SCC algorithms])],, enable_test_SCC=$enable_test_all)
-AM_CONDITIONAL([TEST_SCC], [test x"$enable_test_SCC" = xyes])
-AC_ARG_ENABLE([test-MU], [AS_HELP_STRING([--disable-test-MU],
-               [do not test the mu-calculus algorithms])],, enable_test_MU=$enable_test_all)
-AM_CONDITIONAL([TEST_MU], [test x"$enable_test_MU" = xyes])
-AC_ARG_ENABLE([test-LTS-generation], [AS_HELP_STRING([--disable-test-LTS-generation],
-               [do not test LTS generation])],, enable_test_LTS_generation=$enable_test_all)
-AM_CONDITIONAL([TEST_LTS_GENERATION], [test x"$enable_test_LTS_generation" = xyes])
 
 AC_CONFIG_COMMANDS_POST(
   [ac_configure_args="$ac_configure_args --enable-keep-terminated-procs dnl

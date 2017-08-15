@@ -42,3 +42,11 @@ if HAVE_SPINS_COMPILER
 spins/spins.jar:
 	test -f $@ || (cd "${top_srcdir}/spins/src" && $(ANT))
 endif
+
+.NOTPARALLEL:
+.PHONY: $(EXTRA_CHECKS) check-long
+$(EXTRA_CHECKS): check
+	cd testsuite && $(MAKE) $(AM_MAKEFLAGS) $@
+check-long:
+	cd testsuite && $(MAKE) $(AM_MAKEFLAGS) $@
+

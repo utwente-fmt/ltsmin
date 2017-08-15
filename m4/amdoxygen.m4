@@ -131,7 +131,6 @@ DX_CLEAN_LATEX = $(DX_DOCDIR)/latex
 
 endif DX_COND_latex
 
-.PHONY: doxygen-run doxygen-doc doxygen-clean $(DX_PS_GOAL) $(DX_PDF_GOAL)
 
 .INTERMEDIATE: doxygen-run $(DX_PS_GOAL) $(DX_PDF_GOAL)
 
@@ -152,3 +151,5 @@ doxygen-clean:
 	$(RM) -r $(DX_CLEANFILES)
 
 endif DX_COND_doc
+
+.PHONY: doxygen-run doxygen-doc doxygen-clean $(DX_PS_GOAL) $(DX_PDF_GOAL)
