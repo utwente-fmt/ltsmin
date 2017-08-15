@@ -22,3 +22,6 @@ libutil_la_SOURCES += simplemap.c simplemap.h
 libutil_la_SOURCES += util.c util.h
 libutil_la_SOURCES += zobrist.c zobrist.h
 libutil_la_CPPFLAGS = $(AM_CPPFLAGS) 
+
+EXTRA_DIST = sort_r.h
+

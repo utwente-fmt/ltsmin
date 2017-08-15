@@ -124,6 +124,7 @@ extra_ASCIIDOC += inc/pnml.txt
 extra_ASCIIDOC += inc/pnml-options.txt
 extra_ASCIIDOC += inc/prob.txt
 extra_ASCIIDOC += inc/prob-options.txt
+extra_ASCIIDOC += inc/procs-option.txt
 extra_ASCIIDOC += inc/prom.txt
 extra_ASCIIDOC += inc/reachability-options.txt
 extra_ASCIIDOC += inc/scoop-options.txt
@@ -131,6 +132,7 @@ extra_ASCIIDOC += inc/spg-options.txt
 extra_ASCIIDOC += inc/spg-solve-options.txt
 extra_ASCIIDOC += inc/support.txt
 extra_ASCIIDOC += inc/sylvan-options.txt
+extra_ASCIIDOC += inc/threads-option.txt
 extra_ASCIIDOC += inc/vset-options.txt
 extra_ASCIIDOC += inc/regroup-options.txt
 
