@@ -15,6 +15,5 @@ pins-open: pins-open.in Makefile subst_pins_open.mk
 CLEANFILES 		= pins-open
 DISTCLEANFILES  = subst_pins_open.mk
 
-EXTRA_DIST  = pins-open.in spins.in
-EXTRA_DIST += subst_pins_open.mk
+EXTRA_DIST  = pins-open.in spins
 
