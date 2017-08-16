@@ -3,13 +3,15 @@
 #include <sys/sysctl.h>
 #include <sys/types.h>
 #endif
-
 #include <hre/config.h>
 
 #include <dlfcn.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
+#ifdef __linux__
+#   include <sched.h> // for sched_getaffinity
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -163,7 +165,7 @@ int RTcacheLineSize(){
 #endif
 
 int RTnumCPUs(){
-#if defined(sched_getaffinity)
+#ifdef __linux__
     cpu_set_t cs;
     CPU_ZERO(&cs);
     sched_getaffinity(0, sizeof(cs), &cs);
