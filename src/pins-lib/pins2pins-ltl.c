@@ -536,6 +536,26 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 static ltsmin_buchi_t  *shared_ba = NULL;
 static int              grab_ba = 0;
 
+static void check_POR_X(ltsmin_expr_t e, ltsmin_parse_env_t env) {
+    if (!PINS_POR) return;
+    switch (e->node_type) {
+        case BINARY_OP: {
+            check_POR_X(e->arg1, env);
+            check_POR_X(e->arg2, env);
+            break;
+        }
+        case UNARY_OP: {
+            if (e->token == LTL_NEXT) {
+                const char* ex = LTSminPrintExpr(e, env);
+                Abort("The neXt operator is not allowed in "
+                        "combination with --por: %s", ex);
+            } else check_POR_X(e->arg1, env);
+            break;
+        }
+        default: break;
+    }
+}
+
 /* NOTE: this is hack around non-thread-safe ltl2ba
  * In multi-process environment, all processes create their own buchi,
  * which is what we want anyway, because ltsmin_ltl2ba uses strdup.
@@ -547,6 +567,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         Warning(info, "LTL layer: formula: %s", ltl_file);
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
         ltsmin_expr_t ltl = ltl_parse_file (ltl_file, env, GBgetLTStype(model));
+        check_POR_X(ltl, env);
 
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
 
