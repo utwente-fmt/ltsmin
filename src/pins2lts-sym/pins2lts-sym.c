@@ -913,6 +913,40 @@ inv_cleanup()
     }
 }
 
+/**
+ * Compute a trace to a state that violates invariant i.
+ *
+ * \param i the invariant number.
+ * \param true_states short states that satisfy invariant i.
+ * \param short_states short states over which invariant i was evaluated,
+ *   so it maybe a super set of true_states.
+ * \param long_states same as \p short_states, but long vectors.
+ * \param level the BFS level at which the violation was found.
+ */
+static inline void
+inv_trace(int i, vset_t true_states, vset_t short_states, vset_t long_states,
+        int level)
+{
+    if (trc_output) {
+        /* compute the set of projected states that do not
+         * satisfy invariant i.
+         */
+        vset_minus(true_states, short_states);
+
+        /* compute the set of unprojected states that do
+         * not satisfy invariant i.
+         */
+        vset_t violated = vset_create(domain, -1, NULL);
+        vset_join(violated, true_states, long_states);
+        int e[1][N];
+        vset_example(violated, e[0]);
+        vset_destroy(violated);
+        char name[256];
+        snprintf(name, 256, "invariant-%d", i);
+        find_trace(e, 1, level, levels, name);
+    }
+}
+
 static inline void
 check_inv(vset_t states, const int level)
 {
@@ -928,10 +962,13 @@ check_inv(vset_t states, const int level)
                     if (!vset_equal(inv_set[i], container)) {
                         LTSminExprDestroy(inv_expr[i], 1);
                         LTSminParseEnvDestroy(inv_parse_env[i]);
-                        vset_destroy(inv_set[i]);
                         Warning(info, " ");
                         Warning(info, "Invariant violation (%s) found at depth %d!", inv_detect[i], level);
                         Warning(info, " ");
+
+                        inv_trace(i, inv_set[i], container, states, level);
+
+                        vset_destroy(inv_set[i]);
                         inv_violated[i] = 1;
                         iv = 1;
                         num_inv_violated++;
@@ -972,10 +1009,13 @@ TASK_3(int, check_inv_par_go, vset_t, states, int, i, int, level)
             if (!vset_equal(inv_set[i], container)) {
                 LTSminExprDestroy(inv_expr[i], 1);
                 LTSminParseEnvDestroy(inv_parse_env[i]);
-                vset_destroy(inv_set[i]);
                 Warning(info, " ");
                 Warning(info, "Invariant violation (%s) found at depth %d!", inv_detect[i], level);
                 Warning(info, " ");
+
+                inv_trace(i, inv_set[i], container, states, level);
+
+                vset_destroy(inv_set[i]);
                 RTfree(inv_detect[i]);
                 inv_violated[i] = 1;
                 res = 1;
