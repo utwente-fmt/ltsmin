@@ -98,10 +98,8 @@ AS_IF([test x"$PKG_CONFIG" = x], [AC_MSG_FAILURE([Please install pkgconf])])
 AC_ARG_ENABLE([pkgconf_static],
     [AS_HELP_STRING([--enable-pkgconf-static], [
         Configure pkgconf to search for private libs too.
-        This is necessary when you want to statically link binaries.])],
-    [:],
-    [enable_pkgconf_static=no])
-AS_IF([test x"$enable_pkgconf_static" = "xyes"], [PKG_CONFIG="$PKG_CONFIG --static"])
+        This is necessary when you want to statically link binaries.])])
+AS_IF([test "x$enable_pkgconf_static" = "xyes"], [PKG_CONFIG="$PKG_CONFIG --static"])
 
 AX_PROG_BISON([BISON="$YACC"],[AC_MSG_FAILURE([Please install Bison])])
 AX_PROG_BISON_VERSION([3.0.2],,[AC_MSG_FAILURE([Please install Bison >= 3.0.2])])
@@ -111,15 +109,14 @@ ACX_SPINS([:], [AC_MSG_WARN([SpinS will not be compiled.])])
 
 AC_ARG_ENABLE([dist],
               [AS_HELP_STRING([--disable-dist],
-               [do not build distributed tools, that require MPI])],,
-              enable_dist=yes)
-AS_IF([test x"$enable_dist" = "xyes"],[
-AC_LANG_PUSH([C])
-AX_MPI([have_mpi=yes],[AC_MSG_WARN([unable to find working MPI C complier wrapper])])
-AC_LANG_POP([C])
-AC_LANG_PUSH([C++])
-AX_MPI([have_mpi=yes],[AC_MSG_WARN([unable to find working MPI C++ complier wrapper])])
-AC_LANG_POP([C++])
+               [do not build distributed tools, that require MPI])])
+AS_IF([test "x$enable_dist" != "xno"],[
+    AC_LANG_PUSH([C])
+    AX_MPI([have_mpi=yes],[AC_MSG_WARN([unable to find working MPI C complier wrapper])])
+    AC_LANG_POP([C])
+    AC_LANG_PUSH([C++])
+    AX_MPI([have_mpi=yes],[AC_MSG_WARN([unable to find working MPI C++ complier wrapper])])
+    AC_LANG_POP([C++])
 ])
 
 AC_PROG_CC_C99
@@ -208,8 +205,9 @@ ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
 
-AC_ARG_ENABLE([spot],
-    AS_HELP_STRING([--disable-spot], [do not include the Spot library for LTL model checking]),, [
+AC_ARG_WITH([spot],
+    AS_HELP_STRING([--without-spot], [do not include the Spot library for LTL model checking]))
+AS_IF([test "x$with_spot" != "xno"], [
     PKG_CHECK_MODULES([SPOT], [libspot >= 2.3],[
         acx_spot=yes],
         [AC_MSG_WARN(No valid spot version found!)
@@ -368,25 +366,21 @@ fi
 
 AC_SUBST(AM_CPPFLAGS,['-I${top_srcdir}/src -I${top_builddir}/src'])
 
-AC_ARG_ENABLE([opaal], [AS_HELP_STRING([--disable-opaal], [Do not compile OPAAL front-end])],, [
+AC_ARG_ENABLE([opaal], [AS_HELP_STRING([--disable-opaal], [Do not compile OPAAL front-end])])
+AS_IF([test "x$enable_opaal" != "xno"], [
     AC_CHECK_PROGS(OPAAL_LTSMIN,[opaal_ltsmin])
     have_opaal="yes"
 ])
 
-AC_ARG_ENABLE([scoop],[AS_HELP_STRING([--disable-scoop],[Do not compile scoop front-end])],, [
+AC_ARG_ENABLE([scoop],[AS_HELP_STRING([--disable-scoop],[Do not compile scoop front-end])])
+AS_IF([test "x$enable_scoop" != "xno"], [
     AC_CHECK_PROG(GHC, ghc, ghc)
     AC_CHECK_PROG(HAPPY, happy, happy)
-    if test -z "$GHC" -o -z "$HAPPY"; then
-        [enable_scoop=no]
-    else
-        [enable_scoop=yes]
-    fi
+    AS_IF([test -n "$GHC" -a -n "$HAPPY"], [
+        AC_CONFIG_SUBDIRS([scoop])
+        [have_scoop="yes"]
+    ])
 ])
-
-if test "x$enable_scoop" == xyes; then
-    AC_CONFIG_SUBDIRS([scoop])
-    [have_scoop="yes"]
-fi
 
 AX_BOOST_BASE([1.46],[have_boost="yes"],)
 AX_PATH_VIENNACL(1.5.1, no)
@@ -396,7 +390,8 @@ else
     AC_MSG_WARN([no acceptable ViennaCL installation found.])
 fi
 
-AC_ARG_ENABLE([pnml], [AS_HELP_STRING([--disable-pnml], [Do not compile PNML front-end])],, [
+AC_ARG_ENABLE([pnml], [AS_HELP_STRING([--disable-pnml], [Do not compile PNML front-end])])
+AS_IF([test "x$enable_pnml" != "xno"], [
     PKG_CHECK_MODULES([XML2], [libxml-2.0], [
         acx_pnml=yes
         PNML_CFLAGS="$XML2_CFLAGS"
@@ -411,7 +406,8 @@ PKG_CHECK_MODULES([POPT], [popt],,[
     AC_MSG_ERROR(Missing required package popt please install popt.)
 ])
 
-AC_ARG_ENABLE([prob], [AS_HELP_STRING([--disable-prob], [Do not compile ProB front-end])],, [
+AC_ARG_ENABLE([prob], [AS_HELP_STRING([--disable-prob], [Do not compile ProB front-end])])
+AS_IF([test "x$enable_prob" != "xno"], [
     PKG_CHECK_MODULES([CZMQ], [libczmq],[
         acx_prob=yes
         PROB_CFLAGS="$CZMQ_CFLAGS"
@@ -423,13 +419,11 @@ AC_ARG_ENABLE([prob], [AS_HELP_STRING([--disable-prob], [Do not compile ProB fro
 ])
 
 AC_ARG_ENABLE([werror],
-    [AS_HELP_STRING([--enable-werror], [Use -Werror @<:@no@:>@])],
-    [:],
-    [enable_werror=no])
-AS_IF([test x"$enable_werror" = "xyes"], [AC_SUBST([AM_CFLAGS], [-Werror])])
+    [AS_HELP_STRING([--enable-werror], [Use -Werror @<:@no@:>@])])
+AS_IF([test "x$enable_werror" = "xyes"], [AC_SUBST([AM_CFLAGS], [-Werror])])
 
 AC_ARG_WITH([sylvan],
-    [AS_HELP_STRING([--without-sylvan], [do not include Sylvan's multi-core decision diagram packages])])
+    [AS_HELP_STRING([--without-sylvan], [do not include Sylvan multi-core decision diagram packages])])
 
 AS_IF([test "x$with_sylvan" != "xno"], [
     PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.1 sylvan < 1.2],[
