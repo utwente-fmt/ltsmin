@@ -134,6 +134,7 @@ ACX_MCRL([:],
   [AC_MSG_WARN([no acceptable muCRL installation found.])])
 ACX_MCRL2([:],
   [AC_MSG_WARN([no acceptable mCRL2 installation found.])])
+
 AC_CHECK_PROGS(ASCIIDOC, [asciidoc])
 if test x"$ASCIIDOC" = x && test -d "${srcdir}/.git"; then
   AC_MSG_WARN([Asciidoc is needed for building documentation.])
@@ -420,7 +421,10 @@ AS_IF([test "x$enable_prob" != "xno"], [
 
 AC_ARG_ENABLE([werror],
     [AS_HELP_STRING([--enable-werror], [Use -Werror @<:@no@:>@])])
-AS_IF([test "x$enable_werror" = "xyes"], [AC_SUBST([AM_CFLAGS], [-Werror])])
+AS_IF([test "x$enable_werror" = "xyes"], [
+    AC_SUBST([AM_CFLAGS], [-Werror])
+    AC_SUBST([AM_CXXFLAGS], [-Werror])
+])
 
 AC_ARG_WITH([sylvan],
     [AS_HELP_STRING([--without-sylvan], [do not include Sylvan multi-core decision diagram packages])])
