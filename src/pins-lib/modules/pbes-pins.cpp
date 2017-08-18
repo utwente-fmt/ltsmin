@@ -23,7 +23,7 @@ extern "C" {
 
 } // end of extern "C"
 
-#ifdef MCRL2_JITTYC_AVAILABLE
+#if defined(MCRL2_JITTYC_AVAILABLE) && !defined(DISABLE_JITTYC)
 static const char* mcrl2_rewriter = "jittyc";
 #else
 static const char* mcrl2_rewriter = "jitty";
@@ -287,6 +287,11 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
                 log::log_level_t log_level = static_cast<log::log_level_t>(static_cast<size_t>(log::mcrl2_logger::get_reporting_level()) + mcrl2_verbosity);
                 log::mcrl2_logger::set_reporting_level(log_level);
             }
+#ifdef DISABLE_JITTYC
+            if (strcmp(mcrl2_rewriter, "jittyc") == 0) {
+                Abort("The jittyc rewriter was disabled at compile time");
+            }
+#endif
             Warning(info,"PBES language module initialized");
             return;
         }

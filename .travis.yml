@@ -264,6 +264,9 @@ before_script:
     cp /usr/lib/x86_64-linux-gnu/libz.a "$HOME/static-libs"; fi
 
 script:
+  # the jittyc rewriter will be disabled on OSX, because of a possible
+  # inconsistency between libc++ versions: https://github.com/utwente-fmt/ltsmin/issues/87.
+  - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" = "xyes" ]; then CONFIGURE_WITH="$CONFIGURE_WITH --disable-mcrl2-jittyc"; fi
   - ./ltsminreconf &&
     ./configure --prefix=/tmp/dist --with-viennacl="$HOME/ltsmin-deps/include" --without-scoop $CONFIGURE_WITH
   - if [ "$TRAVIS_OS_NAME" = "osx" -a "x$RELEASE_BUILD" = "xyes" ]; then make LDFLAGS="-Wl,-search_paths_first -L$HOME/static-libs -weak-liconv"; fi # libiconv is necessary for libpopt
