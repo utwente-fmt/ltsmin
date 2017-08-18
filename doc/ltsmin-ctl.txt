@@ -49,3 +49,4 @@ For variable naming consult the +--labels+ option in the PINS tools.
 == SEE ALSO
 manpage:ltsmin[7],
 manpage:etf2lts-sym[1]
+manpage:ltsmin-type-system[5]

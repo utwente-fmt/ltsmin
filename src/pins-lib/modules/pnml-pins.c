@@ -19,6 +19,7 @@
 #include <pins-lib/modules/pnml-pins.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/pins-util.h>
+#include <util-lib/sort_r.h>
 
 #define NUM_TRANSS pn_context->num_transitions
 #define NUM_PLACES SIgetCount(pn_context->place_names)
@@ -329,7 +330,7 @@ get_labels(model_t model, sl_group_enum_t group, int *src, int *label) {
 }
 
 static int
-groups_of_edge(model_t model, int edgeno, int index, int* *groups)
+groups_of_edge(model_t model, int edgeno, int index, const int **groups)
 {
     pn_context_t *pn_context = GBgetContext(model);
 
@@ -345,8 +346,7 @@ groups_of_edge(model_t model, int edgeno, int index, int* *groups)
     if (index + 1 == num_labels) len = NUM_TRANSS - begin;
     else len = pn_context->groups_of_edges_begin[index + 1] - begin;
 
-    *groups = (int*) RTmalloc(sizeof(int[len]));
-    memcpy(*groups, pn_context->groups_of_edges + begin, sizeof(int[len]));
+    *groups = pn_context->groups_of_edges + begin;
 
     return len;
 }
@@ -819,7 +819,7 @@ init_groups_of_edge(pn_context_t *pn_context)
 {
     pn_context->groups_of_edges = RTmalloc(sizeof(int[NUM_TRANSS]));
     for (int i = 0; i < NUM_TRANSS; i++) pn_context->groups_of_edges[i] = i;
-    qsort_r(pn_context->groups_of_edges, NUM_TRANSS, sizeof(int),
+    sort_r(pn_context->groups_of_edges, NUM_TRANSS, sizeof(int),
             compare_transition_label, pn_context->transitions);
 
     const int num_labels = SIgetCount(pn_context->edge_labels);

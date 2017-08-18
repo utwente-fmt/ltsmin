@@ -9,27 +9,6 @@ AC_CONFIG_HEADERS([src/hre/config.h])
 AC_SUBST([pkglibdir], "\${libdir}/${PACKAGE_NAME}-${PACKAGE_VERSION}")
 
 AC_USE_SYSTEM_EXTENSIONS
-AH_VERBATIM([_XOPEN_SOURCE],[
-/* Define if you have POSIX and XPG specifications */
-#ifndef _XOPEN_SOURCE
-# undef _XOPEN_SOURCE
-#endif])
-AC_DEFINE([_XOPEN_SOURCE], 600L)
-AH_VERBATIM([_LARGEFILE_SOURCE],[
-/* Define for large file support */
-#ifndef _LARGEFILE_SOURCE
-# undef _LARGEFILE_SOURCE
-#endif
-#ifndef _LARGEFILE64_SOURCE
-# undef _LARGEFILE64_SOURCE
-#endif
-#ifndef _FILE_OFFSET_BITS
-# undef _FILE_OFFSET_BITS
-#endif
-])
-AC_DEFINE([_LARGEFILE_SOURCE])
-AC_DEFINE([_LARGEFILE64_SOURCE])
-AC_DEFINE([_FILE_OFFSET_BITS], 64)
 
 AC_DEFINE([LTSMIN_PATHNAME_MAX], 1024, [Define maximal length of pathnames])
 AC_DEFINE([LTSMIN_CONFIG_INCLUDED], 1, [Controls where headers are included from])
@@ -185,7 +164,6 @@ dnl some autotools/libtool versions appear to lose dependencies to -lm
 dnl when linking .la files with CXXLD, hence add it here
 AC_SEARCH_LIBS([pow], [m])
 AC_CHECK_LIB([dl], [dlsym],,[AC_MSG_FAILURE([libdl not found.])])
-AC_CHECK_LIB([popt],[poptGetContext],,[AC_MSG_FAILURE([popt not found.])])
 AC_CHECK_LIB([z], [inflateEnd],,[AC_MSG_FAILURE([zlib not found.])])
 
 AC_ARG_WITH([bignum],
@@ -230,10 +208,8 @@ ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
 
-AC_ARG_WITH([spot],
-    [AS_HELP_STRING([--without-spot], [do not include the Spot library for LTL model checking])])
-
-AS_IF([test "x$with_spot" != "xno"], [
+AC_ARG_ENABLE([spot],
+    AS_HELP_STRING([--disable-spot], [do not include the Spot library for LTL model checking]),, [
     PKG_CHECK_MODULES([SPOT], [libspot >= 2.3],[
         acx_spot=yes],
         [AC_MSG_WARN(No valid spot version found!)
@@ -330,8 +306,6 @@ AS_IF([test x"$have_libgmp" = xyes],
 AS_IF([test x"$have_libtommath" = xyes], 
   [AC_CHECK_HEADERS([tommath.h],,[AC_MSG_FAILURE([tommath.h not found.])])])
 
-AC_CHECK_HEADER([popt.h],[], [AC_MSG_FAILURE([popt.h not found.])])
-
 AC_CACHE_SAVE
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -388,32 +362,28 @@ if test x"$acx_atomics" != "xyes"; then
   AC_MSG_FAILURE([no acceptable atomic operations found.])
 fi
 
-have_opaal="yes"
-#AC_CHECK_LIB([tbbmalloc_proxy], [malloc],
-#    [have_tbbmalloc="TBB malloc library was found"]
-#    AC_SUBST([MALLOC_LIBS], ["-ltbbmalloc_proxy"])
-#    [have_opaal="yes"],
-#    AC_MSG_WARN([TBB malloc library not found.]))
-
 if test "x$have_libspg" == xyes; then
     AC_DEFINE([HAVE_LIBSPG], [], [Defined if the SPG lib has been compiled.])
 fi
 
 AC_SUBST(AM_CPPFLAGS,['-I${top_srcdir}/src -I${top_builddir}/src'])
 
-AC_CHECK_PROGS(OPAAL_LTSMIN,[opaal_ltsmin])
+AC_ARG_ENABLE([opaal], [AS_HELP_STRING([--disable-opaal], [Do not compile OPAAL front-end])],, [
+    AC_CHECK_PROGS(OPAAL_LTSMIN,[opaal_ltsmin])
+    have_opaal="yes"
+])
 
-AC_ARG_WITH([scoop],[AS_HELP_STRING([--with-scoop],[Compile scoop])],[],[
+AC_ARG_ENABLE([scoop],[AS_HELP_STRING([--disable-scoop],[Do not compile scoop front-end])],, [
     AC_CHECK_PROG(GHC, ghc, ghc)
     AC_CHECK_PROG(HAPPY, happy, happy)
-    if test -z "$GHC" -o -z "$HAPPY"; then    
-        [with_scoop=no]
+    if test -z "$GHC" -o -z "$HAPPY"; then
+        [enable_scoop=no]
     else
-        [with_scoop=yes]
+        [enable_scoop=yes]
     fi
 ])
 
-if test "x$with_scoop" == xyes; then
+if test "x$enable_scoop" == xyes; then
     AC_CONFIG_SUBDIRS([scoop])
     [have_scoop="yes"]
 fi
@@ -426,22 +396,30 @@ else
     AC_MSG_WARN([no acceptable ViennaCL installation found.])
 fi
 
-PKG_CHECK_MODULES([XML], [libxml-2.0], [have_xml2=yes],[
-    AC_MSG_WARN(libxml2 is not installed. Not building PNML front-end)
+AC_ARG_ENABLE([pnml], [AS_HELP_STRING([--disable-pnml], [Do not compile PNML front-end])],, [
+    PKG_CHECK_MODULES([XML2], [libxml-2.0], [
+        acx_pnml=yes
+        PNML_CFLAGS="$XML2_CFLAGS"
+        PNML_LIBS="$XML2_LIBS"
+        AC_SUBST(PNML_CFLAGS)
+        AC_SUBST(PNML_LIBS)],
+        AC_MSG_WARN(libxml2 is not installed. Not building PNML front-end)
+    )
 ])
 
-AC_ARG_ENABLE([prob],[AS_HELP_STRING([--enable-prob],[Compile ProB front-end])],[],[with_prob=yes])
-AS_IF([test x"$with_prob" = "xyes"],[
+PKG_CHECK_MODULES([POPT], [popt],,[
+    AC_MSG_ERROR(Missing required package popt please install popt.)
+])
+
+AC_ARG_ENABLE([prob], [AS_HELP_STRING([--disable-prob], [Do not compile ProB front-end])],, [
     PKG_CHECK_MODULES([CZMQ], [libczmq],[
         acx_prob=yes
         PROB_CFLAGS="$CZMQ_CFLAGS"
-        PROB_LDFLAGS="$CZMQ_LDFLAGS"
         PROB_LIBS="$CZMQ_LIBS"
         AC_SUBST(PROB_CFLAGS)
-        AC_SUBST(PROB_LDFLAGS)
         AC_SUBST(PROB_LIBS)],
-        [AC_MSG_WARN(libczmq is not installed. Not building ProB front-end)
-    ])
+        AC_MSG_WARN(libczmq is not installed. Not building ProB front-end)
+    )
 ])
 
 AC_ARG_ENABLE([werror],
@@ -493,7 +471,7 @@ AM_CONDITIONAL([HAVE_LIBZIP], [test x"$acx_libzip" = xyes])
 AM_CONDITIONAL([HAVE_PROFILER], [test x"$acx_profiler" = xyes])
 AM_CONDITIONAL([HAVE_BOOST], [test x"$have_boost" = xyes])
 AM_CONDITIONAL([HAVE_VIENNACL], [test x"$have_viennacl" = xyes])
-AM_CONDITIONAL([HAVE_PNML], [test x"$have_xml2" = xyes])
+AM_CONDITIONAL([HAVE_PNML], [test x"$acx_pnml" = xyes])
 AM_CONDITIONAL([HAVE_PROB], [test x"$acx_prob" = xyes])
 AM_CONDITIONAL([HAVE_SPOT], [test x"$acx_spot" = xyes])
 AS_IF([test x"$acx_spot" = "xyes"], [AC_DEFINE([HAVE_SPOT], [1], [Define if using Spot.])])
@@ -653,7 +631,7 @@ Configuration:
     XMLTO    = ${XMLTO:-NOT FOUND, not building manpages}
     BOOST    = ${have_boost:-NOT FOUND, not including advanced variable reordering algorithms}
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
-    PNML     = ${have_xml2:-NO, not building pnml (Petri net) front-end}
+    PNML     = ${acx_pnml:-NO, not building pnml (Petri net) front-end}
     PROB     = ${acx_prob:-NO, either ProB was disabled or CZMQ could not be found}
     Sylvan   = ${have_sylvan:-NOT FOUND, not including parallel symbolic algorithms}
 ======================================================================

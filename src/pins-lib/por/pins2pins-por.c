@@ -187,7 +187,7 @@ get_local ()
 {
     local_t* loc = HREgetLocal (local_key);
     if (loc == NULL) {
-        loc = RTmalloc (sizeof(local_t));
+        loc = RTmallocZero (sizeof(local_t));
         HREsetLocal (local_key, loc);
     }
     return loc;
@@ -206,7 +206,9 @@ por_seen (int *dst, int group, bool src_changed)
 {
     transition_info_t  ti = GB_TI (NULL, src_changed ? -1 : group);
     local_t           *loc = get_local ();
-    HREassert (loc, "POR seen not activated (call por_set_find_state)");
+    HREassert (loc->find_state && loc->find_state_ctx,
+            "POR seen not activated (call por_set_find_state)");
+
     return loc->find_state (dst, &ti, loc->find_state_ctx);
 }
 

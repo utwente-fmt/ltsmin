@@ -266,7 +266,7 @@ public:
         }
     }
 
-    int groups_of_edge (int edgeno, int index, int** groups)
+    int groups_of_edge (int edgeno, int index, const int **groups)
     {
         int mt = edge_label_type(edgeno);
         int pt = lts_type_get_edge_label_typeno (GBgetLTStype (model_), edgeno);
@@ -279,18 +279,19 @@ public:
         else
             c = data_type(mt).print(id);
 
-        std::vector<int> g;
-        *groups = &g[0]; (void) groups;
+        groups_of_edge_.clear();
 
         for (size_t i = 0; i < group_count(); i++) {
             std::set<std::string> s = summand_action_names(i);
 
             for (std::set<std::string>::iterator j = s.begin(); j != s.end(); ++j) {
-                if (c.find(*j) == std::string::npos) g.push_back(static_cast<int>(i));
+                if (c.find(*j) == std::string::npos) groups_of_edge_.push_back(static_cast<int>(i));
             }
         }
 
-        return static_cast<int>(g.size());
+        *groups = &groups_of_edge_[0];
+
+        return static_cast<int>(groups_of_edge_.size());
     }
 
 private:
@@ -298,6 +299,7 @@ private:
     model_t model_;
     std::vector< std::map<int,int> > rmap_;
     std::vector< std::vector<int> > map_;
+    std::vector<int> groups_of_edge_;
 };
 
 // initialisation outside class to avoid linking error
@@ -427,7 +429,7 @@ MCRL2getTransitionsAll (model_t m, int* src, TransitionCB cb, void *ctx)
 }
 
 static int
-MCRL2groupsOfEdge (model_t m, int edge_no, int index, int **groups)
+MCRL2groupsOfEdge (model_t m, int edge_no, int index, const int **groups)
 {
     ltsmin::pins *pins = reinterpret_cast<ltsmin::pins*>(GBgetContext (m));
     return pins->groups_of_edge(edge_no, index, groups);

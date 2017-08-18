@@ -14,10 +14,13 @@
 #include <pins-lib/pins-util.h>
 
 int pins_allow_undefined_edges = 0;
+int pins_allow_undefined_values = 0;
 
 struct poptOption pins_util_options[] = {
     { "allow-undefined-edges", 0, POPT_ARG_NONE, &pins_allow_undefined_edges, 0,
       "Allow undefined edges in atomic predicates." , NULL},
+    { "allow-undefined-values", 0, POPT_ARG_NONE, &pins_allow_undefined_values,
+        0, "Allow undefined enum values in atomic predicates", NULL},
     POPT_TABLEEND
 };
 
@@ -78,13 +81,12 @@ pins_add_edge_label_visible (model_t model, int edge, int label)
     }
     //if (count > 0) return; // we still need to add the group in case it has multiple guards
 
-    int* groups_of_edge = NULL;
+    const int *groups_of_edge = NULL;
     const int n = GBgroupsOfEdge(model, edge, label, &groups_of_edge);
     if (n > 0) {
         for (int i = 0; i < n; i++) {
             visibles[groups_of_edge[i]] = 1;
         }
-        RTfree(groups_of_edge);
     } else {
         chunk c = pins_chunk_get(model, lts_type_get_edge_label_typeno(GBgetLTStype(model), edge), label);
         char s[c.len * 2 + 6];

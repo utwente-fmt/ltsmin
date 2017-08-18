@@ -19,8 +19,8 @@ set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs" 
 compile_DVE {"anderson.1.prop4.dve"}
 
 foreach s $strategies {
-    dict set commands test16_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=2 \
-    	--strategy=$s -s22 anderson.1.prop4.dve2C"
+    dict set commands test16_dve_mc_$s cmd "$binpaths(dve2lts-mc) \
+    	--strategy=$s anderson.1.prop4.dve2C"
     dict set commands test16_dve_mc_$s exp "633945 states|unique states count:        633945"
 }
 dict set commands test_16_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
@@ -33,8 +33,8 @@ dict set commands test_16_dve_seq exp "633945 states"
 compile_promela {"p117.pml"}
 
 foreach s $strategies {
-    dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) --threads=2 \
-	--strategy=$s -s20 p117.pml.spins"
+    dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) \
+	--strategy=$s p117.pml.spins"
     dict set commands test16_seq_$s exp "354 states|unique states count:        354"
 }
 dict set commands test16_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
@@ -47,8 +47,8 @@ dict set commands test16_prom_seq exp "354 states"
 compile_DVE {"iprotocol.2.prop4.dve"}
 
 foreach s $strategies {
-    dict set commands test17_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=2 \
-	-s22 --strategy=$s iprotocol.2.prop4.dve2C"
+    dict set commands test17_dve_mc_$s cmd "$binpaths(dve2lts-mc) \
+	--strategy=$s iprotocol.2.prop4.dve2C"
     dict set commands test17_dve_mc_$s exp "Accepting cycle FOUND"
 }
 dict set commands test_17_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
@@ -59,8 +59,8 @@ dict set commands test_17_dve_seq exp "accepting cycle found"
 compile_promela {"zune.pml"}
 
 foreach s $strategies {
-    dict set commands test17_prom_mc_$s cmd "$binpaths(prom2lts-mc) --threads=2 \
-	-s22 --strategy=$s zune.pml.spins"
+    dict set commands test17_prom_mc_$s cmd "$binpaths(prom2lts-mc) \
+	--strategy=$s zune.pml.spins"
     dict set commands test17_prom_mc_$s exp "Accepting cycle FOUND"
 }
 dict set commands test17_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
@@ -71,7 +71,7 @@ dict set commands test17_prom_seq exp "accepting cycle found"
 compile_DVE {"iprotocol.2.dve"}
 
 dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --strategy=ndfs \
-	-s22 iprotocol.2.dve2C \
+	iprotocol.2.dve2C \
 	--ltl=$EXAMPLES_PATH/iprotocol.2.ltl"
 dict set commands test18_mc exp "Accepting cycle FOUND"
 
@@ -86,7 +86,7 @@ dict set commands test18_seq exp "accepting cycle found"
 compile_DVE {"elevator.3.dve"}
 
 dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=ndfs \
-	-s22 elevator.3.dve2C \
+	elevator.3.dve2C \
 	--ltl=$EXAMPLES_PATH/elevator.3.ltl"]
 dict set commands test19_mc exp "495463 states"
 

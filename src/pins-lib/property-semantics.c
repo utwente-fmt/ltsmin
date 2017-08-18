@@ -13,6 +13,18 @@
 #include <pins-lib/pins-util.h>
 #include <pins-lib/por/pins2pins-por.h>
 
+#define ENUM_VALUE_NOT_FOUND\
+    "Value '%s' cannot be found in table for enum type \"%s\"."
+
+#define ENUM_VALUE_NOT_FOUND_HINT\
+    "To change this error into a warning use option --allow-undefined-values"
+
+#define GROUP_NOT_FOUND\
+    "There is no group that can produce edge '%s'"
+
+#define GROUP_NOT_FOUND_HINT\
+    "To change this error into a warning use option --allow-undefined-edges"
+
 void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps, bitvector_t *sl_deps)
 {
     const lts_type_t lts_type = GBgetLTStype(model);
@@ -41,7 +53,6 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
         }
         case EVAR: {
             const int type = lts_type_get_edge_label_typeno(GBgetLTStype(model), e->idx);
-            const int n_chunks = pins_chunk_count(model, type);
             const int value = LTSminExprSibling(e)->idx;
 
             chunk c;
@@ -49,16 +60,7 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
     
             e->chunk_cache = pins_chunk_put(model, type, c);
     
-            if (lts_type_get_format(GBgetLTStype(model), type) == LTStypeEnum) {
-                if (pins_chunk_count(model, type) != n_chunks) {
-                    char id[c.len * 2 + 6];
-                    chunk2string(c, sizeof(id), id);
-                    Warning(info, "Value for identifier '%s' cannot be found in table for enum type %s.",
-                        id, lts_type_get_type(GBgetLTStype(model),type));
-                }
-            }
-
-            int* groups = NULL;
+            const int *groups = NULL;
             const int n = GBgroupsOfEdge(model, e->idx, e->chunk_cache, &groups);
             if (n > 0) {
                 for (int k = 0; k < n; k++) {
@@ -66,15 +68,12 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
                     if (PINS_POR) pins_add_group_visible(model, group);
                     if (deps != NULL) dm_row_union(deps, GBgetDMInfoRead(model), group);
                 }
-                RTfree(groups);
             } else {
                 char s[c.len * 2 + 6];
                 chunk2string(c, sizeof(s), s);
-                if (pins_allow_undefined_edges) {
-                    Warning(info, "There is no group that can produce edge \"%s\"", s);
-                } else {
-                    Abort("There is no group that can produce edge \"%s\"", s);
-                }
+                const log_t l = pins_allow_undefined_edges ? info : error;
+                Warning(l, GROUP_NOT_FOUND, s); 
+                if (!pins_allow_undefined_edges) Abort(GROUP_NOT_FOUND_HINT);
             }            
             break;
         }
@@ -84,7 +83,22 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
             const int type = get_typeno(other, GBgetLTStype(model));
             chunk c;
             c.data = SIgetC(env->values, e->idx, (int*) &c.len);
+
+            const int n_chunks = pins_chunk_count(model, type);
             e->chunk_cache = pins_chunk_put(model, type, c);
+            if (lts_type_get_format(GBgetLTStype(model), type) == LTStypeEnum) {
+                if (pins_chunk_count(model, type) != n_chunks) {
+                    char id[c.len * 2 + 6];
+                    chunk2string(c, sizeof(id), id);
+
+                    const log_t l = pins_allow_undefined_values ? info : error;
+                    Warning(l, ENUM_VALUE_NOT_FOUND, id,
+                        lts_type_get_type(GBgetLTStype(model),type));
+                    if (!pins_allow_undefined_values) {
+                        Abort(ENUM_VALUE_NOT_FOUND_HINT);
+                    }
+                }
+            }
             break;
         }
         default:
@@ -143,14 +157,13 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
                 ctx.num = e->chunk_cache;
                 ctx.exists = 0;
 
-                int* groups = NULL;
+                const int *groups = NULL;
                 const int n = GBgroupsOfEdge(model, e->idx, ctx.num, &groups);
 
                 if (n > 0) {
                     for (int i = 0; i < n && ctx.exists == 0; i++) {
                         GBgetTransitionsLong(model, groups[i], state, evar_cb, &ctx);
                     }
-                    RTfree(groups);
                     return ctx.exists ? ctx.num : -1;
                 } else return -1;
             } else if (edge_labels != NULL) {

@@ -14,16 +14,12 @@ puts "\n----------------------------------------------"
 puts   "TESTING: Algorithmic backends for ETF language"
 puts   "----------------------------------------------\n"
 
-
-# the number of threads to use in multithreaded backends
-set num_threads 2
-
 # Language ETF-frontends:
 # -------------------
 set langs [dict create]
 # a model per language
 dict set langs etf model "gear.1.etf" 
-dict set langs etf options mc "--threads=$num_threads"
+dict set langs etf options mc
 
 dict set langs etf exp_output "2689 states 3567 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]

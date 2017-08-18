@@ -14,16 +14,11 @@ puts "\n----------------------------------------------"
 puts   "TESTING: Algorithmic backends for MAPA language"
 puts   "----------------------------------------------\n"
 
-
-# the number of threads to use in multithreaded backends
-set num_threads 2
-
 # Language MAPA-frontends:
 # -------------------
 set langs [dict create]
 # a model per language
 dict set langs mapa model "salesman.mapa" 
-dict set langs mapa options mc "--threads=$num_threads"
 
 dict set langs mapa exp_output "4 states 5 transitions"
 set alg_be [ find_alg_backends "{dist}" ]

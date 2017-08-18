@@ -32,6 +32,7 @@
 #include <hre/user.h>
 
     void yy_fatal_error(yyconst char* msg , yyscan_t yyscanner) {
+        (void) msg; (void) yyscanner;
     }
 
     void yyerror(YYLTYPE *loc, void *scanner, andl_context_t *andl_context, const char* c) {
@@ -148,9 +149,10 @@ tdec
             t->label = SIput(andl_context->pn_context->edge_labels, $1);
             t->in_arcs = 0;
             t->out_arcs = 0;
-            andl_context->pn_context->num_transitions++;
             RTfree($1);
-        } arcs transition_function SEMICOLON
+        } arcs transition_function SEMICOLON { 
+            andl_context->pn_context->num_transitions++;
+        }
     |   IDENT error SEMICOLON {
             Warning(info, "Something went wrong with transition %s on line %d", $1, @1.first_line);
         }

@@ -1,18 +1,13 @@
 #!/bin/bash
 # Simple bash shell script to launch SpinS using the LTSmin backend
 
+# get the directory where this file is located
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-COMMAND=`perl -e 'use Cwd "abs_path";print abs_path(shift)' $0`
-
-# the following variables are initialised by "configure"
-LTSMIN_VERSION="@VERSION@"
-LTSMIN_PREFIX="@prefix@"
-LTSMIN_LIB="@pkglibdir@"
-LTSMIN_SRCDIR="@top_srcdir@"
-LTSMIN_SRCDIR="`dirname $COMMAND`/$LTSMIN_SRCDIR"
-
-spins_dir="$LTSMIN_PREFIX/share/ltsmin"
-spins_dir2="$LTSMIN_SRCDIR/spins"
+# first check if the spins.jar is in the install directory,
+# otherwise use the spins.jar from the source tree.
+spins_dir="$DIR/../share/ltsmin" # installed version
+spins_dir2="$DIR/../../spins" # source tree version
 
 CP="$spins_dir/spins.jar"
 if [ ! -e $CP ]; then

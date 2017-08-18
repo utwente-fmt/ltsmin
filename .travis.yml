@@ -247,6 +247,7 @@ before_script:
     cp "$HOME/ltsmin-deps/lib/libczmq.a" "$HOME/static-libs" &&
     cp /usr/local/lib/libgmp.a "$HOME/static-libs" &&
     cp /usr/local/lib/libpopt.a "$HOME/static-libs" &&
+    cp "/usr/local/Cellar/hwloc/$(brew list --versions hwloc | cut -d' ' -f2)/lib/libhwloc.a" "$HOME/static-libs" &&
     cp "/usr/local/Cellar/libxml2/$(brew list --versions libxml2 | cut -d' ' -f2)/lib/libxml2.a" "$HOME/static-libs"; fi
   # Now do the same on Linux.
   - if [ "$TRAVIS_OS_NAME" = "linux" ]; then
@@ -261,9 +262,6 @@ before_script:
     cp /usr/lib/x86_64-linux-gnu/libhwloc.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libnuma.a "$HOME/static-libs" &&
     cp /usr/lib/x86_64-linux-gnu/libz.a "$HOME/static-libs"; fi
-  # Since Travis workers do not allow overcommitting memory,
-  # we must reduce the amount of vm allocated by the chunk tables.
-  - export SLABS_RATIO=8
 
 script:
   - ./ltsminreconf &&
@@ -277,6 +275,7 @@ script:
     make distcheck DISTCHECK_CONFIGURE_FLAGS="-with-viennacl=$HOME/ltsmin-deps/include --without-scoop $CONFIGURE_WITH"; fi
   - if [ -n $TRAVIS_TAG -a "x$RELEASE_BUILD" = "xyes" ]; then
     make install &&
+    strip -s /tmp/dist/bin/* || true &&
     cp "$HOME/ltsmin-deps/bin/divine" /tmp/dist/bin &&
     cp "$HOME/ltsmin-deps/bin/txt2lps" /tmp/dist/bin &&
     cp "$HOME/ltsmin-deps/bin/txt2pbes" /tmp/dist/bin &&
@@ -292,17 +291,16 @@ notifications:
   email: false
 
 before_deploy:
-  - export OLD_WEBSITE_VERSION=$(git --no-pager show gh-pages:_config.yml | grep "version" || echo "version 0.0.0" | cut -d" " -f2)
-  - export NEW_WEBSITE_VERSION=$(cat "www/_config.yml" | grep "version" | cut -d" " -f2)
-  - echo "Old website version is $OLD_WEBSITE_VERSION, new website version is $NEW_WEBSITE_VERSION"
-  # If the LTSmin version is larger than the website version,
-  # we need to deploy a new website.
-  - ./deploy-web "$NEW_WEBSITE_VERSION" "$OLD_WEBSITE_VERSION" &&
-        test -n "$TRAVIS_TAG" -a "x$RELEASE_BUILD" = "xyes" -a "$TRAVIS_OS_NAME" = "linux" &&
-    export DEPLOY_WEBSITE="yes" && echo "The website will be deployed" ; true
+  # we will deploy the website if the tag is prefixed with a v,
+  # and only when we do a release build, since it builds the documentation,
+  # and only once on linux, not also on OSX.
+  - if [ "x$TRAVIS_TAG" = "xv$LTSMIN_VERSION" -a "x$RELEASE_BUILD" = "xyes" -a "$TRAVIS_OS_NAME" = "linux" ]; then
+    export DEPLOY_WEBSITE="yes"; fi
   - if [ "x$DEPLOY_WEBSITE" = "xyes" ]; then
     mkdir -p www/assets/man && cp doc/*.html www/assets/man &&
-    cp README.md www && 
+    cp README.md www &&
+    cp changelog.md www &&
+    ls www/assets/man | perl -e 'print "<html><body><ul>"; while(<>) { chop $_; print "<li><a href=\"./$_\">$_</a></li>";} print "</ul></body></html>"' > www/assets/man/index.html &&
     pushd www && gem install jekyll bundler && bundle install && 
     jekyll b && popd; fi
 
@@ -325,3 +323,4 @@ deploy:
     on:
       tags: true
       condition: "x$DEPLOY_WEBSITE = xyes"
+

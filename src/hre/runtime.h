@@ -80,9 +80,6 @@ extern int RTnumCPUs();
 /// Get the amount of memory.
 extern size_t RTmemSize();
 
-/// Get the page size.
-extern size_t RTpageSize();
-
 /// Get the cache line size.
 extern int RTcacheLineSize();
 

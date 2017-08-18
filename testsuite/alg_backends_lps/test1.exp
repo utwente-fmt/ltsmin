@@ -13,9 +13,6 @@ puts "\n-----------------------------"
 puts   "TESTING: Algorithmic backends for Mcrl2"
 puts   "-----------------------------\n"
 
-# the number of threads to use in multithreaded backends
-set num_threads 2
-
 set langs [dict create]
 
 # Language frontends:
@@ -23,7 +20,7 @@ set langs [dict create]
 
 # lps:
 dict set langs lps model "ieee-11073.lps"
-dict set langs lps options mc "--procs=$num_threads --mcrl2-rewriter=jitty"
+dict set langs lps options mc "--mcrl2-rewriter=jitty"
 dict set langs lps options dist "--mcrl2-rewriter=jitty"
 dict set langs lps options seq "--mcrl2-rewriter=jitty"
 dict set langs lps options sym "--mcrl2-rewriter=jitty"

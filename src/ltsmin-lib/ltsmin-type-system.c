@@ -5,6 +5,9 @@
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <ltsmin-lib/ltsmin-type-system.h>
 
+#define TYPE_ABORT \
+    Abort("For more info on resolving type checking errors see 'man ltsmin-type-system'.")
+
 static inline int
 hint_binary(const format_table_t f[DATA_FORMAT_SIZE][DATA_FORMAT_SIZE], char *msg, size_t size)
 {
@@ -26,13 +29,14 @@ get_data_format_binary(const format_table_t f[DATA_FORMAT_SIZE][DATA_FORMAT_SIZE
 {
     const format_table_t entry = f[l][r];
     if (entry.error == -1) {
-        const char* ex = LTSminPrintExpr(e, env);
         char hint[hint_binary(f, NULL, 0) + 1];
         hint_binary(f, hint, sizeof(hint));
-        Abort(
-            "Incompatible type formats (LHS = \"%s\", RHS = \"%s\") for expression: \"%s\", "
-            "expecting format pair (LHS, RHS) to be any pair in {%s}",
-            data_format_string_generic(l), data_format_string_generic(r), ex, hint);
+        Warning(infoLong, "Error: expecting format pair (LHS, RHS) to be any pair in {%s}", hint);
+
+        const char* ex = LTSminPrintExpr(e, env);
+        Warning(error, "Incompatible type formats (LHS = \"%s\", RHS = \"%s\") for expression: \"%s\"." ,
+            data_format_string_generic(l), data_format_string_generic(r), ex);
+        TYPE_ABORT;
     } else return entry.df;
 }
 
@@ -55,13 +59,14 @@ get_data_format_unary(const format_table_t f[DATA_FORMAT_SIZE],
 {
     const format_table_t entry = f[c];
     if (entry.error == -1) {
-        const char* ex = LTSminPrintExpr(e, env);
         char hint[hint_unary(f, NULL, 0) + 1];
         hint_unary(f, hint, sizeof(hint));
-        Abort(
-            "Incompatible type format (\"%s\") for expression: \"%s\", "
-            "expecting format to be any of {%s}",
-            data_format_string_generic(c), ex, hint);
+        Warning(infoLong, "Error: expecting format to be any of {%s}", hint);
+
+        const char* ex = LTSminPrintExpr(e, env);
+        Warning(error, "Incompatible type format (\"%s\") for expression: \"%s\"",
+            data_format_string_generic(c), ex);
+        TYPE_ABORT;
     }
     return entry.df;
 }
@@ -96,7 +101,7 @@ verify_chunk(data_format_t df, ltsmin_expr_t e, ltsmin_parse_env_t env, int type
                     LTSminLogExpr(error,
                         "A chunk should be paired with a state variable,"
                         " state label or edge label: ", e->parent, env);
-                    HREabort(LTSMIN_EXIT_FAILURE);
+                    TYPE_ABORT;
                 }
             } else {
                 if (other->token == SVAR || other->token == EVAR) {
@@ -105,7 +110,7 @@ verify_chunk(data_format_t df, ltsmin_expr_t e, ltsmin_parse_env_t env, int type
                         LTSminLogExpr(error,
                             "LHS and RHS are chunks and "
                             "should be of the same type: ", e->parent, env);
-                        HREabort(LTSMIN_EXIT_FAILURE);
+                        TYPE_ABORT;
                     }
                 }
             }
@@ -138,7 +143,7 @@ check_type_format_atom(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
                         LTSminLogExpr(error,
                             "Either the LHS or RHS (not both) should be an edge variable: ",
                             e, env);
-                        HREabort(LTSMIN_EXIT_FAILURE);
+                        TYPE_ABORT;
                     }
                     return df;
                 }
@@ -146,7 +151,7 @@ check_type_format_atom(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
                     LTSminLogExpr(error, "Unsupported expression: ", e, env);
                     HREabort(LTSMIN_EXIT_FAILURE);
                 }
-            }            
+            }
         }
         case UNARY_OP: {
             data_format_t c = check_type_format_atom(e->arg1, env, lts_type);
@@ -180,6 +185,14 @@ check_type_format_atom(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
                     HREabort(LTSMIN_EXIT_FAILURE);
                 }
             }
+        }
+        case VAR: {
+            const char *v = LTSminPrintExpr(e, env);
+            Warning(error, "Invalid identifier: '%s' is not a state variable "
+                    "or edge variable. If you meant to write a string "
+                    "constant, surround it with double quotes, i.e. '\"%s\"'.",
+                    v, v);
+            TYPE_ABORT;
         }
         default: {
             LTSminLogExpr(error, "Unsupported expression: ", e, env);
@@ -217,7 +230,7 @@ check_type_format_LTL(const ltsmin_expr_t e, const ltsmin_parse_env_t env, const
             data_format_t l = check_type_format_LTL(e->arg1, env, lts_type);
             data_format_t r = check_type_format_LTL(e->arg2, env, lts_type);
             return get_data_format_binary(BOOL_OPS, e, env, l, r);
-        }            
+        }
         case LTL_NOT: case LTL_FUTURE: case LTL_GLOBALLY: case LTL_NEXT: {
             data_format_t c = check_type_format_LTL(e->arg1, env, lts_type);
             return get_data_format_unary(UNARY_BOOL_OPS, e, env, c);
@@ -225,7 +238,7 @@ check_type_format_LTL(const ltsmin_expr_t e, const ltsmin_parse_env_t env, const
         default: {
             return check_type_format_atom(e, env, lts_type);
         }
-    }        
+    }
 }
 
 data_format_t
@@ -261,13 +274,19 @@ check_type_format_MU(const ltsmin_expr_t e, const ltsmin_parse_env_t env, const 
         case MU_NOT: {
             data_format_t c = check_type_format_MU(e->arg1, env, lts_type);
             return get_data_format_unary(UNARY_BOOL_OPS, e, env, c);
-        }                
-        // Todo: not to sure about these cases below
+        }
         case MU_VAR:
-        case MU_EDGE_EXIST: case MU_EDGE_ALL: case MU_EDGE_EXIST_LEFT:
-        case MU_EDGE_EXIST_RIGHT: case MU_EDGE_ALL_LEFT: case MU_EDGE_ALL_RIGHT:
-        case MU_MU: case MU_NU: case MU_NEXT: case MU_EXIST: case MU_ALL: {
             return LTStypeBool;
+        case MU_EDGE_EXIST: case MU_EDGE_ALL: case MU_EDGE_EXIST_LEFT:
+        case MU_EDGE_EXIST_RIGHT: case MU_EDGE_ALL_LEFT: case MU_EDGE_ALL_RIGHT: {
+            // mu language does not yet support edges semantics.
+            LTSminLogExpr(error, "Unsupported expression: ", e, env);
+            HREabort(LTSMIN_EXIT_FAILURE);
+            break;
+        }
+        case MU_MU: case MU_NU: case MU_NEXT: case MU_EXIST: case MU_ALL: {
+            data_format_t c = check_type_format_MU(e->arg1, env, lts_type);
+            return get_data_format_unary(UNARY_BOOL_OPS, e, env, c);
         }
         default: {
             return check_type_format_atom(e, env, lts_type);

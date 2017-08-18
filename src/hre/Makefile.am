@@ -21,12 +21,13 @@ libhre_la_SOURCES += hre_timer.c
 libhre_la_SOURCES += hre_unix.c unix.h
 libhre_la_SOURCES += hre_utils.c
 libhre_la_SOURCES += stringindex.c stringindex.h
-libhre_la_SOURCES += qsortex.c
 
 libhre_la_CPPFLAGS = $(AM_CPPFLAGS)
+libhre_la_CFLAGS   = $(AM_CFLAGS) $(POPT_CFLAGS)
 
 ##libhre_la_LIBADD   = ../hre-io/libhre-io.la
 libhre_la_LIBADD   = ../util-lib/libutil.la
+libhre_la_LIBADD  += $(POPT_LIBS)
 
 # git_version.h
 EXTRA_DIST = git_version.h
