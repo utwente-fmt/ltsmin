@@ -56,7 +56,7 @@ public:
         global_group_var_ids(0)
     {
         local2global_maps.resize(get_info()->get_lts_type().get_number_of_state_types());
-        for (int i = 0; i <= get_info()->get_lts_type().get_number_of_state_types(); i++) {
+        for (size_t i = 0; i <= get_info()->get_lts_type().get_number_of_state_types(); i++) {
             std::map<int,int> local2global_map;
             local2global_maps.push_back(local2global_map);
             std::vector<int> global2local_map;
