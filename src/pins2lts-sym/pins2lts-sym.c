@@ -4602,6 +4602,10 @@ static void actual_main(void *arg)
                 !(vset_default_domain == VSET_LDDmc  && strcasecmp(ext, ".ldd") == 0)) {
                 Abort("Only supported output formats are ETF, BDD (with --vset=sylvan) and LDD (with --vset=lddmc)");
             }
+            if (PINS_USE_GUARDS) {
+                Abort("Exporting symbolic state space not comptabile with "
+                        "guard-splitting");
+            }
         }
     }
 
