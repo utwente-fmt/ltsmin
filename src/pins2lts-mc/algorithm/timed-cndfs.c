@@ -533,6 +533,8 @@ ta_cndfs_local_init   (run_t *run, wctx_t *ctx)
     state_info_add_simple (si_perm, sizeof(lm_loc_t), &loc->lloc);
 
     cndfs_local_setup (run, ctx);
+    cndfs_alg_local_t  *cloc = (cndfs_alg_local_t *) ctx->local;
+    cloc->pink = fset_create (sizeof(ref_t), 0, FSET_MIN_SIZE, 24);
     state_info_add_simple (((alg_local_t*)loc)->seed, sizeof(lm_loc_t), &loc->lloc);
 }
 

@@ -292,6 +292,7 @@ typedef union gsea_queue {
                 void (*state_next)(gsea_state_t*, void*);
             } color;
         } proviso;
+        gsea_state_t ce;
 
         // queue/store specific callbacks
         void (*push)(gsea_state_t*, void*);
@@ -313,7 +314,6 @@ typedef union gsea_queue {
         queue_t queue;
     } fifo;
     */
-
 } gsea_queue_t;
 
 typedef void(*gsea_void)(gsea_state_t*,void*);
@@ -1274,9 +1274,19 @@ gsea_action_check(gsea_state_t *src, transition_info_t *ti, gsea_state_t *dst)
 {
     if (NULL != ti->labels && ti->labels[opt.act_label] == opt.act_index) {
         global.errors++;
-        do_trace(dst, NULL, "Error action", opt.act_detect);
+        gc.queue.filo.ce = *dst;
     }
     (void) src;
+}
+
+static void
+gsea_action_check2(gsea_state_t *state, void *arg)
+{
+    if (gc.queue.filo.ce.tree.tree_idx != -1) {
+        do_trace(&gc.queue.filo.ce, NULL, "Error action", opt.act_detect);
+    }
+    (void) state;
+    (void) arg;
 }
 
 static int
@@ -1468,7 +1478,9 @@ gsea_setup_default()
     // action label detection?
     if (-1 != opt.act_index) {
         if (gc.state_process) Abort("LTS output incompatible with action detection.");
+        gc.queue.filo.ce.tree.tree_idx = -1;
         gc.state_process = gsea_action_check;
+        gc.post_state_next = gsea_action_check2;
     }
 
     // maximum search depth?
@@ -1504,6 +1516,29 @@ set_strategy (const char *output)
             opt.strategy = Strategy_DFS;
         }
     }
+}
+
+static int
+state_find_tree (int *state, transition_info_t *ti, void *t)
+{
+    int idx;
+    return TreeFold_ret(gc.store.tree.dbs, state, &idx);
+    (void) ti; (void) t;
+}
+
+static int
+state_find_table (int *state, transition_info_t *ti, void *t)
+{
+    dbs_ref_t idx;
+    return DBSLLlookup_ret(gc.store.table.dbs, state, &idx);
+    (void) ti; (void) t;
+}
+
+static int
+state_find_vset (int *state, transition_info_t *ti, void *t)
+{
+    return vset_member(gc.store.vset.closed_set, state);
+    (void) ti; (void) t;
 }
 
 static void
@@ -1710,6 +1745,20 @@ gsea_setup(const char *output)
     case Strategy_None: Abort ("No strategy selected?");
     default:
         Abort ("unimplemented strategy");
+    }
+
+    switch (opt.state_db) {
+    case DB_TreeDBS:
+        if (PINS_POR) por_set_find_state (state_find_tree, &gc);
+        break;
+    case DB_Vset:
+        if (PINS_POR) por_set_find_state (state_find_vset, &gc);
+        break;
+    case DB_DBSLL:
+        if (PINS_POR) por_set_find_state (state_find_table, &gc);
+        break;
+    default:
+        Abort ("unimplemented storage %s", opt.arg_state_db );
     }
 }
 

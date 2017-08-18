@@ -349,7 +349,8 @@ void
 leap_stats (model_t model)
 {
     (void)model;
-    leap_t             *leap = RTmalloc (sizeof(leap_t));
+    por_context         *ctx = GBgetContext (model);
+    leap_t              *leap = ctx->leap;
     Warning (info, "LEAPING POR avg. levels: %f%% / avg. seen: %f%%\n",
             (float) (leap->levels / leap->states),
             (float) (leap->seens / leap->states));
