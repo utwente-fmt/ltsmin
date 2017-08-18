@@ -21,7 +21,7 @@ case "$with_mcrl2" in
    *) acx_mcrl2=yes;;
 esac
 
-if test x"$acx_mcrl2" = xyes; then
+AS_IF([test "x$acx_mcrl2" = "xyes"], [
     AC_LANG_PUSH([C++])
 
     MCRL2_PINS_CXXFLAGS=""
@@ -31,14 +31,21 @@ if test x"$acx_mcrl2" = xyes; then
       8) MCRL2_PINS_CPPFLAGS="-DAT_64BIT" ;;
       *) AC_MSG_FAILURE([can only compile mCRL2 on 32- and 64-bit machines.]) ;;
     esac
-    
+
+    AC_ARG_ENABLE([mcrl2-jittyc], [AS_HELP_STRING([--disable-mcrl2-jittyc], [
+        disable the mCRL2 jittyc rewriter, making jitty the default rewriter])])
+    AS_IF([test "x$enable_mcrl2_jittyc" = "xno"], [
+        AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -DDISABLE_JITTYC"])
+        AC_MSG_NOTICE([disabling mCRL2 jittyc rewriter])
+    ])
+
     mcrl2_lib_dir=""
     if test -d ${with_mcrl2}/lib/mcrl2; then
         mcrl2_lib_dir="${with_mcrl2}/lib/mcrl2"
     else
         mcrl2_lib_dir="${with_mcrl2}/lib"
     fi
-    
+
     #AX_CHECK_COMPILE_FLAG([-std=c++0x], [CXXFLAGS="$CXXFLAGS -std=c++0x"])
     AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -I$with_mcrl2/include"])
     AC_SUBST(MCRL2_PINS_LDFLAGS,  ["-L${mcrl2_lib_dir}"])
@@ -57,7 +64,7 @@ if test x"$acx_mcrl2" = xyes; then
     ac_compile_cxx11=$ac_success
     CXX11CXXFLAGS="$CXXFLAGS"
     CXXFLAGS="$save_CXXFLAGS"
- 
+
     if test x"$ac_compile_cxx11" = xyes; then
       AC_SUBST(MCRL2_PINS_CXXFLAGS, ["$MCRL2_PINS_CXXFLAGS $CXX11CXXFLAGS"])
       $as_unset $mcrl2_pins_cache_var
@@ -83,10 +90,10 @@ if test x"$acx_mcrl2" = xyes; then
     AC_LANG_POP([C++])
 
     $1
-else
+], [
     $2
     :
-fi
+])
 ])
 
 #

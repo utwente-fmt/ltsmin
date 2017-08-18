@@ -25,7 +25,7 @@ extern "C" {
 #include <ltsmin-lib/ltsmin-standard.h>
 }
 
-#ifdef MCRL2_JITTYC_AVAILABLE
+#if defined(MCRL2_JITTYC_AVAILABLE) && !defined(DISABLE_JITTYC)
 static const char* mcrl2_rewriter = "jittyc";
 #else
 static const char* mcrl2_rewriter = "jitty";
@@ -358,6 +358,11 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
             mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(mcrl2_logger::get_reporting_level()) + mcrl2_verbosity);
             mcrl2_logger::set_reporting_level(level);
         }
+#ifdef DISABLE_JITTYC
+        if (strcmp(mcrl2_rewriter, "jittyc") == 0) {
+            Abort("The jittyc rewriter was disabled at compile time");
+        }
+#endif
         Warning(info,"mCRL2 language module initialized");
         return;
     }
