@@ -71,8 +71,8 @@ int main(int argc, char *argv[]){
     int peers=HREpeers(HREglobal());
     Print(infoShort,"I am %d of %d",me,peers);
 
-    Print(infoShort,"%d cores, %.1fGB memory, %dKB pages, %dB cache line.",RTnumCPUs(),
-        ((float)RTmemSize())/1073741824.0,(int)(RTpageSize()/1024),RTcacheLineSize());
+    Print(infoShort,"%d cores, %.1fGB memory, %dB cache line.",RTnumCPUs(),
+        ((float)RTmemSize())/1073741824.0,RTcacheLineSize());
 
     Print(info,"info");
     Print(infoShort,"infoShort");
