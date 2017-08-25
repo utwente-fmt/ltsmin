@@ -4609,7 +4609,7 @@ static void actual_main(void *arg)
         }
     }
 
-#if !SPEC_MT_SAFE && HAVE_SYLVAN
+#if !SPEC_MT_SAFE && defined(HAVE_SYLVAN)
     if (strategy == PAR_P) {
         strategy = BFS_P;
         Print(info, "Front-end not thread-safe; using --order=bfs-prev instead of --order=par-prev.");

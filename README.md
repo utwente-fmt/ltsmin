@@ -448,6 +448,19 @@ To build the Petri net front-end, [libxml2](http://xmlsoft.org/) is required.
 To use Büchi automata created by Spot, download Spot (>=2.3.1) 
 from <https://spot.lrde.epita.fr/index.html>.
 
+#### BuDDy
+
+To use BuDDy's FDDs implementation for symbolic state storage, you have two
+options.
+
+1. Install [Spot](#Spot) which distributes a BuDDy fork called BDDX
+    (recommended),
+1. Install BuDDy from <https://github.com/utwente-fmt/buddy/releases>, which
+    is a fork originally included in LTSmin.
+
+If both versions of BuDDy are installed, LTSmin will use the Spot version
+of BuDDy.
+
 ## Building from a Git Repository
 
 Before building the software as described above, the following commands

@@ -108,5 +108,6 @@ nodist_EXTRA_pnml2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 prob2lts_seq_SOURCES   = pins2lts-seq.c
 prob2lts_seq_SOURCES  += ../pins-lib/modules/prob-pins.c ../pins-lib/modules/prob-pins.h 
 prob2lts_seq_LDADD     = $(PROB_LIB_LIBS) $(LIBS)
+prob2lts_seq_CFLAGS    = $(AM_CFLAGS) $(PROB_CFLAGS)
 prob2lts_seq_CPPFLAGS  = -DPROB $(SEQ_CPPFLAGS)
 nodist_EXTRA_prob2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset

@@ -205,34 +205,42 @@ fi
 ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
-
 AC_ARG_WITH([spot],
     AS_HELP_STRING([--without-spot], [do not include the Spot library for LTL model checking]))
+acx_spot="no"
 AS_IF([test "x$with_spot" != "xno"], [
-    PKG_CHECK_MODULES([SPOT], [libspot >= 2.3],[
-        acx_spot=yes],
-        [AC_MSG_WARN(No valid spot version found!)
+    PKG_CHECK_MODULES([SPOT], [libspot >= 2.3], [
+        acx_spot=yes
+    ], [
+        AC_MSG_WARN(No valid Spot version found!)
     ])
 ])
 
+acx_buddy=""
 AS_IF([test "x$acx_spot" = "xyes"], [
     PKG_CHECK_MODULES([BDDX], [libbddx >= 2.3],[
-        AC_MSG_NOTICE([Because SPOT was found, the SPOT Buddy implementation will be used!])
+        AC_MSG_NOTICE([Because Spot was found, the Spot Buddy implementation will be used!])
+        acx_buddy="Spot version (because Spot was found)"
         AC_SUBST([BUDDY_LIBS],["$BDDX_LIBS"])
-        AC_SUBST([BUDDY_CPPFLAGS],["$BDDX_CPPFLAGS"])
         AC_SUBST([BUDDY_CFLAGS],["$BDDX_CFLAGS"])
-        AC_SUBST([BUDDY_LDFLAGS])
     ],[
        AC_MSG_ERROR(Could not find libbddx!
-                    Because both SPOT and LTSmin distribute BuDDy,
+                    Because both Spot and LTSmin distribute BuDDy,
                     we have to choose between BUDDY versions,
-                    if SPOT is found, then the SPOT version will be used,
+                    if Spot is found, then the Spot version will be used,
                     meaning libbddx must be installed.)])
 ],[
-    AC_SUBST([BUDDY_LIBS],['${top_builddir}/buddy/src/libbdd.la -lm'])
-    AC_SUBST([BUDDY_CPPFLAGS],['-I${top_srcdir}/buddy/src'])
-    AC_SUBST([BUDDY_CFLAGS],['-I${top_srcdir}/buddy/src']) 
-    AC_SUBST([BUDDY_LDFLAGS])
+    AC_ARG_WITH([buddy],
+        AS_HELP_STRING([--without-buddy], [do not include BuDDy for symbolic state storage]))
+    AS_IF([test "x$with_buddy" != "xno"], [
+        PKG_CHECK_MODULES([BDD], [libbdd >= 2.4], [
+            acx_buddy="LTSmin version (because Spot was not found or disabled)"
+            AC_SUBST([BUDDY_LIBS],["$BDD_LIBS"])
+            AC_SUBST([BUDDY_CFLAGS],["$BDD_CFLAGS"])
+        ], [
+            AC_MSG_WARN(No valid BuDDy version found!)
+        ])
+    ])
 ])
 
 ACX_CLINE_DEF([], [])
@@ -432,18 +440,15 @@ AC_ARG_WITH([sylvan],
 AS_IF([test "x$with_sylvan" != "xno"], [
     PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.1 sylvan < 1.2],[
         have_sylvan=yes
-        SYLVAN_CPPFLAGS="$SYLVAN_CFLAGS"
-        AC_SUBST(SYLVAN_CFLAGS)
-        AC_SUBST(SYLVAN_CPPFLAGS)
-        AC_SUBST(SYLVAN_LDFLAGS)
-        AC_SUBST(SYLVAN_LIBS)],
-        [AC_MSG_WARN([Sylvan >= 1.1, < 1.2 is not installed.])])
+    ], [
+        AC_MSG_WARN([Sylvan >= 1.1, < 1.2 is not installed.])
+    ])
 ])
 
 #AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])
-AS_IF([test x"$have_sylvan" = "xyes"], [AC_DEFINE([HAVE_SYLVAN], [1], [Define if using sylvan.])])
+AM_COND_IF([HAVE_SYLVAN], [AC_DEFINE([HAVE_SYLVAN],, [Define if using Sylvan.])])
 AM_CONDITIONAL([HAVE_OPAAL], [test x"$have_opaal" = "xyes"])
 AM_CONDITIONAL([HAVE_OPAAL_COMPILER], [test x"$OPAAL_LTSMIN" != x])
 AM_CONDITIONAL([HAVE_MPI], [test x"$have_mpi" != "x"])
@@ -472,7 +477,9 @@ AM_CONDITIONAL([HAVE_VIENNACL], [test x"$have_viennacl" = xyes])
 AM_CONDITIONAL([HAVE_PNML], [test x"$acx_pnml" = xyes])
 AM_CONDITIONAL([HAVE_PROB], [test x"$acx_prob" = xyes])
 AM_CONDITIONAL([HAVE_SPOT], [test x"$acx_spot" = xyes])
-AS_IF([test x"$acx_spot" = "xyes"], [AC_DEFINE([HAVE_SPOT], [1], [Define if using Spot.])])
+AM_COND_IF([HAVE_SPOT], [AC_DEFINE([HAVE_SPOT],, [Define if using Spot.])])
+AM_CONDITIONAL([HAVE_BUDDY], [test x"$acx_buddy" != x])
+AM_COND_IF([HAVE_BUDDY], [AC_DEFINE([HAVE_BUDDY],, [Define if using BuDDy.])])
 
 AM_CONDITIONAL(BUILD_OS_IS_DARWIN,
 [case "${build_os}" in
@@ -600,11 +607,6 @@ AC_CONFIG_LINKS([src/ltsmin-lib/lempar.c:lemon/lempar.c])
 
 AC_CONFIG_SUBDIRS([ltl2ba])
 
-AM_COND_IF([HAVE_SPOT],[
-    buddy="SPOT version (because SPOT was found)"],[
-    buddy="LTSmin version (because SPOT was not found)"
-    AC_CONFIG_SUBDIRS([buddy])])
-
 AC_OUTPUT
 
 cat <<EOM
@@ -612,7 +614,7 @@ Configuration:
 ======================================================================
     ASCIIDOC = ${ASCIIDOC:-NOT FOUND, not building documentation}
     BIGNUM   = ${with_bignum}
-    BUDDY    = ${buddy}
+    BUDDY    = ${acx_buddy:-NOT FOUND, building without BuDDy support}
     CADP     = ${CADP:-NOT FOUND, building without CADP support}
     CC       = ${CC:-NOT FOUND}
     CXX      = ${CXX:-NOT FOUND}

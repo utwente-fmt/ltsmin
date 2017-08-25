@@ -12,8 +12,10 @@ extern vdom_t vdom_create_list(int n);
 extern vdom_t vdom_create_tree(int n);
 #endif
 
+#ifdef HAVE_BUDDY
 extern struct poptOption buddy_options[];
 extern vdom_t vdom_create_fdd(int n);
+#endif
 
 #ifdef HAVE_DDD_H
 extern vdom_t vdom_create_ddd(int n);
@@ -73,7 +75,9 @@ static si_map_entry vset_table[]={
 	{"list",VSET_AtermDD_list},
 	{"tree",VSET_AtermDD_tree},
 #endif
+#ifdef HAVE_BUDDY
 	{"fdd",VSET_BuDDy_fdd},
+#endif
 #ifdef HAVE_DDD_H
 	{"ddd",VSET_DDD},
 #endif
@@ -88,17 +92,38 @@ static si_map_entry vset_table[]={
 struct poptOption vset_options[]={
     { NULL, 0 , POPT_ARG_CALLBACK , (void*)vset_popt , 0 , (void*)vset_table ,NULL },
     { "vset" , 0 , POPT_ARG_STRING , NULL , 0 ,
-      "select a vector set implementation from native ListDD (32-bit or 64-bit),"
-      " ATermDD with *list* encoding,"
-      " ATermDD with *tree* encoding, BuDDy using the *fdd* feature"
+      "select a vector set implementation from "
 #ifdef HAVE_SYLVAN
-      ", DDD, Sylvan BDDs, or Sylvan LDDs"
+      "Sylvan LDDs, "
 #endif
-      " (default: first available)", "<"
+      "native ListDD (32-bit or 64-bit), "
+#ifdef HAVE_ATERM2_H
+      "ATermDD with *list* encoding, "
+      "ATermDD with *tree* encoding, "
+#endif
+#ifdef HAVE_BUDDY
+      "BuDDy using the *fdd* feature, "
+#endif
+#if HAVE_DDD_H
+      "DDD, "
+#endif
+#ifdef HAVE_SYLVAN
+      "Sylvan BDDs, "
+#endif
+      "(default: first available)", "<"
 #ifdef HAVE_SYLVAN
       "lddmc|"
 #endif
-      "ldd|ldd64|list|tree|fdd|ddd"
+      "ldd|ldd64"
+#ifdef HAVE_ATERM2_H
+      "|list|tree"
+#endif
+#ifdef HAVE_BUDDY
+      "|fdd"
+#endif
+#ifdef HAVE_DDD_H
+      "|ddd"
+#endif
 #ifdef HAVE_SYLVAN
       "|sylvan"
 #endif
@@ -108,7 +133,9 @@ struct poptOption vset_options[]={
 #ifdef HAVE_ATERM2_H
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , atermdd_options , 0 , "ATermDD options" , NULL},
 #endif
+#ifdef HAVE_BUDDY
     { NULL,0 , POPT_ARG_INCLUDE_TABLE , buddy_options , 0 , "BuDDy options" , NULL},
+#endif
 #ifdef HAVE_SYLVAN
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , sylvan_options , 0 , "Sylvan options" , NULL},
 #endif
@@ -131,7 +158,9 @@ vdom_create_domain(int n, vset_implementation_t impl)
     case VSET_AtermDD_list: return vdom_create_list(n);
     case VSET_AtermDD_tree: return vdom_create_tree(n);
 #endif
+#ifdef HAVE_BUDDY
     case VSET_BuDDy_fdd: return vdom_create_fdd(n);
+#endif
 #ifdef HAVE_DDD_H
     case VSET_DDD: return vdom_create_ddd(n);
 #endif

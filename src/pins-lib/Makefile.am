@@ -1,19 +1,3 @@
-PINS_LIBS  =
-PINS_LIBS += ../lts-io/liblts-io.la
-PINS_LIBS += ../hre-io/libhre-io.la
-PINS_LIBS += ../hre/libhre.la
-PINS_LIBS += ../ltsmin-lib/libltsmin.la
-PINS_LIBS += ../dm/libdm.la
-PINS_LIBS += por/libpor.la
-
-if HAVE_BOOST
-LIBS += ../dm/libdm_boost.la
-endif
-
-if HAVE_VIENNACL
-LIBS += ../dm/libdm_viennacl.la
-endif
-
 SUBDIRS  = por
 
 noinst_LTLIBRARIES  = libpins.la
@@ -63,7 +47,7 @@ libmcrl2_pins_la_LIBADD   = $(MCRL2_PINS_LIBS)
 # libpbes-pins
 libpbes_pins_la_SOURCES   = modules/pbes-pins.cpp modules/pbes-pins.h
 libpbes_pins_la_CPPFLAGS  = -DLTSMIN_PBES -DNDEBUG $(MCRL2_PINS_CPPFLAGS) $(AM_CPPFLAGS)
-libpbes_pins_la_CXXFLAGS = $(MCRL2_PINS_CXXFLAGS) $(AM_CXXFLAGS)
+libpbes_pins_la_CXXFLAGS  = $(MCRL2_PINS_CXXFLAGS) $(AM_CXXFLAGS)
 libpbes_pins_la_LDFLAGS   = $(MCRL2_PINS_LDFLAGS) $(MCRL2_LDFLAGS) $(AM_LDFLAGS)
 libpbes_pins_la_LIBADD    = $(MCRL2_PINS_LIBS)
 
@@ -81,7 +65,20 @@ libpins_la_SOURCES += pg-types.c pg-types.h
 libpins_la_SOURCES += pins2pins-mucalc.c pins2pins-mucalc.h
 libpins_la_SOURCES += pins2pins-ltl.c pins2pins-ltl.h
 libpins_la_SOURCES += property-semantics.c property-semantics.h
-libpins_la_CPPFLAGS = -DNXT $(AM_CPPFLAGS) -I${top_srcdir}/ltl2ba
-libpins_la_LIBADD   = $(PINS_LIBS)
-libpins_la_LIBADD  += por/libpor.la
+libpins_la_CFLAGS   = $(AM_CFLAGS) -I${top_srcdir}/ltl2ba
+libpins_la_LIBADD   = ../lts-io/liblts-io.la
 libpins_la_LIBADD  += ../ltsmin-lib/libmucalc.la
+libpins_la_LIBADD  += ../hre-io/libhre-io.la
+libpins_la_LIBADD  += ../hre/libhre.la
+libpins_la_LIBADD  += ../ltsmin-lib/libltsmin.la
+libpins_la_LIBADD  += ../dm/libdm.la
+libpins_la_LIBADD  += por/libpor.la
+
+if HAVE_BOOST
+libpins_la_LIBADD  += ../dm/libdm_boost.la
+endif
+
+if HAVE_VIENNACL
+libpins_la_LIBADD  += ../dm/libdm_viennacl.la
+endif
+
