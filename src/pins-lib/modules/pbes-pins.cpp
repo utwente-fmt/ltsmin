@@ -56,7 +56,7 @@ public:
         global_group_var_ids(0)
     {
         local2global_maps.resize(get_info()->get_lts_type().get_number_of_state_types());
-        for (size_t i = 0; i <= get_info()->get_lts_type().get_number_of_state_types(); i++) {
+        for (size_t i = 0; i <= (size_t) get_info()->get_lts_type().get_number_of_state_types(); i++) {
             std::map<int,int> local2global_map;
             local2global_maps.push_back(local2global_map);
             std::vector<int> global2local_map;
@@ -357,7 +357,7 @@ int PBESgetStateLabelLong(model_t model, int label, int *s)
  */
 lts_type_t PBESgetLTSType(const lts_type& t)
 {
-    assert(t.get_state_length()==t.get_state_names().size());
+    assert((size_t)t.get_state_length()==t.get_state_names().size());
     lts_type_t type = lts_type_create();
     lts_type_set_state_length(type, t.get_state_length());
     for (size_t i = 0; i < t.get_state_names().size(); i++) {
