@@ -117,6 +117,7 @@ nodist_EXTRA_pnml2lts_dist_SOURCES = automake-force-linker.cxx # required by Boo
 prob2lts_dist_SOURCES   = ../pins2lts-dist.c
 prob2lts_dist_SOURCES  += ../../pins-lib/modules/prob-pins.c ../../pins-lib/modules/prob-pins.h
 prob2lts_dist_LDADD     = $(PROB_LIB_LIBS) $(LIBS)
+prob2lts_dist_CFLAGS    = $(AM_CFLAGS) $(PROB_CFLAGS)
 prob2lts_dist_CPPFLAGS  = -DPROB $(DIST_CPPFLAGS)
 prob2lts_dist_LDFLAGS   = $(AM_LDFLAGS)
 nodist_EXTRA_prob2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL

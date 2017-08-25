@@ -1,11 +1,8 @@
-
-DM_LIB = ../dm/libdm.la
-HRE_LIB = ../hre/libhre.la
-UTIL_LIB = ../util-lib/libutil.la $(HRE_LIB)
-MC_LIB = ../mc-lib/libmc.la $(UTIL_LIB)
-LTSMIN_LIB = ../ltsmin-lib/libltsmin.la $(UTIL_LIB)
-PINS_LIB = ../pins-lib/libpins.la $(LTSMIN_LIB)
-VSET_LIB = ../vset-lib/libvset.la
+OPEN_LIBS  = ../hre/libhre.la
+OPEN_LIBS += ../util-lib/libutil.la
+OPEN_LIBS += ../mc-lib/libmc.la
+OPEN_LIBS += ../ltsmin-lib/libltsmin.la
+OPEN_LIBS += ../pins-lib/libpins.la
 
 pkglib_LTLIBRARIES  = libetf-open.la
 if HAVE_SPINS
@@ -32,25 +29,25 @@ endif
 libetf_open_la_SOURCES   = pins-open.c ../pins-lib/modules/etf-pins.c
 libetf_open_la_SOURCES  += ../pins-lib/modules/etf-pins.h
 libetf_open_la_CPPFLAGS  = -DETF $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-libetf_open_la_LIBADD    = $(PINS_LIB)
+libetf_open_la_LIBADD    = $(OPEN_LIBS)
 
 # liblpo-open.la
 liblpo_open_la_SOURCES   = pins-open.c
 liblpo_open_la_CPPFLAGS  = -DMCRL $(MCRL_CPPFLAGS) $(CADP_CPPFLAGS)
 liblpo_open_la_CPPFLAGS += ../pins-lib/libmcrl-pins.la $(AM_CPPFLAGS)
-liblpo_open_la_LIBADD    = $(PINS_LIB)
+liblpo_open_la_LIBADD    = $(OPEN_LIBS)
 nodist_EXTRA_liblpo_open_la_SOURCES = automake-force-linker.cxx
 
 # liblps-open.la
 liblps_open_la_SOURCES   = pins-open.c
 liblps_open_la_CPPFLAGS  = -DMCRL2 $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-liblps_open_la_LIBADD    = ../pins-lib/libmcrl2-pins.la $(PINS_LIB)
+liblps_open_la_LIBADD    = ../pins-lib/libmcrl2-pins.la $(OPEN_LIBS)
 nodist_EXTRA_liblps_open_la_SOURCES = automake-force-linker.cxx
 
 # libpbes-open.la
 libpbes_open_la_SOURCES   = pins-open.c
 libpbes_open_la_CPPFLAGS  = -DLTSMIN_PBES $(CADP_CPPFLAGS) $(AM_CPPFLAGS)
-libpbes_open_la_LIBADD    = ../pins-lib/libpbes-pins.la $(PINS_LIB)
+libpbes_open_la_LIBADD    = ../pins-lib/libpbes-pins.la $(OPEN_LIBS)
 nodist_EXTRA_libpbes_open_la_SOURCES = automake-force-linker.cxx
 
 # libdve-open.la
@@ -58,7 +55,7 @@ libdve_open_la_SOURCES   = pins-open.c ../pins-lib/modules/dve-pins.c
 libdve_open_la_SOURCES  += ../pins-lib/modules/dve-pins.h
 libdve_open_la_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(CADP_CPPFLAGS)
 libdve_open_la_CPPFLAGS += $(AM_CPPFLAGS)
-libdve_open_la_LIBADD    = $(PINS_LIB)
+libdve_open_la_LIBADD    = $(OPEN_LIBS)
 
 ### libopaal-open.la
 ##libopaal_open_la_SOURCES = pins-open.c ../pins-lib/modules/opaal-pins.c
@@ -72,5 +69,5 @@ libprom_open_la_SOURCES  = pins-open.c ../pins-lib/modules/prom-pins.c
 libprom_open_la_SOURCES += ../pins-lib/modules/prom-pins.h
 libprom_open_la_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(CADP_CPPFLAGS)
 libprom_open_la_CPPFLAGS+= $(AM_CPPFLAGS)
-libprom_open_la_LIBADD   = $(PINS_LIB)
+libprom_open_la_LIBADD   = $(OPEN_LIBS)
 

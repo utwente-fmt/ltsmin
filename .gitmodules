@@ -1,6 +1,3 @@
-[submodule "buddy"]
-	path = buddy
-	url = https://github.com/utwente-fmt/buddy.git
 [submodule "spins"]
 	path = spins
 	url = https://github.com/utwente-fmt/spins.git
