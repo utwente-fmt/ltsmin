@@ -165,13 +165,32 @@ int RTcacheLineSize(){
 #endif
 
 int RTnumCPUs(){
+    int cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
 #ifdef __linux__
-    cpu_set_t cs;
-    CPU_ZERO(&cs);
-    sched_getaffinity(0, sizeof(cs), &cs);
-    return CPU_COUNT(&cs);
-#else
-    return sysconf(_SC_NPROCESSORS_ONLN);
+    cpu_set_t cpus;
+    cpu_set_t* cpus_p = &cpus;
+    size_t cpus_size = sizeof(cpu_set_t);
+    int configured_cpus = sysconf(_SC_NPROCESSORS_CONF);
+    if (configured_cpus >= CPU_SETSIZE) {
+        cpus_p = CPU_ALLOC(configured_cpus);
+        if (cpus_p) {
+            cpus_size = CPU_ALLOC_SIZE(configured_cpus);
+            CPU_ZERO_S(cpus_size, cpus_p);
+        } else {
+            Warning(error, "CPU_ALLOC failed: %s",
+                    errno != 0 ? strerror(errno) : "unknown error");
+            return cpu_count;
+        }
+    }
+    if (!sched_getaffinity(0, cpus_size, cpus_p)) {
+        if (cpus_p != &cpus) cpu_count = CPU_COUNT_S(cpus_size, cpus_p);
+        else cpu_count = CPU_COUNT(cpus_p);
+    } else {
+        Warning(error, "Unable to get CPU set affinity: %s",
+                errno != 0 ? strerror(errno) : "unknown error");
+    }
+    if (cpus_p != &cpus) CPU_FREE(cpus_p);
 #endif
+    return cpu_count;
 }
 
