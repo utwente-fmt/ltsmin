@@ -82,14 +82,19 @@ char *key_search(si_map_entry map[],const int val){
 #if defined(__APPLE__)
 
 size_t RTmemSize(){
-    int mib[4];
-    int64_t physical_memory;
-    size_t len = sizeof(int64_t);
-    mib[0] = CTL_HW;
-    mib[1] = HW_MEMSIZE;
-    len = sizeof(int64_t);
-    sysctl(mib, 2, &physical_memory, &len, NULL, 0);
-    return physical_memory;
+    const char *memsize = getenv("LTSMIN_MEM_SIZE");
+    if (memsize) {
+        return strtoimax(memsize, NULL, 10);
+    } else {
+        int mib[4];
+        int64_t physical_memory;
+        size_t len = sizeof(int64_t);
+        mib[0] = CTL_HW;
+        mib[1] = HW_MEMSIZE;
+        len = sizeof(int64_t);
+        sysctl(mib, 2, &physical_memory, &len, NULL, 0);
+        return physical_memory;
+    }
 }
 
 int RTcacheLineSize(){
@@ -108,43 +113,49 @@ int RTcacheLineSize(){
 static int mem_size_warned = 0;
 
 size_t RTmemSize(){
-    const long res=sysconf(_SC_PHYS_PAGES);
-    const long pagesz=sysconf(_SC_PAGESIZE);
-    size_t limit = pagesz*((size_t)res);
+    const char *memsize = getenv("LTSMIN_MEM_SIZE");
+    if (memsize) {
+        return strtoimax(memsize, NULL, 10);
+    } else {
+        const long res=sysconf(_SC_PHYS_PAGES);
+        const long pagesz=sysconf(_SC_PAGESIZE);
+        size_t limit = pagesz*((size_t)res);
 
-    /* Now try to determine whether this program runs in a cgroup.
-     * If this is the case, we will pick the minimum of the previously computed
-     * limit.
-     */
-    const char *file = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
-    FILE *fp = fopen(file, "r");
-    if (fp != NULL) {
-        size_t cgroup_limit = 0;
-        /* If there is no limit then the value scanned for will be larger than
-         * SIZE_T_MAX, and thus fscanf will not return 1.
+        /* Now try to determine whether this program runs in a cgroup.
+         * If this is the case, we will pick the minimum of the previously
+         * computed limit.
          */
-        int ret = fscanf(fp, "%zu", &cgroup_limit);
-        if (ret == 1 && cgroup_limit > 0) {
-            if (cgroup_limit < limit) {
-                limit = cgroup_limit;
-                if (!mem_size_warned) {
-                    Warning(infoLong,
-                            "Using cgroup limit of %zu bytes", limit);
+        const char *file = "/sys/fs/cgroup/memory/memory.limit_in_bytes";
+        FILE *fp = fopen(file, "r");
+        if (fp != NULL) {
+            size_t cgroup_limit = 0;
+            /* If there is no limit then the value scanned for will be larger
+             * than SIZE_T_MAX, and thus fscanf will not return 1.
+             */
+            int ret = fscanf(fp, "%zu", &cgroup_limit);
+            if (ret == 1 && cgroup_limit > 0) {
+                if (cgroup_limit < limit) {
+                    limit = cgroup_limit;
+                    if (!mem_size_warned) {
+                        Warning(infoLong,
+                                "Using cgroup limit of %zu bytes", limit);
+                    }
                 }
+            } else if (!mem_size_warned) {
+                Warning(error, "Unable to get cgroup memory limit "
+                        "in file %s: %s",
+                        file, errno != 0 ? strerror(errno) : "unknown error");
             }
+            fclose(fp);
         } else if (!mem_size_warned) {
-            Warning(error, "Unable to get cgroup memory limit in file %s: %s",
-                    file, errno != 0 ? strerror(errno) : "unknown error");
+            Warning(error, "Unable to open cgroup memory limit file %s: %s",
+                    file, strerror(errno));
         }
-        fclose(fp);
-    } else if (!mem_size_warned) {
-        Warning(error, "Unable to open cgroup memory limit file %s: %s", file,
-                strerror(errno));
+
+        mem_size_warned = 1;
+
+        return limit;
     }
-
-    mem_size_warned = 1;
-
-    return limit;
 }
 
 #if defined(__linux__)
@@ -165,32 +176,37 @@ int RTcacheLineSize(){
 #endif
 
 int RTnumCPUs(){
-    int cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
-#ifdef __linux__
-    cpu_set_t cpus;
-    cpu_set_t* cpus_p = &cpus;
-    size_t cpus_size = sizeof(cpu_set_t);
-    int configured_cpus = sysconf(_SC_NPROCESSORS_CONF);
-    if (configured_cpus >= CPU_SETSIZE) {
-        cpus_p = CPU_ALLOC(configured_cpus);
-        if (cpus_p) {
-            cpus_size = CPU_ALLOC_SIZE(configured_cpus);
-            CPU_ZERO_S(cpus_size, cpus_p);
-        } else {
-            Warning(error, "CPU_ALLOC failed: %s",
-                    errno != 0 ? strerror(errno) : "unknown error");
-            return cpu_count;
-        }
-    }
-    if (!sched_getaffinity(0, cpus_size, cpus_p)) {
-        if (cpus_p != &cpus) cpu_count = CPU_COUNT_S(cpus_size, cpus_p);
-        else cpu_count = CPU_COUNT(cpus_p);
+    const char *numCPUs = getenv("LTSMIN_NUM_CPUS");
+    if (numCPUs) {
+        return strtoimax(numCPUs, NULL, 10);
     } else {
-        Warning(error, "Unable to get CPU set affinity: %s",
-                errno != 0 ? strerror(errno) : "unknown error");
-    }
-    if (cpus_p != &cpus) CPU_FREE(cpus_p);
+        int cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
+#ifdef __linux__
+        cpu_set_t cpus;
+        cpu_set_t* cpus_p = &cpus;
+        size_t cpus_size = sizeof(cpu_set_t);
+        int configured_cpus = sysconf(_SC_NPROCESSORS_CONF);
+        if (configured_cpus >= CPU_SETSIZE) {
+            cpus_p = CPU_ALLOC(configured_cpus);
+            if (cpus_p) {
+                cpus_size = CPU_ALLOC_SIZE(configured_cpus);
+                CPU_ZERO_S(cpus_size, cpus_p);
+            } else {
+                Warning(error, "CPU_ALLOC failed: %s",
+                        errno != 0 ? strerror(errno) : "unknown error");
+                return cpu_count;
+            }
+        }
+        if (!sched_getaffinity(0, cpus_size, cpus_p)) {
+            if (cpus_p != &cpus) cpu_count = CPU_COUNT_S(cpus_size, cpus_p);
+            else cpu_count = CPU_COUNT(cpus_p);
+        } else {
+            Warning(error, "Unable to get CPU set affinity: %s",
+                    errno != 0 ? strerror(errno) : "unknown error");
+        }
+        if (cpus_p != &cpus) CPU_FREE(cpus_p);
 #endif
-    return cpu_count;
+        return cpu_count;
+    }
 }
 

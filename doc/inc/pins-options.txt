@@ -141,3 +141,5 @@ del;;
     Use leaping partial-order reduction, by combining several disjoint
     stubborn sets sequentially.
 
+include::env-vars.txt[]
+

@@ -93,6 +93,7 @@ extra_ASCIIDOC += inc/buddy-options.txt
 extra_ASCIIDOC += inc/compression.txt
 extra_ASCIIDOC += inc/devel-options.txt
 extra_ASCIIDOC += inc/dve.txt
+extra_ASCIIDOC += inc/env-vars.txt
 extra_ASCIIDOC += inc/file-formats.txt
 extra_ASCIIDOC += inc/general-options.txt
 extra_ASCIIDOC += inc/hre-options.txt
