@@ -14,6 +14,7 @@ AC_DEFINE([LTSMIN_PATHNAME_MAX], 1024, [Define maximal length of pathnames])
 AC_DEFINE([LTSMIN_CONFIG_INCLUDED], 1, [Controls where headers are included from])
 AC_DEFINE([DEFFILEMODE], 0666, [Define default file mode])
 
+m4_divert_text([DEFAULTS], [: "${ARFLAGS=crs} ${AR_FLAGS=crs}"])
 #DejaGNU
 if test x"$DEJAGNU" = x
 then
