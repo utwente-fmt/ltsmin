@@ -278,7 +278,7 @@ void lts_write(char *name,lts_t lts,string_set_t filter,int segments){
             lts_write_dir(archive,NULL,lts,segments);
             arch_close(&archive);
             break;
-        }
+        } else // fall through
     default: {
         lts_file_t src=lts_reader(lts,segments,NULL);
         lts_file_t dst;

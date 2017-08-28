@@ -69,7 +69,7 @@ HAVE_VIENNACL=0
     # If we can see the ViennaCL headers, then we know where to get them
     # and we'll need C++11 to compile them
     if test -e "${VIENNACL_PREFIX}/viennacl/vector.hpp" ; then
-       VIENNACL_CPPFLAGS="-I${VIENNACL_PREFIX}"
+       VIENNACL_CPPFLAGS="-isystem${VIENNACL_PREFIX}"
        AX_CXX_COMPILE_STDCXX_11(noext)
     fi
 

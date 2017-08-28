@@ -50,7 +50,7 @@ static void write_init(lts_file_t file,int seg,void* state){
         DSwriteU32(file->init,*((uint32_t*)state));
         break;
     case SegVector:
-        DSwriteS32(file->init,seg);
+        DSwriteS32(file->init,seg); // fall through
     case Vector:
         {
             lts_type_t ltstype=lts_file_get_type(file);
@@ -125,7 +125,7 @@ static void write_begin(lts_file_t file){
         }
         break;
     case SegVector:
-        write_seg=1;
+        write_seg=1; // fall through
     case Vector:
         if (NV==0) Abort("vector mode unusable if vector undefined");
         file->src_vec=(struct_stream_t*)RTmallocZero(segments*sizeof(struct_stream_t));
@@ -158,7 +158,7 @@ static void write_begin(lts_file_t file){
         }
         break;
     case SegVector:
-        write_seg=1;
+        write_seg=1; // fall through
     case Vector:
         if (NV==0) Abort("vector mode unusable if vector undefined");
         file->dst_vec=(struct_stream_t*)RTmallocZero(segments*sizeof(struct_stream_t));

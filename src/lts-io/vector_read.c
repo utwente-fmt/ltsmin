@@ -101,7 +101,7 @@ static int read_init(lts_file_t file,int *seg,void* state){
         *((uint32_t*)state)=DSreadS32(file->init);
         break;
     case SegVector:
-        *seg=DSreadS32(file->init);
+        *seg=DSreadS32(file->init); // fall through
     case Vector:
         {
             lts_type_t ltstype=lts_file_get_type(file);
