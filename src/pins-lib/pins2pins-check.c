@@ -83,7 +83,10 @@ print_chunk (model_t model, char *res, int max, int typeno, int val)
         case LTStypeChunk:
             c = pins_chunk_get (model, typeno, val);
             return snprintf (res, max, "%s", c.data);
-        default: HREassert(false);
+        default: {
+            HREassert(false);
+            return -1;
+        }
     }
 }
 
@@ -346,7 +349,10 @@ type_min (check_ctx_t *ctx, int idx)
         case LTStypeTrilean:
         case LTStypeSInt32:
             return 0;
-        default: HREassert(false);
+        default: {
+            HREassert(false);
+            return -1;
+        }
     }
 }
 
@@ -378,7 +384,10 @@ type_max (check_ctx_t *ctx, int idx)
             return 2;
         case LTStypeSInt32:
             return (1UL<<31) - 1;
-        default: HREassert(false);
+        default: {
+                HREassert(false);
+                return -1;
+        }
     }
 }
 

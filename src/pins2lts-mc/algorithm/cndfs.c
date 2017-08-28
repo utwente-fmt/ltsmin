@@ -341,6 +341,7 @@ accepting_down (wctx_t* ctx, state_info_t *state, int accepting)
                "Wrong level: %zu, depth=%zu, accepting depth=%zu",
                loc->seed->ref, *depth, cloc->accepting_depth);
     cloc->accepting_depth -= accepting;
+    (void) loc;
 }
 
 static inline int

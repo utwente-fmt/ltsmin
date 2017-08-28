@@ -321,10 +321,13 @@ model_t
 GBaddPOR (model_t model)
 {
     switch (PINS_POR) {
-    case PINS_POR_NONE:     return model;
-    case PINS_POR_ON:       return PORwrapper(model);
-    case PINS_POR_CHECK:    return GBaddPORCheck(model);
-    default: HREassert (false, "Unknown POR mode: %d", PINS_POR);
+        case PINS_POR_NONE:     return model;
+        case PINS_POR_ON:       return PORwrapper(model);
+        case PINS_POR_CHECK:    return GBaddPORCheck(model);
+        default: {
+            HREassert (false, "Unknown POR mode: %d", PINS_POR);
+            return NULL;
+        }
     }
 }
 
