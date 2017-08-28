@@ -531,6 +531,7 @@ lipton_is_stubborn (por_context *ctx, int group)
 {
     HREassert(false, "Unimplemented for Lipton reduction");
     (void) ctx; (void) group;
+    return false;
 }
 
 void

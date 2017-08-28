@@ -114,8 +114,8 @@ extern void HREinit(int *argc,char **argv[]);
 /**
 \brief Assertion check, with or without print arguments
 */
-#ifdef DNDEBUG
-#define HREassert(check,...)    ((void)0);
+#ifdef NDEBUG
+#define HREassert(check,...)    ((void) (check));
 #else
 #ifdef LTSMIN_DEBUG
 #define PRINT_STACK HREprintStack();

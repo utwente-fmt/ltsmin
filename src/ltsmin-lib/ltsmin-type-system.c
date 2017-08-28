@@ -86,7 +86,10 @@ get_typeno(ltsmin_expr_t e, lts_type_t lts_type)
         case EVAR: {
             return lts_type_get_edge_label_typeno(lts_type, e->idx);
         }
-        default: HREassert(false);
+        default: {
+            HREassert(false);
+            return -1;
+        }
     }
 }
 
