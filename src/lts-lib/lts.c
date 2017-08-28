@@ -593,8 +593,9 @@ lts_t lts_encode_edge(lts_t lts){
                         char label_s[label_c.len*2+6];
                         chunk2string(label_c,sizeof label_s,label_s);
                         current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        break;
                         }
-                    case LTStypeBool:
+                    case LTStypeBool: // fall through
                     case LTStypeTrilean: {
                         char* value = NULL;
                         switch (vector[j]) {
@@ -656,6 +657,7 @@ lts_t lts_encode_edge(lts_t lts){
                         char label_s[label_c.len*2+6];
                         chunk2string(label_c,sizeof label_s,label_s);
                         current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        break;
                         }
                     case LTStypeBool:
                     case LTStypeTrilean: {
@@ -719,6 +721,7 @@ lts_t lts_encode_edge(lts_t lts){
                         char label_s[label_c.len*2+6];
                         chunk2string(label_c,sizeof label_s,label_s);
                         current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        break;
                         }
                     case LTStypeBool:
                     case LTStypeTrilean: {

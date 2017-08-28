@@ -1601,7 +1601,7 @@ gsea_setup(const char *output)
     case Strategy_SCC:
         if (opt.dlk_detect || opt.act_detect || opt.inv_detect)
             Abort ("Verification of safety properties works only with reachability algorithms.");
-        set_cycle_proviso ();
+        set_cycle_proviso (); // fall through
     case Strategy_DFS:
         if (output) Abort("Use BFS to write the state space to an lts file.");
         switch (opt.state_db) {

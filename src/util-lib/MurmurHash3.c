@@ -9,6 +9,8 @@
 
 #include "MurmurHash3.h"
 
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+
 #define	FORCE_INLINE __attribute__((always_inline))
 
 static inline uint32_t rotl32 ( uint32_t x, int8_t r )

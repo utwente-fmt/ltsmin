@@ -27,11 +27,11 @@ bandwidth(std::vector<std::map<int, double> > const & matrix, int & max, double 
 {
     max = 0;
     tot = 0;
-    for (std::size_t i = 0; i < matrix.size(); i++) {
+    for (int i = 0; i < (int) matrix.size(); i++) {
         if (matrix[i].size() == 0) continue;
         int d = 0;
         for (std::map<int, double>::const_iterator it = matrix[i].begin(); it != matrix[i].end(); it++) {
-            std::size_t col_idx = static_cast<std::size_t>(it->first);
+            const int col_idx = it->first;
             d = std::max(d, abs(i - col_idx));
         }
         max = std::max(max, d);

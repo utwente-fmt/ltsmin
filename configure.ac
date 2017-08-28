@@ -444,6 +444,12 @@ AS_IF([test "x$with_sylvan" != "xno"], [
     ])
 ])
 
+AC_DEFINE(
+    [__assume(cond)],
+    [do { if (!(cond)) __builtin_unreachable(); } while (0)],
+    [Provide a hint to the optimizer]
+)
+
 #AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
 AM_CONDITIONAL([HAVE_SYLVAN], [test x"$have_sylvan" = "xyes"])

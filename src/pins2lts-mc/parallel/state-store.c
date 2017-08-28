@@ -169,6 +169,7 @@ state_store_init (model_t model, bool timed)
     case ClearyTree:
         if (indexing) Abort ("Cleary tree not supported in combination with "
                               "error trails or the MCNDFS algorithms.");
+        // fall through
     case TreeTable:
         if (ZOBRIST)
             Abort ("Zobrist and treedbs is not implemented");

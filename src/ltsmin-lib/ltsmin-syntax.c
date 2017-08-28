@@ -265,6 +265,13 @@ int LTSminBinaryToken(ltsmin_parse_env_t env, int idx)
 size_t
 LTSminSPrintExpr(char *buf, size_t max_buf, ltsmin_expr_t expr, ltsmin_parse_env_t env)
 {
+    /*
+     * Make assumption for the optimizer to prevent a false positive warning:
+     * src/ltsmin-lib/ltsmin-syntax.c:326:18: error: null destination pointer
+     * [-Werror=format-truncation=]
+     * n += snprintf        (buf + (buf?n:0), max_buf, ".");
+     */
+    __assume((!buf && !max_buf) || (buf && max_buf));
     size_t n = 0;
     switch(expr->node_type){
         case VAR:
