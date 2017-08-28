@@ -22,8 +22,6 @@ then
 fi
 AC_SUBST(DEJAGNU)
   
-# Checks for programs.
-AC_SUBST(AM_CXXFLAGS,["-Wno-inline -ftemplate-depth-128 -finline-functions"])
 
 AM_PROG_CC_C_O
 AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
