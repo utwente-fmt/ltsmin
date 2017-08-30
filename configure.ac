@@ -39,15 +39,8 @@ ACX_PTHREAD(
 # explicitly link if necessary  
 AC_CHECK_LIB(pthread, pthread_create, [LIBS="$LIBS -lpthread"])
 
-dnl Newer libtool allows this instead:
-dnl LT_PREREQ(2.2)
-dnl LT_INIT([disable-shared])
-AC_DISABLE_SHARED
-AC_PROG_LIBTOOL
-AC_PROG_RANLIB
-dnl automake 1.8 <= x <= 1.9.6 has broken AM_PROG_MKDIR_P
-AC_PROG_MKDIR_P
-AC_SUBST([MKDIR_P])
+LT_PREREQ(2.4)
+LT_INIT([disable-shared])
 
 AX_CHECK_FLEX([
 %option prefix="ltsmin_"
