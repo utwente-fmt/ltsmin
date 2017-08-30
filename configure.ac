@@ -119,7 +119,7 @@ AS_IF([test "x$enable_dist" != "xno"],[
 ])
 
 AC_PROG_CC_C99
-AX_CXX_COMPILE_STDCXX_11
+AX_CXX_COMPILE_STDCXX_11(, [mandatory])
 AS_IF([test x"$ac_cv_prog_cc_c99" = xno],
   [AC_MSG_FAILURE([no acceptable C99 compiler found.])])
 AX_TRY_CFLAGS_IFELSE([-W -Wall])
