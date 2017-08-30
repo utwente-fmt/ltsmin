@@ -429,8 +429,8 @@ AS_IF([test "x$enable_prob" != "xno"], [
 AC_ARG_ENABLE([werror],
     [AS_HELP_STRING([--enable-werror], [Use -Werror @<:@no@:>@])])
 AS_IF([test "x$enable_werror" = "xyes"], [
-    AC_SUBST([AM_CFLAGS], [-Werror])
-    AC_SUBST([AM_CXXFLAGS], [-Werror])
+    AC_SUBST([AM_CFLAGS], ["$AM_CFLAGS -Werror"])
+    AC_SUBST([AM_CXXFLAGS], ["$AM_CXXFLAGS -Werror"])
 ])
 
 AC_ARG_WITH([sylvan],
