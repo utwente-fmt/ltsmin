@@ -273,7 +273,6 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
         break;
     case POPT_CALLBACK_REASON_POST:
         {
-            Warning(debug,"pbes init");
             if (reset_flag) {
                 Warning(info,"Reset flag is set.");
             }
