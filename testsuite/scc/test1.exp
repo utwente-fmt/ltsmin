@@ -21,14 +21,14 @@ set strategies [list "renault" 2 "tarjan" 1 "ufscc" 2]
 # anderson:
 foreach {s t} $strategies {
     dict set commands test_anderson_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=$t \
-	    -n --strategy=$s $EXAMPLES_PATH/anderson.1.prop4.dve"
+	    -n --strategy=$s $EXAMPLES_SRC_PATH/anderson.1.prop4.dve"
     dict set commands test_anderson_dve_mc_$s exp "scc count: *281301"
 }
 
 # iprotocol
 foreach {s t} $strategies {
     dict set commands test_iprotocol_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=$t \
-	-n --strategy=$s $EXAMPLES_PATH/iprotocol.2.prop4.dve"
+	-n --strategy=$s $EXAMPLES_SRC_PATH/iprotocol.2.prop4.dve"
     dict set commands test_iprotocol_dve_mc_$s exp "scc count: *25985"
 }
 

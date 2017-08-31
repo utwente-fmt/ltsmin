@@ -72,13 +72,13 @@ compile_DVE {"iprotocol.2.dve"}
 
 dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --strategy=ndfs \
 	iprotocol.2.dve2C \
-	--ltl=$EXAMPLES_PATH/iprotocol.2.ltl"
+	--ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
 dict set commands test18_mc exp "Accepting cycle FOUND"
 
 # NOTE: the difference in the use of captitals in the expected output between this and previous test
 dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	iprotocol.2.dve2C \
-	--ltl=$EXAMPLES_PATH/iprotocol.2.ltl"
+	--ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
 dict set commands test18_seq exp "accepting cycle found"
 
 
@@ -87,12 +87,12 @@ compile_DVE {"elevator.3.dve"}
 
 dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=ndfs \
 	elevator.3.dve2C \
-	--ltl=$EXAMPLES_PATH/elevator.3.ltl"]
+	--ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"]
 dict set commands test19_mc exp "495463 states"
 
 dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	elevator.3.dve2C \
-	--ltl=$EXAMPLES_PATH/elevator.3.ltl"
+	--ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"
 dict set commands test19_seq exp "495463 states"
 
 foreach testcase [dict keys $commands] {

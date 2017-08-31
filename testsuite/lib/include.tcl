@@ -9,12 +9,16 @@ proc makeAbsolute {pathname} {
 }
 
 set LTSMIN_SRCDIR "[makeAbsolute $srcdir]/.."
+set LTSMIN_BUILDDIR "[makeAbsolute $base_dir]/.."
+
 
 # The directory containing all the models used for testing.
-set EXAMPLES_PATH "$LTSMIN_SRCDIR/examples"
+set EXAMPLES_SRC_PATH "$LTSMIN_SRCDIR/examples"
+set EXAMPLES_BUILD_PATH "$LTSMIN_BUILDDIR/examples"
 
 # filter: filter a specific (list of) backend(s): {mc,sym,seq,dist}
 proc find_alg_backends { filter } {
+    global LTSMIN_BUILDDIR
     global base_dir
     set backends [list]
     set lts_backends [glob -directory "$base_dir/../src" -type d pins2lts-$filter ]
@@ -218,7 +222,7 @@ set binpaths(spins-jar) "$LTSMIN_SRCDIR/spins/spins.jar"
 set binpaths(ltsmin-compare) "$base_dir/../src/ltsmin-compare/ltsmin-compare"
 set binpaths(ltsmin-convert) "$base_dir/../src/ltsmin-convert/ltsmin-convert"
 set binpaths(ltsmin-printtrace) "$base_dir/../src/ltsmin-printtrace/ltsmin-printtrace"
-set binpaths(spins) "$base_dir/../src/scripts/spins"
+set binpaths(spins) "$LTSMIN_SRCDIR/src/scripts/spins"
 set binpaths(out) "out"
 
 set bins [find_alg_backends "{seq,mc,dist,sym}"]
@@ -229,7 +233,7 @@ foreach path $bins {
 
 proc compile_promela { prom_models } {
     global binpaths
-    global EXAMPLES_PATH
+    global EXAMPLES_SRC_PATH
 
     if { ! [file exists "$binpaths(spins-jar)" ] } {
 	 fail "Cannot find spins binary in $binpaths(spins-jar)"
@@ -237,8 +241,8 @@ proc compile_promela { prom_models } {
     }
 
     foreach prom_model $prom_models {
-        puts "Executing precommand: '$binpaths(spins) $EXAMPLES_PATH/$prom_model'"
-        set rc [catch { exec $binpaths(spins) -o $EXAMPLES_PATH/$prom_model } msg ]
+        puts "Executing precommand: '$binpaths(spins) $EXAMPLES_SRC_PATH/$prom_model'"
+        set rc [catch { exec $binpaths(spins) -o $EXAMPLES_SRC_PATH/$prom_model } msg ]
 
         if { $rc != 0 } {
             fail "Failed executing precommand"
@@ -250,11 +254,11 @@ proc compile_promela { prom_models } {
 }
 
 proc compile_DVE { DVE_models } {
-    global EXAMPLES_PATH
+    global EXAMPLES_SRC_PATH
 
     foreach DVE_model $DVE_models {
-        puts "Executing precommand: 'divine compile -l $EXAMPLES_PATH/$DVE_model'"
-        set rc [catch { exec divine compile -l $EXAMPLES_PATH/$DVE_model } msg ]
+        puts "Executing precommand: 'divine compile -l $EXAMPLES_SRC_PATH/$DVE_model'"
+        set rc [catch { exec divine compile -l $EXAMPLES_SRC_PATH/$DVE_model } msg ]
 
         if { $rc != 0 } {
             fail "Failed executing precommand"
@@ -266,10 +270,10 @@ proc compile_DVE { DVE_models } {
 }
 
 proc start_ProB { model } {
-    global EXAMPLES_PATH
+    global EXAMPLES_SRC_PATH
 
-    puts "Executing precommand: 'probcli $EXAMPLES_PATH/$model -ltsmin'"
-    set PID [exec probcli $EXAMPLES_PATH/$model -ltsmin &]
+    puts "Executing precommand: 'probcli $EXAMPLES_SRC_PATH/$model -ltsmin'"
+    set PID [exec probcli $EXAMPLES_SRC_PATH/$model -ltsmin &]
 
     while { ! [file exists /tmp/ltsmin.probz] } {
         sleep 1

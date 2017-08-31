@@ -52,7 +52,8 @@ proc test_forall_params { params_dict idx command } {
 # langs: dict with options for language frontends (model, expected output etc.)
 # backends: dict with options for algorithmic backends
 proc run_test_for_alg_backends { alg_be langs backends} {
-    global EXAMPLES_PATH
+    global EXAMPLES_SRC_PATH
+    global EXAMPLES_BUILD_PATH
 
     foreach path $alg_be {
         set testcounter 1
@@ -67,8 +68,10 @@ proc run_test_for_alg_backends { alg_be langs backends} {
 
             if { [file exists "$model" ] } {
             	set model "$model"
-            } elseif { [file exists "$EXAMPLES_PATH/$model" ] } {
-		 set model "$EXAMPLES_PATH/$model" 
+            } elseif { [file exists "$EXAMPLES_SRC_PATH/$model" ] } {
+		 set model "$EXAMPLES_SRC_PATH/$model"
+            } elseif { [file exists "$EXAMPLES_BUILD_PATH/$model" ] } {
+		 set model "$EXAMPLES_BUILD_PATH/$model"
             } else {
                  fail "Model not found: $model"
 		 continue
