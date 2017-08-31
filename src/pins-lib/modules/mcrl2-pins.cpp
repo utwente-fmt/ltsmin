@@ -350,7 +350,6 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_PRE:
         break;
     case POPT_CALLBACK_REASON_POST: {
-        Warning(debug,"mcrl2 init");
         GBregisterLoader("lps", MCRL2loadGreyboxModel);
         GBregisterLoader("txt", MCRL2CompileGreyboxModel);
         if (mcrl2_verbosity > 0) {
