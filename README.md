@@ -98,12 +98,12 @@ If you were to refer to the LTSmin toolset in your academic paper, we would appr
 
 Ordered by the number of commits (January 2017) LTSmin's contributors are:
 
-* [Alfons Laarman](http://fmt.cs.utwente.nl/~laarman/),
-* [Michael Weber](http://fmt.cs.utwente.nl/~michaelw/),
+* [Alfons Laarman](http://alfons.laarman.com/),
+* [Michael Weber](http://foldr.org/mw/),
 * [Jeroen Meijer](http://jmeijer.nl/),
 * [Stefan Blom](http://fmt.cs.utwente.nl/~sccblom/),
 * [Jeroen Ketema](http://www.ketema.eu/),
-* [Tom van Dijk](http://fmt.cs.utwente.nl/~dijkt/),
+* [Tom van Dijk](http://www.tvandijk.nl/),
 * Elwin Pater,
 * [Gijs Kant](http://fmt.cs.utwente.nl/~kant/),
 * Vincent Bloemen
