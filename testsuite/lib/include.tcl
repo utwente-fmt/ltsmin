@@ -72,6 +72,7 @@ proc runmytest { test_name command_line exp_output} {
 
         # expected last line when execution succeeds
         "writing output took" {
+            exec sync
             pass "Program finished\n"
         }
 
@@ -182,6 +183,7 @@ proc runmytest { test_name command_line exp_output} {
         }
 
         -re $exp_output {
+            exec sync
             pass "Expected output $exp_output found"
         }
 	    
