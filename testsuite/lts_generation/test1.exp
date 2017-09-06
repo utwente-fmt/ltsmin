@@ -18,9 +18,7 @@ set commands [dict create]
 # TEST 8:
 
 dict set commands test8 cmd "$binpaths(dve2lts-sym) $EXAMPLES_SRC_PATH/gear.1.dve gear.1.etf --lace-workers=1"
-dict set commands test8 exp ""
-# cannot check output without stopping tool:
-# state space has 2689 (~2.69e+03) states, 1716 BDD nodes
+dict set commands test8 exp "state space has 2689"
 
 
 dict set commands test8_check cmd "$binpaths(etf2lts-seq) gear.1.etf"
@@ -29,13 +27,11 @@ dict set commands test8_check exp "2689 states 3567 transitions"
 
 # TEST 9:
 
-dict set commands test9_seq cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/ieee-11073.lps model.gcf --mcrl2-rewriter=jitty"
-dict set commands test9_seq exp ""
-#"1760 states 6583 transitions"
+dict set commands test9_seq cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
+dict set commands test9_seq exp "state space 20 levels, 74 states 92 transitions"
 
-dict set commands test9_dist cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/ieee-11073.lps model.gcf --mcrl2-rewriter=jitty"
-dict set commands test9_dist exp ""
-#"1760 states 6583 transitions"
+dict set commands test9_dist cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
+dict set commands test9_dist exp "state space has 20 levels 74 states 92 transitions"
 
 
 # TEST 10:
@@ -64,21 +60,18 @@ foreach s $strategies {
 
 # TEST 11:
 # gcf is already tested and created in test 9.
-#dict set commands test11_gcf cmd "$binpaths(lps2lts-seq) $EXAMPLES_BUILD_PATH/ieee-11073.lps model.gcf --mcrl2-rewriter=jitty"
+#dict set commands test11_gcf cmd "$binpaths(lps2lts-seq) $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
 #dict set commands test11_gcf exp ""
 
-dict set commands test11_bcg cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/ieee-11073.lps model.bcg --mcrl2-rewriter=jitty"
+dict set commands test11_bcg cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.bcg --mcrl2-rewriter=jitty"
 dict set commands test11_bcg exp ""
-#"1760 states 6583 transitions"
 
 # can not write state labels to .aut
-#dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/ieee-11073.lps model.aut --mcrl2-rewriter=jitty"
+#dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.aut --mcrl2-rewriter=jitty"
 #dict set commands test11_aut exp ""
-#"1760 states 6583 transitions"
 
-dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/ieee-11073.lps model.dir --mcrl2-rewriter=jitty"
-dict set commands test11_dir exp ""
-#"1760 states 6583 transitions"
+dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.dir --mcrl2-rewriter=jitty"
+dict set commands test11_dir exp "state space 20 levels, 74 states 92 transitions"
 
 # create fsm
 dict set commands test11_fsm cmd "$binpaths(ltsmin-convert) --rdwr model.dir model.fsm"
@@ -107,11 +100,11 @@ dict set commands test11_check5 exp "LTSs are equivalent"
 
 # TEST 12:
 
-dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/ieee-11073.lps model_dist.gcf --mcrl2-rewriter=jitty"
-dict set commands test12_gcf exp ""
+dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model_dist.gcf --mcrl2-rewriter=jitty"
+dict set commands test12_gcf exp "state space has 20 levels 74 states 92 transitions"
 
-dict set commands test12_dir cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/ieee-11073.lps model_dist.dir --mcrl2-rewriter=jitty"
-dict set commands test12_dir exp ""
+dict set commands test12_dir cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model_dist.dir --mcrl2-rewriter=jitty"
+dict set commands test12_dir exp "state space has 20 levels 74 states 92 transitions"
 
 # NOTE: The working of the following code has never been tested since no correct output was available
 dict set commands test12_check cmd "$binpaths(ltsmin-compare) -b model_dist.dir model_dist.gcf"
