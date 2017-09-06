@@ -32,11 +32,11 @@ uint32_t                HOA_ACCEPTING_SET = 0;
 static char            *ltl_file = NULL;
 static const char      *ltl_semantics_name = "none";
 static const char      *buchi_type = "ba";
-pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
+pins_ltl_type_t         PINS_LTL = PINS_LTL_AUTO;
 pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
 
 static si_map_entry db_ltl_semantics[]={
-    {"none",    PINS_LTL_NONE},
+    {"none",    PINS_LTL_AUTO},
     {"spin",    PINS_LTL_SPIN},
     {"textbook",PINS_LTL_TEXTBOOK},
     {"ltsmin",  PINS_LTL_LTSMIN},
@@ -96,7 +96,7 @@ struct poptOption ltl_options[] = {
     {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "LTL formula or file with LTL formula",
      "<ltl-file>.ltl|<ltl formula>"},
     {"ltl-semantics", 0, POPT_ARG_STRING, &ltl_semantics_name, 0,
-     "LTL semantics", "<spin|textbook|ltsmin> (default: \"spin\")"},
+     "LTL semantics", "<spin|textbook|ltsmin> (default: \"auto\")"},
     {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
      "Buchi automaton type", "<ba|tgba|spotba>"},
     POPT_TABLEEND
@@ -274,12 +274,7 @@ void ltl_spin_cb (void *context, transition_info_t *ti, int *dst, int *cpy) {
     // copy dst, append ltl never claim in lockstep
     int dst_buchi[ctx->len];
     memcpy (dst_buchi + 1, dst, ctx->old_len * sizeof(int) );
-    int pred_evals = infoctx->predicate_evals;
-
-    // if there are edge vars in the BA, perform eval again
-    if (ctx->ba->edge_predicates != 0) {
-        pred_evals |= eval (infoctx, infoctx->src + 1, ti->labels);
-    }
+    const int pred_evals = infoctx->predicate_evals;
 
     int i = infoctx->src[ctx->ltl_idx];
     HREassert (i < ctx->ba->state_count);
@@ -536,20 +531,32 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 static ltsmin_buchi_t  *shared_ba = NULL;
 static int              grab_ba = 0;
 
-static void check_POR_X(ltsmin_expr_t e, ltsmin_parse_env_t env) {
-    if (!PINS_POR) return;
+struct LTL_info {
+    int has_X;
+    int has_EVAR;
+};
+
+static void check_LTL(ltsmin_expr_t e, ltsmin_parse_env_t env,
+        struct LTL_info* info) {
     switch (e->node_type) {
         case BINARY_OP: {
-            check_POR_X(e->arg1, env);
-            check_POR_X(e->arg2, env);
+            check_LTL(e->arg1, env, info);
+            check_LTL(e->arg2, env, info);
             break;
         }
         case UNARY_OP: {
-            if (e->token == LTL_NEXT) {
-                const char* ex = LTSminPrintExpr(e, env);
-                Abort("The neXt operator is not allowed in "
-                        "combination with --por: %s", ex);
-            } else check_POR_X(e->arg1, env);
+            switch (e->token) {
+                case LTL_NEXT: {
+                    info->has_X = 1;
+                    break;
+                }
+                default: break;
+            }
+            check_LTL(e->arg1, env, info);
+            break;
+        }
+        case EVAR: {
+            info->has_EVAR = 1;
             break;
         }
         default: break;
@@ -567,7 +574,36 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         Warning(info, "LTL layer: formula: %s", ltl_file);
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
         ltsmin_expr_t ltl = ltl_parse_file (ltl_file, env, GBgetLTStype(model));
-        check_POR_X(ltl, env);
+        struct LTL_info LTL_info = {0, 0};
+        check_LTL(ltl, env, &LTL_info);
+        if (PINS_LTL == PINS_LTL_AUTO) {
+            if (LTL_info.has_EVAR) {
+                PINS_LTL = PINS_LTL_LTSMIN;
+                Warning(info, "Using LTSmin LTL semantics");
+            } else {
+                PINS_LTL = PINS_LTL_SPIN;
+                Warning(info, "Using Spin LTL semantics");
+            }
+        }
+        if (LTL_info.has_X && PINS_POR) {
+            const char* ex = LTSminPrintExpr(ltl, env);
+            Abort("The neXt operator is not allowed in "
+                    "combination with --por: %s", ex);
+        } else if (LTL_info.has_EVAR) {
+            if (PINS_POR) {
+                const char* ex = LTSminPrintExpr(ltl, env);
+                Abort("Edge-based LTL is incompatible with "
+                        "Partial Order Reduction (--por): %s", ex);
+            } else if (PINS_LTL == PINS_LTL_SPIN) {
+                const char* ex = LTSminPrintExpr(ltl, env);
+                Abort("Edge-based LTL is incompatible with "
+                        "Spin semantics (--ltl-semantics=spin): %s", ex);
+            } else if (PINS_LTL == PINS_LTL_TEXTBOOK) {
+                const char* ex = LTSminPrintExpr(ltl, env);
+                Abort("Edge-based LTL is incompatible with "
+                        "textbook semantics (--ltl-semantics=textbook): %s", ex);
+            }
+        }
 
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
 
@@ -689,8 +725,6 @@ GBaddLTL (model_t model)
         Print1 (info, "LTL layer: model already has a ``%s'' property, overriding",
                lts_type_get_state_label_name(ltstype, old_idx));
     }
-
-    if (PINS_LTL == PINS_LTL_NONE) PINS_LTL = PINS_LTL_SPIN;
 
     ltsmin_buchi_t *ba = init_ltsmin_buchi(model, ltl_file);
 

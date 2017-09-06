@@ -89,14 +89,18 @@ encode accepting states.
 *--ltl-semantics*='spin|textbook|ltsmin'::
     Change the semantics of the crossproduct generated using '--ltl'
 +
-Three options are available, the default is 'spin'.
+Three options are available, the default is automatically chosen based on the
+atomic predicates in the formula.
 
 spin;;
     Use semantics equal to the spin model checker. From the 'source'
     state all transitions are generated. Then, state predicates
     are evaluated on the 'source' state. The Buchi automaton now
     moves according to these predicates.
-    Deadlocks in the LTS cause the Buchi to progress independently. 
+    Deadlocks in the LTS cause the Buchi to progress independently.
+    This option is incompatible with edge-based atomic predicates.
+    This option is the default if no edge-based atomic predicates are found
+    in the LTL formula.
 
 textbook;;
     Use textbook semantics. A new initial state is generated with an
@@ -104,10 +108,13 @@ textbook;;
     are evaluated on the 'target' state and the Buchi automaton
     moves according to these predicates.
     Deadlocks in the LTS do NOT cause the Buchi to progress independently.
+    This option is incompatible with edge-based atomic predicates.
 
 ltsmin;;
     Same as spin semantics, but now deadlocks in the LTS do NOT cause the Buchi
     to progress independently.
+    This option is the default if edge-based atomic predicates are found
+    in the LTL formula.
 endif::ltl[]
 
 *--por*='heur|del'::

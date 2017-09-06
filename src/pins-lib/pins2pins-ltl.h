@@ -18,7 +18,7 @@ deadlock detection is non-local (it depends on the conjunction of all
 guards from all transition groups).
 */
 typedef enum {
-    PINS_LTL_NONE,
+    PINS_LTL_AUTO,
     PINS_LTL_TEXTBOOK,
     PINS_LTL_SPIN,
     PINS_LTL_LTSMIN

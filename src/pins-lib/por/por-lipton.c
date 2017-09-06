@@ -389,7 +389,7 @@ lipton_create (por_context *por, model_t pormodel)
     HRE_ASSERT (GROUP_BITS + PROC_BITS + 1 == 32);
     HREassert (por->ngroups < (1LL << GROUP_BITS) - 1, // minus GROUP_NONE
                "Lipton reduction does not support more than 2^%d-1 groups", GROUP_BITS);
-    HREassert (PINS_LTL == PINS_LTL_NONE, "LTL currently not supported in Lipton reduction.");
+    HREassert (PINS_LTL == PINS_LTL_AUTO, "LTL currently not supported in Lipton reduction.");
 
     lipton_ctx_t *lipton = RTmalloc (sizeof(lipton_ctx_t));
 
