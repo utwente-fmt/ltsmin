@@ -46,7 +46,7 @@ if [ ! -f "$HOME/ltsmin-deps/lib/libzmq.a" ]; then
     ./autogen.sh
     ./configure --enable-static --enable-shared --prefix="$HOME/ltsmin-deps" \
         --without-libsodium --without-pgm --without-documentation
-    make
+    make CFLAGS="-Wno-error -g -O2"
     make install
     popd
 fi
@@ -61,7 +61,7 @@ if [ ! -f "$HOME/ltsmin-deps/lib/libczmq.a" ]; then
     pushd /tmp/czmq-$CZMQ_VERSION
     ./autogen.sh
     ./configure --enable-static --enable-shared --prefix="$HOME/ltsmin-deps" --with-libzmq="$HOME/ltsmin-deps"
-    make CFLAGS="" LDFLAGS="-lpthread"
+    make CFLAGS="-Wno-error -g -O2" LDFLAGS="-lpthread"
     make install
     popd
 fi
