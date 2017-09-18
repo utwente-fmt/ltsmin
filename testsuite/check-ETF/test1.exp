@@ -19,7 +19,6 @@ puts   "----------------------------------------------\n"
 set langs [dict create]
 # a model per language
 dict set langs etf model "gear.1.etf" 
-dict set langs etf options mc
 
 dict set langs etf exp_output "2689 states 3567 transitions"
 set alg_be [ find_alg_backends "{dist,mc,seq}" ]
