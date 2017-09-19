@@ -19,6 +19,7 @@ export LTSMIN_LDFLAGS="-L$HOME/static-libs -static-libgcc -static-libstdc++"
 export LTSMIN_CFLAGS="-Wno-lto-type-mismatch"
 export LTSMIN_CXXFLAGS="-Wno-lto-type-mismatch"
 export STRIP_FLAGS="-s"
+export MCRL2_LIB_DIR=""
 
 . travis/build-release-generic.sh
 

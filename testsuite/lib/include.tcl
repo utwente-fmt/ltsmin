@@ -244,13 +244,16 @@ proc compile_promela { prom_models } {
 
     foreach prom_model $prom_models {
         puts "Executing precommand: '$binpaths(spins) $EXAMPLES_SRC_PATH/$prom_model'"
-        set rc [catch { exec $binpaths(spins) -o $EXAMPLES_SRC_PATH/$prom_model } msg ]
+        set rc [catch { exec $binpaths(spins) -o $EXAMPLES_SRC_PATH/$prom_model } msg opt ]
 
         # check for exit code, and whether there is output on stderr
         if { $rc != 0 } {
-            fail "Failed executing precommand"
-            puts "this is what I got on stderr: $msg"
-            exit $rc
+            set errc [dict get $opt "-errorcode"]
+            if { $errc != "NONE" } {
+                fail "Failed executing precommand"
+                puts "this is what I got on stderr: $msg"
+                exit 1
+            }
         }
     }
     return true
@@ -261,13 +264,16 @@ proc compile_DVE { DVE_models } {
 
     foreach DVE_model $DVE_models {
         puts "Executing precommand: 'divine compile -l $EXAMPLES_SRC_PATH/$DVE_model'"
-        set rc [catch { exec divine compile -l $EXAMPLES_SRC_PATH/$DVE_model } msg ]
+        set rc [catch { exec divine compile -l $EXAMPLES_SRC_PATH/$DVE_model } msg opt ]
 
         # check for exit code, and whether there is output on stderr
         if { $rc != 0 } {
-            fail "Failed executing precommand"
-            puts "this is what I got on stderr: $msg"
-            exit $rc
+            set errc [dict get $opt "-errorcode"]
+            if { $errc != "NONE" } {
+                fail "Failed executing precommand"
+                puts "this is what I got on stderr: $msg"
+                exit 1
+            }
         }
     }
     return true

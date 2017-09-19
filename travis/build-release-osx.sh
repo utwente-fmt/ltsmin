@@ -21,6 +21,7 @@ export LTSMIN_LDFLAGS="$LTSMIN_LDFLAGS -L$HOME/static-libs -weak-liconv"
 export LTSMIN_CFLAGS=""
 export LTSMIN_CXXFLAGS=""
 export STRIP_FLAGS=""
+export MCRL2_LIB_DIR="/mCRL2.app/Contents"
 
 . travis/build-release-generic.sh
 

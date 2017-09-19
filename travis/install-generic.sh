@@ -2,6 +2,8 @@
 set -e
 set -o xtrace
 
+export MAKEFLAGS=-j2
+
 export CZMQ_VERSION="3.0.2"
 export CZMQ_URL="https://github.com/zeromq/czmq/archive/v$CZMQ_VERSION.tar.gz"
 export VIENNACL_NAME="ViennaCL-1.7.1"
@@ -15,8 +17,6 @@ export DDD_URL="http://ddd.lip6.fr/download/$DDD_VERSION.tar.gz"
 export SYLVAN_VERSION="1.1.1"
 export SYLVAN_URL="https://github.com/trolando/sylvan/archive/v$SYLVAN_VERSION.tar.gz"
 export SYLVAN_NAME="sylvan-$SYLVAN_VERSION"
-export MCRL2_NAME="mCRL2.tar.gz"
-export MCRL2_URL="https://raw.githubusercontent.com/utwente-fmt/ltsmin-travis/master/$TRAVIS_OS_NAME/$MCRL2_NAME"
 export SPOT_VERSION="2.3.3"
 export SPOT_NAME="spot-$SPOT_VERSION"
 export SPOT_URL="http://www.lrde.epita.fr/dload/spot/$SPOT_NAME.tar.gz"
@@ -74,12 +74,6 @@ if [ ! -f "$HOME/ltsmin-deps/lib/libspot.a" ]; then
     ./configure --disable-dependency-tracking --disable-python --enable-static --disable-shared --prefix="$HOME/ltsmin-deps"
     make install
     popd
-fi
-
-# install mCRL2
-if [ ! -f "$HOME/ltsmin-deps/lib/libmcrl2_core.a" ]; then
-    wget "$MCRL2_URL" -P "$HOME/ltsmin-deps"
-    tar -xf "$HOME/ltsmin-deps/$MCRL2_NAME" -C "$HOME/ltsmin-deps"
 fi
 
 # install ViennaCL on linux

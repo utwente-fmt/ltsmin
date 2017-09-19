@@ -26,39 +26,57 @@ addons:
       - libpopt-dev
       - libz-dev
       - xmlto
+      - pastebinit
 
 stage: cache warmup
 
-install: travis/install-$TRAVIS_OS_NAME.sh
+before_install: travis/before_install-$TRAVIS_OS_NAME.sh
 
 jobs:
   include:
     - compiler: clang
       os: osx
+      install: travis/install-osx.sh
       script: skip
     - compiler: gcc
       os: linux
+      install: travis/install-linux.sh
+      script: skip
+    - compiler: clang
+      os: osx
+      install: travis/install-mCRL2-osx.sh
+      script: skip
+    - compiler: gcc
+      os: linux
+      install: travis/install-mCRL2-linux.sh
       script: skip
     - os: osx
+      compiler: clang
       before_script:
         - travis/install-DiVinE.sh
         - travis/install-ProB-osx.sh
       script: . travis/test-1.sh
       stage: test
     - os: linux
+      compiler: gcc
       before_script:
         - travis/install-DiVinE.sh
         - travis/install-ProB-linux.sh
       script: . travis/test-1.sh
       stage: test
     - os: osx
+      compiler: clang
+      before_script:
+        - travis/install-DiVinE.sh
       script: . travis/test-2.sh
       stage: test
     - os: linux
+      compiler: gcc
       before_script:
+        - travis/install-DiVinE.sh
       script: . travis/test-2.sh
       stage: test
-    - compiler: gcc
+    - compiler: gcc # here starts 'deploy' stage
       os: linux
       script:
         - . travis/build-source.sh
