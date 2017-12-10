@@ -201,6 +201,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
         if (run_stop(perm->run_ctx)) {
             Warning (info, "Error: %s full! Change -s/--ratio.",
                            state_store_full_msg(seen));
+            Abort ("Out of Memory related Error ! Try setting --size to a higher value.");
         }
         return;
     }
