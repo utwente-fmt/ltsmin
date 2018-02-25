@@ -1,6 +1,7 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
+
 export GHCVER="7.10.3"
 export HAPPYVER="1.19.5"
 

@@ -1,6 +1,6 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
 
 mkdir "$HOME/static-libs"
 cp "$HOME/ltsmin-deps/lib/libzmq.a" "$HOME/static-libs"

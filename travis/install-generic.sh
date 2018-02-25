@@ -1,6 +1,6 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
 
 export MAKEFLAGS=-j2
 

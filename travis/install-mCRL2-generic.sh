@@ -1,6 +1,6 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
 
 MCRL2_NAME="mcrl2-201707.1"
 MCRL2_URL="http://www.mcrl2.org/download/release/$MCRL2_NAME.tar.gz"

@@ -1,6 +1,6 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
 
 if [ ! -f "$HOME/ProB/probcli" ]; then
     wget "$PROB_URL" -P /tmp

@@ -1,6 +1,6 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
 
 export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$HOME/ltsmin-deps/lib/pkgconfig"
 

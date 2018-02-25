@@ -1,6 +1,7 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
+
 export PATH=/opt/ghc/$GHCVER/bin:/opt/happy/$HAPPYVER/bin:$PATH &&
 export LTSMIN_NUM_CPUS=2
 export LD_LIBRARY_PATH="$HOME/ltsmin-deps/lib:$HOME/ProB/lib:$LD_LIBRARY_PATH"

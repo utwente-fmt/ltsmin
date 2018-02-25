@@ -1,6 +1,7 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
+
 export DIVINE_VERSION="1.3"
 export DIVINE_COMPILER="gcc-4.9"
 export DIVINE_NAME="divine2-ltsmin-$DIVINE_VERSION-$TRAVIS_OS_NAME-$DIVINE_COMPILER.tgz"

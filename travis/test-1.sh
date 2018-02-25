@@ -1,6 +1,6 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
 
 . travis/configure-$TRAVIS_OS_NAME.sh "--disable-doxygen-doc --without-mcrl2"
 

@@ -1,3 +1,7 @@
+#!/bin/bash
+#set -e
+#set -o xtrace
+
 export MCRL2_LIB_DIR=""
 
 export GHCVER="7.10.3"

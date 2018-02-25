@@ -1,6 +1,6 @@
 #!/bin/bash
-set -e
-set -o xtrace
+#set -e
+#set -o xtrace
 
 TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
 
