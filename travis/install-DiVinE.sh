@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 export DIVINE_VERSION="1.3"
@@ -11,4 +11,6 @@ if [ ! -f "$HOME/ltsmin-deps/bin/divine" ]; then
     wget "$DIVINE_URL" -P /tmp
     tar -xf "/tmp/$DIVINE_NAME" -C "$HOME/ltsmin-deps"
 fi
+
+set +e
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 export MAKEFLAGS=-j2
@@ -82,4 +82,6 @@ if [ ! -d "$HOME/ltsmin-deps/include/viennacl" -a "$TRAVIS_OS_NAME" = "linux" ];
     tar xf "/tmp/$VIENNACL_NAME.tar.gz" -C /tmp &&
     cp -R "/tmp/$VIENNACL_NAME/viennacl" "$HOME/ltsmin-deps/include"
 fi
+
+set +e
 

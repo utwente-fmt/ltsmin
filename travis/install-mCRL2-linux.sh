@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 export MCRL2_LIB_DIR=""
@@ -15,3 +15,6 @@ export RANLIB="gcc-ranlib-7"
 export NM="gcc-nm-7"
 
 travis/install-mCRL2-generic.sh
+
+set +e
+

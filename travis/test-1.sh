@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 . travis/configure-$TRAVIS_OS_NAME.sh "--disable-doxygen-doc --without-mcrl2"
@@ -18,5 +18,7 @@ make check-POR || { FAIL=1 ; cat testsuite/check-POR.log; }
 make check-safety || { FAIL=1 ; cat testsuite/check-safety.log; }
 make check-SCC || { FAIL=1 ; cat testsuite/check-SCC.log; }
 
-test $FAIL -eq 1 && exit 1 || exit 0
+test $FAIL -eq 1 && exit 1 || true
+
+set +e
 

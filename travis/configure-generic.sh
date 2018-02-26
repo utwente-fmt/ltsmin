@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$HOME/ltsmin-deps/lib/pkgconfig"
@@ -13,4 +13,6 @@ autoreconf -i
 ./configure $CONFIGURE_FLAGS || { pastebinit -b slexy.org config.log && exit 1; }
 
 export PATH="$PATH:$HOME/ltsmin-deps/bin:$HOME/ProB"
+
+set +e
 

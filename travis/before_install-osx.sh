@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 brew update
@@ -20,3 +20,4 @@ dejagnu
 #    cabal install happy
 #fi
 
+set +e

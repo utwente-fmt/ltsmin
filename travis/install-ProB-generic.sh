@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 if [ ! -f "$HOME/ProB/probcli" ]; then
@@ -7,3 +7,4 @@ if [ ! -f "$HOME/ProB/probcli" ]; then
     tar -xf "/tmp/$PROB_NAME" -C "$HOME"
 fi
 
+set +e

@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
@@ -13,4 +13,6 @@ export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 
 
 # rename the source tarball
 mv "ltsmin-$LTSMIN_VERSION.tar.gz" "ltsmin-$TAG_OR_BRANCH-source.tgz"
+
+set +e
 

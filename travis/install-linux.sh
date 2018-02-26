@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 export GHCVER="7.10.3"
@@ -13,3 +13,6 @@ export RANLIB="gcc-ranlib-7"
 export NM="gcc-nm-7"
 
 travis/install-generic.sh
+
+set +e
+

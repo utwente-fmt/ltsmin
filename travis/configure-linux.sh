@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 export PATH=/opt/ghc/$GHCVER/bin:/opt/happy/$HAPPYVER/bin:$PATH &&
@@ -16,3 +16,6 @@ export NM="gcc-nm-7"
 export MCRL2_LIB_DIR=""
 
 . travis/configure-generic.sh "$@"
+
+set +e
+

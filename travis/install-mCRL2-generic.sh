@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 MCRL2_NAME="mcrl2-201707.1"
@@ -32,4 +32,6 @@ if [ ! -f "$HOME/ltsmin-deps$MCRL2_LIB_DIR/lib/libmcrl2_core.a" ]; then
     popd
     popd
 fi
+
+set +e
 

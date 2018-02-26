@@ -1,5 +1,8 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
-exit 0
+true
+
+set +e
+

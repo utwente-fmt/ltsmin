@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
@@ -18,10 +18,12 @@ make install
 
 strip "$STRIP_FLAGS" /tmp/$TAG_OR_BRANCH/bin/* || true
 cp "$HOME/ltsmin-deps/bin/divine" "/tmp/$TAG_OR_BRANCH/bin"
-cp "$HOME/ltsmin-deps/bin$MCRL2_LIB_DIR/txt2lps" "/tmp/$TAG_OR_BRANCH/bin"
-cp "$HOME/ltsmin-deps/bin$MCRL2_LIB_DIR/txt2pbes" "/tmp/$TAG_OR_BRANCH/bin"
+cp "$HOME/ltsmin-deps$MCRL2_LIB_DIR/bin/txt2lps" "/tmp/$TAG_OR_BRANCH/bin"
+cp "$HOME/ltsmin-deps$MCRL2_LIB_DIR/bin/txt2pbes" "/tmp/$TAG_OR_BRANCH/bin"
 export LTSMIN_DISTNAME="ltsmin-$TAG_OR_BRANCH-$TRAVIS_OS_NAME"
 pushd /tmp
 tar cfz "$LTSMIN_DISTNAME.tgz" "$TAG_OR_BRANCH"
 popd
+
+set +e
 

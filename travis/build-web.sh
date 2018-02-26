@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
@@ -28,4 +28,6 @@ gem install jekyll bundler
 bundle install
 bundle exec jekyll b
 popd
+
+set +e
 

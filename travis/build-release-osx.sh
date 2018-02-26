@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -e
+set -e
 #set -o xtrace
 
 mkdir "$HOME/static-libs"
@@ -24,4 +24,6 @@ export STRIP_FLAGS=""
 export MCRL2_LIB_DIR="/mCRL2.app/Contents"
 
 . travis/build-release-generic.sh
+
+set +e
 
