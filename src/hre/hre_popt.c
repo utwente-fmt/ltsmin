@@ -41,11 +41,11 @@ void HREinitPopt(){
 }
 
 void HREprintUsage(){
-    poptPrintUsage(optCon,stdout,0);
+    if (HREme(HREglobal()) == 0) poptPrintUsage(optCon,stdout,0);
 }
 
 void HREprintHelp(){
-    poptPrintHelp(optCon,stdout,0);
+    if (HREme(HREglobal()) == 0) poptPrintHelp(optCon,stdout,0);
 }
 
 char* HREnextArg(){
