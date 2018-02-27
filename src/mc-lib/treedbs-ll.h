@@ -62,6 +62,8 @@
 #define             DB_ROOTS_FULL -2
 #define             DB_LEAFS_FULL -3
 
+#define             R_BITS 28      // related to cleary table key size
+
 /**
 Abstract type tree database.
 */

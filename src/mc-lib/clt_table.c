@@ -17,7 +17,6 @@
 
 static const struct timespec BO = {0, 2500};
 
-#define R_BITS 28
 #define NONE 0
 #define EMPTY 1
 #define LEFT 2
