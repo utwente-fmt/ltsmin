@@ -245,7 +245,7 @@ dbg_found_read_dep_error (check_ctx_t *ctx, int *dst, int *dst2, int idx)
     lts_type_t          ltstype = GBgetLTStype (ctx->parent);
     int                 typeno = lts_type_get_state_typeno (ltstype, idx);
     print_chunk (ctx->parent, res, 1024, typeno, dst[idx]);
-    Warning (error, "Found missing read dependency in group %d (diff slot: %d -- %s != %s).\\"
+    Print1 (error, "Found missing read dependency in group %d (diff slot: %d -- %s != %s).\\"
                     "Identifying culprit read slot...",
              ctx->group, idx, str_slot(ctx, dst2, idx), res);
     RTfree (res);

@@ -299,7 +299,7 @@ child_process(struct thread_info *ti)
         } else if (next == EXIT) {
             break;
         } else {
-            Warning(error, "unsupported operation");
+            Print1(error, "unsupported operation");
             HREexit(LTSMIN_EXIT_FAILURE);
         }
     }
@@ -318,7 +318,7 @@ get_or_fork(struct fork_context *ctx, model_t model)
 {
     struct thread_info *ti = pthread_getspecific(ctx->key);
     if (ti == NULL) {
-        Warning(info, "Forking...");
+        Print1(info, "Forking...");
         ti = HREmalloc(NULL, sizeof(struct thread_info));
         pthread_setspecific(ctx->key, ti);
 
@@ -336,7 +336,7 @@ get_or_fork(struct fork_context *ctx, model_t model)
 
         ti->pid = fork();
         if (ti->pid == -1) {
-            Warning(error, "cannot fork, error: %s", strerror(errno));
+            Print1(error, "cannot fork, error: %s", strerror(errno));
             HREexit(LTSMIN_EXIT_FAILURE);
         }
         if (ti->pid == 0) {
@@ -419,7 +419,7 @@ forked_next(model_t model, int param1, int param2, int* src, TransitionCB cb, vo
             res = DSreadS32(is);
             break;
         } else {
-            Warning(error, "invalid reply");
+            Print1(error, "invalid reply");
             HREexit(LTSMIN_EXIT_FAILURE);
         }
     }
