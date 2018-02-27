@@ -1021,24 +1021,24 @@ str2vec(const int max_size, const char *perm, int *vec)
     int i = 0;
     while ((e = strsep(&p, ",")) != NULL && strlen(e) > 0) {
         if (i == max_size) {
-            Warning(error, "to many numbers (%d) given", i + 1);
+            Print1(error, "to many numbers (%d) given", i + 1);
             HREexit(LTSMIN_EXIT_FAILURE);
         }
         const int j = atoi(e);
 
         if (j < 0) {
-            Warning(error, "%d at %d should be >= 0", j, i);
+            Print1(error, "%d at %d should be >= 0", j, i);
             HREexit(LTSMIN_EXIT_FAILURE);
         }
 
         if (j >= max_size) {
-            Warning(error, "%d at %d should be < %d", j, i, max_size);
+            Print1(error, "%d at %d should be < %d", j, i, max_size);
             HREexit(LTSMIN_EXIT_FAILURE);
         }
 
         for (int k = 0; k < i; k++) {
             if (j == vec[k]) {
-                Warning(error, "%d at %d already given previously at %d", j, i, k);
+                Print1(error, "%d at %d already given previously at %d", j, i, k);
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
         }
@@ -1048,7 +1048,7 @@ str2vec(const int max_size, const char *perm, int *vec)
         i++;
     }
     if (i != max_size) {
-        Warning(error, "to few numbers");
+        Print1(error, "to few numbers");
         HREexit(LTSMIN_EXIT_FAILURE);
     }
 }
@@ -1058,7 +1058,7 @@ GBregroup (model_t model)
 {
     if (!pins_has_guards(model)) {
         if (PINS_USE_GUARDS)
-            Warning (info, "Ignoring option " USE_GUARDS_OPTION " for lack of guards!");
+            Print1 (info, "Ignoring option " USE_GUARDS_OPTION " for lack of guards!");
         PINS_USE_GUARDS = 0;
     }
 
@@ -1113,24 +1113,24 @@ GBregroup (model_t model)
     split_matrices(&inf);
 
     if (GBgetGroupPerm(model) != NULL) {
-        Warning(info, "Got group permutation from language front-end; permuting rows");
+        Print1(info, "Got group permutation from language front-end; permuting rows");
         apply_permutation(&inf, GBgetGroupPerm(model), NULL);
     }
 
     if (GBgetVarPerm(model) != NULL) {
-        Warning(info, "Got state vector permutation from language front-end; permuting columns");
+        Print1(info, "Got state vector permutation from language front-end; permuting columns");
         apply_permutation(&inf, NULL, GBgetVarPerm(model));
     }
 
     if (row_perm != NULL) {
-        Warning(info, "Permuting rows according to given vector");
+        Print1(info, "Permuting rows according to given vector");
         int perm[dm_nrows(inf.r)];
         str2vec(dm_nrows(inf.r), row_perm, perm);
         apply_permutation(&inf, perm, NULL);
     }
 
     if (col_perm != NULL) {
-        Warning(info, "Permuting columns according to given vector");
+        Print1(info, "Permuting columns according to given vector");
         int perm[dm_ncols(inf.r)];
         str2vec(dm_ncols(inf.r), col_perm, perm);
         apply_permutation(&inf, NULL, perm);
@@ -1246,7 +1246,7 @@ GBregroup (model_t model)
     if (log_active(debug)){
         lts_type_printf(debug,ltstype);
     }
-    Warning(debug,"permuting ltstype");
+    Print1(debug,"permuting ltstype");
     ltstype=lts_type_permute(ltstype,ctx->statemap);
     if (log_active(debug)){
         lts_type_printf(debug,ltstype);
