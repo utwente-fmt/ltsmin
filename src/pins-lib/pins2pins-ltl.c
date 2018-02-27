@@ -70,20 +70,20 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
         {
             int l = linear_search (db_ltl_semantics, ltl_semantics_name);
             if (l < 0) {
-                Warning (error, "unknown ltl semantic %s", ltl_semantics_name);
+                Print1 (error, "unknown ltl semantic %s", ltl_semantics_name);
                 HREprintUsage();
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
-            Print (infoLong, "LTL semantics: %s", ltl_semantics_name);
+            Print1 (infoLong, "LTL semantics: %s", ltl_semantics_name);
             PINS_LTL = l;
 
             int b = linear_search (db_buchi_type, buchi_type);
             if (b < 0) {
-                Warning (error, "unknown buchi type %s", buchi_type);
+                Print1 (error, "unknown buchi type %s", buchi_type);
                 HREprintUsage();
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
-            Print (infoLong, "Buchi type: %s", buchi_type);
+            Print1 (infoLong, "Buchi type: %s", buchi_type);
             PINS_BUCHI_TYPE = b;
         }
         return;
@@ -476,7 +476,7 @@ print_ltsmin_buchi_helper (const ltsmin_buchi_t *ba, ltsmin_parse_env_t env,
 void
 print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
 {
-    Warning(info, "buchi has %d states", ba->state_count);
+    Print1(info, "buchi has %d states", ba->state_count);
 
     if (log_active(infoLong)) {
         int is_hoa = ba->acceptance_set;
@@ -491,13 +491,13 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
                     snprintf(buf, n, " %d", p);
                 }
             }
-            Warning(infoLong, "Acceptance set: {%s }", buf);
+            Print1(infoLong, "Acceptance set: {%s }", buf);
             RTfree(buf);
         }
         for(int i=0; i < ba->state_count; i++) {
             if (is_hoa) {
                 if (!ba->states[i]->accept) {
-                    Warning(infoLong, " state %d:", i);
+                    Print1(infoLong, " state %d:", i);
                 } else {
                     char *buf = NULL;
                     for (int p=0; p<32; p++) {
@@ -509,12 +509,12 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
                             snprintf(buf, n, " %d", p);
                         }
                     }
-                    Warning(infoLong, " state %d: {%s }", i, buf);
+                    Print1(infoLong, " state %d: {%s }", i, buf);
                     RTfree(buf);
                 }
             }
             else {
-                Warning(infoLong, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
+                Print1(infoLong, " state %d: %s", i, ba->states[i]->accept ? "accepting" : "non-accepting");
             }
             for(int j=0; j < ba->states[i]->transition_count; j++) {
                 // print two times, first to obtain the size (+ nullbyte)
@@ -523,7 +523,7 @@ print_ltsmin_buchi(const ltsmin_buchi_t *ba, ltsmin_parse_env_t env)
                 // and the second time for the actual print
                 print_ltsmin_buchi_helper (ba, env, is_hoa, i, j, buf, n);
 
-                Warning(infoLong, "  -> %d, | %s", ba->states[i]->transitions[j].to_state, buf);
+                Print1(infoLong, "  -> %d, | %s", ba->states[i]->transitions[j].to_state, buf);
                 RTfree(buf);
             }
         }
@@ -573,7 +573,7 @@ ltsmin_buchi_t *
 init_ltsmin_buchi(model_t model, const char *ltl_file)
 {
     if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
-        Warning(info, "LTL layer: formula: %s", ltl_file);
+        Print1(info, "LTL layer: formula: %s", ltl_file);
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
         ltsmin_expr_t ltl = ltl_parse_file (ltl_file, env, GBgetLTStype(model));
         struct LTL_info LTL_info = {0, 0};
@@ -581,10 +581,10 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         if (PINS_LTL == PINS_LTL_AUTO) {
             if (LTL_info.has_EVAR) {
                 PINS_LTL = PINS_LTL_LTSMIN;
-                Warning(info, "Using LTSmin LTL semantics");
+                Print1(info, "Using LTSmin LTL semantics");
             } else {
                 PINS_LTL = PINS_LTL_SPIN;
-                Warning(info, "Using Spin LTL semantics");
+                Print1(info, "Using Spin LTL semantics");
             }
         }
         if (LTL_info.has_X && PINS_POR) {
@@ -626,8 +626,8 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
 #endif
 
         if (NULL == ba) {
-            Print(info, "Empty buchi automaton.");
-            Print(info, "The property is TRUE.");
+            Print1(info, "Empty buchi automaton.");
+            Print1(info, "The property is TRUE.");
             HREexit(LTSMIN_EXIT_SUCCESS);
         }
         if (ba->predicate_count > 30) {
