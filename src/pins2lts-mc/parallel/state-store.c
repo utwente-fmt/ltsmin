@@ -178,8 +178,8 @@ state_store_init (model_t model, bool timed)
 {
     state_store_t      *store = RTmallocZero (sizeof(state_store_t));
     matrix_t           *m = GBgetDMInfo (model);
-    store->global_bits = get_local_bits ();
-    store->local_bits = get_global_bits ();
+    store->global_bits = get_global_bits ();
+    store->local_bits = get_local_bits ();
     int                 n = num_stategies();
     store->count_bits = (Strat_LNDFS == strategy[n - 1] ? ceil (log2 (W + 1)) :
             (Strat_CNDFS == strategy[n - 1] && PINS_POR ? 2 : 0) );
