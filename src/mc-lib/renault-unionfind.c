@@ -73,7 +73,7 @@ r_uf_make_claim (const r_uf_t *uf, ref_t state)
     }
 
     // wait if someone currently initializing the state
-    while (status == R_UF_INIT) {
+    while (status == R_UF_INIT || status == R_UF_UNSEEN) {
         status = atomic_read (&uf->array[state].r_uf_status);
     }
 
