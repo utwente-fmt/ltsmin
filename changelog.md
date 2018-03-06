@@ -102,7 +102,6 @@
 
 - Known issues:
 
-  1. The renault algorithm may sometimes provide an incorrect result: https://github.com/utwente-fmt/ltsmin/issues/148.
   1. Writing a trace with ndfs sometimes failes: https://github.com/utwente-fmt/ltsmin/issues/147.
 
 ## January 23, 2015: 2.1

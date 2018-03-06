@@ -16,8 +16,7 @@ set commands [dict create]
 compile_promela {}
 
 
-#set strategies [list "renault" 2 "tarjan" 1 "ufscc" 2]
-set strategies [list "tarjan" 1 "ufscc" 2]
+set strategies [list "renault" 2 "tarjan" 1 "ufscc" 2]
 
 # anderson:
 foreach {s t} $strategies {
@@ -25,8 +24,6 @@ foreach {s t} $strategies {
 	    -n --strategy=$s $EXAMPLES_SRC_PATH/anderson.1.prop4.dve"
     dict set commands test_anderson_dve_mc_$s exp "scc count: *281301"
 }
-
-set strategies [list "renault" 2 "tarjan" 1 "ufscc" 2]
 
 # iprotocol
 foreach {s t} $strategies {
