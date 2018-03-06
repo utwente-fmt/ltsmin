@@ -208,6 +208,12 @@ prob_next_action(prob_client_t pc, ProBState s, char *transitiongroup, int *size
     return prob_next_x(pc, s, transitiongroup, size, "next-update");
 }
 
+ProBState *
+prob_next_action_short_R2W(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
+{
+    return prob_next_x(pc, s, transitiongroup, size, "A"); // next action R2W
+}
+
 static int
 prob_get_label(prob_client_t pc, ProBState s, char *label, char *header) {
     zmsg_t *request = zmsg_new();

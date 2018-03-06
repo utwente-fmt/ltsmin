@@ -60,6 +60,7 @@ typedef struct prob_context {
     int* var_type;
     int **transition_writes;
     int **transition_reads;
+    int **transition_reads_action;
     int **state_label_to_index;
     char* zocket;
 } prob_context_t;
@@ -279,6 +280,11 @@ prob2pins_state_short(ProBState s, int *state, model_t model, size_t state_size,
         int chunk_id = pins_chunk_put (model, ctx->var_type[idx], c);
         state[i] = chunk_id;
     }
+    if (group == 0) {
+        assert(i == ctx->num_vars);
+        state[ctx->num_vars] = 1;
+        cpy[ctx->num_vars] = 0;
+    }
     Debugf("\n");
 }
 
@@ -359,6 +365,7 @@ get_successors_short_R2W(model_t model, int group, int *src, TransitionCB cb, vo
     puts("yolo");
     prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
 
+    // TODO: we can probably use the first entry of the idx matrix representations
     size_t state_size_read = dm_ones_in_row(GBgetDMInfoRead(model),group);  // last is is_init
     size_t state_size_written = dm_ones_in_row(GBgetDMInfoMayWrite(model),group);
     printf("state size read: %ld, write: %ld\n", state_size_read, state_size_written);
@@ -387,7 +394,44 @@ get_successors_short_R2W(model_t model, int group, int *src, TransitionCB cb, vo
         int transition_labels[1] = { prob_ctx->op_type[group] };
         transition_info_t transition_info = { transition_labels, group, 0 };
 
-        // TODO: fix this
+        prob2pins_state_short(successors[i], s, model, state_size_written, group, cpy);
+        prob_destroy_state(successors + i);
+        cb(ctx, &transition_info, s, NULL);
+    }
+
+    RTfree(successors);
+
+    return nr_successors;
+}
+
+static int
+get_next_action_short_R2W(model_t model, int group, int *src, TransitionCB cb, void *ctx)
+{
+    puts("swag");
+    prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
+
+    // TODO: we can probably use the first entry of the idx matrix representations
+    size_t state_size_read = dm_ones_in_row(GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), group);  // last is is_init
+    size_t state_size_written = dm_ones_in_row(GBgetDMInfoMayWrite(model),group);
+    printf("state size read: %ld, write: %ld\n", state_size_read, state_size_written);
+
+    int operation_type = prob_ctx->op_type_no;
+
+    chunk op_name = pins_chunk_get (model, operation_type, prob_ctx->op_type[group]);
+
+    ProBState prob = pins2prob_state_short(model, src, state_size_read, group, prob_ctx->transition_reads_action, 0); // is_init is not part of the action
+
+    int nr_successors;
+    ProBState *successors = prob_next_action_short_R2W(prob_ctx->prob_client, prob, op_name.data, &nr_successors);
+    prob_destroy_state(&prob);
+
+    int s[state_size_written];
+    int cpy[state_size_written];
+
+    for (int i = 0; i < nr_successors; i++) {
+        int transition_labels[1] = { prob_ctx->op_type[group] };
+        transition_info_t transition_info = { transition_labels, group, 0 };
+
         prob2pins_state_short(successors[i], s, model, state_size_written, group, cpy);
         prob_destroy_state(successors + i);
         cb(ctx, &transition_info, s, NULL);
@@ -416,20 +460,19 @@ prob_exit(model_t model)
 static int
 get_state_label_short(model_t model, int label, int *src) {
     prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
+    printf("label %d\n", label);
     switch (label) {
         case PROB_IS_INIT_EQUALS_FALSE_GUARD: {
-            int res = src[prob_ctx->num_vars];
-//            chunk c = pins_chunk_get(model, prob_ctx->var_type[prob_ctx->num_vars + 1], src[prob_ctx->num_vars + 1]);
-//            printf("%d\n", c.len);
-//            int res = *((int*) c.data);
+            size_t state_size = dm_ones_in_row(GBgetStateLabelInfo(model),label);  // last is is_init
+            printf("state size: %ld\n", state_size);
+            int res = src[0];
             assert(res == 0 || res == 1);
             return res == 0;
         }
         case PROB_IS_INIT_EQUALS_TRUE_GUARD: {
-            int res = src[prob_ctx->num_vars];
-            //chunk c = pins_chunk_get(model, prob_ctx->var_type[prob_ctx->num_vars + 1], src[prob_ctx->num_vars + 1]);
-            //printf("%d\n", c.len);
-            //int res = *((int*) c.data);
+            size_t state_size = dm_ones_in_row(GBgetStateLabelInfo(model),label);  // last is is_init
+            printf("state size: %ld\n", state_size);
+            int res = src[0];
             assert(res == 0 || res == 1);
             return res == 1;
         }
@@ -1041,6 +1084,7 @@ prob_load_model(model_t model)
 
     ctx->transition_writes = dm_rows_to_idx_table(GBgetDMInfoMayWrite(model));
     ctx->transition_reads = dm_rows_to_idx_table(GBgetDMInfoRead(model));
+    ctx->transition_reads_action = dm_rows_to_idx_table(GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)));
     ctx->state_label_to_index = dm_rows_to_idx_table(GBgetStateLabelInfo(model));
 
     int init_state[ctx->num_vars + 1];
@@ -1051,11 +1095,12 @@ prob_load_model(model_t model)
 
     prob_destroy_initial_response(&init);
 
-    //GBsetNextStateLong(model, get_successors_long);
-    GBsetNextStateShortR2W(model, get_successors_short_R2W);
-    GBsetStateLabelLong(model, get_state_label_long);
-    //GBsetStateLabelShort(model, get_state_label_short);
-    GBsetActionsLong(model, next_action_long);
+    GBsetNextStateLong(model, get_successors_long);
+    //GBsetNextStateShortR2W(model, get_successors_short_R2W);
+    //GBsetStateLabelLong(model, get_state_label_long);
+    GBsetStateLabelShort(model, get_state_label_short);
+    //GBsetActionsLong(model, next_action_long);
+    GBsetActionsShortR2W(model, get_next_action_short_R2W);
 
     GBsetExit(model, prob_exit);
 
