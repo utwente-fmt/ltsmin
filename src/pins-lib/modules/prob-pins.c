@@ -281,7 +281,6 @@ prob2pins_state_short(ProBState s, int *state, model_t model, size_t state_size,
         state[i] = chunk_id;
     }
     if (group == 0) {
-        assert(i == ctx->num_vars);
         state[ctx->num_vars] = 1;
         cpy[ctx->num_vars] = 0;
     }
@@ -1095,8 +1094,8 @@ prob_load_model(model_t model)
 
     prob_destroy_initial_response(&init);
 
-    GBsetNextStateLong(model, get_successors_long);
-    //GBsetNextStateShortR2W(model, get_successors_short_R2W);
+    //GBsetNextStateLong(model, get_successors_long);
+    GBsetNextStateShortR2W(model, get_successors_short_R2W);
     //GBsetStateLabelLong(model, get_state_label_long);
     GBsetStateLabelShort(model, get_state_label_short);
     //GBsetActionsLong(model, next_action_long);
