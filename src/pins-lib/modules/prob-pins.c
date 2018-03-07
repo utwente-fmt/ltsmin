@@ -205,7 +205,6 @@ pins2prob_state_short(model_t model, int* pins, size_t state_size, int group, in
     prob.chunks = RTmalloc(sizeof(ProBChunk) * prob.size);
 
     Debugf("pins2prob state (%zu): ", prob.size);
-    printf("matrix size: %d, state size%ld\n", matrix[group][0], state_size);
     assert(matrix[group][0] == (int) state_size);
     for (size_t i = 0; i < prob.size; i++) {
         int idx = matrix[group][i + 1];
@@ -252,7 +251,6 @@ static void
 prob2pins_state_short(ProBState s, int *state, model_t model, size_t state_size, int group, int *cpy)
 {
     prob_context_t* ctx = (prob_context_t*) GBgetContext(model);
-    printf("group: %d\n", group);
     // is_init is only written to when the transition group is 0, i.e. $init_state
     HREassert(s.size == state_size - !group, "expecting %zu chunks, but got %zu", state_size - !group, s.size);
 
@@ -361,13 +359,11 @@ get_successors_long(model_t model, int group, int *src, TransitionCB cb, void *c
 static int
 get_successors_short_R2W(model_t model, int group, int *src, TransitionCB cb, void *ctx)
 {
-    puts("yolo");
     prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
 
     // TODO: we can probably use the first entry of the idx matrix representations
     size_t state_size_read = dm_ones_in_row(GBgetDMInfoRead(model),group);  // last is is_init
     size_t state_size_written = dm_ones_in_row(GBgetDMInfoMayWrite(model),group);
-    printf("state size read: %ld, write: %ld\n", state_size_read, state_size_written);
 
     /* Don't give any successors for the init group if we have already initialized.
      * This prevents adding a self loop to the initial state. */
@@ -406,13 +402,11 @@ get_successors_short_R2W(model_t model, int group, int *src, TransitionCB cb, vo
 static int
 get_next_action_short_R2W(model_t model, int group, int *src, TransitionCB cb, void *ctx)
 {
-    puts("swag");
     prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
 
     // TODO: we can probably use the first entry of the idx matrix representations
     size_t state_size_read = dm_ones_in_row(GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS)), group);  // last is is_init
     size_t state_size_written = dm_ones_in_row(GBgetDMInfoMayWrite(model),group);
-    printf("state size read: %ld, write: %ld\n", state_size_read, state_size_written);
 
     int operation_type = prob_ctx->op_type_no;
 
@@ -459,18 +453,13 @@ prob_exit(model_t model)
 static int
 get_state_label_short(model_t model, int label, int *src) {
     prob_context_t* prob_ctx = (prob_context_t*) GBgetContext(model);
-    printf("label %d\n", label);
     switch (label) {
         case PROB_IS_INIT_EQUALS_FALSE_GUARD: {
-            size_t state_size = dm_ones_in_row(GBgetStateLabelInfo(model),label);  // last is is_init
-            printf("state size: %ld\n", state_size);
             int res = src[0];
             assert(res == 0 || res == 1);
             return res == 0;
         }
         case PROB_IS_INIT_EQUALS_TRUE_GUARD: {
-            size_t state_size = dm_ones_in_row(GBgetStateLabelInfo(model),label);  // last is is_init
-            printf("state size: %ld\n", state_size);
             int res = src[0];
             assert(res == 0 || res == 1);
             return res == 1;
