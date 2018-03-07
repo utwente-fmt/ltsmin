@@ -391,7 +391,7 @@ get_successors_short_R2W(model_t model, int group, int *src, TransitionCB cb, vo
 
         prob2pins_state_short(successors[i], s, model, state_size_written, group, cpy);
         prob_destroy_state(successors + i);
-        cb(ctx, &transition_info, s, NULL);
+        cb(ctx, &transition_info, s, cpy);
     }
 
     RTfree(successors);
@@ -427,7 +427,7 @@ get_next_action_short_R2W(model_t model, int group, int *src, TransitionCB cb, v
 
         prob2pins_state_short(successors[i], s, model, state_size_written, group, cpy);
         prob_destroy_state(successors + i);
-        cb(ctx, &transition_info, s, NULL);
+        cb(ctx, &transition_info, s, cpy);
     }
 
     RTfree(successors);
