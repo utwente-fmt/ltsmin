@@ -1504,6 +1504,65 @@ dm_expand_vector(matrix_t* m, int row, int* s0, int* src, int* tgt)
 }
 
 void
+dm_transform_vector_via(matrix_t* to, matrix_t* from, int row, int* s0, int* src, int* tgt)
+{
+    int tgt_idx = 0;
+    int src_idx = 0;
+    for (int i = 0; i < dm_ncols(to); i++) {
+        int set_in_to = dm_is_set(to, row, i);
+        int set_in_from = dm_is_set(from, row, i);
+
+        if (set_in_to && set_in_from) {
+            // both the original state and the target shall retain the variable
+            // copy from source
+            tgt[tgt_idx] = src[src_idx];
+            tgt_idx++; src_idx++;
+        } else if (set_in_to && !set_in_from) {
+            // the original state did not have the variable,
+            // need to add from initial state
+            tgt[tgt_idx] = s0[i];
+            tgt_idx++;
+        } else if (!set_in_to && set_in_from) {
+            // the original state had the variable but the target shall not contain it
+            src_idx++;
+        } else {
+            // neither state had the variable, drop it
+            continue;
+        }
+    }
+}
+
+void
+dm_transform_vector_via_short_default(matrix_t* to, matrix_t* from, int row, int* s0, int* src, int* tgt)
+{
+    int tgt_idx = 0;
+    int src_idx = 0;
+    int s0_idx = 0;
+    for (int i = 0; i < dm_ncols(to); i++) {
+        int set_in_to = dm_is_set(to, row, i);
+        int set_in_from = dm_is_set(from, row, i);
+
+        if (set_in_to && set_in_from) {
+            // both the original state and the target shall retain the variable
+            // copy from source
+            tgt[tgt_idx] = src[src_idx];
+            tgt_idx++; src_idx++; s0_idx++;
+        } else if (set_in_to && !set_in_from) {
+            // the original state did not have the variable,
+            // need to add from initial state
+            tgt[tgt_idx] = (s0 == 1 ? 1 : s0[s0_idx]);
+            tgt_idx++; s0_idx++;
+        } else if (!set_in_to && set_in_from) {
+            // the original state had the variable but the target shall not contain it
+            src_idx++;
+        } else {
+            // neither state had the variable, drop it
+            continue;
+        }
+    }
+}
+
+void
 dm_row_union(bitvector_t* bv, const matrix_t* m, int row)
 {
     // check size

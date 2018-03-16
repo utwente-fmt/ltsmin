@@ -167,6 +167,74 @@ void project_dest_write(void*context,transition_info_t*ti,int*dst,int*cpy){
 #undef info
 }
 
+void transform_shorts(matrix_t *to, matrix_t *from, void*context,transition_info_t*ti,int*dst,int*cpy){
+#define info ((struct nested_cb*)context)
+    int len = dm_ones_in_row(to, info->group);
+    int short_dst[len];
+
+    dm_transform_vector_via_short_default(to, from, info->group, info->src, dst, short_dst);
+    ti->group = info->group;
+    if (cpy != NULL) {
+        int short_cpy[len];
+        dm_transform_vector_via_short_default(to, from, info->group, (int*) 1, cpy, short_cpy);
+        info->cb(info->user_ctx,ti,short_dst,short_cpy);
+    } else {
+        info->cb(info->user_ctx,ti,short_dst,NULL);
+    }
+#undef info
+}
+
+void expand_write_to_short(void*context,transition_info_t*ti,int*dst,int*cpy){
+#define info ((struct nested_cb*)context)
+    matrix_t *write = GBgetDMInfoMayWrite(info->model);
+    matrix_t *short_m = GBgetDMInfo(info->model);
+    transform_shorts(short_m, write, context, ti, dst, cpy);
+#undef info
+}
+
+void project_short_to_write(void*context,transition_info_t*ti,int*dst,int*cpy){
+#define info ((struct nested_cb*)context)
+    matrix_t *write = GBgetDMInfoMayWrite(info->model);
+    matrix_t *short_m = GBgetDMInfo(info->model);
+    transform_shorts(write, short_m, context, ti, dst, cpy);
+#undef info
+}
+
+void expand_dest_aux(matrix_t *m, int len, void*context,transition_info_t*ti,int*dst, int*cpy){
+#define info ((struct nested_cb*)context)
+    int long_dst[len];
+	dm_expand_vector(m, info->group, info->src, dst, long_dst);
+    if (cpy != NULL) {
+        // TODO: is this correct? (pk, 16.03.2018)
+        // it should be 0 or 1, not expanded with chunks from the src state?
+        int long_cpy[len];
+        dm_expand_vector(m, info->group, info->src, dst, long_cpy);
+        info->cb(info->user_ctx,ti,long_dst,long_cpy);
+    } else {
+        info->cb(info->user_ctx,ti,long_dst,NULL);
+    }
+#undef info
+}
+void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
+#define info ((struct nested_cb*)context)
+    matrix_t *m = GBgetDMInfo(info->model);
+    int len = dm_ncols (m);
+    expand_dest_aux(m, len, context, ti, dst, cpy);
+#undef info
+}
+
+void expand_dest_r2w(void*context,transition_info_t*ti,int*dst, int*cpy){
+#define info ((struct nested_cb*)context)
+    matrix_t *m = GBgetDMInfoMayWrite(info->model);
+    int len = dm_ones_in_row (m, info->group);
+    expand_dest_aux(m, len, context, ti, dst, cpy);
+#undef info
+}
+
+int default_short(model_t self,int group,int*src,TransitionCB cb,void*context);
+int default_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context);
+int default_long(model_t self,int group,int*src,TransitionCB cb,void*context);
+
 int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
     struct nested_cb info;
     info.model = self;
@@ -175,10 +243,21 @@ int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
     info.cb=cb;
     info.user_ctx=context;
 
-    int long_src[dm_ncols(GBgetDMInfo(self))];
-    dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
+    if (self->next_short_r2w != default_short_r2w) {
+        matrix_t *read = GBgetDMInfoRead(self);
+        int len = dm_ones_in_row(read, group);
+        int r2w_src[len];
+        dm_transform_vector_via(read, GBgetDMInfo(self), group, self->s0, src, r2w_src);
 
-    return self->next_long(self,group,long_src,project_dest,&info);
+        return self->next_short_r2w(self, group, r2w_src, expand_write_to_short, &info);
+    } else if (self->next_long != default_long) {
+        int long_src[dm_ncols(GBgetDMInfo(self))];
+        dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
+
+        return self->next_long(self,group,long_src,project_dest,&info);
+    } else {
+        HREassert(0, "no next state function implemented in some layer");
+    }
 }
 
 int default_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context){
@@ -189,25 +268,22 @@ int default_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*contex
     info.cb=cb;
     info.user_ctx=context;
 
-    int long_src[dm_ncols(GBgetDMInfoRead(self))];
-    dm_expand_vector(GBgetDMInfoRead(self), group, self->s0, src, long_src);
+    if (self->next_short != default_short) {
+        matrix_t *short_m = GBgetDMInfo(self);
+        matrix_t *read = GBgetDMInfoRead(self);
+        int len = dm_ones_in_row(short_m, group);
+        int short_src[len];
+        dm_transform_vector_via(short_m, read, group, self->s0, src, short_src);
 
-    return self->next_long(self,group,long_src,project_dest_write,&info);
-}
+        return self->next_short(self, group, short_src, project_short_to_write, &info);
+    } else if (self->next_long != default_long) {
+        int long_src[dm_ncols(GBgetDMInfoRead(self))];
+        dm_expand_vector(GBgetDMInfoRead(self), group, self->s0, src, long_src);
 
-void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
-#define info ((struct nested_cb*)context)
-    int len = dm_ncols (GBgetDMInfo(info->model));
-    int long_dst[len];
-	dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
-    if (cpy != NULL) {
-        int long_cpy[len];
-        dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_cpy);
-        info->cb(info->user_ctx,ti,long_dst,long_cpy);
+        return self->next_long(self,group,long_src,project_dest_write,&info);
     } else {
-        info->cb(info->user_ctx,ti,long_dst,NULL);
+        HREassert(0, "no next state function implemented in some layer");
     }
-#undef info
 }
 
 int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
@@ -218,12 +294,27 @@ int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	info.cb=cb;
 	info.user_ctx=context;
 
-	const int len = dm_ones_in_row(GBgetDMInfo(self), group);
-	int src_short[len];
-	dm_project_vector(GBgetDMInfo(self), group, src, src_short);
+    if (self->next_short_r2w != default_short_r2w) {
+        matrix_t* read = GBgetDMInfoRead(self);
+        int len = dm_ones_in_row(read, group);
+        int short_src[len];
+        dm_project_vector(read, group, src, short_src);
 
-	return self->next_short(self,group,src_short,expand_dest,&info);
+        return self->next_short_r2w(self, group, short_src, expand_dest_r2w, &info);
+    } else if (self->next_short != default_short) {
+        const int len = dm_ones_in_row(GBgetDMInfo(self), group);
+        int src_short[len];
+        dm_project_vector(GBgetDMInfo(self), group, src, src_short);
+
+        return self->next_short(self,group,src_short,expand_dest,&info);
+    } else {
+        HREassert(0, "no next state function implemented in some layer");
+    }
 }
+
+int default_actions_short(model_t self,int group,int*src,TransitionCB cb,void*context);
+int default_actions_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context);
+int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*context);
 
 int default_actions_short(model_t self,int group,int*src,TransitionCB cb,void*context){
     struct nested_cb info;
@@ -233,9 +324,23 @@ int default_actions_short(model_t self,int group,int*src,TransitionCB cb,void*co
     info.cb=cb;
     info.user_ctx=context;
 
-    int long_src[dm_ncols(GBgetDMInfo(self))];
-    dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
-    return self->actions_long(self,group,long_src,project_dest,&info);
+    if (self->next_short_r2w != default_short_r2w) {
+        matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+        int len = dm_ones_in_row(read, group);
+        int r2w_src[len];
+        dm_transform_vector_via(read, GBgetDMInfo(self),
+                                group, self->s0, src, r2w_src);
+
+        return self->actions_short_r2w(self, group, r2w_src, expand_write_to_short, &info);
+    }
+    else if (self->next_long != default_long) {
+        int long_src[dm_ncols(GBgetDMInfo(self))];
+        dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
+
+        return self->actions_long(self,group,long_src,project_dest,&info);
+    } else {
+        HREassert(0, "no next action function implemented in some layer");
+    }
 }
 
 int default_actions_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context){
@@ -246,11 +351,23 @@ int default_actions_short_r2w(model_t self,int group,int*src,TransitionCB cb,voi
     info.cb=cb;
     info.user_ctx=context;
 
-    matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+    if (self->actions_short != default_actions_short) {
+        matrix_t* short_m = GBgetDMInfo(self);
+        matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+        int len = dm_ones_in_row(short_m, group);
+        int short_src[len];
+        dm_transform_vector_via(short_m, read, group, self->s0, src, short_src);
 
-    int long_src[dm_ncols(read)];
-    dm_expand_vector(read, group, self->s0, src, long_src);
-    return self->actions_long(self,group,long_src,project_dest_write,&info);
+        return self->actions_short(self, group, short_src, project_short_to_write, &info);
+    } else if (self->actions_long != default_actions_long) {
+        matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+
+        int long_src[dm_ncols(read)];
+        dm_expand_vector(read, group, self->s0, src, long_src);
+        return self->actions_long(self,group,long_src,project_dest_write,&info);
+    } else {
+        HREassert(0, "no next action function implemented in some layer");
+    }
 }
 
 int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*context){
@@ -261,13 +378,26 @@ int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*con
     info.cb=cb;
     info.user_ctx=context;
 
-    matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+    if (self->actions_short_r2w != default_actions_short_r2w) {
+        matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
 
-    const int len = dm_ones_in_row(read, group);
-    int src_short[len];
-    dm_project_vector(read, group, src, src_short);
+        const int len = dm_ones_in_row(read, group);
+        int src_short[len];
+        dm_project_vector(read, group, src, src_short);
 
-    return self->actions_short(self,group,src_short,expand_dest,&info);
+        return self->actions_short_r2w(self,group,src_short,expand_dest_r2w,&info);
+    } else if (self->actions_short != default_actions_short) {
+        // TODO: should this be the union of actions_reads and writes instead? (pk, 16.03.2018)
+        matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+
+        const int len = dm_ones_in_row(read, group);
+        int src_short[len];
+        dm_project_vector(read, group, src, src_short);
+
+        return self->actions_short(self,group,src_short,expand_dest,&info);
+    } else {
+        HREassert(0, "no next action function implemented in some layer");
+    }
 }
 
 int GBgetTransitionsMarked(model_t self,matrix_t* matrix,int row,int*src,TransitionCB cb,void*context){

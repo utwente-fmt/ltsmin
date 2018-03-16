@@ -147,6 +147,8 @@ extern int dm_ones_in_col(const matrix_t* m, const int col);
 
 extern int dm_project_vector(matrix_t* m, int row, int* src, int* dst);
 extern int dm_expand_vector(matrix_t*, int row, int* s0, int* src, int* dst);
+extern void dm_transform_vector_via(matrix_t* to, matrix_t* from, int row, int* s0, int* src, int* tgt);
+extern void dm_transform_vector_via_short_default(matrix_t* to, matrix_t* from, int row, int* s0, int* src, int* tgt);
 
 extern void dm_print_perm(const matrix_header_t* p);
 
