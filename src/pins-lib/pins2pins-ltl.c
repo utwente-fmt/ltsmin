@@ -572,8 +572,9 @@ static void check_LTL(ltsmin_expr_t e, ltsmin_parse_env_t env,
 ltsmin_buchi_t *
 init_ltsmin_buchi(model_t model, const char *ltl_file)
 {
+    ltsmin_buchi_t *ba;
     if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
-        Print1(info, "LTL layer: formula: %s", ltl_file);
+        Print(info, "LTL layer: formula: %s", ltl_file);
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
         ltsmin_expr_t ltl = ltl_parse_file (ltl_file, env, GBgetLTStype(model));
         struct LTL_info LTL_info = {0, 0};
@@ -581,10 +582,10 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         if (PINS_LTL == PINS_LTL_AUTO) {
             if (LTL_info.has_EVAR) {
                 PINS_LTL = PINS_LTL_LTSMIN;
-                Print1(info, "Using LTSmin LTL semantics");
+                Print(info, "Using LTSmin LTL semantics");
             } else {
                 PINS_LTL = PINS_LTL_SPIN;
-                Print1(info, "Using Spin LTL semantics");
+                Print(info, "Using Spin LTL semantics");
             }
         }
         if (LTL_info.has_X && PINS_POR) {
@@ -609,7 +610,6 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
 
         ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
 
-        ltsmin_buchi_t *ba;
 #ifdef HAVE_SPOT
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
             PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
@@ -625,21 +625,28 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         }
 #endif
 
-        if (NULL == ba) {
-            Print1(info, "Empty buchi automaton.");
-            Print1(info, "The property is TRUE.");
-            HREexit(LTSMIN_EXIT_SUCCESS);
+        if (ba == NULL) {
+            Print(info, "Empty buchi automaton.");
+            Print(info, "The property is TRUE.");
+        } else {
+            if (ba->predicate_count > 30) {
+                Abort("more than 30 predicates in buchi automaton are currently not supported");
+            }
+            ba->env = env;
+            print_ltsmin_buchi(ba, env);
         }
-        if (ba->predicate_count > 30) {
-            Abort("more than 30 predicates in buchi automaton are currently not supported");
-        }
-        ba->env = env;
         atomic_write (&shared_ba, ba);
-        print_ltsmin_buchi(ba, env);
+        HREbarrier(HREglobal());
     } else {
-        while (NULL == atomic_read(&shared_ba)) {}
+        HREbarrier(HREglobal());
+        ba = atomic_read(&shared_ba);
     }
-    return atomic_read(&shared_ba);
+
+    if (ba == NULL) {
+        HREexit(LTSMIN_EXIT_SUCCESS);
+    }
+
+    return ba;
 }
 
 typedef uint32_t visited_index_t;
