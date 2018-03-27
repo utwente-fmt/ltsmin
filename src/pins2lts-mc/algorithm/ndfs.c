@@ -113,7 +113,7 @@ ndfs_red (wctx_t *ctx, ref_t seed)
 {
     alg_local_t        *loc = ctx->local;
     loc->counters.accepting++; //count accepting states
-    ndfs_explore_state_red (ctx);
+    //ndfs_explore_state_red (ctx);
     while ( !run_is_stopped(ctx->run) ) {
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
