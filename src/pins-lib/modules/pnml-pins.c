@@ -148,7 +148,7 @@ get_successor_short(void *model, int t, int *in, TransitionCB cb, void *arg)
 {
     pn_context_t *pn_context = GBgetContext(model);
 
-    HRE_ASSERT(pn_context->has_safe_places, "get_successor_short not compatible with safe places");
+    HREassert(!pn_context->has_safe_places, "get_successor_short not compatible with safe places");
 
     const int num_writes = dm_ones_in_row(GBgetDMInfoMustWrite(model), t);
 
@@ -211,7 +211,7 @@ get_update_long(void *model, int t, int *in, TransitionCB cb, void *arg)
             case ARC_IN: {
                 /*If there is an underflow then this transition is disabled,
                  *while it should not be, since this is the update function. */
-                HRE_ASSERT(out[arc->place] - arc->num >= 0, "transition should not have been disabled");
+                HREassert(out[arc->place] - arc->num >= 0, "transition should not have been disabled");
 
                 // remove tokens
                 out[arc->place] -= arc->num;
@@ -252,7 +252,7 @@ get_update_short(void *model, int t, int *in, void
 {
     pn_context_t *pn_context = GBgetContext(model);
 
-    HRE_ASSERT(pn_context->has_safe_places, "get_update_short not compatible with safe places");
+    HREassert(!pn_context->has_safe_places, "get_update_short not compatible with safe places");
 
     const int num_writes = dm_ones_in_row(GBgetDMInfoMustWrite(model), t);
 
@@ -269,7 +269,7 @@ get_update_short(void *model, int t, int *in, void
 
                 /* If there is an underflow then this transition is disabled,
                  * while it should not be, since this is the update function. */
-                HRE_ASSERT(*place - arc->num >= 0, "transition should not have been disabled");
+                HREassert(*place - arc->num >= 0, "transition should not have been disabled");
 
                 // remove tokens
                 *place -= arc->num;
@@ -306,7 +306,7 @@ get_update_short(void *model, int t, int *in, void
 static int
 get_label_long(model_t model, int label, int *src) {
     pn_context_t *pn_context = GBgetContext(model);
-    HRE_ASSERT(label < pn_context->num_guards, "unknown state label");
+    HREassert(label < pn_context->num_guards, "unknown state label");
     const arc_t *arc = pn_context->guards[label];
     return src[arc->place] >= arc->num;
 }
@@ -314,7 +314,7 @@ get_label_long(model_t model, int label, int *src) {
 static int
 get_label_short(model_t model, int label, int *src) {
     pn_context_t *pn_context = GBgetContext(model);
-    HRE_ASSERT(label < pn_context->num_guards, "unknown state label");
+    HREassert(label < pn_context->num_guards, "unknown state label");
     return src[0] >= pn_context->guards[label]->num;
 }
 
