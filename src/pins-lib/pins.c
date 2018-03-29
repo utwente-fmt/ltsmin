@@ -226,7 +226,7 @@ void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
 void expand_dest_r2w(void*context,transition_info_t*ti,int*dst, int*cpy){
 #define info ((struct nested_cb*)context)
     matrix_t *m = GBgetDMInfoMayWrite(info->model);
-    int len = dm_ones_in_row (m, info->group);
+    int len = dm_ncols (m);
     expand_dest_aux(m, len, context, ti, dst, cpy);
 #undef info
 }
