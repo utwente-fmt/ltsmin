@@ -147,6 +147,10 @@ state_store_static_init ()
     // Determine database size
     char* end;
     dbs_size = strtol (table_size, &end, 10);
+    if (N == 1 && db_type != HashTable) {
+        Print1 (info, "Switching to a hash table to accommodate state vectors of length 1.");
+        db_type = HashTable;
+    }
     if (dbs_size == 0)
         Abort("Not a valid table size: -s %s", table_size);
     if (*end == '%') {
