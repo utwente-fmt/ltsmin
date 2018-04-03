@@ -1503,6 +1503,32 @@ dm_expand_vector(matrix_t* m, int row, int* s0, int* src, int* tgt)
     return k;
 }
 
+/* REVIEW: I added the following three transformation functions:
+ * - dm_expand_vector_default
+ * - dm_transform_vector_via
+ * - dm_transform_vector_via_short_default
+ * maybe they do something that can be achieved otherwise,
+ * i.e., maybe I duplicated some code?
+ * maybe you would only need one or two of these?
+ * (pk, 03.04.2018) */
+
+int
+dm_expand_vector_default(matrix_t* m, int row, int default_value, int* src, int* tgt)
+{
+    int k = 0;
+    for (int i = 0; i < dm_ncols(m); i++) {
+        if (dm_is_set(m, row, i)) {
+            // copy from source
+            tgt[i] = src[k++];
+        } else {
+            // copy initial state
+            tgt[i] = default_value;
+        }
+    }
+    // return number of copied items from src
+    return k;
+}
+
 void
 dm_transform_vector_via(matrix_t* to, matrix_t* from, int row, int* s0, int* src, int* tgt)
 {

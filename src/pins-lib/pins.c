@@ -205,10 +205,8 @@ void expand_dest_aux(matrix_t *m, int len, void*context,transition_info_t*ti,int
     int long_dst[len];
 	dm_expand_vector(m, info->group, info->src, dst, long_dst);
     if (cpy != NULL) {
-        // TODO: is this correct? (pk, 16.03.2018)
-        // it should be 0 or 1, not expanded with chunks from the src state?
         int long_cpy[len];
-        dm_expand_vector(m, info->group, info->src, dst, long_cpy);
+        dm_expand_vector_default(m, info->group, 1, cpy, long_cpy);
         info->cb(info->user_ctx,ti,long_dst,long_cpy);
     } else {
         info->cb(info->user_ctx,ti,long_dst,NULL);
