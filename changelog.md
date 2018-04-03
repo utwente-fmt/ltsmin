@@ -100,13 +100,6 @@
  5. Multi-core SCC-Based LTL Model Checking
      http://dx.doi.org/10.1007/978-3-319-49052-6_2
 
-- Known issues:
-
-  1. The renault algorithm may sometimes provide an incorrect result:
-     https://github.com/utwente-fmt/ltsmin/issues/148.
-  2. Writing a trace with ndfs sometimes failes (a workaround is to use cndfs):
-     https://github.com/utwente-fmt/ltsmin/issues/147.
-
 ## January 23, 2015: 2.1
 
 This release is accompanied by the tool paper:
