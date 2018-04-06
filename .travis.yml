@@ -55,32 +55,32 @@ jobs:
       before_script:
         - travis/install-DiVinE.sh
         - travis/install-ProB-osx.sh
-      script: . travis/test-1.sh
+      script: travis/test-1.sh
       stage: test
     - os: linux
       compiler: gcc
       before_script:
         - travis/install-DiVinE.sh
         - travis/install-ProB-linux.sh
-      script: . travis/test-1.sh
+      script: travis/test-1.sh
       stage: test
     - os: osx
       compiler: clang
       before_script:
         - travis/install-DiVinE.sh
-      script: . travis/test-2.sh
+      script: travis/test-2.sh
       stage: test
     - os: linux
       compiler: gcc
       before_script:
         - travis/install-DiVinE.sh
-      script: . travis/test-2.sh
+      script: travis/test-2.sh
       stage: test
     - compiler: gcc # here starts 'deploy' stage
       os: linux
       script:
-        - . travis/build-source.sh
-        - . travis/build-web.sh
+        - travis/build-source.sh
+        - travis/build-web.sh
       deploy:
         - provider: releases
           # define $GITHUB_TOKEN in Travis CI build environment.
@@ -102,7 +102,7 @@ jobs:
     - compiler: gcc
       os: linux
       script:
-        - . travis/build-release-linux.sh
+        - travis/build-release-linux.sh
       deploy:
         - provider: releases
           # define $GITHUB_TOKEN in Travis CI build environment.
@@ -116,7 +116,7 @@ jobs:
     - compiler: clang
       os: osx
       script:
-        - . travis/build-release-osx.sh
+        - travis/build-release-osx.sh
       deploy:
         - provider: releases
           # define $GITHUB_TOKEN in Travis CI build environment.

@@ -4,6 +4,10 @@ set -e
 
 TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
 
+# get the LTSmin version number
+export LTSMIN_VERSION=$(grep "PACKAGE_VERSION" src/hre/config.h | cut -d" " -f3 | \
+    cut -d\" -f2)
+
 # build the new webpage
 
 # extract the HTML manpages from the source tarball
