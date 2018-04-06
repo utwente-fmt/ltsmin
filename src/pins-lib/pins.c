@@ -609,6 +609,9 @@ model_t GBcreateBase(){
     model->dna_info=NULL;
     model->gnes_info=NULL;
     model->gnds_info=NULL;
+    model->default_filter=NULL;
+    model->covered_by=NULL;
+    model->covered_by_short=NULL;
 	model->s0=NULL;
 	model->context=0;
     model->next_short=default_short;
