@@ -91,10 +91,10 @@ jobs:
           on:
             tags: true
         - provider: pages
-          # define $GITHUB_TOKEN in Travis CI build environment.
-          github_token: $GITHUB_TOKEN
           local_dir: www/_site
           skip_cleanup: true
+          # define $GITHUB_TOKEN in Travis CI build environment.
+          github_token: $GITHUB_TOKEN
           on:
             tags: true
             condition: "x$TRAVIS_TAG = xv$LTSMIN_VERSION"
