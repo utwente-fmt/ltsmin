@@ -27,9 +27,13 @@ prob_client_create()
     prob_client_t pc = (prob_client_t) RTmalloc(sizeof(struct prob_client));
     pc->id_count = 0;
 
-    zsys_set_logstream(stderr);
-
     return pc;
+}
+
+void
+prob_set_logstream()
+{
+    zsys_set_logstream(stderr);
 }
 
 void
