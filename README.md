@@ -279,7 +279,7 @@ Download pkgconf from <https://github.com/pkgconf/pkgconf>.
 #### Sylvan
 
 To build the parallel symbolic algorithms, [Sylvan](https://github.com/trolando/sylvan)
-(>=1.1, < 1.2) is required.
+(>=1.4) is required.
 If Sylvan is installed in a non-standard location please refer to
 [this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
 and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).
