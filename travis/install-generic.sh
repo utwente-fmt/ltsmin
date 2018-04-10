@@ -30,7 +30,7 @@ if [ ! -f "$HOME/ltsmin-deps/lib/libsylvan.a" ]; then
     pushd /tmp/sylvan-$SYLVAN_VERSION
     mkdir build
     cd build
-    cmake .. -DBUILD_SHARED_LIBS=OFF -DSYLVAN_BUILD_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX="$HOME/ltsmin-deps"
+    cmake .. -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="$HOME/ltsmin-deps"
     make
     make install
     popd
