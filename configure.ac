@@ -440,10 +440,10 @@ AC_ARG_WITH([sylvan],
     [AS_HELP_STRING([--without-sylvan], [do not include Sylvan multi-core decision diagram packages])])
 
 AS_IF([test "x$with_sylvan" != "xno"], [
-    PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.3.2 sylvan < 1.4],[
+    PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.4.0 sylvan < 1.5],[
         have_sylvan=yes
     ], [
-        AC_MSG_WARN([Sylvan >= 1.3.2, < 1.4 is not installed.])
+        AC_MSG_WARN([Sylvan >= 1.4.0, < 1.5 is not installed.])
     ])
 ])
 
