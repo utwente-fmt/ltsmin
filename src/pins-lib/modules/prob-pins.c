@@ -2,6 +2,7 @@
 
 #include <dlfcn.h>
 #include <limits.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -34,7 +35,7 @@ static char* zocket_prefix = "/tmp/ltsmin-";
 
 static char* prob_opts = "";
 
-static pthread_spinlock_t new_zocket_lock;
+static pthread_mutex_t new_zocket_lock;
 
 typedef struct prob_context {
     size_t num_vars;
@@ -738,18 +739,22 @@ static void
 prob_connect_atomic(prob_client_t pc, const char* file)
 {
     // create lock with main thread.
-    if (HREme(HREglobal()) == 0) pthread_spin_init(&new_zocket_lock, PTHREAD_PROCESS_SHARED);
+    if (HREme(HREglobal()) == 0 && pthread_mutex_init(&new_zocket_lock, NULL)) {
+        Abort("Unable to create lock");
+    }
     HREbarrier(HREglobal());
 
     // connect to ProB
-    pthread_spin_lock(&new_zocket_lock);
+    if (pthread_mutex_lock(&new_zocket_lock)) Abort("Unable to aquire lock");
     Warning(info, "connecting to zocket %s", file);
     prob_connect(pc, file);
-    pthread_spin_unlock(&new_zocket_lock);
+    if (pthread_mutex_unlock(&new_zocket_lock)) Abort("Unable to unlock");
 
     // main thread destroys lock.
     HREbarrier(HREglobal());
-    if (HREme(HREglobal()) == 0) pthread_spin_destroy(&new_zocket_lock);
+    if (HREme(HREglobal()) == 0 && pthread_mutex_destroy(&new_zocket_lock)) {
+        Abort("Unable to destroy lock");
+    }
 }
 
 static void
