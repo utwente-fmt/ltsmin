@@ -14,7 +14,6 @@ viennacl \
 ant \
 popt \
 libtool \
-hwloc \
 pastebinit \
 dejagnu
 #ghc \

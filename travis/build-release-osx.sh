@@ -8,9 +8,6 @@ cp "$HOME/ltsmin-deps/lib/libczmq.a" "$HOME/static-libs"
 cp /usr/local/lib/libgmp.a "$HOME/static-libs"
 cp /usr/local/lib/libpopt.a "$HOME/static-libs"
 
-hwloc_version=$(brew list --versions hwloc | cut -d' ' -f2)
-cp "/usr/local/Cellar/hwloc/$hwloc_version/lib/libhwloc.a" "$HOME/static-libs"
-
 libxml2_version=$(brew list --versions libxml2 | cut -d' ' -f2)
 cp "/usr/local/Cellar/libxml2/$libxml2_version/lib/libxml2.a" \
     "$HOME/static-libs"
