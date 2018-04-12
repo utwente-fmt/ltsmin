@@ -615,8 +615,8 @@ cndfs_local_deinit   (run_t *run, wctx_t *ctx)
     dfs_stack_destroy (cloc->in_stack);
     dfs_stack_destroy (cloc->out_stack);
     RTdeleteTimer (cloc->timer);
-    ndfs_local_deinit (run, ctx);
     fset_free (cloc->pink);
+    ndfs_local_deinit (run, ctx);
 }
 
 void

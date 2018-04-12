@@ -4,6 +4,9 @@ set -e
 
 TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
 
+# get the LTSmin version number
+. travis/ltsmin-version.sh
+
 # build the new webpage
 
 # extract the HTML manpages from the source tarball

@@ -7,6 +7,7 @@
 #include <ltsmin-lib/etf-util.h>
 #include <ltsmin-lib/etf-internal.h>
 #include <ltsmin-lib/ltsmin-parse-env.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 /* solves the issue where lemon parses this file
  with -Werror and -DNDEBUG */
 #ifdef NDEBUG
@@ -30,7 +31,7 @@ This section is shared by the parsers for all LTSmin languages.
         HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
     }
 }
-%parse_failure { HREabort(0); }
+%parse_failure { HREabort(LTSMIN_EXIT_FAILURE); }
 %parse_accept { Print1(infoLong,"success!"); }
 %extra_argument { ltsmin_parse_env_t env }
 %stack_overflow {
@@ -68,7 +69,7 @@ etf_spec ::= etf_spec sort_section.
 etf_spec ::= error . {
     HREprintf (error, "ETF syntax error.  For a description of the ETF syntax, "
                       "refer to the etf(5) man page.\n");
-    HREabort(0);
+    HREabort(LTSMIN_EXIT_FAILURE);
 }
 
 state_section ::= BEGIN STATE decl_list(L) END STATE. {

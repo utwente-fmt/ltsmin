@@ -101,9 +101,11 @@ put_chunk (value_table_t vt,chunk item)
 static void
 put_at_chunk (value_table_t vt,chunk item,value_index_t pos)
 {
+    HREbarrier (HREglobal());
     rwticket_wrlock (&vt->map->rw_lock);
     set_ll_install(vt->string_set, item.data, item.len, pos);
     rwticket_wrunlock (&vt->map->rw_lock);
+    HREbarrier (HREglobal());
 }
 
 static chunk

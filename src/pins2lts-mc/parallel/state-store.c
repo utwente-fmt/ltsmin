@@ -110,12 +110,47 @@ z_rehash (const void *v, int b, hash64_t seed)
     (void)b; (void)v;
 }
 
+static int
+num_stategies ()
+{
+    for (int i = 0; i < MAX_STRATEGIES; i++) {
+        if (strategy[i] == Strat_None) return i;
+    }
+    return MAX_STRATEGIES;
+}
+
+
+static int
+get_global_bits ()
+{
+    int bits = 0;
+    for (int i = 0; i < num_stategies(); i++) {
+        bits += num_global_bits (strategy[i]);
+    }
+    return bits;
+}
+
+static int
+get_local_bits ()
+{
+    int bits = 0;
+    for (int i = 0; i < num_stategies(); i++) {
+        bits += (~Strat_DFSFIFO & Strat_LTL & ~Strat_UFSCC & ~Strat_CNDFS
+                 & strategy[i] ? 2 : 0);
+    }
+    return bits;
+}
+
 void
 state_store_static_init ()
 {
     // Determine database size
     char* end;
     dbs_size = strtol (table_size, &end, 10);
+    if (N == 1 && db_type != HashTable) {
+        Print1 (info, "Switching to a hash table to accommodate state vectors of length 1.");
+        db_type = HashTable;
+    }
     if (dbs_size == 0)
         Abort("Not a valid table size: -s %s", table_size);
     if (*end == '%') {
@@ -125,6 +160,21 @@ state_store_static_init ()
         dbs_size = (int)log2 (db_el_size);
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
     }
+
+    int bits = get_local_bits () + get_global_bits ();
+    if ((db_type | Tree) && bits + 2 * (dbs_size-ratio) > 64) {
+        int new_dbs_size = (64 - bits) / 2 + ratio;
+        Print1 (info, "Reducing table size from %d to %d in order to fit data tree buckets", dbs_size, new_dbs_size);
+        Print1 (info, "Increase --ratio or use algorithm with less satelite bits to increase table size");
+        dbs_size = new_dbs_size;
+    }
+
+    if (db_type == ClearyTree && 2 * (dbs_size-ratio) > (size_t)dbs_size + R_BITS) {
+        int new_dbs_size = R_BITS + 2 * ratio;
+        Print1 (info, "Reducing table size from %d to %d in order to fit data Cleary compact tree buckets", dbs_size, new_dbs_size);
+        Print1 (info, "Increase --ratio to increase table size");
+        dbs_size = new_dbs_size;
+    }
 }
 
 state_store_t *
@@ -132,17 +182,11 @@ state_store_init (model_t model, bool timed)
 {
     state_store_t      *store = RTmallocZero (sizeof(state_store_t));
     matrix_t           *m = GBgetDMInfo (model);
-
-    int i = 0;
-    store->global_bits = 0;
-    store->local_bits = 0;
-    while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
-        store->global_bits += num_global_bits (strategy[i]);
-        store->local_bits += (~Strat_DFSFIFO & Strat_LTL & ~Strat_UFSCC & ~Strat_CNDFS & strategy[i] ? 2 : 0);
-        i++;
-    }
-    store->count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) :
-            (Strat_CNDFS == strategy[i - 1] && PINS_POR ? 2 : 0) );
+    store->global_bits = get_global_bits ();
+    store->local_bits = get_local_bits ();
+    int                 n = num_stategies();
+    store->count_bits = (Strat_LNDFS == strategy[n - 1] ? ceil (log2 (W + 1)) :
+            (Strat_CNDFS == strategy[n - 1] && PINS_POR ? 2 : 0) );
     store->count_mask = (1<<store->count_bits) - 1;
     size_t              bits = store->global_bits + store->count_bits;
 

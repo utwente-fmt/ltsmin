@@ -52,35 +52,46 @@ jobs:
       script: skip
     - os: osx
       compiler: clang
+      install: travis/install-osx.sh
       before_script:
         - travis/install-DiVinE.sh
         - travis/install-ProB-osx.sh
-      script: . travis/test-1.sh
+      script: travis/test-1.sh
       stage: test
     - os: linux
       compiler: gcc
+      install: travis/install-linux.sh
       before_script:
         - travis/install-DiVinE.sh
         - travis/install-ProB-linux.sh
-      script: . travis/test-1.sh
+      script: travis/test-1.sh
       stage: test
     - os: osx
       compiler: clang
+      install:
+        - travis/install-osx.sh
+        - travis/install-mCRL2-osx.sh
       before_script:
         - travis/install-DiVinE.sh
-      script: . travis/test-2.sh
+      script: travis/test-2.sh
       stage: test
     - os: linux
       compiler: gcc
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
       before_script:
         - travis/install-DiVinE.sh
-      script: . travis/test-2.sh
+      script: travis/test-2.sh
       stage: test
     - compiler: gcc # here starts 'deploy' stage
       os: linux
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
       script:
-        - . travis/build-source.sh
-        - . travis/build-web.sh
+        - travis/build-source.sh
+        - travis/build-web.sh
       deploy:
         - provider: releases
           # define $GITHUB_TOKEN in Travis CI build environment.
@@ -91,18 +102,21 @@ jobs:
           on:
             tags: true
         - provider: pages
-          # define $GITHUB_TOKEN in Travis CI build environment.
-          github_token: $GITHUB_TOKEN
           local_dir: www/_site
           skip_cleanup: true
+          # define $GITHUB_TOKEN in Travis CI build environment.
+          github_token: $GITHUB_TOKEN
           on:
             tags: true
             condition: "x$TRAVIS_TAG = xv$LTSMIN_VERSION"
       stage: deploy
     - compiler: gcc
       os: linux
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
       script:
-        - . travis/build-release-linux.sh
+        - travis/build-release-linux.sh
       deploy:
         - provider: releases
           # define $GITHUB_TOKEN in Travis CI build environment.
@@ -115,8 +129,11 @@ jobs:
       stage: deploy
     - compiler: clang
       os: osx
+      install:
+        - travis/install-osx.sh
+        - travis/install-mCRL2-osx.sh
       script:
-        - . travis/build-release-osx.sh
+        - travis/build-release-osx.sh
       deploy:
         - provider: releases
           # define $GITHUB_TOKEN in Travis CI build environment.
