@@ -52,6 +52,7 @@ jobs:
       script: skip
     - os: osx
       compiler: clang
+      install: travis/install-osx.sh
       before_script:
         - travis/install-DiVinE.sh
         - travis/install-ProB-osx.sh
@@ -59,6 +60,7 @@ jobs:
       stage: test
     - os: linux
       compiler: gcc
+      install: travis/install-linux.sh
       before_script:
         - travis/install-DiVinE.sh
         - travis/install-ProB-linux.sh
@@ -66,18 +68,27 @@ jobs:
       stage: test
     - os: osx
       compiler: clang
+      install:
+        - travis/install-osx.sh
+        - travis/install-mCRL2-osx.sh
       before_script:
         - travis/install-DiVinE.sh
       script: travis/test-2.sh
       stage: test
     - os: linux
       compiler: gcc
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
       before_script:
         - travis/install-DiVinE.sh
       script: travis/test-2.sh
       stage: test
     - compiler: gcc # here starts 'deploy' stage
       os: linux
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
       script:
         - travis/build-source.sh
         - travis/build-web.sh
@@ -101,6 +112,9 @@ jobs:
       stage: deploy
     - compiler: gcc
       os: linux
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
       script:
         - travis/build-release-linux.sh
       deploy:
@@ -115,6 +129,9 @@ jobs:
       stage: deploy
     - compiler: clang
       os: osx
+      install:
+        - travis/install-osx.sh
+        - travis/install-mCRL2-osx.sh
       script:
         - travis/build-release-osx.sh
       deploy:
