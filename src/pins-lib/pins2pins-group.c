@@ -62,6 +62,9 @@ struct poptOption group_options[] = {
 #endif
         ", f"
           , "<(T,)+>" },
+#ifdef HAVE_BOOST
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, boost_options , 0 , "Boost variable reordering options", NULL },
+#endif
     { "cw-max-cols", 0, POPT_ARG_INT, &cw_max_cols, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> columns", "<num>" },
     { "cw-max-rows", 0, POPT_ARG_INT, &cw_max_rows, 0, "if (<num> > 0): don't apply Column sWaps (cw) when there are more than <num> rows", "<num>" },
     { "col-ins", 0, POPT_ARG_STRING, &col_ins, 0, "insert column C before column C'", "<(C.C',)+>" },

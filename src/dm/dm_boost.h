@@ -5,7 +5,11 @@
 extern "C" {
 #endif
 
+#include <popt.h>
+
 #include <dm/dm.h>
+
+extern struct poptOption boost_options[];
 
 typedef enum {
     BOOST_CM,
