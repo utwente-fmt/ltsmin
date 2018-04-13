@@ -9,6 +9,9 @@ TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
 
 export MAKEFLAGS=-j2
 
+# make sure we compile LTSmin with a patched Boost
+export CPLUS_INCLUDE_PATH="$CPLUS_INCLUDE_PATH:$TRAVIS_BUILD_DIR/travis/include-fix"
+
 make LDFLAGS="-flto -O3 $LTSMIN_LDFLAGS" CFLAGS="-flto -O3 $LTSMIN_CFLAGS" \
     CPPFLAGS="-DNDEBUG" CXXFLAGS="-flto -O3 $LTSMIN_CXXFLAGS"
 make install
