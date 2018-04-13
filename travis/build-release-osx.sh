@@ -20,7 +20,7 @@ export LTSMIN_CXXFLAGS=""
 export STRIP_FLAGS=""
 export MCRL2_LIB_DIR="/mCRL2.app/Contents"
 
-. travis/build-release-generic.sh
+. travis/build-release-generic.sh --disable-mcrl2-jittyc
 
 set +e
 

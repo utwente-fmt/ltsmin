@@ -5,7 +5,7 @@ set -e
 TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
 
 . travis/configure-$TRAVIS_OS_NAME.sh --disable-doxygen-doc \
-    "--prefix=/tmp/$TAG_OR_BRANCH --enable-pkgconf-static"
+    "--prefix=/tmp/$TAG_OR_BRANCH --enable-pkgconf-static" "$@"
 
 export MAKEFLAGS=-j2
 
