@@ -5,6 +5,8 @@
 #include <dm/dm_boost.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 
+#include <popt.h>
+
 #include <vector>
 #include <iostream>
 
@@ -19,6 +21,15 @@
 #include <boost/graph/sloan_ordering.hpp>
 #include <boost/graph/minimum_degree_ordering.hpp>
 #include <boost/graph/king_ordering.hpp>
+
+static int sloan_w1 = 1;
+static int sloan_w2 = 16;
+
+struct poptOption boost_options[] = {
+    { "sloan-w1", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sloan_w1, 0, "use <W1> as weight 1 for the Sloan algorithm", "<W1>"},
+    { "sloan-w2", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sloan_w2, 0, "use <W2> as weight 2 for the Sloan algorithm", "<W2>"},
+    POPT_TABLEEND
+};
 
 using namespace boost;
 using namespace std;
@@ -230,7 +241,7 @@ boost_ordering(const matrix_t* m, int* row_perm, int* col_perm, const boost_reor
             std::vector<Vertex> inv_perm(num_vertices(g));
 
             Warning(infoLong, "Computing Sloan ordering");
-            sloan_ordering(g, inv_perm.begin(), get(vertex_color, g), make_degree_map(g), get(vertex_priority, g));
+            sloan_ordering(g, inv_perm.begin(), get(vertex_color, g), make_degree_map(g), get(vertex_priority, g), sloan_w1, sloan_w2);
             graph_stats(inv_perm, g, index_map, metrics);
 
             parse_ordering<Vertex, Graph>(inv_perm, index_map, row_perm, col_perm, m);

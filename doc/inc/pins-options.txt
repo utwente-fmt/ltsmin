@@ -59,6 +59,12 @@ is done, the columns will be inserted at the desired target position. In other w
 given by the option *-r*,*--regroup*, will only be applied on the dependency matrix with source columns removed.
 +
 
+*--sloan-w1*='WEIGHT1'::
+    Use 'WEIGHT1' as the first weight for the Sloan algorithm, see https://www.boost.org/doc/libs/1_66_0/libs/graph/doc/sloan_ordering.htm.
+
+*--sloan-w2*='WEIGHT2'::
+    Use 'WEIGHT2' as the second weight for the Sloan algorithm, see https://www.boost.org/doc/libs/1_66_0/libs/graph/doc/sloan_ordering.htm.
+
 *--graph-metrics*::
     Print Boost's and ViennaCL's graph metrics (only available when LTSmin is compiled with Boost or ViennaCL).
     
