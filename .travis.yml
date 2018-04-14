@@ -95,6 +95,7 @@ jobs:
       script:
         - travis/build-source.sh
         - travis/build-web.sh
+        - . travis/ltsmin-version.sh
       deploy:
         - provider: releases
           # define $GITHUB_TOKEN in Travis CI build environment.
