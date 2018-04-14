@@ -30,7 +30,10 @@ addons:
 
 stage: cache warmup
 
-before_install: travis/before_install-$TRAVIS_OS_NAME.sh
+before_install:
+  - travis/before_install-$TRAVIS_OS_NAME.sh
+  - export TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
+  - export LTSMIN_DISTNAME="ltsmin-$TAG_OR_BRANCH-$TRAVIS_OS_NAME"
 
 jobs:
   include:
