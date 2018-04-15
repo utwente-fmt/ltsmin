@@ -558,7 +558,7 @@ static void check_LTL(ltsmin_expr_t e, ltsmin_parse_env_t env,
             break;
         }
         case EVAR: {
-            info->has_EVAR = 1;
+            if (e->parent->token != LTL_EN) info->has_EVAR = 1;
             break;
         }
         default: break;
