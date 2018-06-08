@@ -437,7 +437,7 @@ installation CDs.
 
 #### CZMQ
 
-To build the ProB front-end, [CZMQ](http://czmq.zeromq.org/) is required.
+To build the ProB front-end, [CZMQ3](http://czmq.zeromq.org/) is required.
 
 #### libxml2
 
