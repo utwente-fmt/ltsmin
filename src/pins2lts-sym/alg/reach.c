@@ -1,9 +1,5 @@
 #include <hre/config.h>
 
-#ifdef __APPLE__
-#define _DARWIN_C_SOURCE
-#endif
-
 #include <float.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -153,7 +149,7 @@ establish_group_order(int *group_order, int *initial_count)
 
     bitvector_create(&found_groups, nGrps);
 
-    int* groups = NULL;
+    const int *groups = NULL;
     const int n = GBgroupsOfEdge(model, act_label, act_index, &groups);
     if (n > 0) {
         for (int i = 0; i < n; i++) {
@@ -162,7 +158,7 @@ establish_group_order(int *group_order, int *initial_count)
             group_total++;
             bitvector_set(&found_groups, groups[i]);
         }
-        RTfree(groups);
+        RTfree((void *)groups);
     } else Abort("No group will ever produce action \"%s\"", act_detect);
 
     *initial_count = group_total;
