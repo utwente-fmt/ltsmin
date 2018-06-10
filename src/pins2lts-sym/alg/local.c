@@ -1,9 +1,5 @@
 #include <hre/config.h>
 
-#ifdef __APPLE__
-#define _DARWIN_C_SOURCE
-#endif
-
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
