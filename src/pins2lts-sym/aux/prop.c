@@ -392,8 +392,10 @@ init_invariant_detection()
         bitvector_create (&inv_deps[i], N);
         bitvector_create (&inv_sl_deps[i], sLbls);
         set_pins_semantics (model, inv_expr[i], inv_parse_env[i], &inv_deps[i], &inv_sl_deps[i]);
-        inv_proj[i] = ci_create (bitvector_n_high(&inv_deps[i]));
+        size_t n = bitvector_n_high (&inv_deps[i]);
+        inv_proj[i] = ci_create (n);
         bitvector_high_bits (&inv_deps[i], inv_proj[i]->data);
+        inv_proj[i]->count = n;
     }
 
     inv_cleanup ();
