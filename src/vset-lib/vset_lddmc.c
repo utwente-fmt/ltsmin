@@ -538,14 +538,21 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
         rel->topmeta = lddmc_cube((uint32_t*)meta+rel->topvar, j-rel->topvar);
 
         /* Compute topread for saturation */
-        uint32_t readmeta[dom->shared.size+1];
-        memset(readmeta, 0, sizeof(uint32_t[dom->shared.size+1]));
-        // set readmeta to 1 (= keep) for every variable in proj
-        for (int i=0; i<r_k; i++) readmeta[r_proj[i]] = 1;
-        // end sequence with -2 (= quantify rest)
-        readmeta[r_proj[r_k-1]+1] = -2;
-        rel->topread = lddmc_cube((uint32_t*)readmeta+rel->topvar, r_proj[r_k-1]+2-rel->topvar);
-        rel->r_meta = lddmc_cube(readmeta, r_proj[r_k-1]+2);
+        if (r_k == 0) {
+            uint32_t readmeta[1];
+            readmeta[0] = -2;
+            rel->topread = rel->r_meta = lddmc_cube(readmeta, 1);
+        } else {
+            uint32_t readmeta[dom->shared.size+1];
+            memset(readmeta, 0, sizeof(uint32_t[dom->shared.size+1]));
+            // set readmeta to 1 (= keep) for every variable in proj
+            for (int i=0; i<r_k; i++) readmeta[r_proj[i]] = 1;
+            // end sequence with -2 (= quantify rest)
+            int last = r_proj[r_k-1]+1;
+            readmeta[last] = -2;
+            rel->topread = lddmc_cube((uint32_t*)readmeta+rel->topvar, last+1-rel->topvar);
+            rel->r_meta = lddmc_cube(readmeta, last+1);
+        }
     } else {
         rel->topmeta = lddmc_false;
         rel->topread = lddmc_false;
