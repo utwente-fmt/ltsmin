@@ -1164,7 +1164,7 @@ scc_state_matched(gsea_state_t *state, void *arg)
             if (b) {
                 opt.threshold = global.visited-1;
                 gc.report_progress (arg);
-                Warning (info, "accepting cycle found!");
+                Warning (info, "Accepting cycle FOUND!");
                 if (opt.trc_output && gc.goal_trace) {
                     while (gc.store.scc.dfsnum[r>>1] > gc.store.scc.dfsnum[state->tree.tree_idx])
                         r = *dfs_stack_pop (gc.store.scc.roots);
@@ -1849,6 +1849,7 @@ gsea_progress(void *arg) {
 
 static void
 gsea_finished(void *arg) {
+    if (opt.strategy == Strategy_SCC) Warning(info,"Empty product with LTL!");
     if (global.n_transitions < global.n_targets){
         Warning (info, "state space %zu levels, %zu states %zu transitions %zu targets",
              global.max_depth, global.explored, global.n_transitions, global.n_targets);

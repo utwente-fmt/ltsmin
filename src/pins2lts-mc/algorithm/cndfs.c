@@ -518,6 +518,13 @@ endfs_blue (run_t *run, wctx_t *ctx)
          (Strat_LTLG & sm->rec->local->strat) ) {
         endfs_lb (ctx);
     }
+
+
+    if (global->exit_status == LTSMIN_EXIT_SUCCESS && ctx->id == 0) {
+        Warning(info," ");
+        Warning(info,"Empty product with LTL!");
+        Warning(info," ");
+    }
 }
 
 void

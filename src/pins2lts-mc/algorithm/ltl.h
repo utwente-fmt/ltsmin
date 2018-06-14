@@ -5,6 +5,7 @@
 #ifndef LTL_H
 #define LTL_H
 
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/parallel/color.h>
 #include <pins-lib/pins2pins-ltl.h>
