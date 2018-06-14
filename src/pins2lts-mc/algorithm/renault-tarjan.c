@@ -514,6 +514,12 @@ renault_run  (run_t *run, wctx_t *ctx)
     if (!run_is_stopped(run) && fset_count(loc->visited_states) != 0)
         Warning (info, "Stack-set not empty: %zu",
                  fset_count(loc->visited_states));
+
+    if (global->exit_status == LTSMIN_EXIT_SUCCESS && ctx->id == 0) {
+        Warning(info," ");
+        Warning(info,"Empty product with LTL!");
+        Warning(info," ");
+    }
 }
 
 

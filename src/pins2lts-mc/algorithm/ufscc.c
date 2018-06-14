@@ -502,8 +502,14 @@ ufscc_run  (run_t *run, wctx_t *ctx)
 #endif
 
     if (trc_output && run_is_stopped(run) &&
-            global->exit_status != LTSMIN_EXIT_COUNTER_EXAMPLE) {
+            global->exit_status == LTSMIN_EXIT_COUNTER_EXAMPLE) {
         report_lasso (ctx, DUMMY_IDX); // aid other thread in counter-example reconstruction
+    }
+
+    if (global->exit_status == LTSMIN_EXIT_SUCCESS && ctx->id == 0) {
+        Warning(info," ");
+        Warning(info,"Empty product with LTL!");
+        Warning(info," ");
     }
 
     (void) run;

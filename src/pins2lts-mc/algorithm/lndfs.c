@@ -74,8 +74,14 @@ lndfs_blue (run_t *run, wctx_t *ctx)
                 dfs_stack_pop (loc->stack);
             }
         } else { //backtrack
-            if (0 == dfs_stack_nframes (loc->stack))
+            if (0 == dfs_stack_nframes (loc->stack)) {
+                if (global->exit_status == LTSMIN_EXIT_SUCCESS && ctx->id == 0) {
+                    Warning(info," ");
+                    Warning(info,"Empty product with LTL!");
+                    Warning(info," ");
+                }
                 return;
+            }
             dfs_stack_leave (loc->stack);
             ctx->counters->level_cur--;
             state_data = dfs_stack_top (loc->stack);
