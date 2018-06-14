@@ -53,7 +53,7 @@ foreach s $strategies {
 }
 dict set commands test_17_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	iprotocol.2.prop4.dve2C"
-dict set commands test_17_dve_seq exp "accepting cycle found"
+dict set commands test_17_dve_seq exp "Accepting cycle FOUND"
 
 # zune:
 compile_promela {"zune.pml"}
@@ -65,7 +65,7 @@ foreach s $strategies {
 }
 dict set commands test17_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
 					zune.pml.spins"
-dict set commands test17_prom_seq exp "accepting cycle found"
+dict set commands test17_prom_seq exp "Accepting cycle FOUND"
 
 # TEST 18:
 compile_DVE {"iprotocol.2.dve"}
@@ -79,7 +79,7 @@ dict set commands test18_mc exp "Accepting cycle FOUND"
 dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
 	iprotocol.2.dve2C \
 	--ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
-dict set commands test18_seq exp "accepting cycle found"
+dict set commands test18_seq exp "Accepting cycle FOUND"
 
 
 # TEST 19:
