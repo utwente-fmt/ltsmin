@@ -76,12 +76,12 @@ dict set commands test18_mc exp "Accepting cycle FOUND"
 # NOTE: the difference in the use of captitals in the expected output between this and previous test
 dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --por --check --strategy=scc \
 	$EXAMPLES_SRC_PATH/iprotocol.2.dve --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
-dict set commands test18_seq exp "accepting cycle found"
+dict set commands test18_seq exp "Accepting cycle FOUND"
 
 dict set commands test18_color cmd "$binpaths(dve2lts-seq) --por --check --strategy=scc \
 	--proviso=color \
 	$EXAMPLES_SRC_PATH/iprotocol.2.dve --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
-dict set commands test18_color exp "accepting cycle found"
+dict set commands test18_color exp "Accepting cycle FOUND"
 
 
 # TEST 19:
