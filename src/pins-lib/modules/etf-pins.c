@@ -38,7 +38,6 @@ typedef struct grey_box_context {
 	matrix_table_t* trans_table;
 	string_index_t* label_key_idx;
 	int** label_data;
-        int* groups_of_edge;
 } *gb_context_t;
 
 static int etf_short(model_t self,int group,int*src,TransitionCB cb,void*user_context){
@@ -82,7 +81,7 @@ static int etf_state_short(model_t self,int label,int *state){
 }
 
 static int
-etf_groups_of_edge(model_t model, int edge_no, int index, const int** groups)
+etf_groups_of_edge(model_t model, int edge_no, int index, int* groups)
 {
     gb_context_t ctx  = (gb_context_t)GBgetContext(model);
     int n_groups = dm_nrows(GBgetDMInfo(model));
@@ -106,14 +105,16 @@ etf_groups_of_edge(model_t model, int edge_no, int index, const int** groups)
                     break;
                 } case 1: {
                     if (index == (int) row[2]) {
-                        ctx->groups_of_edge[count++] = i;
+                        if (groups != NULL) groups[count] = i;
+                        count++;
                         found = 1;
                     }
                     break;
                 } default: {
                     int* tl = (int*) SIgetC(ctx->label_idx, (int) row[2], NULL);
                     if (tl[edge_no] == index) {
-                        ctx->groups_of_edge[count++] = i;
+                        if (groups != NULL) groups[count] = i;
+                        count++;
                         found = 1;
                     }
                     break;
@@ -121,7 +122,7 @@ etf_groups_of_edge(model_t model, int edge_no, int index, const int** groups)
             }
         }
     }
-    *groups = ctx->groups_of_edge;
+
     return count;
 }
 
@@ -148,7 +149,6 @@ ETFloadGreyboxModel(model_t model, const char *name)
     dm_create(p_dm_write_info, etf_trans_section_count(etf), state_length);
     ctx->trans_key_idx=(string_index_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(string_index_t));
     ctx->trans_table=(matrix_table_t*)RTmalloc(dm_nrows(p_dm_info)*sizeof(matrix_table_t));
-    ctx->groups_of_edge=RTmalloc(sizeof(int[state_length]));
     for(int i=0; i < dm_nrows(p_dm_info); i++) {
         Warning(infoLong,"parsing table %d",i);
         etf_rel_t trans=etf_trans_section(etf,i);

@@ -414,13 +414,15 @@ extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void
 \brief Get the state labels and all transitions in one call.
 */
 
-extern int GBgroupsOfEdge(model_t model, int edgeno, int index, const int **groups);
+extern int GBgroupsOfEdge(model_t model, int edgeno, int index, int *groups);
 /**<
-\brief Computes group numbers that may produce an edge
+\brief Computes group numbers that may produce an edge.
 
 Returns the number of groups that may produce an edge with a specific number (edgeno) and value (index).
 Sets groups to the exact groups that may produce the edge. Data in \p groups
-may not be read beyond the returned value of this function.
+may not be read beyond the returned value of this function. Parameter \p groups
+may be a null pointer, if it is not a null pointer \p groups it must be
+sufficiently large (e.g. the total number of transition groups).
 */
 
 /**
@@ -792,7 +794,7 @@ extern void GBsetStateLabelLong(model_t model,get_label_method_t method);
 extern void GBsetStateLabelShort(model_t model,get_label_method_t method);
 
 /// Type of groups of edge method
-typedef int (*groups_of_edge_t)(model_t model,int edgeno,int index,const int **groups);
+typedef int (*groups_of_edge_t)(model_t model,int edgeno,int index,int *groups);
 
 /**
 \brief Set the method for groups of edge method.

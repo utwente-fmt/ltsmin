@@ -57,14 +57,15 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
 
             chunk c;
             c.data = SIgetC(env->values, value, (int*) &c.len);
-    
+
             e->chunk_cache = pins_chunk_put(model, type, c);
-    
-            const int *groups = NULL;
-            const int n = GBgroupsOfEdge(model, e->idx, e->chunk_cache, &groups);
-            if (n > 0) {
-                for (int k = 0; k < n; k++) {
-                    const int group = groups[k];
+
+            e->groups = RTmalloc(sizeof(int[pins_get_group_count(model)]));
+            e->n_groups = GBgroupsOfEdge(model, e->idx, e->chunk_cache, e->groups);
+            e->groups = RTrealloc(e->groups, sizeof(int[e->n_groups]));
+            if (e->n_groups > 0) {
+                for (int k = 0; k < e->n_groups; k++) {
+                    const int group = e->groups[k];
                     if (PINS_POR) pins_add_group_visible(model, group);
                     if (deps != NULL) dm_row_union(deps, GBgetDMInfoRead(model), group);
                 }
@@ -72,9 +73,9 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
                 char s[c.len * 2 + 6];
                 chunk2string(c, sizeof(s), s);
                 const log_t l = pins_allow_undefined_edges ? info : error;
-                Warning(l, GROUP_NOT_FOUND, s); 
+                Warning(l, GROUP_NOT_FOUND, s);
                 if (!pins_allow_undefined_edges) Abort(GROUP_NOT_FOUND_HINT);
-            }            
+            }
             break;
         }
         case CHUNK: {
@@ -157,15 +158,10 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
                 ctx.num = e->chunk_cache;
                 ctx.exists = 0;
 
-                const int *groups = NULL;
-                const int n = GBgroupsOfEdge(model, e->idx, ctx.num, &groups);
-
-                if (n > 0) {
-                    for (int i = 0; i < n && ctx.exists == 0; i++) {
-                        GBgetTransitionsLong(model, groups[i], state, evar_cb, &ctx);
-                    }
-                    return ctx.exists ? ctx.num : -1;
-                } else return -1;
+                for (int i = 0; i < e->n_groups && ctx.exists == 0; i++) {
+                    GBgetTransitionsLong(model, e->groups[i], state, evar_cb, &ctx);
+                }
+                return ctx.exists ? ctx.num : -1;
             } else if (edge_labels != NULL) {
                 HREassert(edge_labels[0] != -1, "transition checking on state predicates");
 #ifndef NDEBUG
