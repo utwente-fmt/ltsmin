@@ -231,7 +231,7 @@ If you want to configure LTSmin to statically link binaries,
 LTSmin needs to run `pkg-config` with the `--static` flag.
 This will resolve additional flags required for static linking, e.g.:
 
-    $ ./configure PKG_CONFIG="$(which pkg-config) --static"
+    $ ./configure --enable-pkgconf-static
 
 #### make targets
 
