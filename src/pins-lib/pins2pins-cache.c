@@ -188,12 +188,6 @@ cached_short (model_t self, int group, int *src, TransitionCB cb,
     return state->edges;
 }
 
-static int
-cached_groups_of_edge (model_t self, int edgeno, int index, const int **groups)
-{
-    return GBgroupsOfEdge(GBgetParent(self), edgeno, index, groups);
-}
-
 model_t
 GBaddCache (model_t model)
 {
@@ -246,7 +240,6 @@ GBaddCache (model_t model)
     GBsetContext (cached, ctx);
     
     GBsetNextStateShort (cached, cached_short);
-    GBsetGroupsOfEdge (cached, cached_groups_of_edge);
 
     GBsetStateLabelShort (cached, cached_label_short);
     GBsetStateLabelsGroup (cached, get_label_group_cached);

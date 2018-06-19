@@ -111,7 +111,9 @@ struct ltsmin_expr_s {
     ltsmin_expr_t       arg2;
     uint32_t            hash;
     ltsmin_expr_t       parent;
-    int                 chunk_cache;
+    int                 chunk_cache; // typed chunk index (if node_type == EVAR)
+    int                 n_groups; // the number of groups that can produce this edge (if node_type == EVAR)
+    int*                groups; // the groups that can produce this edge (if node_type == EVAR)
     void*               context;
     void                (*destroy_context)(void* c);
 };

@@ -3369,8 +3369,8 @@ establish_group_order(int *group_order, int *initial_count)
 
     bitvector_create(&found_groups, nGrps);
 
-    const int* groups = NULL;
-    const int n = GBgroupsOfEdge(model, act_label, act_index, &groups);
+    int groups[nGrps];
+    const int n = GBgroupsOfEdge(model, act_label, act_index, groups);
     if (n > 0) {
         for (int i = 0; i < n; i++) {
             Warning(info, "Found \"%s\" potentially in group %d", act_detect, groups[i]);

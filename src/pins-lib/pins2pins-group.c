@@ -91,7 +91,6 @@ typedef struct group_context {
     void               *user_context;
     int                **group_cpy;
     int                *cpy;
-    int                *groups_of_edge;
 }                  *group_context_t;
 
 
@@ -236,24 +235,27 @@ group_state_labels_all(model_t self, int *state, int *labels)
 
 /* map groups and delete duplicates, because groups may be subsumed */
 static int
-group_groups_of_edge (model_t self, int edgeno, int index, const int **groups)
+group_groups_of_edge (model_t self, int edgeno, int index, int *groups)
 {
     group_context_t ctx = (group_context_t) GBgetContext(self);
 
-    const int *groups_parent = NULL;
-    const int n = GBgroupsOfEdge(GBgetParent(self), edgeno, index, &groups_parent);
-    
-    if (n == 0) return 0;    
-    
+    /* We must always create a new array to store the groups in, because
+     * the parent may have more groups. And even if groups is a null pointer
+     * we must call GBgroupsOfEdge on the parent with a non-null pointer,
+     * because we must compute how many groups are subsumed. */
+    int subsume_groups[pins_get_group_count(GBgetParent(self))];
+    const int n = GBgroupsOfEdge(GBgetParent(self), edgeno, index, subsume_groups);
+
     int c = 0;
     for (int i = 0; i < n; i++) {
-        for (int k = 0; k < c; k++) {
-            if (ctx->groups_of_edge[k] == groups_parent[i]) continue;
+        int subsumed = 0;
+        for (int k = 0; k < c && !subsumed; k++) {
+            subsumed = subsume_groups[k] == ctx->groupmap[subsume_groups[i]];
         }
-        ctx->groups_of_edge[c++] = ctx->groupmap[groups_parent[i]];
+        if (!subsumed) subsume_groups[c++] = ctx->groupmap[subsume_groups[i]];
     }
 
-    *groups = ctx->groups_of_edge;
+    if (groups != NULL) memcpy(groups, subsume_groups, sizeof(int[c]));
 
     return c;
 }
@@ -1174,7 +1176,6 @@ GBregroup (model_t model)
     GBcopyChunkMaps (group, model);
 
     struct group_context *ctx = RTmalloc (sizeof *ctx);
-    ctx->groups_of_edge = RTmalloc(sizeof(int[dm_ncols(r)]));
 
     GBsetContext (group, ctx);
 

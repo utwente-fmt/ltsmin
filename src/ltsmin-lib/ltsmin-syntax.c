@@ -407,6 +407,8 @@ ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,
     E->hash = SuperFastHash((const char*)hash, sizeof(hash), 0x0739c2d6);
     E->context = NULL;
     E->destroy_context = NULL;
+    E->n_groups = -1;
+    E->groups = NULL;
     return E;
 }
 
@@ -459,6 +461,11 @@ void LTSminExprDestroy(ltsmin_expr_t expr, int recursive)
     if (expr->destroy_context != NULL) {
         expr->destroy_context(expr->context);
         expr->context = NULL;
+    }
+    if (expr->groups != NULL) {
+        RTfree(expr->groups);
+        expr->groups = NULL;
+        expr->n_groups = -1;
     }
     RTfree(expr);
 }

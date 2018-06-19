@@ -7,6 +7,7 @@
 #include <hre-io/user.h> // for streaming
 #include <ltsmin-lib/ltsmin-standard.h> // for LTSMIN_EXIT_FAILURE
 #include <pins-lib/pins.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-fork.h>
 
 int PINS_REQUIRE_FORK_WRAPPER = 0;
@@ -27,7 +28,6 @@ struct fork_context
     int *a_lengths; // for 'short' src (in get_actions_r2w)
     int *w_lengths; // for 'short' dst/cpy (in get_next_r2w and get_actions_r2w)
     int *l_lengths; // for 'short' state (in get_state_label)
-    int *groups_of_edge;
 };
 
 // Struct for the thread-specific information associated with the fork_context key
@@ -287,8 +287,8 @@ child_process(struct thread_info *ti)
         } else if (next == GROUPS_OF_EDGE) {
             int edgeno = DSreadS32(is);
             int index = DSreadS32(is);
-            const int* groups = NULL;
-            const int n = GBgroupsOfEdge(parent_model, edgeno, index, &groups);
+            int groups[pins_get_group_count(parent_model)];
+            const int n = GBgroupsOfEdge(parent_model, edgeno, index, groups);
             DSwriteS32(os, n);
             if (n > 0) {
                 for (int i = 0; i < n; i++) {
@@ -547,7 +547,7 @@ forked_state_labels_group(model_t model, sl_group_enum_t group, int *state, int 
 }
 
 static int
-forked_groups_of_edge(model_t model, int edgeno, int index, const int **groups)
+forked_groups_of_edge(model_t model, int edgeno, int index, int *groups)
 {
     struct fork_context *fc = (struct fork_context*)GBgetContext(model);
     struct thread_info *ti = get_or_fork(fc, model);
@@ -563,9 +563,10 @@ forked_groups_of_edge(model_t model, int edgeno, int index, const int **groups)
     const int n = DSreadS32(is);
     if (n == 0) return 0;
 
-    // read group numbers
-    for (int i = 0; i < n; i++) fc->groups_of_edge[i] = DSreadS32(is);
-    *groups = fc->groups_of_edge;
+    if (groups != NULL) {
+        // read group numbers
+        for (int i = 0; i < n; i++) groups[i] = DSreadS32(is);
+    }
 
     return n;
 }
@@ -601,7 +602,6 @@ GBaddFork(model_t parent_model)
     ctx->a_lengths = (int*)HREmalloc(NULL, sizeof(int)*ctx->n_groups);
     ctx->w_lengths = (int*)HREmalloc(NULL, sizeof(int)*ctx->n_groups);
     ctx->l_lengths = (int*)HREmalloc(NULL, sizeof(int)*ctx->n_state_labels);
-    ctx->groups_of_edge = (int*)HREmalloc(NULL, sizeof(int)*ctx->state_length);
     for (int i=0; i<ctx->n_groups; i++) ctx->s_lengths[i] = dm_ones_in_row(GBgetDMInfo(parent_model), i);
     for (int i=0; i<ctx->n_groups; i++) ctx->r_lengths[i] = dm_ones_in_row(GBgetDMInfoRead(parent_model), i);
     for (int i=0; i<ctx->n_groups; i++) ctx->a_lengths[i] = dm_ones_in_row(GBgetMatrix(parent_model, GBgetMatrixID(parent_model, LTSMIN_MATRIX_ACTIONS_READS)), i);

@@ -337,10 +337,10 @@ state_labels_default_all(model_t model, int *state, int *labels)
 }
 
 static int
-groups_of_edge_default(model_t model, int edgeno, int index, const int **groups)
+groups_of_edge_default(model_t model, int edgeno, int index, int *groups)
 {
     (void) edgeno; (void) index;
-    *groups = model->groups_of_edge_default;
+    for (int i = 0; i < (int) pins_get_group_count(model); i++) groups[i] = i;
 
     return pins_get_group_count(model);
 }
@@ -418,7 +418,7 @@ wrapped_exit_default(model_t model)
 }
 
 static int
-wrapped_default_groups_of_edge(model_t model, int edgeno, int index, const int **groups)
+wrapped_default_groups_of_edge(model_t model, int edgeno, int index, int *groups)
 {
     return GBgroupsOfEdge(GBgetParent(model), edgeno, index, groups);
 }
@@ -663,11 +663,6 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     model->group_perm = default_src->group_perm;
 
     if (model->groups_of_edge == groups_of_edge_default) {
-        model->groups_of_edge_default =
-            RTmalloc(sizeof(int[pins_get_state_variable_count(model)]));
-        for (size_t i = 0; i < pins_get_state_variable_count(model); i++) {
-            model->groups_of_edge_default[i] = i;
-        }
         GBsetGroupsOfEdge(model, wrapped_default_groups_of_edge);
     }
 }
@@ -1015,7 +1010,7 @@ void GBsetGroupsOfEdge(model_t model,groups_of_edge_t method){
     model->groups_of_edge=method;
 }
 
-int GBgroupsOfEdge(model_t model, int edgeno, int index, const int **groups){
+int GBgroupsOfEdge(model_t model, int edgeno, int index, int *groups){
     return model->groups_of_edge(model,edgeno,index,groups);
 }
 

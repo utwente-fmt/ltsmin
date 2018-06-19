@@ -81,8 +81,8 @@ pins_add_edge_label_visible (model_t model, int edge, int label)
     }
     //if (count > 0) return; // we still need to add the group in case it has multiple guards
 
-    const int *groups_of_edge = NULL;
-    const int n = GBgroupsOfEdge(model, edge, label, &groups_of_edge);
+    int groups_of_edge[pins_get_group_count(model)];
+    const int n = GBgroupsOfEdge(model, edge, label, groups_of_edge);
     if (n > 0) {
         for (int i = 0; i < n; i++) {
             visibles[groups_of_edge[i]] = 1;
