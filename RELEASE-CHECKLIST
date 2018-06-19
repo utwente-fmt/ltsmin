@@ -1,11 +1,12 @@
 Release Checklist
 =================
 
-* If first release of the year, update the copyright data in COPYING
+* If first release of the year, update the copyright data in COPYING, and
+  README.md
 
 * Update NEWS with release notes, note that
   NEWS is a sym link to changelog.md.
-  Having this sym link means we remain compatible with 
+  Having this sym link means we remain compatible with
   autoconf.
 
 * Verify the version (<MAJOR>.<MINOR>.<PATCH>) in configure.ac.

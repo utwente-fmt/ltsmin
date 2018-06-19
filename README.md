@@ -555,7 +555,7 @@ See above.
 
 ## License
 
-Copyright (c) 2008 - 2017 Formal Methods and Tools, University of Twente
+Copyright (c) 2008 - 2018 Formal Methods and Tools, University of Twente
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
