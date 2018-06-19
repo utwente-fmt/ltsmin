@@ -1,5 +1,5 @@
 # Changelog
-## Unreleased: 3.0.0
+## June 19, 2018: 3.0.0
 
 - Improvements to the symbolic back-end (*2lts-sym):
     - Precise counting of sets using the bignum interface. Meaning you
