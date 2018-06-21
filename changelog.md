@@ -1,4 +1,14 @@
 # Changelog
+## Unreleased: x.x.x
+
+- Improvements to the symbolic back-end (*lts-sym):
+    - The ProB front-end now allows low level parallel decision diagram
+      operations when using Sylvan.
+    - A parallel saturation algorithm is now available.
+    - Great refactor of the symbolic back-end to make it more
+      accessible to developers.
+    - Build completely static Linux binaries.
+
 ## July 3, 2018: 3.0.2
 
 - Fix an issue where libxml2 was unnecessarily made a mandatory dependency.
