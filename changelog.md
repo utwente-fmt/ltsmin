@@ -1,4 +1,8 @@
 # Changelog
+## July 2, 2018: 3.0.1
+
+- Fix an issue on macOS where libxml2 is not detected correctly.
+
 ## June 19, 2018: 3.0.0
 
 - Improvements to the symbolic back-end (*2lts-sym):
