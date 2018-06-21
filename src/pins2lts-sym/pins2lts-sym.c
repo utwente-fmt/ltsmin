@@ -543,11 +543,6 @@ main (int argc, char *argv[])
     while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
     poptFreeContext(optCon);
 
-#if defined(PROB)
-    if (lace_n_workers != 1) lace_n_workers = 1;
-    Warning(info, "Falling back to 1 LACE worker, since the ProB front-end is not yet compatible with HRE.");
-#endif
-
     lace_init(lace_n_workers, lace_dqsize);
     lace_startup(lace_stacksize, TASK(actual_main), (void*)&args);
 #else
