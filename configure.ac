@@ -394,13 +394,23 @@ fi
 AC_ARG_ENABLE([pnml], [AS_HELP_STRING([--disable-pnml], [Do not compile PNML front-end])])
 AS_IF([test "x$enable_pnml" != "xno"], [
     PKG_CHECK_MODULES([XML2], [libxml-2.0], [
-        acx_pnml=yes
-        PNML_CFLAGS="$XML2_CFLAGS"
-        PNML_LIBS="$XML2_LIBS"
-        AC_SUBST(PNML_CFLAGS)
-        AC_SUBST(PNML_LIBS)],
-        AC_MSG_WARN(libxml2 is not installed. Not building PNML front-end)
-    )
+        SAVE_CPPFLAGS="$CPPFLAGS"
+        CPPFLAGS="$XML2_CFLAGS"
+        AC_CHECK_HEADER([libxml/parser.h], [
+            acx_pnml=yes
+            PNML_CFLAGS="$XML2_CFLAGS"
+            PNML_LIBS="$XML2_LIBS"
+            AC_SUBST(PNML_CFLAGS)
+            AC_SUBST(PNML_LIBS)
+        ], [
+            AC_MSG_WARN([libxml2 is installed but the required headers could not be found.])
+            AC_MSG_WARN([[Please refer to http://ltsmin.utwente.nl/#libxml2 how to resolve this issue.]])
+        ])
+        CPPFLAGS="$SAVE_CPPFLAGS"
+    ])
+])
+AS_IF([test "x$acx_pnml" != "xyes"], [
+    AC_MSG_WARN(No acceptable libxml2 package found. Not building PNML front-end)
 ])
 
 PKG_CHECK_MODULES([POPT], [popt],,[

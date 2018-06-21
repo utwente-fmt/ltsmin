@@ -442,6 +442,10 @@ To build the ProB front-end, [CZMQ](http://czmq.zeromq.org/) is required.
 #### libxml2
 
 To build the Petri net front-end, [libxml2](http://xmlsoft.org/) is required.
+Note that the libxml2 package that macOS provides is not properly configured.
+If you want to build the PNML front-end, please install a proper libxml2
+package, e.g. libxml2 in Homebrew. And do not forget to set `PKG_CONFIG_PATH`,
+as suggested by Homebrew.
 
 #### Spot
 
