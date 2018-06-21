@@ -4,8 +4,7 @@
 
 #include <pins2lts-sym/aux/options.h>
 
-
-#if !SPEC_MT_SAFE
+#if !SPEC_MT_SAFE || defined(PROB)
 int USE_PARALLELISM = 0;
 #else
 int USE_PARALLELISM = 1;
