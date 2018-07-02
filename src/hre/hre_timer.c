@@ -8,6 +8,10 @@
 
 #include <hre/user.h>
 
+#ifdef _WIN32
+# include <windows.h>
+#endif
+
 struct timer {
     clock_t real_time;
     struct tms times;
@@ -78,7 +82,11 @@ void RTstopTimer(rt_timer_t timer){
 }
 
 void RTprintTimer(log_t log,rt_timer_t timer,char *msg, ...){
-    clock_t tick=sysconf(_SC_CLK_TCK);
+#ifdef _WIN32
+    size_t tick=CLK_TCK;
+#else
+    size_t tick=sysconf(_SC_CLK_TCK);
+#endif
     float tm_real, tm_user, tm_sys;
     if (timer->running) {
         struct tms tmp;
@@ -102,7 +110,11 @@ void RTprintTimer(log_t log,rt_timer_t timer,char *msg, ...){
 }
 
 float RTrealTime(rt_timer_t timer){
-    clock_t tick=sysconf(_SC_CLK_TCK);
+#ifdef _WIN32
+    size_t tick=CLK_TCK;
+#else
+    size_t tick=sysconf(_SC_CLK_TCK);
+#endif
     if (timer->running) {
         struct tms tmp;
         clock_t real_time;

@@ -1,8 +1,9 @@
 #include <hre/config.h>
 
-#include <dlfcn.h>
 #include <fcntl.h>
+#include <ftw.h>
 #include <limits.h>
+#include <ltdl.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -128,6 +129,16 @@ sl_group (model_t model, sl_group_enum_t group, int *state, int *labels)
     }
 }
 
+static int unlink_cb(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf)
+{
+    (void) sb; (void) typeflag; (void) ftwbuf;
+    int rv = remove(fpath);
+
+    if (rv) perror(fpath);
+
+    return rv;
+}
+
 void
 DVEexit()
 {
@@ -139,12 +150,8 @@ DVEexit()
     if (strlen (templatename) == 0)
         return;
 
-    char rmcmd[PATH_MAX];
-    if (snprintf(rmcmd, sizeof rmcmd, "rm -rf %s", templatename) < (ssize_t)sizeof rmcmd) {
-        // remove temporary files
-        int status = system(rmcmd);
-        if (status == -1 || !WIFEXITED(status) || WEXITSTATUS(status) != 0)
-            Warning(info, "Could not remove %s.", templatename);
+    if (nftw(templatename, unlink_cb, 64, FTW_DEPTH | FTW_PHYS)) {
+        Warning(info, "Could not remove %s.", templatename);
     }
 }
 
@@ -222,14 +229,15 @@ DVE2loadDynamicLib(model_t model, const char *filename)
     char abs_filename[PATH_MAX];
 	char *ret_filename = realpath(filename, abs_filename);
     if (ret_filename) {
-        dlHandle = dlopen(abs_filename, RTLD_LAZY);
+        lt_dlinit();
+        dlHandle = lt_dlopen(abs_filename);
         if (dlHandle == NULL)
         {
-            Abort("%s, Library \"%s\" is not reachable", dlerror(), filename);
+            Abort("%s, Library \"%s\" is not reachable", lt_dlerror(), filename);
             return;
         }
     } else {
-        Abort("%s, Library \"%s\" is not found", dlerror(), filename);
+        Abort("%s, Library \"%s\" is not found", lt_dlerror(), filename);
     }
     atexit (DVEexit);                   // cleanup
 

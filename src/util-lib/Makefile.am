@@ -2,6 +2,9 @@ noinst_LTLIBRARIES  = libutil.la
 
 pkginclude_HEADERS = chunk_support.h string-map.h chunk_table_factory.h tables.h
 
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
 # libutil
 libutil_la_SOURCES  = balloc.c balloc.h
 libutil_la_SOURCES += bitset.c bitset.h
@@ -21,7 +24,5 @@ libutil_la_SOURCES += treedbs.c treedbs.h
 libutil_la_SOURCES += simplemap.c simplemap.h
 libutil_la_SOURCES += util.c util.h
 libutil_la_SOURCES += zobrist.c zobrist.h
-libutil_la_CPPFLAGS = $(AM_CPPFLAGS) 
 
-EXTRA_DIST = sort_r.h
-
+libutil_la_LIBADD   = $(top_builddir)/lib/libgnu.la

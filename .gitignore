@@ -16,7 +16,6 @@ config.h.in
 *.dirstamp
 aclocal.m4
 autom4te.cache/
-autotools/
 config.log
 config.lt
 config.status
@@ -26,6 +25,7 @@ Makefile
 Makefile.in
 ltsmin-*.tar.gz
 libtool
+ltdl
 bin/
 share/
 include/

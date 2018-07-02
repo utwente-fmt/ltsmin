@@ -1,9 +1,9 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <hre/config.h>
 
-#include <dlfcn.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <ltdl.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -32,6 +32,7 @@ static void plugin_popt(poptContext con,
 	case POPT_CALLBACK_REASON_POST:
 		Warning(info,"Registering PINS so language module");
 		GBregisterLoader("so",PINSpluginLoadGreyboxModel);
+		GBregisterLoader("dll",PINSpluginLoadGreyboxModel);
 		return;
 	case POPT_CALLBACK_REASON_OPTION:
 	    IF_LONG(loader_long){

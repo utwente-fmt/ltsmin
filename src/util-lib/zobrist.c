@@ -72,11 +72,11 @@ zobrist_create (size_t length, size_t z_length, matrix_t * m)
     z->length = length;
     z->keys = RTmalloc (sizeof (hash64_t *[length]));
     z->rows = dm_nrows (m);
-    srandom (time(NULL));
+    srand (time(NULL));
     for (size_t j = 0; j < length; j++) {
         z->keys[j] = RTmalloc (sizeof (hash64_t[z->key_length]));
         for (size_t i = 0; i < z->key_length; i++) {
-            z->keys[j][i] = (((hash64_t)random()) << 32) | rand();
+            z->keys[j][i] = (((hash64_t)rand()) << 32) | rand();
         }
     }
     z->ones = NULL;

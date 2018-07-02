@@ -96,25 +96,14 @@ int main() {
 /* END C-CODE */
         ]])],
         [acx_cl2="`cat conftest.data`";echo "cache_line_size() returned: 2^$acx_cl2"],
-        [acx_cl2=6;AC_MSG_WARN([Determining cache line size failed, using 2^6.])]
-    )
-
-    AC_RUN_IFELSE(
-       [AC_LANG_SOURCE([[
-            int main() {
-                return sizeof(int);
-            }
-        ]])],
-        [AC_MSG_FAILURE([Cannot determine sizeof(int)!])], dnl returned 0!
-        [acx_size_int=$?]
+        [acx_cl2=6;AC_MSG_WARN([Determining cache line size failed, using 2^6.])],
+        [acx_cl2=6;AC_MSG_WARN([Cannot determine cache line size due to x-compilation, using 2^6.])]
     )
 
     [let "acx_cl=1<<$acx_cl2"]
-    [let "acx_cl_int=$acx_cl / $acx_size_int"]
 
     AC_DEFINE_UNQUOTED([CACHE_LINE], [$acx_cl2], [Log2 size of the machine's cache line])
     AC_DEFINE_UNQUOTED([CACHE_LINE_SIZE], [$acx_cl], [Size of the machine's cache line])
-    AC_DEFINE_UNQUOTED([CACHE_LINE_INT], [$acx_cl_int], [Int size of the machine's cache line])
     AC_LANG_RESTORE
 
 if test x"$acx_cl2" = x0; then

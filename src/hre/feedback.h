@@ -77,14 +77,20 @@ extern FILE* log_get_stream(log_t log);
 */
 extern void log_message(log_t log,const char*file,int line,int errnum,
                         const char *fmt,...)
-                        __attribute__ ((format (printf, 5, 6)));
+#ifdef _GNU_C_SOURCE
+                        __attribute__ ((format (printf, 5, 6)))
+#endif
+                        ;
 
 /**
 \brief Output directly to a log stream.
 \deprecated Please use the Printf macro instead.
 */
 extern void log_printf(log_t log,const char*file,const char *fmt,...)
-                       __attribute__ ((format (printf, 3, 4)));
+#ifdef _GNU_C_SOURCE
+                       __attribute__ ((format (printf, 3, 4)))
+#endif
+                       ;
 
 /**
 \brief Test if the given log is active.

@@ -1,4 +1,4 @@
-
+#include <hre/config.h>
 
 // C++ libraries
 #include <algorithm>
@@ -18,7 +18,6 @@
 
 extern "C" {
 
-#include <hre/config.h>
 #include <stdlib.h>
 #include <ctype.h>
 

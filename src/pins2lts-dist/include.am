@@ -1,4 +1,4 @@
-LIBS = ../../pins-lib/libpins.la $(HRE_LIB)
+LIBS = ../../pins-lib/libpins.la $(HRE_LIB) $(top_builddir)/lib/libgnu.la
 
 PROB_LIB_LIBS = ../../prob-lib/libprob.la
 
@@ -54,8 +54,8 @@ nodist_EXTRA_mapa2lts_dist_SOURCES = automake-force-linker.cxx # required by Boo
 # pins2lts-dist
 pins2lts_dist_SOURCES   = ../pins2lts-dist.c
 pins2lts_dist_SOURCES  += ../../pins-lib/modules/dlopen-pins.c ../../pins-lib/modules/dlopen-pins.h
-pins2lts_dist_LDADD     = $(LIBS)
-pins2lts_dist_CPPFLAGS  = -DPINS_DLL $(DIST_CPPFLAGS)
+pins2lts_dist_LDADD     = $(LIBS) $(LIBLTDL)
+pins2lts_dist_CPPFLAGS  = -DPINS_DLL $(DIST_CPPFLAGS) $(LTDLINCL)
 if !BUILD_OS_IS_DARWIN
 pins2lts_dist_LDFLAGS   = -Wl,-E
 endif
@@ -89,18 +89,18 @@ nodist_EXTRA_pbes2lts_dist_SOURCES = automake-force-linker.cxx
 # dve2lts-dist
 dve2lts_dist_SOURCES   = ../pins2lts-dist.c
 dve2lts_dist_SOURCES  += ../../pins-lib/modules/dve-pins.c ../../pins-lib/modules/dve-pins.h
-dve2lts_dist_LDADD     = $(LIBS)
+dve2lts_dist_LDADD     = $(LIBS) $(LIBLTDL)
 dve2lts_dist_LDADD    += $(DVEC_LIBS)
-dve2lts_dist_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(DIST_CPPFLAGS)
+dve2lts_dist_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(DIST_CPPFLAGS) $(LTDLINCL)
 dve2lts_dist_LDFLAGS   = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_dve2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 
 # prom2lts-dist
 prom2lts_dist_SOURCES  = ../pins2lts-dist.c
 prom2lts_dist_SOURCES += ../../pins-lib/modules/prom-pins.c ../../pins-lib/modules/prom-pins.h
-prom2lts_dist_LDADD    = $(LIBS)
+prom2lts_dist_LDADD    = $(LIBS) $(LIBLTDL)
 prom2lts_dist_LDADD   += $(SPINS_LIBS)
-prom2lts_dist_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(DIST_CPPFLAGS)
+prom2lts_dist_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(DIST_CPPFLAGS) $(LTDLINCL)
 prom2lts_dist_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_prom2lts_dist_SOURCES = automake-force-linker.cxx # required by Boost & ViennaCL
 

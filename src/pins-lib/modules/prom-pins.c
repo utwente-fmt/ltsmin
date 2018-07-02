@@ -1,7 +1,7 @@
 #include <hre/config.h>
 
-#include <dlfcn.h>
 #include <limits.h>
+#include <ltdl.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -168,13 +168,14 @@ PromLoadDynamicLib(model_t model, const char *filename)
     char abs_filename[PATH_MAX];
     char *ret_filename = realpath(filename, abs_filename);
     if (ret_filename != NULL) {
-        dlHandle = dlopen (abs_filename, RTLD_LAZY);
+        lt_dlinit();
+        dlHandle = lt_dlopen (abs_filename);
         if (dlHandle == NULL) {
-            Abort("%s, Library \"%s\" is not reachable", dlerror(), filename);
+            Abort("%s, Library \"%s\" is not reachable", lt_dlerror(), filename);
             return;
         }
     } else {
-        Abort("%s, Library \"%s\" is not found", dlerror(), filename);
+        Abort("%s, Library \"%s\" is not found", lt_dlerror(), filename);
     }
 
     // load dynamic library functionality

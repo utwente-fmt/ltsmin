@@ -1,5 +1,7 @@
 SUBDIRS = maxsum 
 
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
 SYM_CPP_FLAGS = $(AM_CPPFLAGS) $(PROFILER_CPPFLAGS)
 SYM_LD_FLAGS = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
 SYM_C_FLAGS = $(AM_CFLAGS) $(PROFILER_CFLAGS)
@@ -27,6 +29,7 @@ LIBZZZ += ../vset-lib/libvset.la
 LIBZZZ += maxsum/libmaxsum.la
 LIBZZZ += ../spg-lib/libspg.la
 LIBZZZ += ../mc-lib/libmc.la
+LIBZZZ += $(top_builddir)/lib/libgnu.la
 
 if HAVE_SYLVAN
 LIBZZZ += $(SYLVAN_LIBS)
@@ -83,9 +86,9 @@ nodist_EXTRA_etf2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 # pins2lts-sym
 pins2lts_sym_SOURCES   = aux/options.c
 pins2lts_sym_SOURCES  += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
-pins2lts_sym_LDADD     = $(LIBZZZ)
+pins2lts_sym_LDADD     = $(LIBZZZ) $(LIBLTDL)
 pins2lts_sym_CFLAGS    = $(SYM_C_FLAGS)
-pins2lts_sym_CPPFLAGS  = -DPINS_DLL $(SYM_CPP_FLAGS)
+pins2lts_sym_CPPFLAGS  = -DPINS_DLL $(LTDLINCL) $(SYM_CPP_FLAGS)
 if !BUILD_OS_IS_DARWIN
 pins2lts_sym_LDFLAGS   = -Wl,-E $(SYM_LD_FLAGS)
 endif
@@ -130,18 +133,18 @@ nodist_EXTRA_pbes2lts_sym_SOURCES = automake-force-linker.cxx # req. by pbes
 # dve2lts-sym
 dve2lts_sym_SOURCES   = aux/options.c
 dve2lts_sym_SOURCES  += ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
-dve2lts_sym_LDADD     = $(LIBZZZ) $(DVE_LIBS)
+dve2lts_sym_LDADD     = $(LIBZZZ) $(DVE_LIBS) $(LIBLTDL)
 dve2lts_sym_CFLAGS    = $(SYM_C_FLAGS)
-dve2lts_sym_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(SYM_CPP_FLAGS)
+dve2lts_sym_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(LTDLINCL) $(SYM_CPP_FLAGS)
 dve2lts_sym_LDFLAGS   = $(DIVINE_LDFLAGS) $(SYM_LD_FLAGS)
 nodist_EXTRA_dve2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prom2lts-sym
 prom2lts_sym_SOURCES  = aux/options.c
 prom2lts_sym_SOURCES += ../pins-lib/modules/prom-pins.c ../pins-lib/modules/prom-pins.h
-prom2lts_sym_LDADD    = $(LIBZZZ) $(SPINS_LIBS)
+prom2lts_sym_LDADD    = $(LIBZZZ) $(SPINS_LIBS) $(LIBLTDL)
 prom2lts_sym_CFLAGS    = $(SYM_C_FLAGS)
-prom2lts_sym_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(SYM_CPP_FLAGS)
+prom2lts_sym_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(LTDLINCL) $(SYM_CPP_FLAGS)
 prom2lts_sym_LDFLAGS  = $(SPINS_LDFLAGS) $(SYM_LD_FLAGS)
 nodist_EXTRA_prom2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 

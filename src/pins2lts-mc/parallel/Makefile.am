@@ -1,5 +1,8 @@
 noinst_LTLIBRARIES = libparallel.la
 
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
 libparallel_la_SOURCES  = color.c
 libparallel_la_SOURCES += color.h
 libparallel_la_SOURCES += counter.c
@@ -21,5 +24,5 @@ libparallel_la_SOURCES += stream-serializer.h
 libparallel_la_SOURCES += worker.h
 libparallel_la_SOURCES += worker.c
 
-libparallel_la_CPPFLAGS = $(AM_CPPFLAGS)
 libparallel_la_LIBADD   = $(MC_LIBS)
+libparallel_la_LIBADD  += $(top_builddir)/lib/libgnu.la

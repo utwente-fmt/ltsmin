@@ -2,7 +2,6 @@
 #include <hre/config.h>
 #undef _XOPEN_SOURCE
 
-#include <dlfcn.h>
 #include <errno.h>
 #include <libgen.h>
 #include <stdarg.h>

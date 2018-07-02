@@ -38,11 +38,11 @@ has_prefix (const char *name, const char *prefix)
 void
 randperm (int *perm, int n, uint32_t seed)
 {
-    srandom (seed);
+    srand (seed);
     for (int i=0; i<n; i++)
         perm[i] = i;
     for (int i=0; i<n; i++) {
-        int                 j = random()%(n-i)+i;
+        int                 j = rand()%(n-i)+i;
         int                 t = perm[j];
         perm[j] = perm[i];
         perm[i] = t;
