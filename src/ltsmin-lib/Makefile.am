@@ -74,8 +74,8 @@ LEMON_FLAGS = -s
 .NOTPARALLEL:
 
 %.c %.h: %.lemon lempar.c
-	cd $(top_builddir)/lemon && $(MAKE) $(AM_MAKEFLAGS) lemon$(EXEEXT)
-	$(top_builddir)/lemon/lemon$(EXEEXT) $(LEMON_FLAGS) $<
+	$(MAKE) $(MAKE_AMFLAGS) -C $(top_builddir)/lemon
+	$(top_builddir)/lemon/lemon$(BUILD_EXEEXT) $(LEMON_FLAGS) $<
 	@if test -f $@; then touch $@; fi
 
 %.c %.h: %.l
