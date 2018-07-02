@@ -132,7 +132,7 @@ AS_CASE(["$with_bignum"],
               [with_bignum=gmp; have_libgmp=yes],
               [AS_IF([test x"$with_bignum" = xgmp],
                      [with_bignum=no; AC_MSG_WARN([cannot use libgmp as bignum library.])])])])
-     AS_IF([text x"$with_bignum" = xyes || test x"$with_bignum" = xtommath],
+     AS_IF([test x"$with_bignum" = xyes || test x"$with_bignum" = xtommath],
            [AC_CHECK_LIB([tommath], [mp_init], 
               [with_bignum=tommath; have_libtommath=yes],
               [AS_IF([test x"$with_bignum" = xtommath],
