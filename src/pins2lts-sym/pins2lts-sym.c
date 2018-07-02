@@ -1,7 +1,6 @@
 #include <hre/config.h>
 
 #include <float.h>
-#include <alloca.h>
 #include <assert.h>
 #include <dirent.h>
 #include <limits.h>
@@ -12,7 +11,6 @@
 #include <strings.h>
 #include <math.h>
 #include <sys/mman.h>
-#include <sys/socket.h>
 
 #include <dm/dm.h>
 #include <hre/stringindex.h>

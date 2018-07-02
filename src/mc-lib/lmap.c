@@ -251,7 +251,7 @@ lm_loc_t
 lm_insert_from_cas (lm_t *map, ref_t k, lattice_t l,
                     lm_status_t status, lm_loc_t *start)
 {
-    HREassert (l < 1UL << LATTICE_BITS, "Lattice pointer does not fit in store!");
+    HREassert (l < 1ULL << LATTICE_BITS, "Lattice pointer does not fit in store!");
     HREassert (k < map->size, "Lattice map size does not match |ref_t|.");
     lm_loc_t loc = NULL == start ?  (lm_loc_t)&map->table[k] : *start;
     lm_store_t store = lm_get_store (loc);
@@ -299,7 +299,7 @@ lm_loc_t
 lm_insert_from (lm_t *map, ref_t k, lattice_t l,
                 lm_status_t status, lm_loc_t *start)
 {
-    HREassert (l < 1UL << LATTICE_BITS, "Lattice pointer does not fit in store!");
+    HREassert (l < 1ULL << LATTICE_BITS, "Lattice pointer does not fit in store!");
     HREassert (k < map->size, "Lattice map size does not match |ref_t|.");
     lm_loc_t loc = NULL == start ?  (lm_loc_t)&map->table[k] : *start;
     lm_store_t store = lm_get_store (loc);

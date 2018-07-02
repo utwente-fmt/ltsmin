@@ -5,12 +5,15 @@
 #endif
 #include <hre/config.h>
 
-#include <dlfcn.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <ltdl.h>
 #ifdef __linux__
 #   include <sched.h> // for sched_getaffinity
+#endif
+#ifdef _WIN32
+#   include <windows.h>
 #endif
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,10 +31,11 @@ void* RTdlopen(const char *name){
     char abs_filename[PATH_MAX];
     char *ret_filename = realpath(name, abs_filename);
     if (ret_filename) {
-        dlHandle = dlopen(abs_filename, RTLD_LAZY);
+        lt_dlinit();
+        dlHandle = lt_dlopen(abs_filename);
         if (dlHandle == NULL)
         {
-            Abort("%s, Library \"%s\" is not reachable", dlerror(), name);
+            Abort("%s, Library \"%s\" is not reachable", lt_dlerror(), name);
         }
     } else {
         Abort("Library \"%s\" is not found", name);
@@ -48,9 +52,9 @@ void* RTdlopen(const char *name){
 void *
 RTdlsym (const char *libname, void *handle, const char *symbol)
 {
-    void *ret = dlsym (handle, symbol);
+    void *ret = lt_dlsym (handle, symbol);
     if (ret == NULL) {
-        const char *dlerr = dlerror ();
+        const char *dlerr = lt_dlerror ();
         Abort("dynamically loading from `%s': %s", libname,
                dlerr != NULL ? dlerr : "unknown error");
     }
@@ -60,7 +64,7 @@ RTdlsym (const char *libname, void *handle, const char *symbol)
 void *
 RTtrydlsym(void *handle, const char *symbol)
 {
-    return dlsym (handle, symbol);
+    return lt_dlsym (handle, symbol);
 }
 
 int linear_search(si_map_entry map[],const char*key){
@@ -79,13 +83,16 @@ char *key_search(si_map_entry map[],const int val){
     return "not found";
 }
 
-#if defined(__APPLE__)
+#ifdef __linux__
+static int mem_size_warned = 0;
+#endif
 
-size_t RTmemSize(){
+size_t RTmemSize() {
     const char *memsize = getenv("LTSMIN_MEM_SIZE");
     if (memsize) {
         return strtoimax(memsize, NULL, 10);
     } else {
+#ifdef __APPLE__
         int mib[4];
         int64_t physical_memory;
         size_t len = sizeof(int64_t);
@@ -94,29 +101,7 @@ size_t RTmemSize(){
         len = sizeof(int64_t);
         sysctl(mib, 2, &physical_memory, &len, NULL, 0);
         return physical_memory;
-    }
-}
-
-int RTcacheLineSize(){
-    int mib[4];
-    int line_size;
-    size_t len = sizeof(int);
-    mib[0] = CTL_HW;
-    mib[1] = HW_CACHELINE;
-    len = sizeof(int);
-    sysctl(mib, 2, &line_size, &len, NULL, 0);
-    return line_size;
-}
-
-#else
-
-static int mem_size_warned = 0;
-
-size_t RTmemSize(){
-    const char *memsize = getenv("LTSMIN_MEM_SIZE");
-    if (memsize) {
-        return strtoimax(memsize, NULL, 10);
-    } else {
+#elif defined(__linux__)
         const long res=sysconf(_SC_PHYS_PAGES);
         const long pagesz=sysconf(_SC_PAGESIZE);
         size_t limit = pagesz*((size_t)res);
@@ -155,31 +140,67 @@ size_t RTmemSize(){
         mem_size_warned = 1;
 
         return limit;
+#elif defined(_WIN32)
+    MEMORYSTATUSEX statex;
+    statex.dwLength = sizeof(statex);
+    GlobalMemoryStatusEx(&statex);
+
+    return (size_t) statex.ullTotalPhys;
+#else
+#   error Can not detect available memory on this system
+#endif
     }
 }
 
-#if defined(__linux__)
+#ifdef _WIN32
+static int line_size = -1;
+#endif
 
 int RTcacheLineSize(){
+#ifdef __APPLE__
+    int mib[4];
+    int line_size;
+    size_t len = sizeof(int);
+    mib[0] = CTL_HW;
+    mib[1] = HW_CACHELINE;
+    len = sizeof(int);
+    sysctl(mib, 2, &line_size, &len, NULL, 0);
+    return line_size;
+#elif defined(__linux__)
     long res=sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
     return (int)res;
-}
+#elif defined(_WIN32)
+    if (line_size == -1) {
+        DWORD buffer_size = 0;
+        DWORD i = 0;
+        SYSTEM_LOGICAL_PROCESSOR_INFORMATION * buffer = 0;
 
+        GetLogicalProcessorInformation(0, &buffer_size);
+        buffer = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION *)RTmalloc(buffer_size);
+        GetLogicalProcessorInformation(&buffer[0], &buffer_size);
+
+        for (i = 0; i != buffer_size / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION); ++i) {
+            if (buffer[i].Relationship == RelationCache && buffer[i].Cache.Level == 1) {
+                line_size = buffer[i].Cache.LineSize;
+                break;
+            }
+        }
+
+        RTfree(buffer);
+    }
+
+    return line_size;
 #else
-
-int RTcacheLineSize(){
-    Abort("generic implementation for RTcacheLineSize needed");
+#    error can not detect cache line size on this system
+#endif
 }
-
-#endif
-
-#endif
 
 int RTnumCPUs(){
     const char *numCPUs = getenv("LTSMIN_NUM_CPUS");
     if (numCPUs) {
         return strtoimax(numCPUs, NULL, 10);
     } else {
+#if defined(__linux__) || defined(__APPLE__)
         int cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
 #ifdef __linux__
         cpu_set_t cpus;
@@ -207,6 +228,14 @@ int RTnumCPUs(){
         if (cpus_p != &cpus) CPU_FREE(cpus_p);
 #endif
         return cpu_count;
+#elif defined(_WIN32)
+    SYSTEM_INFO siSysInfo;
+    GetSystemInfo(&siSysInfo);
+
+    return (int) siSysInfo.dwNumberOfProcessors;
+#else
+#   error can not detect number of CPUs on this system
+#endif
     }
 }
 

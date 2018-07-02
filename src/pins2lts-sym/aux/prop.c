@@ -235,7 +235,7 @@ find_trace(int trace_end[][N], int end_count, int level, vset_t *levels, char* f
     GBgetInitialState(model, init_state);
     lts_file_set_context(trace_output, n);
 
-    char* file_name=alloca((5+strlen(trc_output)+strlen(file_prefix))*sizeof(char));
+    char file_name[(5+strlen(trc_output)+strlen(file_prefix))*sizeof(char)];
     sprintf(file_name, "%s%s.%s", trc_output, file_prefix, trc_type);
     Warning(info,"writing to file: %s",file_name);
     trace_output = lts_file_create(file_name, ltstype, 1, trace_output);

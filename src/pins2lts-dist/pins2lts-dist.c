@@ -73,7 +73,9 @@ struct dist_thread_context {
 static const size_t         THRESHOLD = 100000 / 100 * SPEC_REL_PERF;
 static int              trans_len;
 static int              write_lts=0;
+#ifdef HAVE_NICE
 static int              nice_value=0;
+#endif
 static int              dlk_detect=0;
 static char            *act_detect = NULL;
 static char            *inv_detect = NULL;
@@ -99,8 +101,10 @@ static  struct poptOption options[] = {
     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
       "Select the labels to be written to file from the state vector elements, "
       "state labels and edge labels." , "<patternlist>" },
+#ifdef HAVE_NICE
     { "nice", 0, POPT_ARG_INT, &nice_value, 0, "set the nice level of all workers"
       " (useful when running on other peoples workstations)", NULL},
+#endif
     { "write-state", 0, POPT_ARG_VAL, &write_state, 1, "write the full state vector", NULL },
     { "deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     { "action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
@@ -657,11 +661,14 @@ int main(int argc, char*argv[]){
 
     /* Initializing according to the options just parsed.
      */
+#ifdef HAVE_NICE
     if (nice_value) {
         if (ctx.mpi_me==0) Warning(info,"setting nice to %d",nice_value);
         int rv = nice(nice_value);
         if (rv==-1) Warning(info,"failed to set nice");
     }
+#endif
+
     ctx.state_man=create_manager(65536);
     ctx.cost_man=create_manager(65536);
     /***************************************************/

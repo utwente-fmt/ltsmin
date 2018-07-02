@@ -1,11 +1,16 @@
 #include <hre/config.h>
 
-#include <netdb.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <string.h>
+#ifdef _WIN32
+#include <winsock2.h>
+#else
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/param.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#endif
 
 #include <hre-io/user.h>
 

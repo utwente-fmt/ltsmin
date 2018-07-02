@@ -1,7 +1,12 @@
 // -*- tab-width:4 ; indent-tabs-mode:nil -*-
 #include <hre/config.h>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#else
 #include <arpa/inet.h>
+#endif
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdlib.h>

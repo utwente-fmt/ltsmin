@@ -1,3 +1,4 @@
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
 HRE_LIB = ../hre/libhre.la
 SEQ_CPPFLAGS = $(AM_CPPFLAGS)
 SEQ_CFLAGS   = $(AM_CFLAGS)
@@ -5,6 +6,7 @@ SEQ_CFLAGS   = $(AM_CFLAGS)
 LIBS  = ../pins-lib/libpins.la
 LIBS += ../vset-lib/libvset.la
 LIBS += ../mc-lib/libmc.la
+LIBS += $(top_builddir)/lib/libgnu.la
 
 PROB_LIB_LIBS = ../prob-lib/libprob.la
 
@@ -41,8 +43,8 @@ endif
 # pins2lts-seq
 pins2lts_seq_SOURCES   = pins2lts-seq.c
 pins2lts_seq_SOURCES  += ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
-pins2lts_seq_LDADD     = $(LIBS)
-pins2lts_seq_CPPFLAGS  = -DPINS_DLL $(SEQ_CPPFLAGS)
+pins2lts_seq_LDADD     = $(LIBS) $(LIBLTDL)
+pins2lts_seq_CPPFLAGS  = -DPINS_DLL $(SEQ_CPPFLAGS) $(LTDLINCL)
 if !BUILD_OS_IS_DARWIN
 pins2lts_seq_LDFLAGS   = -Wl,-E
 endif
@@ -83,16 +85,16 @@ nodist_EXTRA_pbes2lts_seq_SOURCES = automake-force-linker.cxx #req. by pbes
 # dve2lts-seq
 dve2lts_seq_SOURCES   = pins2lts-seq.c
 dve2lts_seq_SOURCES  += ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
-dve2lts_seq_LDADD     = $(LIBS) $(DVEC_LIBS)
-dve2lts_seq_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(SEQ_CPPFLAGS)
+dve2lts_seq_LDADD     = $(LIBS) $(DVEC_LIBS) $(LIBLTDL)
+dve2lts_seq_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(SEQ_CPPFLAGS) $(LTDLINCL)
 dve2lts_seq_LDFLAGS   = $(DIVINE_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_dve2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 
 # prom2lts-seq
 prom2lts_seq_SOURCES  = pins2lts-seq.c
 prom2lts_seq_SOURCES += ../pins-lib/modules/prom-pins.c ../pins-lib/modules/prom-pins.h
-prom2lts_seq_LDADD    = $(LIBS) $(SPINS_LIBS)
-prom2lts_seq_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(SEQ_CPPFLAGS)
+prom2lts_seq_LDADD    = $(LIBS) $(SPINS_LIBS) $(LIBLTDL)
+prom2lts_seq_CPPFLAGS = -DSPINS $(SPINS_CPPFLAGS) $(SEQ_CPPFLAGS) $(LTDLINCL)
 prom2lts_seq_LDFLAGS  = $(SPINS_LDFLAGS) $(AM_LDFLAGS)
 nodist_EXTRA_prom2lts_seq_SOURCES = automake-force-linker.cxx # req. by vset
 

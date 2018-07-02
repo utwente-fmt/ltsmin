@@ -89,6 +89,8 @@ static void segv_handle (int signum)
     HREprintStack ();
     _exit (HRE_EXIT_FAILURE);
 }
+
+#if HAVE_DECL_ALARM
 void timeout_handler (int signum) {
   struct sigaction sao;
   memset(&sao, 0, sizeof(sao));
@@ -114,6 +116,8 @@ void timeout_handler (int signum) {
   }
   (void) signum;
 }
+#endif
+
 static void segv_setup(){
     memset(&segv_sa, 0, sizeof(segv_sa));
     segv_sa.sa_handler = segv_handle;
@@ -168,6 +172,7 @@ void popt_callback(
                 return;
             }
             IF_LONG(timeout_long) {
+#if HAVE_DECL_ALARM
                 Print (infoLong,"setting timeout to %d seconds", timeout);
                 struct sigaction sa;
                 memset(&sa, 0, sizeof(sa));
@@ -175,6 +180,9 @@ void popt_callback(
                 sigaction(SIGALRM, &sa, NULL);
                 alarm(timeout);
                 return;
+#else
+                Abort("Option --timeout not available on this platform.");
+#endif
             }
             Abort("bad HRE feedback option %s (%c)",opt->longName,opt->shortName);
             return;
@@ -287,11 +295,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
         errmsg[0]=':';
         errmsg[1]=' ';
         errmsg[2]=0;
-#ifdef STRERROR_R_CHAR_P
-        err_msg=strerror_r(errnum,errmsg+2,126);
-#else
         err_msg=strerror_r(errnum,errmsg+2,126)?NULL:errmsg;
-#endif
         if(!err_msg){
             err_msg=errmsg;
             switch(errno){

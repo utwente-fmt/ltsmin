@@ -21,7 +21,6 @@
 #include <pins2lts-mc/parallel/permute.h>
 #include <pins2lts-mc/parallel/state-store.h>
 #include <pins2lts-mc/parallel/worker.h>
-#include <util-lib/sort_r.h>
 #include <util-lib/util.h>
 
 
@@ -297,19 +296,19 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
             perm_do (perm, perm->rand[perm->nstored][i]);
         break;
     case Perm_Dynamic:
-        sort_r (perm->tosort, perm->nstored, sizeof(int), dyn_cmp, perm);
+        qsort_r (perm->tosort, perm->nstored, sizeof(int), dyn_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_RR:
-        sort_r (perm->tosort, perm->nstored, sizeof(int), rr_cmp, perm);
+        qsort_r (perm->tosort, perm->nstored, sizeof(int), rr_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_SR:
-        sort_r (perm->tosort, perm->nstored, sizeof(int), rand_cmp, perm);
+        qsort_r (perm->tosort, perm->nstored, sizeof(int), rand_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_Sort:
-        sort_r (perm->tosort, perm->nstored, sizeof(int), sort_cmp, perm);
+        qsort_r (perm->tosort, perm->nstored, sizeof(int), sort_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_Shift:
@@ -377,9 +376,9 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
     if (Perm_RR == perm->permutation) {
         perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*));
         perm->rand[0] = RTalign (CACHE_LINE_SIZE, sizeof(int[1<<RR_ARRAY_SIZE]));
-        srandom (time(NULL) + 9876432*worker_index);
+        srand (time(NULL) + 9876432*worker_index);
         for (int i =0; i < (1<<RR_ARRAY_SIZE); i++)
-            perm->rand[0][i] = random();
+            perm->rand[0][i] = rand();
     }
     if (Perm_SR == perm->permutation || Perm_Dynamic == perm->permutation) {
         perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*));

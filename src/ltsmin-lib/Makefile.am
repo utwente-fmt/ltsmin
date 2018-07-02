@@ -3,6 +3,9 @@ noinst_LTLIBRARIES += libmucalc.la
 
 pkginclude_HEADERS = lts-type.h ltsmin-standard.h
 
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
 # libltsmin
 libltsmin_la_SOURCES  =
 libltsmin_la_SOURCES += ltsmin-grammar.lemon
@@ -26,6 +29,7 @@ libltsmin_la_SOURCES += ltsmin-type-system.c ltsmin-type-system.h
 
 libltsmin_la_LIBADD   = $(top_builddir)/ltl2ba/libltl2ba.la
 libltsmin_la_LIBADD  += ../dm/libdm.la
+libltsmin_la_LIBADD  += $(top_builddir)/lib/libgnu.la
 
 libltsmin_la_CXXFLAGS = $(AM_CXXFLAGS)
 

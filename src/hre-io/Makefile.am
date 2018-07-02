@@ -1,5 +1,8 @@
 noinst_LTLIBRARIES = libhre-io.la
 
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
 # libhre-io
 libhre_io_la_SOURCES  = user.h types.h
 libhre_io_la_SOURCES += hre_archive.c archive.h arch_object.h
@@ -22,4 +25,5 @@ libhre_io_la_SOURCES += hre_zip_io.c
 
 libhre_io_la_CFLAGS   = $(ZLIB_CFLAGS) $(AM_CFLAGS)
 libhre_io_la_LIBADD   = $(ZLIB_LIBS)
+libhre_io_la_LIBADD  += $(top_builddir)/lib/libgnu.la
 

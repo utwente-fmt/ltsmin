@@ -19,7 +19,6 @@
 #include <pins-lib/modules/pnml-pins.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <pins-lib/pins-util.h>
-#include <util-lib/sort_r.h>
 
 #define NUM_TRANSS pn_context->num_transitions
 #define NUM_PLACES SIgetCount(pn_context->place_names)
@@ -821,7 +820,7 @@ init_groups_of_edge(pn_context_t *pn_context)
 {
     pn_context->groups_of_edges = RTmalloc(sizeof(int[NUM_TRANSS]));
     for (int i = 0; i < NUM_TRANSS; i++) pn_context->groups_of_edges[i] = i;
-    sort_r(pn_context->groups_of_edges, NUM_TRANSS, sizeof(int),
+    qsort_r(pn_context->groups_of_edges, NUM_TRANSS, sizeof(int),
             compare_transition_label, pn_context->transitions);
 
     const int num_labels = SIgetCount(pn_context->edge_labels);

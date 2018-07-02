@@ -31,7 +31,9 @@ ACX_PKGSRC
 ACX_PTHREAD(, [AC_MSG_FAILURE([no pthread support found.])])
 
 LT_PREREQ(2.4)
-LT_INIT([disable-shared])
+LT_CONFIG_LTDL_DIR([ltdl])
+LT_INIT([disable-shared win32-dll])
+LTDL_INIT
 
 AX_CHECK_FLEX([
 %option prefix="ltsmin_"
@@ -76,6 +78,7 @@ AS_IF([test "x$enable_dist" != "xno"],[
 ])
 
 AC_PROG_CC_C99
+gl_EARLY
 AX_CXX_COMPILE_STDCXX_11(, [mandatory])
 AS_IF([test x"$ac_cv_prog_cc_c99" = xno],
   [AC_MSG_FAILURE([no acceptable C99 compiler found.])])
@@ -114,6 +117,8 @@ AC_CACHE_SAVE
 
 # Checks for libraries.
 AC_SEARCH_LIBS([pow], [m])
+
+gl_INIT
 
 AC_ARG_WITH([bignum],
   [AS_HELP_STRING([--with-bignum=<type>], 
@@ -285,19 +290,15 @@ AC_CACHE_SAVE
 dnl LTSmin has its own *alloc wrappers
 dnl AC_FUNC_MALLOC
 dnl AC_FUNC_REALLOC
-AC_FUNC_STRERROR_R
 AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol dnl
   asprintf memset mkdir pow strcasecmp strrchr backtrace backtrace_symbols dnl
-  strsep mkdtemp])
+  strsep mkdtemp alarm shm_open fork wait nice])
 AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf,dnl
 mkdtemp, strsep])
 
 AX_REQUIRE_ONE_FUNC([posix_memalign _aligned_malloc], ,
     [AC_MSG_ERROR([unable to allocate page-aligned memory])])
-
-AX_REQUIRE_ONE_FUNC([rand_r rand_s], ,
-    [AC_MSG_ERROR([no re-entrant random function])])
 
 # check for fine-grained multi-core synchronization primitives
 acx_atomics=yes
@@ -484,6 +485,7 @@ AC_CONFIG_FILES([
        www/_config.yml
        Makefile
        examples/Makefile
+       lib/Makefile
        src/Makefile
        src/andl-lib/Makefile
        src/hre-io/Makefile

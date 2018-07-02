@@ -47,6 +47,25 @@ extern char *mkdtemp(char *);
 #  define hton_64(x) (x)
 #  define ntoh_64(x) (x)
 # endif
+#elif defined(_WIN32)
+#define bswap_16 __builtin_bswap16
+#define bswap_32 __builtin_bswap32
+#define bswap_64 __builtin_bswap64
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define hton_16(x) __builtin_bswap16(x)
+#  define ntoh_16(x) __builtin_bswap16(x)
+#  define hton_32(x) __builtin_bswap32(x)
+#  define ntoh_32(x) __builtin_bswap32(x)
+#  define hton_64(x) __builtin_bswap64(x)
+#  define ntoh_64(x) __builtin_bswap64(x)
+# else
+#  define hton_16(x) (x)
+#  define ntoh_16(x) (x)
+#  define hton_32(x) (x)
+#  define ntoh_32(x) (x)
+#  define hton_64(x) (x)
+#  define ntoh_64(x) (x)
+# endif
 #elif defined(__NetBSD__)
 #define bswap_16 bswap16
 #define bswap_32 bswap32

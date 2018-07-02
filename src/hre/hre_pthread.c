@@ -17,6 +17,13 @@
 
 #include <hre/provider.h>
 
+#ifndef SIGKILL
+# define SIGKILL (-1)
+#endif
+#ifndef SIGSTOP
+# define SIGSTOP (-1)
+#endif
+
 /**
  * For pthreads we only use a small shared region for the queues.
  * For forks all shared objects are allocated on the region, so we try to claim
@@ -198,7 +205,7 @@ void hre_thread_exit(hre_context_t ctx, int code){
     Debug("thread exit(%d)", code);
     intptr_t c = code;
     pthread_exit ((void *) c);
-    //exit(code); // avoid warning in cygwin
+    exit(code); // avoid warning in cygwin
 }
 
 static void *
@@ -326,17 +333,13 @@ void HREpthreadRun(int threads){
     HREexit(code);
 }
 
-static void hre_process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
-static void hre_process_exit(hre_context_t ctx,int code){
-    (void)ctx;
-    exit(code);
-}
-
-static const char      *process_class="HRE multi-process";
-
 #define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
+#ifdef HAVE_SHM_OPEN
+
 static size_t           name_counter = 0;
+
+static const char      *process_class="HRE multi-process";
 
 void* hre_posix_shm_get(hre_context_t context,size_t size){
     Debug("Creating posix SHM");
@@ -395,6 +398,15 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
     shm_unlink(shm_name);
     return shm.ptr;
 }
+
+#else
+
+void* hre_posix_shm_get(hre_context_t context,size_t size){
+    (void) context; (void) size;
+    Abort("no shm");
+}
+
+#endif
 
 void* hre_privatefixedmem_get(hre_context_t context, size_t size){
     Debug("Creating Private Memory at Fixed location");
@@ -468,6 +480,14 @@ static void fork_popt(poptContext con,
             Abort("unimplemented option: %s",opt->longName);
             exit(HRE_EXIT_FAILURE);
     }
+}
+
+#ifdef HAVE_FORK
+
+static void hre_process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
+static void hre_process_exit(hre_context_t ctx,int code){
+    (void)ctx;
+    exit(code);
 }
 
 static void
@@ -578,6 +598,15 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     }
     (void)argc;(void)argv;
 }
+
+#else
+
+static void fork_start(int* argc,char **argv[],int run_threads){
+    (void) argc; (void) argv; (void) run_threads;
+    Abort("No multi process");
+}
+
+#endif
 
 void HREenableFork(int procs, bool selected){
     Debug("Enabling process runtime environment.");

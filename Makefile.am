@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = @subdirs@ lemon examples src testsuite
+SUBDIRS = @subdirs@ lib lemon examples src testsuite
 if DX_COND_doc
 if HAVE_ASCIIDOC
 if HAVE_XMLTO
@@ -8,11 +8,13 @@ SUBDIRS += doc
 endif
 endif
 endif
+
 EXTRA_DIST  = ltsminreconf
 EXTRA_DIST += Doxyfile
 EXTRA_DIST += contrib/bash-completion/ltsmin
 EXTRA_DIST += CODING-STANDARDS
 EXTRA_DIST += README.md
+EXTRA_DIST += m4/gnulib-cache.m4
 
 doc_DATA = AUTHORS COPYING README.md CODING-STANDARDS
 

@@ -3,6 +3,12 @@ noinst_LTLIBRARIES = libhre.la
 # export to install folder
 pkginclude_HEADERS = feedback.h
 
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
+# for dlopen, etc.
+AM_CPPFLAGS += $(LTDLINCL)
+
 # libhre
 libhre_la_SOURCES  = user.h internal.h provider.h
 libhre_la_SOURCES += hre_context.c context.h
@@ -18,17 +24,20 @@ libhre_la_SOURCES += hre_table.c table.h
 libhre_la_SOURCES += hre_reduce.c
 libhre_la_SOURCES += hre_runtime.c runtime.h
 libhre_la_SOURCES += hre_timer.c
-libhre_la_SOURCES += hre_unix.c unix.h
+libhre_la_SOURCES += unix.h
 libhre_la_SOURCES += hre_utils.c
 libhre_la_SOURCES += stringindex.c stringindex.h
 
-libhre_la_CPPFLAGS = $(AM_CPPFLAGS)
 libhre_la_CFLAGS   = $(AM_CFLAGS) $(POPT_CFLAGS) $(PTHREAD_CFLAGS)
 
 ##libhre_la_LIBADD   = ../hre-io/libhre-io.la
 libhre_la_LIBADD   = ../util-lib/libutil.la
 libhre_la_LIBADD  += $(POPT_LIBS)
+libhre_la_LIBADD  += $(top_builddir)/lib/libgnu.la
 libhre_la_LIBADD  += $(PTHREAD_LIBS)
+
+# for dlopen, etc.
+libhre_la_LIBADD  += $(LIBLTDL)
 
 # git_version.h
 EXTRA_DIST = git_version.h

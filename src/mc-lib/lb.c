@@ -17,9 +17,16 @@
 #include <mc-lib/atomics.h>
 #include <mc-lib/lb.h>
 
+// the number of bytes for the state of the random number generator
+#define PRNG_BUFSZ 8
+
 typedef struct lb_status_s {
     int                 idle;           // poll local + write global
-    uint32_t            seed;           // read+write local
+
+    // for the random generator
+    struct random_data  buf;                    // read+write local
+    char                statebuf[PRNG_BUFSZ];   // read+write local
+
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) requests; // read local + write global
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) received; // read local + write global
     size_t  __attribute__ ((aligned(CACHE_LINE_SIZE))) max_load; // read local
@@ -92,7 +99,10 @@ lb_local_init (lb_t *lb, int id, void *arg)
     loc->requests = 0;
     loc->received = 0;
     loc->max_load = 0;
-    loc->seed = (id + 1) * 32732678642;
+    loc->buf.state = NULL;
+    if (initstate_r((id + 1) * 32732678642, loc->statebuf, PRNG_BUFSZ, &loc->buf)) {
+        Abort("Unable to initialize random number generator");
+    }
     // record thread local data
     atomic_write (&(loc->arg), arg);
     lb->local[id] = loc;
@@ -102,9 +112,12 @@ lb_local_init (lb_t *lb, int id, void *arg)
 static inline int
 request_random (lb_t *lb, size_t id)
 {
-    size_t res = 0;
+    size_t res;
     do {
-        res = rand_r (&lb->local[id]->seed) % lb->threads;
+        if (random_r(&lb->local[id]->buf, (int*) &res)) {
+            Abort("Unable to get random number");
+        }
+        res %= lb->threads;
     } while (res == id);
     fetch_or (&lb->local[res]->requests, 1LL << id);
     Debug ("Requested %zu", res);

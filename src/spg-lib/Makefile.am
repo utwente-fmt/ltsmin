@@ -1,6 +1,9 @@
 
 noinst_LTLIBRARIES = libspg.la
 
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
 # libspg
 libspg_la_SOURCES  =
 libspg_la_SOURCES += spg.c spg.h
@@ -17,3 +20,4 @@ libspg_la_LIBADD  += $(SYLVAN_LIBS)
 endif
 libspg_la_LDFLAGS  = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
 libspg_la_LIBADD  += ../bignum/libbignum.la
+libspg_la_LIBADD  += $(top_builddir)/lib/libgnu.la

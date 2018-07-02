@@ -1030,6 +1030,10 @@ dm_bottom(const matrix_t* const m, const int col)
 static int sig_show = 0;
 static int sig_stop = 0;
 
+#ifndef SIGTSTP
+#   define SIGTSTP -1
+#endif
+
 static void
 catch_sig(int sig)
 {
@@ -1093,7 +1097,7 @@ dm_anneal(matrix_t* m, dm_cost_t cost, const int timeout)
 
     double temp = INIT_TEMP;
 
-    srandom(time(NULL));
+    srand(time(NULL));
 
     signal(SIGINT, catch_sig);
     signal(SIGTSTP, catch_sig);
@@ -1110,8 +1114,8 @@ dm_anneal(matrix_t* m, dm_cost_t cost, const int timeout)
         temp *= COOL_FRAC;
 
         for (int temp_step = 0; temp_step < TEMP_STEPS && !sig_stop && (timeout < 0 || RTrealTime(timer) < timeout); temp_step++) {
-            int i = random() % dm_ncols(m);
-            int j = random() % dm_ncols(m);
+            int i = rand() % dm_ncols(m);
+            int j = rand() % dm_ncols(m);
 
             if (i != j) {
                 int d_rot[dm_ncols(m)];
@@ -1133,8 +1137,7 @@ dm_anneal(matrix_t* m, dm_cost_t cost, const int timeout)
             if (delta < 0) {
                 cur_cost += delta;
             } else {
-                double rand = random();
-                double flip = rand / LONG_MAX;
+                double flip = rand() / LONG_MAX;
                 double exp = (-delta / cur_cost) / (K * temp);
                 double merit = pow(E, exp);
 
