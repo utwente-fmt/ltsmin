@@ -15,13 +15,15 @@ AC_ARG_WITH([macports],
 
 case "$with_macports" in
   no|disable) acx_macports=no ;;
-  *) AC_CHECK_FILE([$with_macports/etc/macports/macports.conf],
-       [acx_macports=yes],
-       [if test x"$acx_macports" != xcheck; then
-          AC_MSG_WARN(
-            [--with-macports was given, but test for macports.conf failed])
+  *) if test -f "$with_macports/etc/macports/macports.conf"; then
+        acx_macports=yes
+     else
+        if test x"$acx_macports" != xcheck; then
+            AC_MSG_WARN(
+                [--with-macports was given, but test for macports.conf failed])
         fi
-        acx_macports=no])
+        acx_macports=no
+     fi
      ;;
 esac
 

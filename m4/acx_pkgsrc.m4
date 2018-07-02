@@ -15,13 +15,15 @@ AC_ARG_WITH([pkgsrc],
 
 case "$with_pkgsrc" in
   no|disable) acx_pkgsrc=no ;;
-  *) AC_CHECK_FILE([$with_pkgsrc/etc/mk.conf],
-       [acx_pkgsrc=yes],
-       [if test x"$acx_pkgsrc" != xcheck; then
-          AC_MSG_WARN(
-            [--with-pkgsrc was given, but test for $with_pkgsrc/etc/mk.conf failed])
+  *) if test -f "$with_pkgsrc/etc/mk.conf"; then
+        acx_pkgsrc=yes
+     else
+        if test x"$acx_pkgsrc" != xcheck; then
+            AC_MSG_WARN(
+                [--with-pkgsrc was given, but test for $with_pkgsrc/etc/mk.conf failed])
         fi
-        acx_pkgsrc=no])
+        acx_pkgsrc=no
+     fi
      ;;
 esac
 
