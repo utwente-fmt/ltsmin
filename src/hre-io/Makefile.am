@@ -20,8 +20,6 @@ libhre_io_la_SOURCES += hre_stream_rle32.c
 libhre_io_la_SOURCES += hre_struct_io.c struct_io.h
 libhre_io_la_SOURCES += hre_zip_io.c
 
-libhre_io_la_CPPFLAGS = $(LIBZIP_CPPFLAGS) $(AM_CPPFLAGS)
-
-libhre_io_la_LDFLAGS  = $(LIBZIP_LDFLAGS) $(AM_LDFLAGS)
-libhre_io_la_LIBADD   = $(LIBZIP_LIBS)
+libhre_io_la_CFLAGS   = $(ZLIB_CFLAGS) $(AM_CFLAGS)
+libhre_io_la_LIBADD   = $(ZLIB_LIBS)
 

@@ -153,7 +153,6 @@ dnl some autotools/libtool versions appear to lose dependencies to -lm
 dnl when linking .la files with CXXLD, hence add it here
 AC_SEARCH_LIBS([pow], [m])
 AC_CHECK_LIB([dl], [dlsym],,[AC_MSG_FAILURE([libdl not found.])])
-AC_CHECK_LIB([z], [inflateEnd],,[AC_MSG_FAILURE([zlib not found.])])
 
 AC_ARG_WITH([bignum],
   [AS_HELP_STRING([--with-bignum=<type>], 
@@ -198,7 +197,6 @@ ACX_DDD([:],
 
 AC_ARG_WITH([spot],
     AS_HELP_STRING([--without-spot], [do not include the Spot library for LTL model checking]))
-acx_spot="no"
 AS_IF([test "x$with_spot" != "xno"], [
     PKG_CHECK_MODULES([SPOT], [libspot >= 2.3], [
         acx_spot=yes
@@ -389,6 +387,8 @@ if (test x$HAVE_VIENNACL = x1); then
 else
     AC_MSG_WARN([no acceptable ViennaCL installation found.])
 fi
+
+PKG_CHECK_MODULES([ZLIB], [zlib], [], [AC_MSG_FAILURE([zlib not found.])])
 
 AC_ARG_ENABLE([pnml], [AS_HELP_STRING([--disable-pnml], [Do not compile PNML front-end])])
 AS_IF([test "x$enable_pnml" != "xno"], [
