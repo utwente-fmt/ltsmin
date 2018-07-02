@@ -344,7 +344,7 @@ lts_file_t vector_open(archive_t archive){
     Debug("file type is %s",description);
     if (strlen(description)==0) {
         if (31==DSreadS16(ds)) {
-            Print(error,"this tool does not support legacy DIR");
+            Print(lerror,"this tool does not support legacy DIR");
             Abort("the file can be converted with ltstrans");
         }
     }

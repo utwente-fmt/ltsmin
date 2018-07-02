@@ -309,7 +309,7 @@ struct cycle_elim_context {
 
 void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bitset_t diverging){
     if (lts->state_db!=NULL){
-        Warning(error,"illegally wiping out state vectors");
+        Warning(lerror,"illegally wiping out state vectors");
         lts->state_db=NULL;
     }
     int has_props=lts->properties!=NULL;

@@ -486,7 +486,7 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
         break;
     }
     default:
-        LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+        LTSminLogExpr (lerror, "Unhandled predicate expression: ", e, env);
         HREabort (LTSMIN_EXIT_FAILURE);
     }
     e->context = c;
@@ -598,7 +598,7 @@ VOID_TASK_3(eval_predicate_set_par, ltsmin_expr_t, e, ltsmin_parse_env_t, env, v
             break;
         }
         default:
-            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            LTSminLogExpr (lerror, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);
     }
 }
@@ -720,7 +720,7 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
             break;
         }
         default:
-            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            LTSminLogExpr (lerror, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);
     }
 }

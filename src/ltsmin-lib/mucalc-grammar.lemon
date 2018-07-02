@@ -18,7 +18,7 @@
 %token_type { int }
 %syntax_error {
     (void)yymajor;(void)yyminor;
-    HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
+    HREmessage(lerror,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
     env->error = true;
 }
 %parse_failure { HREabort(0); }

@@ -1026,24 +1026,24 @@ str2vec(const int max_size, const char *perm, int *vec)
     int i = 0;
     while ((e = strsep(&p, ",")) != NULL && strlen(e) > 0) {
         if (i == max_size) {
-            Print1(error, "to many numbers (%d) given", i + 1);
+            Print1(lerror, "to many numbers (%d) given", i + 1);
             HREexit(LTSMIN_EXIT_FAILURE);
         }
         const int j = atoi(e);
 
         if (j < 0) {
-            Print1(error, "%d at %d should be >= 0", j, i);
+            Print1(lerror, "%d at %d should be >= 0", j, i);
             HREexit(LTSMIN_EXIT_FAILURE);
         }
 
         if (j >= max_size) {
-            Print1(error, "%d at %d should be < %d", j, i, max_size);
+            Print1(lerror, "%d at %d should be < %d", j, i, max_size);
             HREexit(LTSMIN_EXIT_FAILURE);
         }
 
         for (int k = 0; k < i; k++) {
             if (j == vec[k]) {
-                Print1(error, "%d at %d already given previously at %d", j, i, k);
+                Print1(lerror, "%d at %d already given previously at %d", j, i, k);
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
         }
@@ -1053,7 +1053,7 @@ str2vec(const int max_size, const char *perm, int *vec)
         i++;
     }
     if (i != max_size) {
-        Print1(error, "to few numbers");
+        Print1(lerror, "to few numbers");
         HREexit(LTSMIN_EXIT_FAILURE);
     }
 }

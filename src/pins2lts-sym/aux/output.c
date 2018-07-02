@@ -159,7 +159,7 @@ output_lbls(FILE *tbl_file, vset_t visited)
     nGuards = dm_nrows(sl_info);
 
     if (dm_nrows(sl_info) != lts_type_get_state_label_count(ltstype))
-        Warning(error, "State label count mismatch!");
+        Warning(lerror, "State label count mismatch!");
 
     for (int i = 0; i < nGuards; i++){
         int len = dm_ones_in_row(sl_info, i);

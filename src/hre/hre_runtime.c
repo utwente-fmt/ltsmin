@@ -142,13 +142,13 @@ size_t RTmemSize(){
                     }
                 }
             } else if (!mem_size_warned) {
-                Warning(error, "Unable to get cgroup memory limit "
+                Warning(lerror, "Unable to get cgroup memory limit "
                         "in file %s: %s",
                         file, errno != 0 ? strerror(errno) : "unknown error");
             }
             fclose(fp);
         } else if (!mem_size_warned) {
-            Warning(error, "Unable to open cgroup memory limit file %s: %s",
+            Warning(lerror, "Unable to open cgroup memory limit file %s: %s",
                     file, strerror(errno));
         }
 
@@ -192,7 +192,7 @@ int RTnumCPUs(){
                 cpus_size = CPU_ALLOC_SIZE(configured_cpus);
                 CPU_ZERO_S(cpus_size, cpus_p);
             } else {
-                Warning(error, "CPU_ALLOC failed: %s",
+                Warning(lerror, "CPU_ALLOC failed: %s",
                         errno != 0 ? strerror(errno) : "unknown error");
                 return cpu_count;
             }
@@ -201,7 +201,7 @@ int RTnumCPUs(){
             if (cpus_p != &cpus) cpu_count = CPU_COUNT_S(cpus_size, cpus_p);
             else cpu_count = CPU_COUNT(cpus_p);
         } else {
-            Warning(error, "Unable to get CPU set affinity: %s",
+            Warning(lerror, "Unable to get CPU set affinity: %s",
                     errno != 0 ? strerror(errno) : "unknown error");
         }
         if (cpus_p != &cpus) CPU_FREE(cpus_p);

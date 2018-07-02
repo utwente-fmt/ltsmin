@@ -56,7 +56,7 @@ static void vset_popt(poptContext con,
 		if (!strcmp(opt->longName,"vset")){
 			int res=linear_search((si_map_entry*)data,arg);
 			if (res<0) {
-				Warning(error,"unknown vector set implementation %s",arg);
+				Warning(lerror,"unknown vector set implementation %s",arg);
 				HREexitUsage(HRE_EXIT_FAILURE);
 			}
 			vset_default_domain=res;

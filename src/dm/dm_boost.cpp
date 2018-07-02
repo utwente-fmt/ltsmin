@@ -130,7 +130,7 @@ parse_ordering(std::vector<Vertex> inv_perm, typename property_map<Graph, vertex
         }
     }
     if (r != dm_nrows(m) || c != dm_ncols(m)) {
-        Warning(error, "Got invalid permutation from boost. "
+        Warning(lerror, "Got invalid permutation from boost. "
                 "This may happen when the graph representation of the matrix "
                 "has disconnected sub graphs. This needs to be fixed in boost. "
                 "A bug report has been filed here: "
@@ -266,7 +266,7 @@ boost_ordering(const matrix_t* m, int* row_perm, int* col_perm, const boost_reor
             parse_ordering<Vertex, Graph>(inv_perm, index_map, row_perm, col_perm, m);
         } break;
         default: {
-            Warning(error, "Unsupported Boost ordering");
+            Warning(lerror, "Unsupported Boost ordering");
             HREexit(LTSMIN_EXIT_FAILURE);
         }
     }

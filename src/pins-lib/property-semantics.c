@@ -72,7 +72,7 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
             } else {
                 char s[c.len * 2 + 6];
                 chunk2string(c, sizeof(s), s);
-                const log_t l = pins_allow_undefined_edges ? info : error;
+                const log_t l = pins_allow_undefined_edges ? info : lerror;
                 Warning(l, GROUP_NOT_FOUND, s);
                 if (!pins_allow_undefined_edges) Abort(GROUP_NOT_FOUND_HINT);
             }
@@ -92,7 +92,7 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
                     char id[c.len * 2 + 6];
                     chunk2string(c, sizeof(id), id);
 
-                    const log_t l = pins_allow_undefined_values ? info : error;
+                    const log_t l = pins_allow_undefined_values ? info : lerror;
                     Warning(l, ENUM_VALUE_NOT_FOUND, id,
                         lts_type_get_type(GBgetLTStype(model),type));
                     if (!pins_allow_undefined_values) {
@@ -216,7 +216,7 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
             const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
             const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if (long_mult_overflow(l, r)) {
-                LTSminLogExpr (error, "integer overflow in: ", e, env);
+                LTSminLogExpr (lerror, "integer overflow in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
             }
             return l * r;
@@ -225,7 +225,7 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
             const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
             const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if (r == 0 || ((l == LONG_MIN) && r == -1)) {
-                LTSminLogExpr (error, "division by zero in: ", e, env);
+                LTSminLogExpr (lerror, "division by zero in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
             }
             return l / r;
@@ -234,7 +234,7 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
             const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
             const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if (r == 0 || ((l == LONG_MIN) && r == -1)) {
-                LTSminLogExpr (error, "division by zero in: ", e, env);
+                LTSminLogExpr (lerror, "division by zero in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
             }
             return l % r;
@@ -243,7 +243,7 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
             const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
             const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if ((r > 0 && l > LONG_MAX - r) || (r < 0 && l < LONG_MIN - r)) {
-                LTSminLogExpr (error, "integer overflow in: ", e, env);
+                LTSminLogExpr (lerror, "integer overflow in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
             }
             return l + r;
@@ -252,13 +252,13 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
             const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
             const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
             if ((r > 0 && l < LONG_MIN + r) || (r < 0 && l > LONG_MAX + r)) {
-                LTSminLogExpr (error, "integer overflow in: ", e, env);
+                LTSminLogExpr (lerror, "integer overflow in: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
             }
             return l - r;
         }
         default:
-            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
+            LTSminLogExpr (lerror, "Unhandled predicate expression: ", e, env);
             HREabort (LTSMIN_EXIT_FAILURE);
     }
     return 0;

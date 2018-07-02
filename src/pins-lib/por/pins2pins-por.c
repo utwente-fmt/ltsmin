@@ -84,7 +84,7 @@ por_popt (poptContext con, enum poptCallbackReason reason,
             if (arg == NULL) arg = "";
             int num = linear_search (por_algorithm, arg);
             if (num < 0) {
-                Warning (error, "unknown POR algorithm %s", arg);
+                Warning (lerror, "unknown POR algorithm %s", arg);
                 HREprintUsage();
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
@@ -99,7 +99,7 @@ por_popt (poptContext con, enum poptCallbackReason reason,
             if (arg == NULL) arg = "";
             int num = linear_search (por_weak, arg);
             if (num < 0) {
-                Warning (error, "unknown weak setting %s", arg);
+                Warning (lerror, "unknown weak setting %s", arg);
                 HREprintUsage();
                 HREexit(LTSMIN_EXIT_FAILURE);
             } else {

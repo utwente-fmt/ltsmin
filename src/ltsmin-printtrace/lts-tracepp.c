@@ -43,7 +43,7 @@ output_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_POST: {
             int ov = linear_search (output_values, arg_value);
             if (ov < 0) {
-                Warning (error, "unknown output value %s", arg_value);
+                Warning (lerror, "unknown output value %s", arg_value);
                 HREprintUsage();
                 HREabort(LTSMIN_EXIT_FAILURE);
             }

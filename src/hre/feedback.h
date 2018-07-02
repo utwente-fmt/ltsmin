@@ -32,7 +32,7 @@ extern log_t assertion;
 /**
 \brief Log stream for error messages.
 */
-extern log_t error;
+extern log_t lerror;
 
 /**
 \brief Log stream for providing information.
@@ -170,7 +170,7 @@ extern log_t hre_debug;
 \brief Macro that prints an error messages and then aborts.
 */
 #define Abort(...) {\
-    log_message(error,__FILE__,__LINE__,0,__VA_ARGS__);\
+    log_message(lerror,__FILE__,__LINE__,0,__VA_ARGS__);\
     HREabort(HRE_EXIT_FAILURE);\
 }
 
@@ -178,7 +178,7 @@ extern log_t hre_debug;
 \brief Macro that prints an error message about a system call and then aborts.
 */
 #define AbortCall(...) {\
-    log_message(error,__FILE__,__LINE__,errno,__VA_ARGS__);\
+    log_message(lerror,__FILE__,__LINE__,errno,__VA_ARGS__);\
     HREabort(HRE_EXIT_FAILURE);\
 }
 

@@ -71,9 +71,9 @@ exit_ltsmin (int sig)
     if (HREme(HREglobal()) == 0 && atomic_read(&run) != NULL) {
         if ( run_stop(run) ) {
             global->exit_status = LTSMIN_EXIT_TIMEOUT;
-            Warning (error, "PREMATURE EXIT (caught signal: %d)", sig);
+            Warning (lerror, "PREMATURE EXIT (caught signal: %d)", sig);
         } else {
-            Warning (error, "UNGRACEFUL EXIT");
+            Warning (lerror, "UNGRACEFUL EXIT");
             HREabort (LTSMIN_EXIT_TIMEOUT);
         }
     }

@@ -56,7 +56,7 @@ static void MCRLinitGreybox(int argc,const char *argv[],void* stack_bottom){
 	MCRLsetArguments(&argc, (char ***)&argv);
 	if (argc > 1) {
 		for(int i=1;i<argc;i++){
-			Warning(error,"unparsed mCRL option %s",argv[i]);
+			Warning(lerror,"unparsed mCRL option %s",argv[i]);
 		}
 		Abort("Exiting");
 	}

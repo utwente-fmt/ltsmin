@@ -175,7 +175,7 @@ EOL         (\n|\r|\n\r|\r\n)
 
 . {
     yyextra->linepos++;
-    HREmessage(error,"Unexpected character %s (%x) at line %d, pos %d",
+    HREmessage(lerror,"Unexpected character %s (%x) at line %d, pos %d",
           yytext,yytext[0],yyextra->lineno+1,yyextra->linepos+1);
     yyextra->error = true;
     (void)yyunput;

@@ -37,7 +37,7 @@ static int HREwhen=0;
 struct runtime_log stats_log={NULL,NULL,LOG_IGNORE,NULL};
 log_t stats=&stats_log;
 struct runtime_log error_log={NULL,"** error **",LOG_PRINT,NULL};
-log_t error=&error_log;
+log_t lerror=&error_log;
 struct runtime_log assert_log={NULL,NULL,LOG_PRINT|LOG_WHERE,NULL};
 log_t assertion=&assert_log;
 struct runtime_log info_log={NULL,NULL,LOG_PRINT,NULL};
@@ -151,7 +151,7 @@ void popt_callback(
             }
             IF_LONG(where_long) {
                 hre_debug->flags|=LOG_WHERE;
-                error->flags|=LOG_WHERE;
+                lerror->flags|=LOG_WHERE;
                 return;
             }
             IF_LONG(when_long) {

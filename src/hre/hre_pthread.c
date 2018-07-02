@@ -502,7 +502,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     for(int i=0;i<procs;i++){
         pid[i]=fork();
         if (pid[i]==-1) {
-            PrintCall(error,"fork");
+            PrintCall(lerror,"fork");
             success=0;
             break;
         }
@@ -543,7 +543,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
         pid_t res=wait(&status);
         Debug("process %d received %d,%d (exit: %d, signal: %d)", res, WEXITSTATUS(status), status, WIFEXITED(status), WIFSIGNALED(status));
         if (res==-1 ) {
-            PrintCall(error,"wait");
+            PrintCall(lerror,"wait");
             success=0;
         } else {
             int i;
