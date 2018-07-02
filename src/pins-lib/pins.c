@@ -8,13 +8,11 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-cache.h>
-#include <pins-lib/pins2pins-fork.h>
 #include <pins-lib/pins2pins-group.h>
 #include <pins-lib/pins2pins-guards.h>
 #include <pins-lib/pins2pins-check.h>
 #include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/pins2pins-mucalc.h>
-#include <pins-lib/pins2pins-fork.h>
 #include <pins-lib/por/pins2pins-por.h>
 #include <util-lib/treedbs.h>
 
@@ -1188,7 +1186,7 @@ static model_t
 wrapModel(model_t model)
 {
     /* add fork layer */
-    model = GBaddFork (model);
+    //model = GBaddFork (model);
 
     /* add GBlong guard evaluation layer (Deprecated) */
     model = GBaddGuards (model);
