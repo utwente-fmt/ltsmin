@@ -447,7 +447,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
         }
     } else {
         Warning(debug,"copied %"PRIu64" op cache nodes",copy_count);
-        RTfree(op_cache);
+        RTalignedFree(op_cache);
         op_cache=new_cache;
         cache_size=new_cache_size;
         uint64_t old_size=mdd_nodes;

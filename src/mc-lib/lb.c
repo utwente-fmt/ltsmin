@@ -214,8 +214,8 @@ lb_destroy (lb_t *lb)
 {
     for (size_t i = 0; i < lb->threads; i++)
         if (lb->local[i]) RTfree(lb->local[i]);
-    RTfree (lb->local);
-    RTfree (lb);
+    RTalignedFree (lb->local);
+    RTalignedFree (lb);
 }
 
 lb_barrier_result_t

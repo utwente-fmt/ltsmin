@@ -137,6 +137,6 @@ BVLLcreate (size_t values, size_t logsize)
 void
 BVLLfree (bitvector_ll_t *bv)
 {
-    RTfree (bv->bits);
-    RTfree (bv);
+    RTalignedFree (bv->bits);
+    RTalignedFree (bv);
 }

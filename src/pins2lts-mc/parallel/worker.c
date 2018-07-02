@@ -57,6 +57,6 @@ void
 wctx_destroy (wctx_t *ctx)
 {
     RTdeleteTimer (ctx->timer);
-    RTfree (ctx);
+    RTalignedFree (ctx);
 }
 

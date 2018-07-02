@@ -285,7 +285,7 @@ void HREpthreadRun(int threads){
     /* Caused huge performance regression in MC tool */
     //pthread_attr_t attr = set_thread_stack_size();
     struct shared_area *shared = create_shared_region(PTHREAD_SHARED_SIZE*threads,false);
-    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
+    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free,area_free);
 
     struct message_queue *queues=HREmallocZero(region,threads*sizeof(struct message_queue));
     hre_context_t thr_ctx[threads];
@@ -491,7 +491,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
 
     // this area is mmapped before the fork, so no shm_open is required
     struct shared_area* shared = create_shared_region(RTmemSize()*16, true);
-    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
+    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free,area_free);
 
     struct message_queue *queues=HREmallocZero(region,procs*sizeof(struct message_queue));
     for(int i=0;i<procs;i++){

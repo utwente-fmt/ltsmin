@@ -485,10 +485,10 @@ lm_create (size_t workers, size_t size, size_t block_size)
 void
 lm_free (lm_t *map)
 {
-    RTfree (map->table);
+    RTalignedFree (map->table);
     for (size_t i = 0; i < map->workers; i++)
-        if (NULL != map->locals[i]) RTfree (map->locals[i]);
-    RTfree (map);
+        if (NULL != map->locals[i]) RTalignedFree (map->locals[i]);
+    RTalignedFree (map);
 }
 
 size_t

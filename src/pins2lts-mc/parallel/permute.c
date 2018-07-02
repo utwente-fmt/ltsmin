@@ -435,24 +435,24 @@ permute_state_info (permute_t *perm)
 void
 permute_free (permute_t *perm)
 {
-    RTfree (perm->tosort);
+    RTalignedFree (perm->tosort);
     if (Perm_Otf == perm->permutation)
-        RTfree (perm->pad);
+        RTalignedFree (perm->pad);
     if (Perm_Random == perm->permutation) {
         for (size_t i = 0; i < K+TODO_MAX; i++)
-            RTfree (perm->rand[i]);
+            RTalignedFree (perm->rand[i]);
         RTfree (perm->rand);
     }
     if ( Perm_RR == perm->permutation || Perm_SR == perm->permutation ||
          Perm_Dynamic == perm->permutation ) {
-        RTfree (perm->rand[0]);
-        RTfree (perm->rand);
+        RTalignedFree (perm->rand[0]);
+        RTalignedFree (perm->rand);
     }
     if (act_detect || files[1] || (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)) {
         for (size_t i = 0; i < K+TODO_MAX; i++) {
             RTfree (perm->todos[i].ti.labels);
         }
     }
-    RTfree (perm->todos);
-    RTfree (perm);
+    RTalignedFree (perm->todos);
+    RTalignedFree (perm);
 }

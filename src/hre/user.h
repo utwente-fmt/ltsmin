@@ -280,6 +280,11 @@ Free memory.
 extern void HREfree(hre_region_t region,void* mem);
 
 /**
+Free memory that has been allocated with HREalign, or HREalignZero.
+*/
+extern void HREalignedFree(hre_region_t region,void* mem);
+
+/**
 Macro that allocates room for a new object given the type.
 */
 #define HRE_NEW(region,sort) ((sort*)HREmallocZero(region,sizeof(sort)))
@@ -298,7 +303,7 @@ typedef void(*hre_free_t)(void* area,void*mem);
 Create a new allocater given malloc, align, realloc and free methods.
 */
 
-extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free);
+extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free,hre_free_t aligned_free);
 
 extern hre_region_t RTgetMallocRegion();
 
@@ -327,6 +332,11 @@ extern void* RTalignZero(size_t align, size_t size);
 extern void* RTrealloc(void *rt_ptr, size_t size);
 
 extern void RTfree(void *rt_ptr);
+
+/**
+Free memory allocated with RTalign or RTalignZero.
+*/
+extern void RTalignedFree(void *rt_ptr);
 
 /**
 \brief Switch (HREsetRegion) to the global allocator provided by the region

@@ -293,6 +293,11 @@ AC_CHECK_FUNCS([atexit bzero ftruncate strdup strndup strchr strstr strtol dnl
 AC_CHECK_DECLS([strdup, strndup, strchr, strrchr, strstr, asprintf,dnl
 mkdtemp, strsep])
 
+AX_REQUIRE_ONE_FUNC([posix_memalign _aligned_malloc], ,
+    [AC_MSG_ERROR([unable to allocate page-aligned memory])])
+
+AX_REQUIRE_ONE_FUNC([rand_r rand_s], ,
+    [AC_MSG_ERROR([no re-entrant random function])])
 
 # check for fine-grained multi-core synchronization primitives
 acx_atomics=yes
