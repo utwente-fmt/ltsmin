@@ -28,15 +28,7 @@ AC_PROG_CXX
 ACX_FINK
 ACX_MACPORTS
 ACX_PKGSRC
-ACX_PTHREAD(
-  [LIBS="$PTHREAD_LIBS $LIBS"
-   CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
-   CXXFLAGS="$CXXFLAGS $PTHREAD_CFLAGS"
-   CC="$PTHREAD_CC"],
-  [AC_MSG_FAILURE([no pthread support found.])])
-
-# explicitly link if necessary  
-AC_CHECK_LIB(pthread, pthread_create, [LIBS="$LIBS -lpthread"])
+ACX_PTHREAD(, [AC_MSG_FAILURE([no pthread support found.])])
 
 LT_PREREQ(2.4)
 LT_INIT([disable-shared])
@@ -53,33 +45,6 @@ AX_CHECK_FLEX([
 
 AC_PROG_MAKE_SET
 AC_PROG_INSTALL
-
-AC_LANG_SAVE
-AC_LANG_C
-AC_RUN_IFELSE([AC_LANG_SOURCE([[
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <pthread.h>
-int main()
-{
-    pthread_mutex_t mutex;
-    pthread_mutexattr_t attr;
-    if (pthread_mutexattr_init(&attr))
-        exit(1);
-    if (pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED))
-        exit(2);
-    if (pthread_mutex_init(&mutex, &attr))
-        exit(3);
-    if (pthread_mutexattr_destroy(&attr))
-        exit(4);
-    if (pthread_mutex_destroy(&mutex))
-        exit(5);
-    exit(0);
-}
-]])], [POSIX_SHARED=yes], [POSIX_SHARED=no
-    AC_MSG_FAILURE([No POSIX support found.])])
-AC_LANG_RESTORE
 
 PKG_PROG_PKG_CONFIG
 m4_pattern_forbid([^PKG_[A-Z_]+$], [missing some pkgconf macros (pkgconf package)])
