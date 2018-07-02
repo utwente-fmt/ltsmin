@@ -21,10 +21,9 @@ then
   DEJAGNU="\$(top_srcdir)/testsuite/ltsmin.exp"
 fi
 AC_SUBST(DEJAGNU)
-  
 
+AC_PROG_CC_FOR_BUILD
 AM_PROG_CC_C_O
-AC_SUBST([CC_FOR_BUILD], [${CC_FOR_BUILD-$CC}])
 AC_PROG_CXX
 ACX_FINK
 ACX_MACPORTS
