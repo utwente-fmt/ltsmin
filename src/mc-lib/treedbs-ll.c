@@ -402,9 +402,9 @@ void
 LOCALfree (void *arg)
 {
     loc_t              *loc=  (loc_t*) arg;
-    RTfree (loc->node_count);
-    RTfree (loc->storage);
-    RTfree (loc);
+    RTalignedFree (loc->node_count);
+    RTalignedFree (loc->storage);
+    RTalignedFree (loc);
 }
 
 treedbs_ll_t
@@ -509,18 +509,18 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m,
 void
 TreeDBSLLfree (treedbs_ll_t dbs)
 {
-    RTfree (dbs->data.table);
+    RTalignedFree (dbs->data.table);
     if (dbs->slim) {
         clt_free (dbs->clt);
     } else {
-        RTfree (dbs->root.table);
+        RTalignedFree (dbs->root.table);
     }
     if (NULL != dbs->todo) {
         for(int row = 0;row < dbs->k;++row)
-            RTfree (dbs->todo[row]);
-        RTfree (dbs->todo);
+            RTalignedFree (dbs->todo[row]);
+        RTalignedFree (dbs->todo);
     }
-    RTfree (dbs);
+    RTalignedFree (dbs);
 }
 
 stats_t *

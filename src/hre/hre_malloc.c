@@ -55,8 +55,12 @@ void* RTmallocZero(size_t size){
 void* RTalign(size_t align, size_t size) {
     if (region)
         return HREalign(region, align, size);
+#ifdef HAVE_POSIX_MEMALIGN
     void *ret = NULL;
     errno = posix_memalign(&ret, align, size);
+#elif HAVE__ALIGNED_MALLOC
+    void *ret = _aligned_malloc(size, align);
+#endif
     if (errno) {
     switch (errno) {
         case ENOMEM:
@@ -125,8 +129,15 @@ void* RTrealloc(void *rt_ptr, size_t size){
 }
 
 void RTfree(void *rt_ptr){
-    if (region)
-        return HREfree(region, rt_ptr);
+    if (region) return HREfree(region, rt_ptr);
+    if (rt_ptr != NULL) {
+        Debug("freeing %p from system", rt_ptr);
+        free (rt_ptr);
+    }
+}
+
+void RTalignedFree(void *rt_ptr){
+    if (region) return HREalignedFree(region, rt_ptr);
     for (size_t i = 0; i < next_calloc; i++) {
         if (rt_ptr == calloc_table[i][0]) {
             Debug("freeing %p (LARGE) from system", rt_ptr);
@@ -136,7 +147,11 @@ void RTfree(void *rt_ptr){
     }
     if (rt_ptr != NULL) {
         Debug("freeing %p from system", rt_ptr);
+#ifdef HAVE_POSIX_MEMALIGN
         free (rt_ptr);
+#elif HAVE__ALIGNED_MALLOC
+        _aligned_free(rt_ptr);
+#endif
     }
 }
 
@@ -159,6 +174,7 @@ struct hre_region_s {
     hre_align_t align;
     hre_realloc_t realloc;
     hre_free_t free;
+    hre_free_t aligned_free;
 };
 
 hre_region_t hre_heap=NULL;
@@ -214,17 +230,26 @@ void HREfree(hre_region_t region,void* mem){
     }
 }
 
+void HREalignedFree(hre_region_t region,void*mem){
+    if(region==NULL) {
+        RTalignedFree(mem);
+    } else {
+        region->aligned_free(region->area,mem);
+    }
+}
+
 void *HREgetArea(hre_region_t region) {
     return region->area;
 }
 
-hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free){
+hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free,hre_free_t aligned_free){
     hre_region_t res=HRE_NEW(hre_heap,struct hre_region_s);
     res->area=area;
     res->malloc=malloc;
     res->align=align;
     res->realloc=realloc;
     res->free=free;
+    res->aligned_free=aligned_free;
     return res;
 }
 

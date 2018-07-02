@@ -245,16 +245,16 @@ DBSLLcreate_sized (int length, int size, hash64_f hash64, int satellite_bits)
     dbs->mask = ((uint64_t)dbs->size) - 1;
     dbs->table = RTalignZero (CACHE_LINE_SIZE, sizeof (mem_hash_t[dbs->size]));
     dbs->data = RTalign (CACHE_LINE_SIZE, dbs->size * dbs->bytes);
-    HREcreateLocal (&dbs->local_key, RTfree);
+    HREcreateLocal (&dbs->local_key, RTalignedFree);
     return dbs;
 }
 
 void
 DBSLLfree (dbs_ll_t dbs)
 {
-    RTfree (dbs->data);
-    RTfree (dbs->table);
-    RTfree (dbs);
+    RTalignedFree (dbs->data);
+    RTalignedFree (dbs->table);
+    RTalignedFree (dbs);
 }
 
 stats_t *

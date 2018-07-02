@@ -380,7 +380,7 @@ fset_mem (fset_t *dbs)
 void
 fset_free (fset_t *dbs)
 {
-    RTfree (dbs->data);
-    RTfree (dbs->hash);
-    RTfree (dbs);
+    RTalignedFree (dbs->data);
+    RTalignedFree (dbs->hash);
+    RTalignedFree (dbs);
 }

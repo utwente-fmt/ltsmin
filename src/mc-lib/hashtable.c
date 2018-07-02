@@ -103,7 +103,7 @@ nbd_free (void *x)
 #ifndef NDEBUG
     memset(x, 0xcd, sizeof(void *)); // bear trap
 #endif//NDEBUG
-    RTfree(x);
+    RTalignedFree(x);
     return;
 }
 

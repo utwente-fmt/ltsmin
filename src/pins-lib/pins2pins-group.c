@@ -701,7 +701,7 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 Print1 (info, "Regroup Column Nub");
                 prepare_col_compare(inf, &context);
                 dm_nub_cols (inf->r, &eq_cols, &context);
-                RTfree(context.combined);
+                RTalignedFree(context.combined);
                 inf_copy_col_headers(inf->r, inf);
             } else if (strcasecmp (tok, "sa") == 0) {
                 Print1 (info, "Regroup Simulated Annealing");
@@ -728,13 +728,13 @@ apply_regroup_spec (rw_info_t *inf, const char *spec_, guard_t **guards, const c
                 Print1 (info, "Regroup Row Nub");
                 prepare_row_compare(inf, &context);
                 dm_nub_rows (inf->r, &eq_rows, &context);
-                RTfree(context.combined);
+                RTalignedFree(context.combined);
                 inf_copy_row_headers(inf->r, inf);
             } else if (strcasecmp (tok, "ru") == 0) {
                 Print1 (info, "Regroup Row sUbsume");
                 prepare_row_compare(inf, &context);
                 dm_subsume_rows (inf->r, &subsume_rows, &context);
-                RTfree(context.combined);
+                RTalignedFree(context.combined);
                 inf_copy_row_headers(inf->r, inf);
             } else if (strcasecmp (tok, "hf") == 0) {
                 Print1 (info, "Reqroup Horizontal Flip");
@@ -1153,7 +1153,7 @@ GBregroup (model_t model)
     // post processing regroup specification
     if (inf.combined != NULL) {
         dm_free(inf.combined);
-        RTfree(inf.combined);
+        RTalignedFree(inf.combined);
     }
 
     // undo column grouping
