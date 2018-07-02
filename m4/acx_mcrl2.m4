@@ -12,7 +12,7 @@ AC_ARG_WITH([mcrl2],
 AC_ARG_VAR([MCRL2], [some mCRL2 command])
 case "$with_mcrl2" in
   no) acx_mcrl2=no ;;
-  '') AC_PATH_TOOL(MCRL2, ["${MCRL2:-mcrl22lps}"], [""])
+  '') AC_PATH_TOOL(MCRL2, ["${MCRL2:-mcrl22lps${EXEEXT}}"], [""])
       if test x"$MCRL2" != x; then
         acx_mcrl2=yes
         with_mcrl2="$(dirname "$MCRL2")/.."
