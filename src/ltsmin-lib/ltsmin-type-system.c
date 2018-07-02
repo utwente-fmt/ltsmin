@@ -34,7 +34,7 @@ get_data_format_binary(const format_table_t f[DATA_FORMAT_SIZE][DATA_FORMAT_SIZE
         Warning(infoLong, "Error: expecting format pair (LHS, RHS) to be any pair in {%s}", hint);
 
         const char* ex = LTSminPrintExpr(e, env);
-        Warning(error, "Incompatible type formats (LHS = \"%s\", RHS = \"%s\") for expression: \"%s\"." ,
+        Warning(lerror, "Incompatible type formats (LHS = \"%s\", RHS = \"%s\") for expression: \"%s\"." ,
             data_format_string_generic(l), data_format_string_generic(r), ex);
         TYPE_ABORT;
     } else return entry.df;
@@ -64,7 +64,7 @@ get_data_format_unary(const format_table_t f[DATA_FORMAT_SIZE],
         Warning(infoLong, "Error: expecting format to be any of {%s}", hint);
 
         const char* ex = LTSminPrintExpr(e, env);
-        Warning(error, "Incompatible type format (\"%s\") for expression: \"%s\"",
+        Warning(lerror, "Incompatible type format (\"%s\") for expression: \"%s\"",
             data_format_string_generic(c), ex);
         TYPE_ABORT;
     }
@@ -101,7 +101,7 @@ verify_chunk(data_format_t df, ltsmin_expr_t e, ltsmin_parse_env_t env, int type
         if (other != NULL) {
             if (typeno == -1) {
                 if (other->token != SVAR && other->token != EVAR) {
-                    LTSminLogExpr(error,
+                    LTSminLogExpr(lerror,
                         "A chunk should be paired with a state variable,"
                         " state label or edge label: ", e->parent, env);
                     TYPE_ABORT;
@@ -110,7 +110,7 @@ verify_chunk(data_format_t df, ltsmin_expr_t e, ltsmin_parse_env_t env, int type
                 if (other->token == SVAR || other->token == EVAR) {
                     const int t = get_typeno(other, lts_type);
                     if (t != typeno) {
-                        LTSminLogExpr(error,
+                        LTSminLogExpr(lerror,
                             "LHS and RHS are chunks and "
                             "should be of the same type: ", e->parent, env);
                         TYPE_ABORT;
@@ -118,7 +118,7 @@ verify_chunk(data_format_t df, ltsmin_expr_t e, ltsmin_parse_env_t env, int type
                 }
             }
         } else {
-            LTSminLogExpr(error,
+            LTSminLogExpr(lerror,
                 "A chunk should be paired.", e->parent, env);
             HREabort(LTSMIN_EXIT_FAILURE);
         }
@@ -143,7 +143,7 @@ check_type_format_atom(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
                 case S_EN: {
                     const data_format_t df = get_data_format_binary(REL_OPS, e, env, l, r);
                     if ((e->arg1->token == EVAR) == (e->arg2->token == EVAR)) {
-                        LTSminLogExpr(error,
+                        LTSminLogExpr(lerror,
                             "Either the LHS or RHS (not both) should be an edge variable: ",
                             e, env);
                         TYPE_ABORT;
@@ -151,7 +151,7 @@ check_type_format_atom(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
                     return df;
                 }
                 default: {
-                    LTSminLogExpr(error, "Unsupported expression: ", e, env);
+                    LTSminLogExpr(lerror, "Unsupported expression: ", e, env);
                     HREabort(LTSMIN_EXIT_FAILURE);
                 }
             }
@@ -184,21 +184,21 @@ check_type_format_atom(const ltsmin_expr_t e, const ltsmin_parse_env_t env, cons
                     return LTStypeTrilean;
                 }
                 default: {
-                    LTSminLogExpr(error, "Unsupported expression: ", e, env);
+                    LTSminLogExpr(lerror, "Unsupported expression: ", e, env);
                     HREabort(LTSMIN_EXIT_FAILURE);
                 }
             }
         }
         case VAR: {
             const char *v = LTSminPrintExpr(e, env);
-            Warning(error, "Invalid identifier: '%s' is not a state variable "
+            Warning(lerror, "Invalid identifier: '%s' is not a state variable "
                     "or edge variable. If you meant to write a string "
                     "constant, surround it with double quotes, i.e. '\"%s\"'.",
                     v, v);
             TYPE_ABORT;
         }
         default: {
-            LTSminLogExpr(error, "Unsupported expression: ", e, env);
+            LTSminLogExpr(lerror, "Unsupported expression: ", e, env);
             HREabort(LTSMIN_EXIT_FAILURE);
         }
     }
@@ -283,7 +283,7 @@ check_type_format_MU(const ltsmin_expr_t e, const ltsmin_parse_env_t env, const 
         case MU_EDGE_EXIST: case MU_EDGE_ALL: case MU_EDGE_EXIST_LEFT:
         case MU_EDGE_EXIST_RIGHT: case MU_EDGE_ALL_LEFT: case MU_EDGE_ALL_RIGHT: {
             // mu language does not yet support edges semantics.
-            LTSminLogExpr(error, "Unsupported expression: ", e, env);
+            LTSminLogExpr(lerror, "Unsupported expression: ", e, env);
             HREabort(LTSMIN_EXIT_FAILURE);
             break;
         }

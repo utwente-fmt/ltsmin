@@ -131,7 +131,7 @@ check_expr(ltsmin_expr_t e, ltsmin_parse_env_t env, int i, bitvector_t *vars)
                     break;
                 }
                 default: {
-                    LTSminLogExpr(error, "Unsupported expression: ", e, env);
+                    LTSminLogExpr(lerror, "Unsupported expression: ", e, env);
                     HREabort(LTSMIN_EXIT_FAILURE);
                 }
             }
@@ -139,13 +139,13 @@ check_expr(ltsmin_expr_t e, ltsmin_parse_env_t env, int i, bitvector_t *vars)
         }
         case SVAR: {
             if (bitvector_isset_or_set(vars, e->idx)) {
-                LTSminLogExpr(error, "duplicate variable: ", e, env);
+                LTSminLogExpr(lerror, "duplicate variable: ", e, env);
                 HREabort(LTSMIN_EXIT_FAILURE);
             }
             break;
         }
         default: {
-            LTSminLogExpr(error, "Unsupported expression: ", e, env);
+            LTSminLogExpr(lerror, "Unsupported expression: ", e, env);
             Abort("Note that only integer type state variables can be used.");
         }
     }

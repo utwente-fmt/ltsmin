@@ -577,7 +577,7 @@ static void check_mu_go(vset_t visited, int i, int *init)
         } else if (i < num_mu + num_ctl_star + num_ltl) {
             formula = ltl_formulas[i - num_mu - num_ctl_star - num_ctl];
         } else {
-            Warning(error, "Number of formulas doesn't match (%d+%d+%d+%d)", num_mu, num_ctl_star, num_ctl, num_ltl);
+            Warning(lerror, "Number of formulas doesn't match (%d+%d+%d+%d)", num_mu, num_ctl_star, num_ctl, num_ltl);
         }
 
         if (log_active(infoLong)) {

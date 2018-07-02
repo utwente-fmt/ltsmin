@@ -59,7 +59,7 @@ find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack, bool is_lasso)
         trace[level - i - 1] = (ref_t) val;
     }
     if (is_lasso && trace[level-1] >= level - 1) {
-        Warning (error, "Trace has no cycle. Writing erroneous trace for debugging purposes.");
+        Warning (lerror, "Trace has no cycle. Writing erroneous trace for debugging purposes.");
         global->exit_status = LTSMIN_EXIT_FAILURE;
     }
     trc_env_t          *trace_env = trc_create (model, get_stack_state, &ctx);

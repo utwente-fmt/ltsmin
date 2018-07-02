@@ -224,7 +224,7 @@ viennacl_reorder(const matrix_t* m, int* row_perm, int* col_perm, viennacl_reord
         }
         break;
     default:
-        Warning(error, "Unsupported ViennaCL ordering");
+        Warning(lerror, "Unsupported ViennaCL ordering");
         HREexit(LTSMIN_EXIT_FAILURE);
     }
 

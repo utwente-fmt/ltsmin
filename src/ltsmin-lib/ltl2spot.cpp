@@ -148,7 +148,7 @@ check_edgevar(ltsmin_expr_t e, ltsmin_parse_env_t env)
             return (check_edgevar(e->arg1, env) != -1) ? check_edgevar(e->arg1, env) : check_edgevar(e->arg2, env);
         }
         default:
-            LTSminLogExpr (error, "Unhandled LTL expression: ", e, env);
+            LTSminLogExpr (lerror, "Unhandled LTL expression: ", e, env);
             HREabort(LTSMIN_EXIT_FAILURE);
     }
     return -1;

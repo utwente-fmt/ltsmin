@@ -963,8 +963,8 @@ int main(int argc, char*argv[]){
 
     if (ctx.mpi_me==0) {
         if (global_transitions==0 && global_targets>0) {
-            Warning(error,"language module fails to report the number of transitions");
-            Warning(error,"assuming number of transitions is number of targets");
+            Warning(lerror,"language module fails to report the number of transitions");
+            Warning(lerror,"assuming number of transitions is number of targets");
             global_transitions=global_targets;
         }
         if (global_targets > global_transitions) {

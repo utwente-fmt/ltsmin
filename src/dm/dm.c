@@ -1052,7 +1052,7 @@ print_progress(const matrix_t* const m, dm_cost_t cost, long double num_perms, r
         Warning(info, "Current costs: %.*g", sig_digs, cost);
     } break;
     default:
-        Warning(error, "unsupported cost function");
+        Warning(lerror, "unsupported cost function");
         HREabort(LTSMIN_EXIT_FAILURE);
     }
 
@@ -1085,7 +1085,7 @@ dm_anneal(matrix_t* m, dm_cost_t cost, const int timeout)
         fn = dm_weighted_event_span;
         break;
     default:
-        Warning(error, "unsupported cost function");
+        Warning(lerror, "unsupported cost function");
         HREabort(LTSMIN_EXIT_FAILURE);
     }
 

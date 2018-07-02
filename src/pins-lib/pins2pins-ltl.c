@@ -70,7 +70,7 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
         {
             int l = linear_search (db_ltl_semantics, ltl_semantics_name);
             if (l < 0) {
-                Print1 (error, "unknown ltl semantic %s", ltl_semantics_name);
+                Print1 (lerror, "unknown ltl semantic %s", ltl_semantics_name);
                 HREprintUsage();
                 HREexit(LTSMIN_EXIT_FAILURE);
             }
@@ -79,7 +79,7 @@ ltl_popt (poptContext con, enum poptCallbackReason reason,
 
             int b = linear_search (db_buchi_type, buchi_type);
             if (b < 0) {
-                Print1 (error, "unknown buchi type %s", buchi_type);
+                Print1 (lerror, "unknown buchi type %s", buchi_type);
                 HREprintUsage();
                 HREexit(LTSMIN_EXIT_FAILURE);
             }

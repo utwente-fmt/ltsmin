@@ -77,7 +77,7 @@ int main(int argc, char *argv[]){
     Print(info,"info");
     Print(infoShort,"infoShort");
     Print(infoLong,"infoLong");
-    Print(error,"error");
+    Print(lerror,"error");
     Print(debug,"debug");
 
     sleep(1);
@@ -92,7 +92,7 @@ int main(int argc, char *argv[]){
     }
     if (do_segv==me){
         Print(infoShort,"causing a seg fault");
-        Print(error,"%s",(char*)1);
+        Print(lerror,"%s",(char*)1);
     }
     if (do_abort==me){
         Abort("aborting...");

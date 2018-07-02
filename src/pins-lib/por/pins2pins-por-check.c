@@ -187,22 +187,22 @@ print_group_name (dlk_check_context_t *ctx, int group, int idx)
         size_t          count = pins_chunk_count  (model, statement_type);
         HREassert (count >= K, "Missing group names in LTSMIN_EDGE_TYPE_STATEMENT edge labels");
         chunk c = pins_chunk_get  (model, statement_type, group);
-        Printf (error, "Group %d (%d) name: %s\n", group, idx, c.data);
+        Printf (lerror, "Group %d (%d) name: %s\n", group, idx, c.data);
     } else {
-        Printf (error, "Group %d (%d)\n", group, idx);
+        Printf (lerror, "Group %d (%d)\n", group, idx);
     }
 }
 
 static void
 print_search_path (dlk_check_context_t *ctx)
 {
-    Printf (error, "NS search path: \n");
+    Printf (lerror, "NS search path: \n");
     size_t start = dfs_stack_frame_size(ctx->stack) == 0 ? 1 : 0;
     for (size_t i = start; i < dfs_stack_nframes(ctx->stack); i++) {
         int *path = dfs_stack_peek_top (ctx->stack, i);
         print_group_name (ctx, path[ctx->len], path[ctx->len+1]);
     }
-    Printf (error, "\n");
+    Printf (lerror, "\n");
 }
 
 static void
@@ -315,7 +315,7 @@ check_commute (dlk_check_context_t *ctx, int *dst)
     int scount = dfs_stack_frame_size(ctx->tgt_in_stack);
     int nscount = dfs_stack_frame_size(ctx->tgt_out_stack);
     if ((!POR_WEAK && scount != nscount) || scount > nscount)
-        Warning (error, "Stubborn trans %s disappeared after NS %d/%d (|src| = %d, |dst| = %d):\n %s <--> %s",
+        Warning (lerror, "Stubborn trans %s disappeared after NS %d/%d (|src| = %d, |dst| = %d):\n %s <--> %s",
                  str_list(ctx->ss_en_list), nsgroup, nsgroup_idx, scount, nscount,
                  str_group(ctx,ctx->ss_en_list->data[0]), str_group(ctx, nsgroup));
 

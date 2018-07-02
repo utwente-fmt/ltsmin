@@ -26,9 +26,9 @@ This section is shared by the parsers for all LTSmin languages.
 %syntax_error {
     (void)yymajor;(void)yyminor;
     if (env->lineno == 0) {
-        HREmessage(error,"syntax error near pos %d",env->linepos+1);
+        HREmessage(lerror,"syntax error near pos %d",env->linepos+1);
     } else {
-        HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
+        HREmessage(lerror,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
     }
 }
 %parse_failure { HREabort(LTSMIN_EXIT_FAILURE); }
@@ -67,7 +67,7 @@ etf_spec ::= etf_spec map_section.
 etf_spec ::= etf_spec sort_section.
 
 etf_spec ::= error . {
-    HREprintf (error, "ETF syntax error.  For a description of the ETF syntax, "
+    HREprintf (lerror, "ETF syntax error.  For a description of the ETF syntax, "
                       "refer to the etf(5) man page.\n");
     HREabort(LTSMIN_EXIT_FAILURE);
 }

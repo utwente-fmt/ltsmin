@@ -19,7 +19,7 @@ struct poptOption check_options[]={
 
 #define abort_if(e, ...) \
     if (EXPECT_FALSE(e)) {\
-        Print(error, __VA_ARGS__);\
+        Print(lerror, __VA_ARGS__);\
         HREabort(HRE_EXIT_FAILURE);\
     }
 
@@ -126,7 +126,7 @@ print_ti (check_ctx_t *ctx, transition_info_t *ti)
         char           *res = tmp;
         l  = snprintf (res, Max, " --> %s : %s = ", name, type);
         l += print_chunk (model, res+l, Max-l, typeno, ti->labels[i]);
-        Printf (error, "%s\n", res);
+        Printf (lerror, "%s\n", res);
     }
     RTfree (tmp);
 }
@@ -134,9 +134,9 @@ print_ti (check_ctx_t *ctx, transition_info_t *ti)
 static inline void
 report (char *s, check_ctx_t *ctx, int g, int i, int *v, transition_info_t *ti)
 {
-    Printf (error, "\n\n%s: %d X %d (group X slot)\n\n\n", s, g, i);
+    Printf (lerror, "\n\n%s: %d X %d (group X slot)\n\n\n", s, g, i);
     print_ti (ctx, ti);
-    Printf (error, "\n %s\n \tX\n %s\n \n ",
+    Printf (lerror, "\n %s\n \tX\n %s\n \n ",
             str_group (ctx, g), str_slot (ctx, v, i));
     HREabort (LTSMIN_EXIT_FAILURE);
 }
@@ -245,7 +245,7 @@ dbg_found_read_dep_error (check_ctx_t *ctx, int *dst, int *dst2, int idx)
     lts_type_t          ltstype = GBgetLTStype (ctx->parent);
     int                 typeno = lts_type_get_state_typeno (ltstype, idx);
     print_chunk (ctx->parent, res, 1024, typeno, dst[idx]);
-    Print1 (error, "Found missing read dependency in group %d (diff slot: %d -- %s != %s).\\"
+    Print1 (lerror, "Found missing read dependency in group %d (diff slot: %d -- %s != %s).\\"
                     "Identifying culprit read slot...",
              ctx->group, idx, str_slot(ctx, dst2, idx), res);
     RTfree (res);

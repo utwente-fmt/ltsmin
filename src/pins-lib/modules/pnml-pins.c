@@ -55,7 +55,7 @@ pnml_popt(poptContext con,
 
         const int res = linear_search(EDGE_LABEL, edge_label_option);
         if (res < 0) {
-            Warning(error, "unknown edge label %s", edge_label_option);
+            Warning(lerror, "unknown edge label %s", edge_label_option);
             HREexitUsage(LTSMIN_EXIT_FAILURE);
         }
         edge_label = res;

@@ -91,7 +91,7 @@ static int HREcallPopt(int argc,char*argv[],struct poptOption optionsTable[],
         }
         if (res==-1) break;
         if (res==POPT_ERROR_BADOPT){
-            Print(error,"bad option: %s (use --help for help)",poptBadOption(optCon,0));
+            Print(lerror,"bad option: %s (use --help for help)",poptBadOption(optCon,0));
             return 1;
         }
         if (res<0) {
@@ -103,7 +103,7 @@ static int HREcallPopt(int argc,char*argv[],struct poptOption optionsTable[],
     for(int i=0;i<min_args;i++){
         args[i] = HREstrdup (poptGetArg (optCon));
         if (!args[i]) {
-            Print(error,"not enough arguments");
+            Print(lerror,"not enough arguments");
             HREprintUsage();
             return 1;
         }
@@ -117,7 +117,7 @@ static int HREcallPopt(int argc,char*argv[],struct poptOption optionsTable[],
             }
         }
         if (poptPeekArg(optCon)!=NULL) {
-            Print(error,"too many arguments");
+            Print(lerror,"too many arguments");
             HREprintUsage();
             return 1;
         }

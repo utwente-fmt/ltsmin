@@ -201,14 +201,14 @@ static void write_chunk_tables(lts_file_t file){
         case LTStypeTrilean:
         case LTStypeSInt32:
             if (values && VTgetCount(values)!=0) {
-                Print(error,"non-chunk type %s has table",type_name);
+                Print(lerror,"non-chunk type %s has table",type_name);
             }
             break;
         case LTStypeChunk:
         case LTStypeEnum:
             if (values==NULL || VTgetCount(values)==0) {
-                Print(error,"table for type %s is missing or empty",type_name);
-                Print(error,"change format for %s to direct",type_name);
+                Print(lerror,"table for type %s is missing or empty",type_name);
+                Print(lerror,"change format for %s to direct",type_name);
                 lts_type_set_format(ltstype,i,LTStypeDirect);
             } else {
                 char stream_name[1024];

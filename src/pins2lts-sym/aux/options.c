@@ -117,7 +117,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 
         res = linear_search(ORDER, order);
         if (res < 0) {
-            Warning(error, "unknown exploration order %s", order);
+            Warning(lerror, "unknown exploration order %s", order);
             HREexitUsage(LTSMIN_EXIT_FAILURE);
         } else if (HREme(HREglobal())==0) {
             Warning(info, "Exploration order is %s", order);
@@ -126,7 +126,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 
         res = linear_search(SATURATION, saturation);
         if (res < 0) {
-            Warning(error, "unknown saturation strategy %s", saturation);
+            Warning(lerror, "unknown saturation strategy %s", saturation);
             HREexitUsage(LTSMIN_EXIT_FAILURE);
         } else if (HREme(HREglobal())==0) {
             Warning(info, "Saturation strategy is %s", saturation);
@@ -135,7 +135,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
 
         res = linear_search(GUIDED, guidance);
         if (res < 0) {
-            Warning(error, "unknown guided search strategy %s", guidance);
+            Warning(lerror, "unknown guided search strategy %s", guidance);
             HREexitUsage(LTSMIN_EXIT_FAILURE);
         } else if (HREme(HREglobal())==0) {
             Warning(info, "Guided search strategy is %s", guidance);
@@ -146,7 +146,7 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
             Warning(info, "Ignoring trace output");
 
         if (inv_bin_par == 1 && inv_par == 0) {
-            Warning(error, "--inv-bin-par requires --inv-par");
+            Warning(lerror, "--inv-bin-par requires --inv-par");
             HREexitUsage(LTSMIN_EXIT_FAILURE);
         }
 

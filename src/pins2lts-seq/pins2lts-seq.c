@@ -143,21 +143,21 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_POST: {
             int db = linear_search (db_types, opt.arg_state_db);
             if (db < 0) {
-                Warning (error, "unknown vector storage mode type %s", opt.arg_state_db);
+                Warning (lerror, "unknown vector storage mode type %s", opt.arg_state_db);
                 HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.state_db = db;
 
             int s = linear_search (strategies, opt.arg_strategy);
             if (s < 0) {
-                Warning (error, "unknown search mode %s", opt.arg_strategy);
+                Warning (lerror, "unknown search mode %s", opt.arg_strategy);
                 HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.strategy = s;
 
             int p = linear_search (provisos, opt.arg_proviso);
             if (p < 0) {
-                Warning(error, "unknown proviso %s", opt.arg_proviso);
+                Warning(lerror, "unknown proviso %s", opt.arg_proviso);
                 HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.proviso = p;

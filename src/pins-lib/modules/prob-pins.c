@@ -93,7 +93,7 @@ ProBcreateZocket(model_t model, const char* file)
 {
     if (HREpeers(HREglobal()) > 1) {
         if (HREme(HREglobal()) == 0) {
-            Warning(error, "The \".probz\" extension is incompatible with parallelism. "
+            Warning(lerror, "The \".probz\" extension is incompatible with parallelism. "
                 "If you want to exploit parallelism, supply the machine file directly. "
                 "Consult the manpage \"man prob2lts-mc\" for further information. "
                 "If you don't need parallelism, you can also supply the --procs=1 option.");

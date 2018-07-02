@@ -261,7 +261,7 @@ uint32_t HREactionCreate(hre_context_t context,uint32_t comm,uint32_t size,hre_r
 
 void HREactionDelete(hre_context_t context,uint32_t comm,uint32_t tag){
     if (context->recv) {
-        Print(error,"cancellation mechanism needed!");
+        Print(lerror,"cancellation mechanism needed!");
     } else {
         context->comm[comm].action[tag].action=NULL;
     }
