@@ -297,7 +297,7 @@ save_snapshot_vset(FILE *f)
 }
 
 void
-do_dd_output (vset_t initial, vset_t visited, char* file)
+do_dd_output (char* file)
 {
     // if not .etf, then the filename ends with .bdd or .ldd, symbolic LTS
     FILE *f = fopen(file, "w");

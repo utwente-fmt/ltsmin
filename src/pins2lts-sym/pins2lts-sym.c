@@ -502,7 +502,7 @@ static void actual_main(void *arg)
             do_output(files[1], visited);
         } else {
             // if not .etf, then the filename ends with .bdd or .ldd, symbolic LTS
-            do_dd_output (initial, visited, files[1]);
+            do_dd_output (files[1]);
         }
     }
 
