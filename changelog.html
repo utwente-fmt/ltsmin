@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Changelog</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#157878">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="assets/css/style.css?v=2456789fa1629168f0356ee1fcead89a07302f01">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="assets/js/main.js"></script>
+  </head>
+  <body>
+      <div class="navigation">
+        <nav>
+          <ul><li class="tag-h1"><a href="#top">LTSmin</a></li></ul>
+        </nav>
+      </div>
+    <section class="page-header">
+      <h1 id="top" class="project-name">LTSmin</h1>
+      <h2 class="project-tagline">Model Checking and Minimization of Labelled Transition Systems</h2>
+      
+        <a href="http://github.com/utwente-fmt/ltsmin" class="btn">View on GitHub</a>
+      
+      
+      <h3>Download latest release (v3.0.2):</h2>
+      <h4>
+	<a href="http://github.com/utwente-fmt/ltsmin/releases/download/v3.0.2/ltsmin-v3.0.2-source.tgz" class="btn">Sources</a>
+	<a href="http://github.com/utwente-fmt/ltsmin/releases/download/v3.0.2/ltsmin-v3.0.2-linux.tgz" class="btn">Linux</a>
+	<a href="http://github.com/utwente-fmt/ltsmin/releases/download/v3.0.2/ltsmin-v3.0.2-osx.tgz" class="btn">OSX</a>
+	<a href="changelog.html" class="btn" target="_blank">Changelog</a>
+      </h4>
+      
+    </section>
+
+    <section class="main-content">
+      <h1 id="changelog">Changelog</h1>
+<h2 id="july-3-2018-302">July 3, 2018: 3.0.2</h2>
+
+<ul>
+  <li>Fix an issue where libxml2 was unnecessarily made a mandatory dependency.</li>
+</ul>
+
+<h2 id="july-2-2018-301">July 2, 2018: 3.0.1</h2>
+
+<ul>
+  <li>Fix an issue on macOS where libxml2 is not detected correctly.</li>
+</ul>
+
+<h2 id="june-19-2018-300">June 19, 2018: 3.0.0</h2>
+
+<ul>
+  <li>Improvements to the symbolic back-end (*2lts-sym):
+    <ul>
+      <li>Precise counting of sets using the bignum interface. Meaning you
+can now print the size of a set arbitrarily large without loss of
+precision.</li>
+      <li>Add feature that allows counting the size of a set using long doubles
+(in addition to doubles). The symbolic back-end will automatically 
+switch to long doubles when necessary.</li>
+      <li>Add option –next-union that computes the application of a transition
+relation together with the identity.</li>
+      <li>The symbolic back-end is now capable of invariant checking.</li>
+      <li>Multiple formulas, invariants are now supported through their respective
+commandline options. If LACE is used, these properties will be checked
+in parallel.</li>
+      <li>It is now possible to output all Sylvan statistics, such as the size
+of the node table, number of GCs etc.</li>
+      <li>Add option –mu-opt that enables a faster mu-calculus model checker.</li>
+      <li>Sylvan’s LDDmc is now the default decision diagram package.</li>
+    </ul>
+  </li>
+  <li>Improvements to the static variable ordering:
+    <ul>
+      <li>Invert the permutation of rows/columns (transition groups/state variables)
+using options –regroup=hf –regroup=vf respectively.</li>
+      <li>Transformations on the dependency matrix ignore read dependencies,
+since write dependencies seem to influence the actual size of Decision
+Diagrams to a much greater extent.</li>
+      <li>Add option –col-ins (see manpage) that can pick a column/state variable
+and insert it at a specific index.</li>
+      <li>A vast amount of static variable reordering algorithms have been added
+available through Boost and ViennaCL. Furthermore the FORCE algorithm and
+Noack’s algorithms have been implemented, see [1]. In addition to these
+algorithms metrics related to the quality of the static variable order
+can be shown with option –regroup=mm.</li>
+      <li>A manual group/variable order can now be given with –row-perm/–col-perm
+respectively.</li>
+    </ul>
+  </li>
+  <li>Improvements to the LTSmin language (see <code class="highlighter-rouge">man ltsmin-pred</code>):
+    <ul>
+      <li>Added the enabledness operator <code class="highlighter-rouge">??</code> to the LTSMin language,
+see <code class="highlighter-rouge">man ltsmin-pred</code>.</li>
+      <li>Native LTSmin support for signed 32-bit integers is added,
+including some basic arithmatic operators.</li>
+      <li>Added a type format checker.</li>
+    </ul>
+  </li>
+  <li>
+    <p>A new Petri net front-end has been added to LTSmin, see [2]. The front-end
+reads Petri nets in the PNML format.</p>
+  </li>
+  <li>
+    <p>A front-end for B, Event-B CSP, and Z is now available through ProB, see [3].</p>
+  </li>
+  <li>
+    <p>The mCRL2 front-end now accepts files with .txt extension.</p>
+  </li>
+  <li>
+    <p>Added support for SPOT’s LTL to Büchi translation [5]</p>
+  </li>
+  <li>Improvements to the multi-core backend (*2lts-mc):
+    <ul>
+      <li>Added a parallel Strongly Connected Components algorithm [4]
+(–strategy=ufscc).</li>
+      <li>Added Renault’s parallel SCC algorithm (–strategy=renault).</li>
+      <li>Added support for transition-based general büchi automata (TGBAs)
+via UFSCC/Renault and SPOT.</li>
+      <li>Added Bosnacki’s closed-set proviso to preserve safety under POR.</li>
+      <li>Support for weak LTS formulae in DFS-FIFO. Simply combine –ltl with
+   –strategy=dfsfifo to benefit from this highly scalable algorithm
+   (if the property is not weak, an error is raised).</li>
+      <li>Support for tracing in DFS-FIFO and all new SCC algorithms.</li>
+    </ul>
+  </li>
+  <li>Improvements to the PINS interface:
+    <ul>
+      <li>A new PINS2PINS layer is added that checks the validity of
+dependency matrices. The option –check activates the layer.
+By default, all read/write matrices are checked. When partial-order
+reduction (–por) is used, then the POR matrices are checked as well
+via an expensive reachability over the unreduced state space
+(because commutativity should hold in all futures).</li>
+      <li>Added experimental support for leaping partial-order reduction.
+   Leap sets sequentially combine multiple disjoint POR sets to
+   ‘leap’ through the state space (–leap in combination with –por).</li>
+      <li>Add GBExit function that is called before a back-end exits.</li>
+      <li>Factored out chunk tables and other functionality from pins.c.</li>
+      <li>Add functions GB&lt;set|get&gt;VarPerm and GB&lt;set|get&gt;GroupPerm that allows
+language front-ends to provide permutations. This is useful when
+front-ends have language specific algorithms for static variable reordering.</li>
+    </ul>
+  </li>
+  <li>Miscellaneous:
+    <ul>
+      <li>All default autoconf files such as README, NEWS are moved to *.md and
+sym-linked to their old file names. The markdown styling works better with
+Github.</li>
+      <li>Major refactor to the PINS regrouping layer, simplifying its use for
+developers.</li>
+      <li>LTSmin now uses Travis CI.</li>
+      <li>LTSmin now fully supports the Windows platform, since CygWin is available
+in 64 bit.</li>
+    </ul>
+  </li>
+</ul>
+
+<ol>
+  <li>Bandwidth and Wavefront Reduction for Static Variable Ordering in Symbolic Reachability Analysis -
+ http://dx.doi.org/10.1007/978-3-319-40648-0_20</li>
+  <li>Complete Results for the 2016 Edition of the Model Checking Contest -
+ http://mcc.lip6.fr/</li>
+  <li>Symbolic Reachability Analysis of B Through ProB and LTSmin -
+ http://dx.doi.org/10.1007/978-3-319-33693-0_18</li>
+  <li>Multi-Core On-The-Fly SCC Decomposition -
+ http://eprints.eemcs.utwente.nl/26873/</li>
+  <li>Multi-core SCC-Based LTL Model Checking
+ http://dx.doi.org/10.1007/978-3-319-49052-6_2</li>
+</ol>
+
+<h2 id="january-23-2015-21">January 23, 2015: 2.1</h2>
+
+<p>This release is accompanied by the tool paper:
+LTSmin: High-Performance Language-Independent Model Checking [6].</p>
+
+<ul>
+  <li>Improvements to symbolic backend (*2lts-sym):
+    <ul>
+      <li>Parallelized transition relatioBandwidth and Wavefront Reduction for Static Variable Ordering in Symbolic Reachability Analysisn learning and application using Lace [5]</li>
+      <li>Exploiting read, write and copy dependencies [3]</li>
+      <li>Parallelized guard learning and application (–pins-guards, –no-soundness-check) [1]</li>
+      <li>Improved regrouping algorithm for bandwidth reduction (-rcw)</li>
+      <li>New parallel MDD implementation from the Sylvan package: LDDmc (–vset=lddmc) [5,7]</li>
+      <li>Support maximal progress for probabilistic LTSs</li>
+    </ul>
+  </li>
+  <li>New mu-calculus PINS layer (–mucalc):
+    <ul>
+      <li>Enables verification of mu-calculus properties 
+for any of the supported languages and all backends</li>
+      <li>A parity game is generated (instead of an LTS), 
+which can be solved with –pg-solve in the symbolic tool, 
+or with any parity game solver that supports the pgsolver format.</li>
+    </ul>
+  </li>
+  <li>Symbolic Parity game solver (–pg-solve, spgsolver) [4]:
+    <ul>
+      <li>Added parallel attractor computation (–attr=par)</li>
+    </ul>
+  </li>
+  <li>
+    <p>New frontend for MAPA: Scoop (mapa2lts{sym,dist})</p>
+  </li>
+  <li>New frontend for dl-open (pins2*):
+    <ul>
+      <li>Example can be found in section 3.4 in [6].</li>
+    </ul>
+  </li>
+  <li>Improvements to the POR layer (PINS2PINS wrapper):
+    <ul>
+      <li>Added Valmari’s weak POR dependencies (–weak)</li>
+      <li>Added deletion algorithm [1] (–por=del)</li>
+      <li>Added Valmari’s SCC-based algorithm (–por=scc)</li>
+    </ul>
+  </li>
+  <li>Improvements to the multi-core backend (*2lts-mc):
+    <ul>
+      <li>Added CNDFS proviso for efficient POR in LTL (–proviso=cndfs) [2]</li>
+      <li>Refactored code and separated search algorithms in objects</li>
+    </ul>
+  </li>
+  <li>Improvements to distributed backend (*2lts-dist):
+    <ul>
+      <li>Added counter example tracing</li>
+      <li>Tau confluence detection</li>
+      <li>Support maximal progress for probabilistic LTSs</li>
+    </ul>
+  </li>
+</ul>
+
+<ol>
+  <li>Guard-based Partial-Order Reduction (Extended Version) -
+ http://dx.doi.org/10.1007/s10009-014-0363-9</li>
+  <li>Partial-Order Reduction for Multi-Core LTL Model Checking -
+ http://dx.doi.org/10.1007/978-3-319-13338-6_20</li>
+  <li>Read, Write and Copy Dependencies for Symbolic Model Checking -
+ http://dx.doi.org/10.1007/978-3-319-13338-6_16</li>
+  <li>Generating and Solving Symbolic Parity Games -
+ http://dx.doi.org/10.4204/EPTCS.159.2</li>
+  <li>Lace: non-blocking split deque for work-stealing -
+ http://dx.doi.org/10.1007/978-3-319-14313-2_18</li>
+  <li>LTSmin: High-Performance Language-Independent Model Checking -
+ http://wwwhome.ewi.utwente.nl/~meijerjjg/LTSmin_High-performance_Language-Independent_Model_Checking.pdf</li>
+  <li>Sylvan: Multi-core Decision Diagrams -
+ http://www.tvandijk.nl/wp-content/uploads/2015/01/sylvan_tacas15.pdf</li>
+</ol>
+
+<h2 id="march-4-2013-20">March 4, 2013: 2.0</h2>
+
+<ul>
+  <li>Refactored runtime and IO libraries, organized source and renamed tools:
+    <ul>
+      <li>*-reach       -&gt; *2lts-sym  (Symbolic CTL/mu model checking, ETF output)</li>
+      <li>*2lts-mc      – *2lts-mc   (Multi-core LTL model checking, compression)</li>
+      <li>*2lts-mpi     -&gt; *2lts-dist (Distributed LTS generation, LTS output)</li>
+      <li>*2lts-gsea    -&gt; *2lts-seq  (Sequential POR, LTL, LTS gen., BDD storage)</li>
+      <li>*2lts-grey    – REMOVED    (Old sequential tool)</li>
+      <li>lts-compare   – NEW        (Branching/Strong bisim. equivalence check)</li>
+      <li>ltsmin-tracepp-&gt; ltsmin-printtrace    (Trace pretty printing)</li>
+      <li>ltsmin(-mpi)  -&gt; ltsmin-reduce(-dist) (LTS minimization:LTSmin’s origin)</li>
+      <li>ltstrans      -&gt; lts-convert          (LTS file format conversion)</li>
+    </ul>
+  </li>
+  <li>New parallel BDD package: Sylvan [1,2]
+    <ul>
+      <li>BDD operations are parallelized using the Wool framework (included)</li>
+      <li>Use: *2lts-sym –vset=sylvan
+     *2lts-seq –state=vset –vset=sylvan</li>
+    </ul>
+  </li>
+  <li>New frontend for UPPAAL xml timed automata via opaal [10] (only opaal2lts-mc).
+ This adds semi-symbolic states and inclusion checks to PINS [3]:
+    <ul>
+      <li>Multi-core reachability on timed automata using inclusion abstraction</li>
+      <li>Supports all multi-core features, including NDFS with abstraction [4]</li>
+      <li>Added a strict BFS algorithm [3] to reduce abstracted state counts
+(–strategy=sbfs, default for opaal)</li>
+    </ul>
+  </li>
+  <li>New frontend for PBESs generating parity games for the symbolic solver [5]:
+    <ul>
+      <li>All backends: pbes2lts-sym, pbes2lts-mc, pbes2lts-dist, and pbes2lts-seq</li>
+      <li>Added a symbolic parity game solver: spgsolver</li>
+      <li>PGSolver file output format (‘{ast}.pg’)</li>
+    </ul>
+  </li>
+  <li>Extensions to the multi-core backend (*2lts-mc):
+    <ul>
+      <li>Support for muCRL/mCRL2/PBES using processes ({lpo,lps,pbes}2lts-mc)</li>
+      <li>Added CNDFS algorithm [6]</li>
+      <li>Added OWCTY algorithm [11] in the multi-core backends</li>
+      <li>Added DFS_FIFO algorithm for parallel livelock detection using POR [7]</li>
+      <li>Added strict BFS algorithms (–strategy=sbfs,pbfs, see [3,12])</li>
+      <li>Elementary support for writing LTSs (using pbfs) and POR (single core)</li>
+    </ul>
+  </li>
+  <li>Renamed SpinJa to SpinS [8], and added:
+    <ul>
+      <li>Valid end-state filter, assertions (–action=assert) and never claims</li>
+      <li>Guards and dependencies for POR</li>
+      <li>Support for Java 1.5 and VMs from different vendors (previously JDK 1.7)</li>
+    </ul>
+  </li>
+  <li>Optimized multi-core data structures (mc-lib):
+    <ul>
+      <li>Reduced initialization times by using calloc instead of malloc+memset</li>
+      <li>Reduced tree memory usage by 50% by splitting table for roots and leafs.
+Set the relative ratio using: –ratio=n (n=2 by default)</li>
+      <li>Parallel Cleary tree (–state=cleary-tree) halving memory usage [9,8]</li>
+      <li>Reduced memoized hash sizes to 16 bit</li>
+      <li>Thread-local allocation for better NUMA performance</li>
+      <li>New load balancer with simplified interface</li>
+    </ul>
+  </li>
+  <li>Added test suite, called via ‘make check’ (requires DejaGNU)</li>
+</ul>
+
+<ol>
+  <li>Multi-Core BDD Operations for Symbolic Reachability -
+ http://eprints.eemcs.utwente.nl/22166/</li>
+  <li>Multi-core and/or Symbolic Model Checking -
+ http://eprints.eemcs.utwente.nl/22550/</li>
+  <li>Multi-Core Reachability for Timed Automata -
+ http://eprints.eemcs.utwente.nl/21972/</li>
+  <li>Multi-Core Emptiness Checking of Timed Buchi Automata using Inclusion
+ Abstraction - http://eprints.eemcs.utwente.nl/23158</li>
+  <li>Efficient Instantiation of Parameterised Boolean Equations Systems to
+ Parity Games - http://eprints.eemcs.utwente.nl/22278/</li>
+  <li>Improved Multi-Core Nested Depth First Search -
+ http://eprints.eemcs.utwente.nl/21967/</li>
+  <li>Improved On-The-Fly Livelock Detection -
+ http://eprints.eemcs.utwente.nl/23159</li>
+  <li>SpinS: Extending LTSmin with Promela via SpinJa -
+ http://eprints.eemcs.utwente.nl/22042/</li>
+  <li>A Parallel Compact Hash Table - http://eprints.eemcs.utwente.nl/20648/</li>
+  <li>opaal:
+ https://code.launchpad.net/~opaal-developers/opaal/opaal-ltsmin-succgen</li>
+  <li>J. Barnat et al. - A Time-Optimal On-the-Fly parallel algorithm for
+     model checking of weak LTL properties</li>
+  <li>G.J. Holzmann - Parallelizing the Spin Model Checker</li>
+</ol>
+
+<h2 id="february-22-2012-18">February 22, 2012: 1.8</h2>
+
+<ul>
+  <li>Implementation of Evangelista et al.’s parallel NDFS and variations, see:
+http://eprints.eemcs.utwente.nl/20618/ (Variations on Multi-Core NDFS)</li>
+  <li>Native implementations of Ciardo et al.’s saturation algorithms for
+AtermDD and ListDD (<spec>-reach --saturation=sat) (Tien-Loong Siaw)</spec></li>
+  <li>Dependency matrix regrouping using simulated annealing (-rgsa, -rcsa)</li>
+  <li>SpinJa support for channel operations, run expressions with arguments,
+and preprocessor defines</li>
+  <li>New experimental I/O library and run-time environment</li>
+  <li>New tools employing the new I/O library and run-time environment:
+o lts-tracepp for pretty printing traces
+o sigmin-mpi for distributed reduction of labeled transition systems
+o sigmin-one for sequential reduction of labeled transition systems
+o ltstrans for conversion of labeled transition systems
+o ltscmp-one for sequential comparison of labeled transition systems
+o <spec>2lts-hre for distributed state space generation</spec></li>
+</ul>
+
+<h2 id="july-24-2011-171">July 24, 2011: 1.7.1</h2>
+
+<ul>
+  <li>Fix for Multi-Core NDFS algorithm: introduced wait counter
+(<spec>2lts-mc)</spec></li>
+  <li>Introduced/improved color counters and option no-all-red
+(<spec>2lts-mc)</spec></li>
+</ul>
+
+<h2 id="june-24-2011-17">June, 24, 2011: 1.7</h2>
+
+<ul>
+  <li>New tools <spec>2lts-gsea
+(General State Exploring Algorithms)</spec></li>
+  <li>PINS LTL layer</li>
+  <li>Several multi-core LTL search algorithms
+(<spec>2lts-mc)</spec></li>
+  <li>Several sequential LTL search algorithms
+(<spec>2lts-grey, <spec>2lts-gsea)</spec></spec></li>
+  <li>PINS Partial-Order Reduction Layer
+(<spec>2lts-gsea)</spec></li>
+  <li>Bare-bones symbolic model checker for state-based mu-calculus</li>
+  <li>New SpinJa frontend</li>
+  <li>Patched DiVinE 2.4 frontend required</li>
+  <li>Reimplementation of mcrl2 PINS frontend</li>
+  <li>Read/Write dependency matrices and combined printing</li>
+  <li>Vector set improvements and clean-up</li>
+  <li>Connection to the libDDD decision diagram package</li>
+  <li>Conversion from ETF to DVE (etf-convert)</li>
+</ul>
+
+<h2 id="november-1-2010-16">November 1, 2010: 1.6</h2>
+
+<ul>
+  <li>New frontend DVE2 (requires DiVinE 2.2)</li>
+  <li>Enumerative Multi-Core backend
+(<spec>2lts-mc)</spec></li>
+  <li>Multi-Core TreeDBS compression for state vectors
+(<spec>2lts-mc)</spec></li>
+  <li>Finding error actions symbolically (<spec>-reach --action)</spec></li>
+  <li>Symbolic saturation-like strategies</li>
+  <li>Faster trace generation for <spec>-reach</spec></li>
+  <li>BDD reordering for BuDDy vset</li>
+</ul>
+
+<h2 id="december-1-2009-15">December 1, 2009: 1.5</h2>
+
+<ul>
+  <li>New frontend DVE (requires DiVinE-cluster)</li>
+  <li>Bignum support for state counts in spec-reach tools
+(Jeroen Ketema)</li>
+  <li>spec-reach clean-up</li>
+  <li>‘tree’ vector set implementation based on AtermDD</li>
+</ul>
+
+<h2 id="september-17-2009-14">September 17, 2009: 1.4</h2>
+
+<ul>
+  <li>New tool ce-mpi for distributed cycle elimination
+(Simona Orzan)</li>
+  <li>New tool ltsmin-tracepp for pretty-printing traces to
+deadlock states</li>
+  <li>TorX support factored out into separate tools
+{lpo,lps,nips}2torx</li>
+  <li>Enumerative DFS support</li>
+  <li>Enumerative deadlock detection and trace output</li>
+  <li>Reworked ETF support (non-backwards compatible)</li>
+  <li>bash completion for LTSmin tools (see contrib/)</li>
+</ul>
+
+<h2 id="july-10-2009-13">July 10, 2009: 1.3</h2>
+
+<ul>
+  <li>Regrouping optimizations of the PINS matrix</li>
+  <li>Connection to the CADP toolkit via pins_open</li>
+  <li>Tuning of the BDD usage</li>
+  <li>Significant performance improvements</li>
+  <li>Symbolic deadlock detection and trace output</li>
+</ul>
+
+<h2 id="march-31-2009-12">March 31, 2009: 1.2</h2>
+
+<p>The main improvements in this release are:</p>
+<ul>
+  <li>Option parsing is now performed using the popt library. Thus, all
+long options now start with a double minus.</li>
+  <li>The user can choose between BuDDy and ATermDD as the decision diagram
+library used in the symbolic tools.</li>
+  <li>A new compressed file format for labeled transition systems with
+arbitrary numbers of state and edge labels has been implemented.</li>
+  <li>The symbolic tools can write the results of the reachability analysis
+in the form of an ETF (Enumerated Table Format) file. This ETF file
+can be used as input for the reachabilty tools and can be directly
+translated to DVE.</li>
+</ul>
+
+
+
+      <footer class="site-footer">
+        
+          <span class="site-footer-owner"><a href="http://github.com/utwente-fmt/ltsmin">ltsmin</a> is maintained by <a href="http://github.com/utwente-fmt">utwente-fmt</a>.</span>
+        
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a>.</span>
+      </footer>
+    </section>
+
+    
+  </body>
+</html>

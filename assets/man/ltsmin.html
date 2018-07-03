@@ -1,0 +1,1641 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+    "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
+<head>
+<meta http-equiv="Content-Type" content="application/xhtml+xml; charset=UTF-8" />
+<meta name="generator" content="AsciiDoc 8.6.9" />
+<title>ltsmin(7)</title>
+<style type="text/css">
+/* Shared CSS for AsciiDoc xhtml11 and html5 backends */
+
+/* Default font. */
+body {
+  font-family: Georgia,serif;
+}
+
+/* Title font. */
+h1, h2, h3, h4, h5, h6,
+div.title, caption.title,
+thead, p.table.header,
+#toctitle,
+#author, #revnumber, #revdate, #revremark,
+#footer {
+  font-family: Arial,Helvetica,sans-serif;
+}
+
+body {
+  margin: 1em 5% 1em 5%;
+}
+
+a {
+  color: blue;
+  text-decoration: underline;
+}
+a:visited {
+  color: fuchsia;
+}
+
+em {
+  font-style: italic;
+  color: navy;
+}
+
+strong {
+  font-weight: bold;
+  color: #083194;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #527bbd;
+  margin-top: 1.2em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+h1, h2, h3 {
+  border-bottom: 2px solid silver;
+}
+h2 {
+  padding-top: 0.5em;
+}
+h3 {
+  float: left;
+}
+h3 + * {
+  clear: left;
+}
+h5 {
+  font-size: 1.0em;
+}
+
+div.sectionbody {
+  margin-left: 0;
+}
+
+hr {
+  border: 1px solid silver;
+}
+
+p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+ul, ol, li > p {
+  margin-top: 0;
+}
+ul > li     { color: #aaa; }
+ul > li > * { color: black; }
+
+.monospaced, code, pre {
+  font-family: "Courier New", Courier, monospace;
+  font-size: inherit;
+  color: navy;
+  padding: 0;
+  margin: 0;
+}
+pre {
+  white-space: pre-wrap;
+}
+
+#author {
+  color: #527bbd;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+#email {
+}
+#revnumber, #revdate, #revremark {
+}
+
+#footer {
+  font-size: small;
+  border-top: 2px solid silver;
+  padding-top: 0.5em;
+  margin-top: 4.0em;
+}
+#footer-text {
+  float: left;
+  padding-bottom: 0.5em;
+}
+#footer-badges {
+  float: right;
+  padding-bottom: 0.5em;
+}
+
+#preamble {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+div.imageblock, div.exampleblock, div.verseblock,
+div.quoteblock, div.literalblock, div.listingblock, div.sidebarblock,
+div.admonitionblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.admonitionblock {
+  margin-top: 2.0em;
+  margin-bottom: 2.0em;
+  margin-right: 10%;
+  color: #606060;
+}
+
+div.content { /* Block element content. */
+  padding: 0;
+}
+
+/* Block element titles. */
+div.title, caption.title {
+  color: #527bbd;
+  font-weight: bold;
+  text-align: left;
+  margin-top: 1.0em;
+  margin-bottom: 0.5em;
+}
+div.title + * {
+  margin-top: 0;
+}
+
+td div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content div.title:first-child {
+  margin-top: 0.0em;
+}
+div.content + div.title {
+  margin-top: 0.0em;
+}
+
+div.sidebarblock > div.content {
+  background: #ffffee;
+  border: 1px solid #dddddd;
+  border-left: 4px solid #f0f0f0;
+  padding: 0.5em;
+}
+
+div.listingblock > div.content {
+  border: 1px solid #dddddd;
+  border-left: 5px solid #f0f0f0;
+  background: #f8f8f8;
+  padding: 0.5em;
+}
+
+div.quoteblock, div.verseblock {
+  padding-left: 1.0em;
+  margin-left: 1.0em;
+  margin-right: 10%;
+  border-left: 5px solid #f0f0f0;
+  color: #888;
+}
+
+div.quoteblock > div.attribution {
+  padding-top: 0.5em;
+  text-align: right;
+}
+
+div.verseblock > pre.content {
+  font-family: inherit;
+  font-size: inherit;
+}
+div.verseblock > div.attribution {
+  padding-top: 0.75em;
+  text-align: left;
+}
+/* DEPRECATED: Pre version 8.2.7 verse style literal block. */
+div.verseblock + div.attribution {
+  text-align: left;
+}
+
+div.admonitionblock .icon {
+  vertical-align: top;
+  font-size: 1.1em;
+  font-weight: bold;
+  text-decoration: underline;
+  color: #527bbd;
+  padding-right: 0.5em;
+}
+div.admonitionblock td.content {
+  padding-left: 0.5em;
+  border-left: 3px solid #dddddd;
+}
+
+div.exampleblock > div.content {
+  border-left: 3px solid #dddddd;
+  padding-left: 0.5em;
+}
+
+div.imageblock div.content { padding-left: 0; }
+span.image img { border-style: none; vertical-align: text-bottom; }
+a.image:visited { color: white; }
+
+dl {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+dt {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  font-style: normal;
+  color: navy;
+}
+dd > *:first-child {
+  margin-top: 0.1em;
+}
+
+ul, ol {
+    list-style-position: outside;
+}
+ol.arabic {
+  list-style-type: decimal;
+}
+ol.loweralpha {
+  list-style-type: lower-alpha;
+}
+ol.upperalpha {
+  list-style-type: upper-alpha;
+}
+ol.lowerroman {
+  list-style-type: lower-roman;
+}
+ol.upperroman {
+  list-style-type: upper-roman;
+}
+
+div.compact ul, div.compact ol,
+div.compact p, div.compact p,
+div.compact div, div.compact div {
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
+}
+
+tfoot {
+  font-weight: bold;
+}
+td > div.verse {
+  white-space: pre;
+}
+
+div.hdlist {
+  margin-top: 0.8em;
+  margin-bottom: 0.8em;
+}
+div.hdlist tr {
+  padding-bottom: 15px;
+}
+dt.hdlist1.strong, td.hdlist1.strong {
+  font-weight: bold;
+}
+td.hdlist1 {
+  vertical-align: top;
+  font-style: normal;
+  padding-right: 0.8em;
+  color: navy;
+}
+td.hdlist2 {
+  vertical-align: top;
+}
+div.hdlist.compact tr {
+  margin: 0;
+  padding-bottom: 0;
+}
+
+.comment {
+  background: yellow;
+}
+
+.footnote, .footnoteref {
+  font-size: 0.8em;
+}
+
+span.footnote, span.footnoteref {
+  vertical-align: super;
+}
+
+#footnotes {
+  margin: 20px 0 20px 0;
+  padding: 7px 0 0 0;
+}
+
+#footnotes div.footnote {
+  margin: 0 0 5px 0;
+}
+
+#footnotes hr {
+  border: none;
+  border-top: 1px solid silver;
+  height: 1px;
+  text-align: left;
+  margin-left: 0;
+  width: 20%;
+  min-width: 100px;
+}
+
+div.colist td {
+  padding-right: 0.5em;
+  padding-bottom: 0.3em;
+  vertical-align: top;
+}
+div.colist td img {
+  margin-top: 0.3em;
+}
+
+@media print {
+  #footer-badges { display: none; }
+}
+
+#toc {
+  margin-bottom: 2.5em;
+}
+
+#toctitle {
+  color: #527bbd;
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-top: 1.0em;
+  margin-bottom: 0.1em;
+}
+
+div.toclevel0, div.toclevel1, div.toclevel2, div.toclevel3, div.toclevel4 {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+div.toclevel2 {
+  margin-left: 2em;
+  font-size: 0.9em;
+}
+div.toclevel3 {
+  margin-left: 4em;
+  font-size: 0.9em;
+}
+div.toclevel4 {
+  margin-left: 6em;
+  font-size: 0.9em;
+}
+
+span.aqua { color: aqua; }
+span.black { color: black; }
+span.blue { color: blue; }
+span.fuchsia { color: fuchsia; }
+span.gray { color: gray; }
+span.green { color: green; }
+span.lime { color: lime; }
+span.maroon { color: maroon; }
+span.navy { color: navy; }
+span.olive { color: olive; }
+span.purple { color: purple; }
+span.red { color: red; }
+span.silver { color: silver; }
+span.teal { color: teal; }
+span.white { color: white; }
+span.yellow { color: yellow; }
+
+span.aqua-background { background: aqua; }
+span.black-background { background: black; }
+span.blue-background { background: blue; }
+span.fuchsia-background { background: fuchsia; }
+span.gray-background { background: gray; }
+span.green-background { background: green; }
+span.lime-background { background: lime; }
+span.maroon-background { background: maroon; }
+span.navy-background { background: navy; }
+span.olive-background { background: olive; }
+span.purple-background { background: purple; }
+span.red-background { background: red; }
+span.silver-background { background: silver; }
+span.teal-background { background: teal; }
+span.white-background { background: white; }
+span.yellow-background { background: yellow; }
+
+span.big { font-size: 2em; }
+span.small { font-size: 0.6em; }
+
+span.underline { text-decoration: underline; }
+span.overline { text-decoration: overline; }
+span.line-through { text-decoration: line-through; }
+
+div.unbreakable { page-break-inside: avoid; }
+
+
+/*
+ * xhtml11 specific
+ *
+ * */
+
+div.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+div.tableblock > table {
+  border: 3px solid #527bbd;
+}
+thead, p.table.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.table {
+  margin-top: 0;
+}
+/* Because the table frame attribute is overriden by CSS in most browsers. */
+div.tableblock > table[frame="void"] {
+  border-style: none;
+}
+div.tableblock > table[frame="hsides"] {
+  border-left-style: none;
+  border-right-style: none;
+}
+div.tableblock > table[frame="vsides"] {
+  border-top-style: none;
+  border-bottom-style: none;
+}
+
+
+/*
+ * html5 specific
+ *
+ * */
+
+table.tableblock {
+  margin-top: 1.0em;
+  margin-bottom: 1.5em;
+}
+thead, p.tableblock.header {
+  font-weight: bold;
+  color: #527bbd;
+}
+p.tableblock {
+  margin-top: 0;
+}
+table.tableblock {
+  border-width: 3px;
+  border-spacing: 0px;
+  border-style: solid;
+  border-color: #527bbd;
+  border-collapse: collapse;
+}
+th.tableblock, td.tableblock {
+  border-width: 1px;
+  padding: 4px;
+  border-style: solid;
+  border-color: #527bbd;
+}
+
+table.tableblock.frame-topbot {
+  border-left-style: hidden;
+  border-right-style: hidden;
+}
+table.tableblock.frame-sides {
+  border-top-style: hidden;
+  border-bottom-style: hidden;
+}
+table.tableblock.frame-none {
+  border-style: hidden;
+}
+
+th.tableblock.halign-left, td.tableblock.halign-left {
+  text-align: left;
+}
+th.tableblock.halign-center, td.tableblock.halign-center {
+  text-align: center;
+}
+th.tableblock.halign-right, td.tableblock.halign-right {
+  text-align: right;
+}
+
+th.tableblock.valign-top, td.tableblock.valign-top {
+  vertical-align: top;
+}
+th.tableblock.valign-middle, td.tableblock.valign-middle {
+  vertical-align: middle;
+}
+th.tableblock.valign-bottom, td.tableblock.valign-bottom {
+  vertical-align: bottom;
+}
+
+
+/*
+ * manpage specific
+ *
+ * */
+
+body.manpage h1 {
+  padding-top: 0.5em;
+  padding-bottom: 0.5em;
+  border-top: 2px solid silver;
+  border-bottom: 2px solid silver;
+}
+body.manpage h2 {
+  border-style: none;
+}
+body.manpage div.sectionbody {
+  margin-left: 3em;
+}
+
+@media print {
+  body.manpage div#toc { display: none; }
+}
+
+
+</style>
+<script type="text/javascript">
+/*<![CDATA[*/
+var asciidoc = {  // Namespace.
+
+/////////////////////////////////////////////////////////////////////
+// Table Of Contents generator
+/////////////////////////////////////////////////////////////////////
+
+/* Author: Mihai Bazon, September 2002
+ * http://students.infoiasi.ro/~mishoo
+ *
+ * Table Of Content generator
+ * Version: 0.4
+ *
+ * Feel free to use this script under the terms of the GNU General Public
+ * License, as long as you do not remove or alter this notice.
+ */
+
+ /* modified by Troy D. Hanson, September 2006. License: GPL */
+ /* modified by Stuart Rackham, 2006, 2009. License: GPL */
+
+// toclevels = 1..4.
+toc: function (toclevels) {
+
+  function getText(el) {
+    var text = "";
+    for (var i = el.firstChild; i != null; i = i.nextSibling) {
+      if (i.nodeType == 3 /* Node.TEXT_NODE */) // IE doesn't speak constants.
+        text += i.data;
+      else if (i.firstChild != null)
+        text += getText(i);
+    }
+    return text;
+  }
+
+  function TocEntry(el, text, toclevel) {
+    this.element = el;
+    this.text = text;
+    this.toclevel = toclevel;
+  }
+
+  function tocEntries(el, toclevels) {
+    var result = new Array;
+    var re = new RegExp('[hH]([1-'+(toclevels+1)+'])');
+    // Function that scans the DOM tree for header elements (the DOM2
+    // nodeIterator API would be a better technique but not supported by all
+    // browsers).
+    var iterate = function (el) {
+      for (var i = el.firstChild; i != null; i = i.nextSibling) {
+        if (i.nodeType == 1 /* Node.ELEMENT_NODE */) {
+          var mo = re.exec(i.tagName);
+          if (mo && (i.getAttribute("class") || i.getAttribute("className")) != "float") {
+            result[result.length] = new TocEntry(i, getText(i), mo[1]-1);
+          }
+          iterate(i);
+        }
+      }
+    }
+    iterate(el);
+    return result;
+  }
+
+  var toc = document.getElementById("toc");
+  if (!toc) {
+    return;
+  }
+
+  // Delete existing TOC entries in case we're reloading the TOC.
+  var tocEntriesToRemove = [];
+  var i;
+  for (i = 0; i < toc.childNodes.length; i++) {
+    var entry = toc.childNodes[i];
+    if (entry.nodeName.toLowerCase() == 'div'
+     && entry.getAttribute("class")
+     && entry.getAttribute("class").match(/^toclevel/))
+      tocEntriesToRemove.push(entry);
+  }
+  for (i = 0; i < tocEntriesToRemove.length; i++) {
+    toc.removeChild(tocEntriesToRemove[i]);
+  }
+
+  // Rebuild TOC entries.
+  var entries = tocEntries(document.getElementById("content"), toclevels);
+  for (var i = 0; i < entries.length; ++i) {
+    var entry = entries[i];
+    if (entry.element.id == "")
+      entry.element.id = "_toc_" + i;
+    var a = document.createElement("a");
+    a.href = "#" + entry.element.id;
+    a.appendChild(document.createTextNode(entry.text));
+    var div = document.createElement("div");
+    div.appendChild(a);
+    div.className = "toclevel" + entry.toclevel;
+    toc.appendChild(div);
+  }
+  if (entries.length == 0)
+    toc.parentNode.removeChild(toc);
+},
+
+
+/////////////////////////////////////////////////////////////////////
+// Footnotes generator
+/////////////////////////////////////////////////////////////////////
+
+/* Based on footnote generation code from:
+ * http://www.brandspankingnew.net/archive/2005/07/format_footnote.html
+ */
+
+footnotes: function () {
+  // Delete existing footnote entries in case we're reloading the footnodes.
+  var i;
+  var noteholder = document.getElementById("footnotes");
+  if (!noteholder) {
+    return;
+  }
+  var entriesToRemove = [];
+  for (i = 0; i < noteholder.childNodes.length; i++) {
+    var entry = noteholder.childNodes[i];
+    if (entry.nodeName.toLowerCase() == 'div' && entry.getAttribute("class") == "footnote")
+      entriesToRemove.push(entry);
+  }
+  for (i = 0; i < entriesToRemove.length; i++) {
+    noteholder.removeChild(entriesToRemove[i]);
+  }
+
+  // Rebuild footnote entries.
+  var cont = document.getElementById("content");
+  var spans = cont.getElementsByTagName("span");
+  var refs = {};
+  var n = 0;
+  for (i=0; i<spans.length; i++) {
+    if (spans[i].className == "footnote") {
+      n++;
+      var note = spans[i].getAttribute("data-note");
+      if (!note) {
+        // Use [\s\S] in place of . so multi-line matches work.
+        // Because JavaScript has no s (dotall) regex flag.
+        note = spans[i].innerHTML.match(/\s*\[([\s\S]*)]\s*/)[1];
+        spans[i].innerHTML =
+          "[<a id='_footnoteref_" + n + "' href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+        spans[i].setAttribute("data-note", note);
+      }
+      noteholder.innerHTML +=
+        "<div class='footnote' id='_footnote_" + n + "'>" +
+        "<a href='#_footnoteref_" + n + "' title='Return to text'>" +
+        n + "</a>. " + note + "</div>";
+      var id =spans[i].getAttribute("id");
+      if (id != null) refs["#"+id] = n;
+    }
+  }
+  if (n == 0)
+    noteholder.parentNode.removeChild(noteholder);
+  else {
+    // Process footnoterefs.
+    for (i=0; i<spans.length; i++) {
+      if (spans[i].className == "footnoteref") {
+        var href = spans[i].getElementsByTagName("a")[0].getAttribute("href");
+        href = href.match(/#.*/)[0];  // Because IE return full URL.
+        n = refs[href];
+        spans[i].innerHTML =
+          "[<a href='#_footnote_" + n +
+          "' title='View footnote' class='footnote'>" + n + "</a>]";
+      }
+    }
+  }
+},
+
+install: function(toclevels) {
+  var timerId;
+
+  function reinstall() {
+    asciidoc.footnotes();
+    if (toclevels) {
+      asciidoc.toc(toclevels);
+    }
+  }
+
+  function reinstallAndRemoveTimer() {
+    clearInterval(timerId);
+    reinstall();
+  }
+
+  timerId = setInterval(reinstall, 500);
+  if (document.addEventListener)
+    document.addEventListener("DOMContentLoaded", reinstallAndRemoveTimer, false);
+  else
+    window.onload = reinstallAndRemoveTimer;
+}
+
+}
+asciidoc.install();
+/*]]>*/
+</script>
+</head>
+<body class="manpage">
+<div id="header">
+<h1>
+ltsmin(7) Manual Page
+</h1>
+<h2>NAME</h2>
+<div class="sectionbody">
+<p>ltsmin -
+   Overview of the LTSmin toolset.
+</p>
+</div>
+</div>
+<div id="content">
+<div class="sect1">
+<h2 id="_synopsis">SYNOPSIS</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>This man page provides an overview of the tools in the LTSmin toolset.</p></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_language_modules">Language Modules</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The LTSmin toolset was designed to support multiple languages. All tools for
+a specific language start with a prefix that indicates the language. Below,
+we list the languages and the prefixes that are supported in this release:</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+DVE (<code>dve</code>)
+</dt>
+<dd>
+<p>
+The DVE language.  See the
+<a href="http://divine.fi.muni.cz/">DiVinE website</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+ETF (<code>etf</code>)
+</dt>
+<dd>
+<p>
+The Enumerated Table Format is an intermediate format for models in the LTSmin
+toolset. See <a href="etf.html">etf(5)</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+mCRL2 (<code>lps</code>)
+</dt>
+<dd>
+<p>
+The mCRL2 language. See the
+<a href="http://www.mcrl2.org/">mCRL2 website</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+muCRL (<code>lpo</code>)
+</dt>
+<dd>
+<p>
+The muCRL language. See the
+<a href="http://www.cwi.nl/~mcrl/">muCRL website</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+Promela (<code>prom</code>)
+</dt>
+<dd>
+<p>
+The Promela language is supported via the included version of SpinS,
+which generates C code implementing the PINS interface. See
+<a href="http://spinroot.com/">Spin website</a>
+and
+<a href="http://dx.doi.org/10.1016/j.entcs.2013.07.007">SpinS: Extending LTSmin with Promela through SpinJa</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+UPPAAL (<code>opaal</code>)
+</dt>
+<dd>
+<p>
+The UPPAAL xml language for timed automata is supported via the opaal
+successor generator. Currently only multi-core reachability is supported
+(<a href="opaal2lts-mc.html">opaal2lts-mc(1)</a>).
+See the opaal website:
+<a href="https://code.launchpad.net/~opaal-developers/opaal/opaal-ltsmin-succgen">opaal website</a>
+</p>
+</dd>
+<dt class="hdlist1">
+PBES (<code>pbes</code>)
+</dt>
+<dd>
+<p>
+Specifications in <em>pbes</em> format generated by <a href="lps2pbes.html">lps2pbes(1)</a> are
+reduced to parity games. These can then be solved (symbolically) by
+<a href="spgsolver.html">spgsolver(1)</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+C-code (<code>pins</code>)
+</dt>
+<dd>
+<p>
+LTSmin enables linking to language modules provided as <code>.so</code>-files. The file
+<code>dlopen-api.h</code> needs to be included in the C-code.
+The <code>pins2lts</code> tools will load the binary at runtime.
+See <a href="pins2lts-seq.html">pins2lts-seq(1)</a>, <a href="pins2lts-mc.html">pins2lts-mc(1)</a>, <a href="pins2lts-dist.html">pins2lts-dist(1)</a>, <a href="pins2lts-sym.html">pins2lts-sym(1)</a>.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_state_space_exploration_and_analysis_tools">State Space Exploration and Analysis Tools</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The LTSmin toolset has four different tools for reachability,
+checking for deadlocks, actions and invariants and verification of properties
+in Linear Temporal Logic (LTL) or modal mu-calculus.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+&lt;prefix&gt;2lts-sym
+</dt>
+<dd>
+<p>
+Symbolic tools that use decision diagrams for manipulating sets
+of states. The optional output produced by these tools is an ETF model.
+</p>
+<div class="paragraph"><p>See <a href="dve2lts-sym.html">dve2lts-sym(1)</a>, <a href="etf2lts-sym.html">etf2lts-sym(1)</a>,
+<a href="lps2lts-sym.html">lps2lts-sym(1)</a>, <a href="lpo2lts-sym.html">lpo2lts-sym(1)</a>,
+<a href="pbes2lts-sym.html">pbes2lts-sym(1)</a>,
+<a href="mapa2lts-sym.html">mapa2lts-sym(1)</a>
+and <a href="prom2lts-sym.html">prom2lts-sym(1)</a>.</p></div>
+<div class="paragraph"><p>To use multi-core decision diagrams, choose either Sylvan or LDDmc as
+DD package using the <code>--vset</code> option.</p></div>
+</dd>
+<dt class="hdlist1">
+&lt;prefix&gt;2lts-seq
+</dt>
+<dd>
+<p>
+Sequential tools that enumerate states and can use
+both decision diagrams and (tree-compressed) hash tables to represent sets of
+states. The optional output produced by these tools is an explicit LTS.
+These tools are based on an extended version of the
+<a href="http://dx.doi.org/10.1007/s10009-008-0093-y">General State Exploring
+Algorithm (GSEA)</a>.
+</p>
+<div class="paragraph"><p>See <a href="dve2lts-seq.html">dve2lts-seq(1)</a>, <a href="etf2lts-seq.html">etf2lts-seq(1)</a>,
+<a href="lps2lts-seq.html">lps2lts-seq(1)</a>, <a href="lpo2lts-seq.html">lpo2lts-seq(1)</a>,
+<a href="pbes2lts-seq.html">pbes2lts-seq(1)</a>
+and <a href="prom2lts-seq.html">prom2lts-seq(1)</a>.</p></div>
+</dd>
+<dt class="hdlist1">
+&lt;prefix&gt;2lts-mc
+</dt>
+<dd>
+<p>
+Concurrent (multi-core) state space generators and model checkers.
+Enumeration uses lockless (tree-compressed) hash tables to represent sets of
+states. Model checking of LTL is supported by a set of multi-core NDFS
+algorithms. To input LTL-formulae, one can use the PINS2PINS wrapper (--ltl)
+or an LTL cross-product computed by the frontend (DiVinE 2 property models or
+PROMELA models via SpinS with never claim).
+</p>
+<div class="paragraph"><p>See <a href="dve2lts-mc.html">dve2lts-mc(1)</a>, <a href="etf2lts-mc.html">etf2lts-mc(1)</a>,
+<a href="lps2lts-mc.html">lps2lts-mc(1)</a>, <a href="lpo2lts-mc.html">lpo2lts-mc(1)</a>,
+<a href="pbes2lts-mc.html">pbes2lts-mc(1)</a>,
+<a href="opaal2lts-mc.html">opaal2lts-mc(1)</a>, <a href="prom2lts-mc.html">prom2lts-mc(1)</a>
+and <a href="ltsmin-ltl.html">ltsmin-ltl(5)</a>.</p></div>
+<div class="openblock">
+<div class="content">
+<div class="ulist"><ul>
+<li>
+<p>
+MacOS X only supports the multiple process architecture from version
+10.7 (Lion).
+</p>
+</li>
+</ul></div>
+</div></div>
+</dd>
+<dt class="hdlist1">
+&lt;prefix&gt;2lts-dist
+</dt>
+<dd>
+<p>
+Distributed state space generators that enumerate states and use
+distributed hash tables for storing sets of states.
+The optional output produced by these tools is an explicit LTS.
+These tools work with MPI, multiple threads or multiple process whenever possible and available.
+For example:
+</p>
+<div class="openblock">
+<div class="content">
+<div class="ulist"><ul>
+<li>
+<p>
+MacOS X does not support the multiple process architecture at this time.
+</p>
+</li>
+</ul></div>
+</div></div>
+<div class="paragraph"><p>See <a href="dve2lts-dist.html">dve2lts-dist(1)</a>, <a href="etf2lts-dist.html">etf2lts-dist(1)</a>,
+<a href="lps2lts-dist.html">lps2lts-dist(1)</a>, <a href="lpo2lts-dist.html">lpo2lts-dist(1)</a>,
+<a href="pbes2lts-dist.html">pbes2lts-dist(1)</a>,
+<a href="mapa2lts-dist.html">mapa2lts-dist(1)</a>,
+<a href="nips2lts-dist.html">nips2lts-dist(1)</a>,
+and <a href="spinja2lts-dist.html">spinja2lts-dist(1)</a></p></div>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_pins_to_pins_wrappers">Pins-to-pins wrappers</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>Most of the analysis tools offer the following options, which are implemented as
+a layer between the language modules and the analysis algoritms.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+caching
+</dt>
+<dd>
+<p>
+Enable transition caching with the <code>-c</code> option.
+</p>
+</dd>
+<dt class="hdlist1">
+regrouping
+</dt>
+<dd>
+<p>
+Choose regrouping and reordering heuristics with the <code>-r</code> option.
+The following regroup macros are available.
+</p>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+gs
+</dt>
+<dd>
+<p>
+  Group Safely; macro for "<strong>gc</strong>,<strong>gr</strong>,<strong>cw</strong>,<strong>rs</strong>"; almost
+  always a win.
+</p>
+</dd>
+<dt class="hdlist1">
+ga
+</dt>
+<dd>
+<p>
+  Group Aggressively (row subsumption); macro for
+  "<strong>gc</strong>,<strong>rs</strong>,<strong>ru</strong>,<strong>cw</strong>,<strong>rs</strong>"; can be a huge win, but in some
+  cases causes slower state space generation.
+</p>
+</dd>
+<dt class="hdlist1">
+gsa
+</dt>
+<dd>
+<p>
+  Group Simulated Annealing; macro for "<strong>gc</strong>,<strong>gr</strong>,<strong>csa</strong>,<strong>rs</strong>"; almost
+  always a win; usually better than <strong>gs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+gc
+</dt>
+<dd>
+<p>
+  Group Columns; macro for "<strong>cs</strong>,<strong>cn</strong>".
+</p>
+</dd>
+<dt class="hdlist1">
+gr
+</dt>
+<dd>
+<p>
+  Group Rows; macro for "<strong>rs</strong>,<strong>rn</strong>".
+</p>
+</dd>
+<dt class="hdlist1">
+cs
+</dt>
+<dd>
+<p>
+  Column Sort; sort columns lexicographically.
+</p>
+</dd>
+<dt class="hdlist1">
+cn
+</dt>
+<dd>
+<p>
+  Column Nub; (temporarily) group duplicate columns, thereby making
+  <em>ca</em> more tractable.  Requires <strong>cs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+cw
+</dt>
+<dd>
+<p>
+  Column sWap; minimize distance between columns by swapping them
+  heuristically.  This reordering improves performance of the symbolic
+  data structures.
+</p>
+</dd>
+<dt class="hdlist1">
+ca
+</dt>
+<dd>
+<p>
+  Column All permutations; try to find the column permutation with the
+  best cost metric.  Potentially, this is an expensive operation.
+</p>
+</dd>
+<dt class="hdlist1">
+csa
+</dt>
+<dd>
+<p>
+  Column Simulated Annealing; minimize distance between columns by
+  swapping them using simulated annealing.
+</p>
+</dd>
+<dt class="hdlist1">
+rs
+</dt>
+<dd>
+<p>
+  Row Sort; sort rows lexicographically.
+</p>
+</dd>
+<dt class="hdlist1">
+rn
+</dt>
+<dd>
+<p>
+  Row Nub; remove duplicate rows from the dependency matrix.  This is
+  always a win.  Requires <strong>rs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+ru
+</dt>
+<dd>
+<p>
+  Row sUbsume; try to remove more rows than nubbing, thereby trading
+  speed for memory.  Requires <strong>rs</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+w2W
+</dt>
+<dd>
+<p>
+  Over-approximate all must-write to may-write. May-write supports the copy (-) dependency.
+</p>
+</dd>
+<dt class="hdlist1">
+r2+
+</dt>
+<dd>
+<p>
+  Over-approximate read to read+write. Allows read dependencies to also subsume write dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+w2+
+</dt>
+<dd>
+<p>
+  Over-approximate must-write to read+write. Allows must-write dependencies to also subsume read dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+W2+
+</dt>
+<dd>
+<p>
+  Over-approximate may-write to read+write. Allows must-write dependencies to also subsume read dependencies.
+</p>
+</dd>
+<dt class="hdlist1">
+-2r
+</dt>
+<dd>
+<p>
+  Over-approximate copy to read. May be useful for testing whether the dependency matrix is correct.
+</p>
+</dd>
+<dt class="hdlist1">
+rb4w
+</dt>
+<dd>
+<p>
+  Use special heuristics to move read dependencies before write dependences. Often a win in symbolic state space generation.
+</p>
+</dd>
+<dt class="hdlist1">
+mm
+</dt>
+<dd>
+<p>
+  Writes metrics of the selected (<strong>sr</strong>, <strong>sw</strong>, <strong>sc</strong>) matrix to stdout. The following metrics are printed:
+</p>
+<div class="olist arabic"><ol class="arabic">
+<li>
+<p>
+Event span: the total distance between the minimum and maximum column of rows.
+</p>
+</li>
+<li>
+<p>
+Normalized event span: the event span divided by the size of the matrix (rows x columns).
+</p>
+</li>
+<li>
+<p>
+Weighted event span: the weighted event span, the event span, including a moment signifying the location of the span. See, Siminiceanu et al., we use moment 1.
+</p>
+</li>
+<li>
+<p>
+Normalized weighted event span: the weighted event span divided by the size of the matrix (rows x column).
+</p>
+</li>
+</ol></div>
+</dd>
+<dt class="hdlist1">
+sr
+</dt>
+<dd>
+<p>
+ Select the read matrix for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+sw
+</dt>
+<dd>
+<p>
+ Select the write matrix (default) for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+ The write matrix is the default selection, because only write dependencies can create new nodes in decision diagrams.
+ A bad variable order in the write matrix thus leads to a large number of peak nodes during reachability analysis.
+ A bad variable order in the read matrix can also lead to a slow reachability analysis, but typically
+ not as severe as a bad variable order in the write matrix. Slow reachability analysis due to a bad variable order
+ in the read matrix causes many recursive calls to the relational product operation. Typically it is best that read
+ dependencies are moved to the top DD level, thus left most in the read matrix.
+</p>
+</dd>
+<dt class="hdlist1">
+sc
+</dt>
+<dd>
+<p>
+ Select the combined matrix for <strong>cs</strong>, <strong>csa</strong>, <strong>cw</strong>, <strong>ca</strong>, <strong>rs</strong>, <strong>bcm</strong>, <strong>bs</strong>, <strong>bk</strong>, <strong>vcm</strong>, <strong>vacm</strong>, <strong>vgps</strong> and <strong>mm</strong>.
+ The combined matrix is the logical or of the read and write matrix.
+</p>
+</dd>
+<dt class="hdlist1">
+bg
+</dt>
+<dd>
+<p>
+  Use a bipartite graph (default) for <strong>bcm</strong>, <strong>bk</strong>, <strong>bs</strong>, <strong>vcm</strong>, <strong>vacm</strong> and <strong>vgps</strong>.
+</p>
+</dd>
+<dt class="hdlist1">
+tg
+</dt>
+<dd>
+<p>
+  Create a total graph of the bipartite graph for <strong>bcm</strong>, <strong>bk</strong>, <strong>bs</strong>, <strong>vcm</strong>, <strong>vacm</strong> and <strong>vgps</strong>.
+  This adds more vertices and edges thus increasing computation time, but sometimes provides a better ordering.
+</p>
+</dd>
+</dl></div>
+<div class="paragraph"><p>Below, the sparse matrix algorithms prefixed with <strong>b</strong> are only available when LTSmin is compiled with Boost.
+Algorithms prefixed with <strong>v</strong> are only available when LTSmin is compiled with ViennaCL.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+bcm
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+bk
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s King ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+bs
+</dt>
+<dd>
+<p>
+  Apply Boost&#8217;s Sloan ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vcm
+</dt>
+<dd>
+<p>
+  Apply ViennaCL&#8217;s Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vacm
+</dt>
+<dd>
+<p>
+  Apply ViennaCL&#8217;s advanced Cuthill-McKee ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+vgps
+</dt>
+<dd>
+<p>
+  Apply ViennaCl&#8217;s Gibbs-Poole-Stockmeyer ordering.
+</p>
+</dd>
+<dt class="hdlist1">
+f
+</dt>
+<dd>
+<p>
+  Apply FORCE ordering.
+</p>
+</dd>
+</dl></div>
+</dd>
+<dt class="hdlist1">
+partial order reduction
+</dt>
+<dd>
+<p>
+Enable POR with the <code>--por</code> option.
+</p>
+</dd>
+<dt class="hdlist1">
+ltl
+</dt>
+<dd>
+<p>
+Generate a Büchi automaton and enable detection of accepting cycles
+with the <code>--ltl</code> option.
+Only available in the <code>*2lts-seq</code> and <code>*2lts-mc</code> tools.
+See <a href="ltsmin-ltl.html">ltsmin-ltl(5)</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+mu-calculus
+</dt>
+<dd>
+<p>
+Generate a parity game with the <code>--mucalc</code> option.
+See <a href="ltsmin-mucalc.html">ltsmin-mucalc(5)</a>.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_state_space_reduction_tools">State Space Reduction Tools</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The LTSmin toolset provides distributed minimization with respect to various bisimulations.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+ltsmin-reduce
+</dt>
+<dd>
+<p>
+Sequential minimization modulo strong and branching bisimulation, as well as
+modulo lumping of CTMCs.
+See <a href="ltsmin-reduce.html">ltsmin-reduce(1)</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+ltsmin-reduce-dist
+</dt>
+<dd>
+<p>
+Distributed minimization modulo strong and branching bisimulation.
+This tool has an implementation of the new inductive signature algorithms
+that work on tau-cycle free LTSs.
+See <a href="ltsmin-reduce-dist.html">ltsmin-reduce-dist(1)</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+ltsmin-compare
+</dt>
+<dd>
+<p>
+Compare two transitions systems, using the same equivalences as supported by
+ltsmin-reduce.
+See <a href="ltsmin-compare.html">ltsmin-compare(1)</a>.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_tau_cycle_elimination_tool">Tau Cycle Elimination Tool</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The LTSmin toolset provides distributed tau-cycle elimination.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+ce-mpi
+</dt>
+<dd>
+<p>
+Distributed tau cycle elimination.
+See <a href="ce-mpi.html">ce-mpi(1)</a>.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_torx_rpc_interfaces">TorX RPC interfaces</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The LTSmin toolset provides TorX RPC interfaces.</p></div>
+<div class="dlist"><dl>
+<dt class="hdlist1">
+&lt;prefix&gt;2torx
+</dt>
+<dd>
+<p>
+TorX RPC interface.
+</p>
+<div class="paragraph"><p>See <a href="dve2torx.html">dve2torx(1)</a>, <a href="etf2torx.html">etf2torx(1)</a>,
+<a href="lps2torx.html">lps2torx(1)</a>, <a href="lpo2torx.html">lpo2torx(1)</a>,
+and <a href="prom2torx.html">prom2torx(1)</a>.</p></div>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_trace_pretty_printing">Trace Pretty Printing</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+ltsmin-printtrace
+</dt>
+<dd>
+<p>
+Pretty print traces. See <a href="ltsmin-printtrace.html">ltsmin-printtrace(1)</a>.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_conversion_tools">Conversion Tools</h2>
+<div class="sectionbody">
+<div class="dlist"><dl>
+<dt class="hdlist1">
+etf-convert
+</dt>
+<dd>
+<p>
+Translate ETF to DVE. See <a href="etf-convert.html">etf-convert(1)</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+ltsmin-convert
+</dt>
+<dd>
+<p>
+Convert LTS file formats. See <a href="ltsmin-convert.html">ltsmin-convert(1)</a>.
+</p>
+</dd>
+<dt class="hdlist1">
+gcf
+</dt>
+<dd>
+<p>
+Utility for creating and extracting <em>Generic Container Format</em> archives.
+See <a href="gcf.html">gcf(1)</a>.
+</p>
+</dd>
+</dl></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_file_formats">File Formats</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>The following file formats are supported:</p></div>
+<div class="ulist"><ul>
+<li>
+<p>
+Directory format (<em>&#42;.dir</em>, <em>&#42;.dz</em> and <em>&#42;.gcf</em>)
+</p>
+</li>
+<li>
+<p>
+Vector format (<em>&#42;.dir</em>, <em>&#42;.gcd</em>, <em>&#42;.gcf</em>)
+</p>
+</li>
+<li>
+<p>
+Binary Coded Graphs (<em>&#42;.bcg</em>)
+</p>
+</li>
+<li>
+<p>
+Aldebaran Format (<em>&#42;.aut</em>)
+</p>
+</li>
+<li>
+<p>
+FSM Format (<em>&#42;.fsm</em>)
+</p>
+</li>
+<li>
+<p>
+MRMC/Prism (<em>&#42;.tra</em>+<em>&#42;.lab</em>)
+</p>
+</li>
+<li>
+<p>
+PGSolver format (<em>&#42;.pg</em>)
+</p>
+</li>
+</ul></div>
+<div class="paragraph"><p>If a tool operates in streaming mode then support for file formats is limited,
+as can be seen in the following table:</p></div>
+<div class="tableblock">
+<table rules="all"
+width="80%"
+frame="hsides"
+cellspacing="0" cellpadding="4">
+<col width="33%" />
+<col width="33%" />
+<col width="33%" />
+<thead>
+<tr>
+<th align="left" valign="top">Format </th>
+<th align="left" valign="top">Streaming mode </th>
+<th align="left" valign="top">Load/Store mode</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left" valign="top"><p class="table">DIR</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">VEC</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">BCG</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">AUT</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">FSM</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">TRA</p></td>
+<td align="left" valign="top"><p class="table">-</p></td>
+<td align="left" valign="top"><p class="table">R/W</p></td>
+</tr>
+<tr>
+<td align="left" valign="top"><p class="table">PG</p></td>
+<td align="left" valign="top"><p class="table">-</p></td>
+<td align="left" valign="top"><p class="table">W</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="paragraph"><p>The directory format uses multiple files to store an LTS.
+The various extension explain how these files are stored in the underlying file system.
+The <em>&#42;.dir</em> format uses multiple files in a directory without compression.
+If the LTS has one edge label, no state labels and does not store state vectors then
+these files are backwards compatible. Neither the <em>&#42;.dz</em> nor the <em>&#42;.gcf</em>
+formats are backwards compatible. Both formats use compression. The first uses a directory for the files,
+second interleaves files into a single file.</p></div>
+<div class="paragraph"><p>If you try to open a <em>&#42;.dir</em> with the old mCRL tools and
+you get the error message:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>wrong file version: 0</code></pre>
+</div></div>
+<div class="paragraph"><p>then the directory is probably compressed.
+If that happens then you may convert the directory by typing the command:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>ltsmin-convert bad.dir good.dir</code></pre>
+</div></div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_mini_tutorial">Mini Tutorial</h2>
+<div class="sectionbody">
+<div class="paragraph"><p>As running example, we use a model of the bounded retransmission
+protocol from the mCRL examples. Assuming we have copied the file
+<em>brp.mcrl</em> to our working directory, we can linearize the model with
+the following command:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>mcrl -regular -nocluster brp.mcrl</code></pre>
+</div></div>
+<div class="paragraph"><p>This produces a file named <em>brp.tbf</em>. This is the input for the state
+space generator. Just to see how many states and transitions are produced,
+we can run the command</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>lpo2lts-seq brp.tbf</code></pre>
+</div></div>
+<div class="paragraph"><p>Assuming that the model is small and CADP is installed, we can simply generate a BCG file
+(this requires BFS exploration order)</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>lpo2lts-seq --strategy=bfs brp.tbf brp.bcg</code></pre>
+</div></div>
+<div class="paragraph"><p>and then use CADP.</p></div>
+<div class="paragraph"><p>If it turns out that the LTS was very big then we might want to use the distributed tools
+to generate and reduce the LTS:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>lpo2lts-dist --workers=4 brp.tbf brp.dir
+ltsmin-reduce-dist --workers=4 brp.dir brp-s.dir
+ltsmin-convert --rdwr --segments 1 brp-s.dir brp-s.bcg</code></pre>
+</div></div>
+<div class="paragraph"><p>The tools start the command <em>mpirun</em> silently in the background with the
+suitable options.
+Alternatively, one may wish to call <em>mpirun</em> with additional options. This can
+be done using the <em>--mpi</em> option, e.g.:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>mpirun -np 4 -mca btl tcp,self lpo2lts-dist --mpi brp.tbf brp.dir</code></pre>
+</div></div>
+<div class="paragraph"><p>The dir format used to store the LTS in the example is backwards compatible with the mCRL toolset.
+We also support a newer format that adds compression:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>lpo2lts-dist --workers=4 brp.tbf brp.gcf
+ltsmin-reduce-dist --workers=4 brp.gcf brp-s.gcf
+ltsmin-convert --rdwr --segments 1 brp-s.gcf brp-s.bcg</code></pre>
+</div></div>
+<div class="paragraph"><p>When the model is suitable, state space generation can be speeded up by memoizing next state calls:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>lpo2lts-dist --workers=4 --cache brp.tbf brp.gcf</code></pre>
+</div></div>
+<div class="sect2">
+<h3 id="_symbolic_tools">Symbolic tools</h3>
+<div class="paragraph"><p>The LTSmin toolset also has a symbolic reachability tool.
+If we want to know the number of states, we can give the command:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>lpo2lts-sym brp.tbf</code></pre>
+</div></div>
+<div class="paragraph"><p>This command will compute the necessary part of the transition relation and the
+set of reachable states. If we want to record the transition relation symbolically
+then we can do so in the form of an ETF file:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>lpo2lts-sym brp.tbf brp.etf</code></pre>
+</div></div>
+<div class="paragraph"><p>This etf file can be translated to DVE for model checking:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>etf-convert brp.etf brp.dve</code></pre>
+</div></div>
+<div class="paragraph"><p>It can also serve as the input for state space generation</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>etf2lts-dist --workers=4 brp.etf brp-s.gcf</code></pre>
+</div></div>
+</div>
+<div class="sect2">
+<h3 id="_parity_game_solver">Parity game solver</h3>
+<div class="paragraph"><p>The LTSmin toolset finally includes a parity game solver:</p></div>
+<div class="listingblock">
+<div class="content">
+<pre><code>etf2lts-sym --mucalc=property.mcf model.etf --pg-write=game.spg
+spgsolver game.spg</code></pre>
+</div></div>
+<div class="paragraph"><p>To tool reports whether the game successfully terminates.</p></div>
+</div>
+</div>
+</div>
+</div>
+<div id="footnotes"><hr /></div>
+<div id="footer">
+<div id="footer-text">
+Last updated 2018-07-03 19:28:10 UTC
+</div>
+</div>
+</body>
+</html>
