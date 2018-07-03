@@ -127,8 +127,8 @@ rr_cmp (const void *a, const void *b, void *arg)
     int                *rand = *perm->rand;
     ref_t               A = perm->todos[*((int*)a)].ref;
     ref_t               B = perm->todos[*((int*)b)].ref;
-    return ((((1UL<<dbs_size)-1)&rand[A & ((1<<RR_ARRAY_SIZE)-1)])^A) -
-           ((((1UL<<dbs_size)-1)&rand[B & ((1<<RR_ARRAY_SIZE)-1)])^B);
+    return ((((1ULL<<dbs_size)-1)&rand[A & ((1<<RR_ARRAY_SIZE)-1)])^A) -
+           ((((1ULL<<dbs_size)-1)&rand[B & ((1<<RR_ARRAY_SIZE)-1)])^B);
 }
 
 static int
@@ -357,7 +357,7 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
     perm->todos = RTalign (CACHE_LINE_SIZE, sizeof(permute_todo_t[K+TODO_MAX]));
     perm->tosort = RTalign (CACHE_LINE_SIZE, sizeof(int[K+TODO_MAX]));
     perm->shift = ((double)K)/W;
-    perm->shiftorder = (1UL<<dbs_size) / W * worker_index;
+    perm->shiftorder = (1ULL<<dbs_size) / W * worker_index;
     perm->start_group = perm->shift * worker_index;
     perm->model = model;
     perm->state_seen = ssf;

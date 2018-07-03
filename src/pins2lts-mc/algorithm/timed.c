@@ -12,7 +12,7 @@
 
 // TODO: merge with reach algorithms
 
-int              LATTICE_BLOCK_SIZE = (1UL<<CACHE_LINE) / sizeof(lattice_t);
+int              LATTICE_BLOCK_SIZE = (1ULL<<CACHE_LINE) / sizeof(lattice_t);
 int              UPDATE = TA_UPDATE_WAITING;
 int              NONBLOCKING = 0;
 
@@ -380,7 +380,7 @@ ta_print_stats   (lm_t *lmap, wctx_t *ctx)
     size_t              db_elts = global->stats.elts;
     size_t              alloc = lm_allocated (lmap);
     double              mem3 = ((double)(sizeof(lattice_t[alloc + db_elts]))) / (1<<20);
-    double lm = ((double)(sizeof(lattice_t[alloc + (1UL<<dbs_size)]))) / (1<<20);
+    double lm = ((double)(sizeof(lattice_t[alloc + (1ULL<<dbs_size)]))) / (1<<20);
     double redundancy = (((double)(db_elts + alloc)) / lattices - 1) * 100;
     Warning (info, "Lattice map: %.1fMB (~%.1fMB paged-in) "
                    "overhead: %.2f%%, allocated: %zu",

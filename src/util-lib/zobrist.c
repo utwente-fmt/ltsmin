@@ -66,7 +66,7 @@ zobrist_t
 zobrist_create (size_t length, size_t z_length, matrix_t * m)
 {
     zobrist_t           z = RTmalloc (sizeof (struct zobrist_s));
-    z->key_length = 1UL << z_length;
+    z->key_length = 1ULL << z_length;
     z->key_pow = z_length;
     z->mask = z->key_length - 1;
     z->length = length;

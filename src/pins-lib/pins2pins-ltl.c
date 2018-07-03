@@ -35,7 +35,7 @@ static const char      *buchi_type = "ba";
 pins_ltl_type_t         PINS_LTL = PINS_LTL_AUTO;
 pins_buchi_type_t       PINS_BUCHI_TYPE = PINS_BUCHI_TYPE_BA;
 
-static const int        TEXTBOOK_INIT = (1UL << 30);
+static const int        TEXTBOOK_INIT = (1ULL << 30);
 
 static si_map_entry db_ltl_semantics[]={
     {"none",    PINS_LTL_AUTO},

@@ -238,7 +238,7 @@ state_store_init (model_t model, bool timed)
     }
 
     if (timed) {
-        store->lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
+        store->lmap = lm_create (W, 1ULL<<dbs_size, LATTICE_BLOCK_SIZE);
     }
 
     return store;

@@ -16,7 +16,7 @@ static const int        TABLE_SIZE = 24;
 static const mem_hash_t EMPTY = 0;
 static mem_hash_t       WRITE_BIT = 1;
 static mem_hash_t       WRITE_BIT_R = ~((mem_hash_t)1);
-static const uint64_t   CL_MASK = -(1UL << CACHE_LINE);
+static const uint64_t   CL_MASK = -(1ULL << CACHE_LINE);
 
 struct dbs_ll_s {
     size_t              length;
@@ -61,8 +61,8 @@ DBSLLtry_set_sat_bits (const dbs_ll_t dbs, const ref_t ref,
                        uint64_t exp, uint64_t new_val)
 {
     mem_hash_t         old_val, new_v;
-    mem_hash_t         mask = (1UL << bits) - 1;
-    HREassert (new_val < (1UL << dbs->sat_bits), "new_val too high");
+    mem_hash_t         mask = (1ULL << bits) - 1;
+    HREassert (new_val < (1ULL << dbs->sat_bits), "new_val too high");
     HREassert ((new_val & mask) == new_val, "new_val too high wrt bits");
 
     mask <<= offs;
@@ -235,11 +235,11 @@ DBSLLcreate_sized (int length, int size, hash64_f hash64, int satellite_bits)
     dbs->full = 0;
     HREassert (satellite_bits < 8, "To many satellite bits for good DBS performance");
     dbs->sat_bits = satellite_bits;
-    dbs->sat_mask = satellite_bits ? (1UL<<satellite_bits) - 1 : 0;
+    dbs->sat_mask = satellite_bits ? (1ULL<<satellite_bits) - 1 : 0;
     WRITE_BIT <<= satellite_bits;
     WRITE_BIT_R <<= satellite_bits;
     dbs->bytes = length * sizeof (int);
-    dbs->size = 1UL << size;
+    dbs->size = 1ULL << size;
     dbs->threshold = dbs->size / 100;
     dbs->threshold = min (dbs->threshold, 1ULL << 16);
     dbs->mask = ((uint64_t)dbs->size) - 1;

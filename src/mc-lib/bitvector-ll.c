@@ -39,7 +39,7 @@ BVLLget_sat_bit (const bitvector_ll_t *dbs, const bv_ref_t ref, int index)
     size_t pos = (ref << dbs->num_bits) >> 4;
     size_t rest = (ref << dbs->num_bits) & 15;
     uint16_t b = atomic_read (dbs->bits + pos);
-    return ((b >> rest) & (1UL << index)) != 0;
+    return ((b >> rest) & (1ULL << index)) != 0;
 }
 
 void
@@ -47,7 +47,7 @@ BVLLunset_sat_bit (const bitvector_ll_t *dbs, const bv_ref_t ref, int index)
 {
     size_t pos = (ref << dbs->num_bits) >> 4;
     size_t rest = (ref << dbs->num_bits) & 15;
-    uint16_t b = 1UL << index << rest;
+    uint16_t b = 1ULL << index << rest;
     fetch_and (dbs->bits+pos, ~b);
     return;
 }
@@ -57,7 +57,7 @@ BVLLtry_set_sat_bit (const bitvector_ll_t *dbs, const bv_ref_t ref, int index)
 {
     size_t pos = (ref << dbs->num_bits) >> 4;
     size_t rest = (ref << dbs->num_bits) & 15;
-    uint16_t b = 1UL << index << rest;
+    uint16_t b = 1ULL << index << rest;
     uint16_t p = fetch_or (dbs->bits+pos, b);
     return (p & b) == 0;
 }
@@ -67,7 +67,7 @@ BVLLtry_unset_sat_bit (const bitvector_ll_t *dbs, const bv_ref_t ref, int index)
 {
     size_t pos = (ref << dbs->num_bits) >> 4;
     size_t rest = (ref << dbs->num_bits) & 15;
-    uint16_t b = 1UL << index << rest;
+    uint16_t b = 1ULL << index << rest;
     uint16_t p = fetch_and (dbs->bits+pos, ~b);
     return (p & b) != 0;
 }
@@ -125,7 +125,7 @@ BVLLcreate (size_t values, size_t logsize)
 {
     bitvector_ll_t     *dbs = RTalign (CACHE_LINE_SIZE, sizeof(bitvector_ll_t));
     dbs->num_bits = ceil (log(values) / log(2));
-    dbs->values = 1UL << dbs->num_bits;
+    dbs->values = 1ULL << dbs->num_bits;
     dbs->value_mask = dbs->values - 1;
     dbs->size = logsize;
     HREassert (dbs->num_bits < 16, "too many sat bits for bitvector-ll");

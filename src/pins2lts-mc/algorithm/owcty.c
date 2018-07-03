@@ -258,7 +258,7 @@ owcty_reachability_handle (void *arg, state_info_t *successor, transition_info_t
         if (strategy[1] == Strat_ECD)
             owcty_ecd (ctx, successor);
         uint32_t num = owcty_pre_inc (ctx->run, successor->ref, 1);
-        HREassert (num < (1UL<<30)-1, "Overflow in accepting predecessor counter");
+        HREassert (num < (1ULL<<30)-1, "Overflow in accepting predecessor counter");
     }
     if (strategy[1] == Strat_MAP)
         owcty_map (ctx, successor);
@@ -608,12 +608,12 @@ owcty_shared_init   (run_t *run)
 
     run->shared = RTmallocZero (sizeof(alg_shared_t));
     run->shared->pre = RTalignZero (CACHE_LINE_SIZE,
-                                    sizeof(owcty_pre_t[1UL << dbs_size]));
+                                    sizeof(owcty_pre_t[1ULL << dbs_size]));
     run->shared->lb = lb_create_max (W, G, H);
     run_set_is_stopped (run, owcty_is_stopped);
     run_set_stop (run, owcty_stop);
 
     if (strategy[1] == Strat_MAP) {
-        run->shared->parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
+        run->shared->parent_ref = RTmalloc (sizeof(ref_t[1ULL<<dbs_size]));
     }
 }

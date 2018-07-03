@@ -236,7 +236,7 @@ init_maxsum(lts_type_t lts_type)
  * The user context for the visitor.
  */
 typedef struct maxsum_info {
-    long maxsum; // the maximum sum of the current value.
+    long long maxsum; // the maximum sum of the current value.
     struct maxsum_info* down; // the context of the next value.
     struct maxsum_info* right; // the context of the next vector.
 } maxsum_info_t;
@@ -268,7 +268,7 @@ maxsum_pre(int terminal, int val, int cached, void* result, void* context)
 {
     (void) val;
     maxsum_info_t *ctx = (maxsum_info_t*) context;
-    if(!terminal && cached) ctx->maxsum = (long) result;
+    if(!terminal && cached) ctx->maxsum = (long long) result;
 }
 
 /*
@@ -280,8 +280,8 @@ maxsum_post(int val, void* context, int* cache, void** result)
 {
     maxsum_info_t *ctx = (maxsum_info_t*) context;
 
-    if (    (ctx->down->maxsum > 0 && val > LONG_MAX - ctx->down->maxsum) ||
-            (ctx->down->maxsum < 0 && val < LONG_MIN - ctx->down->maxsum)) {
+    if (    (ctx->down->maxsum > 0 && val > LLONG_MAX - ctx->down->maxsum) ||
+            (ctx->down->maxsum < 0 && val < LLONG_MIN - ctx->down->maxsum)) {
         Abort("Integer overflow in maxsum");
     }
 

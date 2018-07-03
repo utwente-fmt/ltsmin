@@ -43,7 +43,7 @@ static const size_t CACHE_LINE_MEM_SIZE = CACHE_LINE_SIZE / sizeof (mem_hash_t);
 static const size_t CACHE_LINE_MEM_MASK = -(CACHE_LINE_SIZE / sizeof (mem_hash_t));
 
 static const mem_hash_t EMPTY= (mem_hash_t)0;
-static const mem_hash_t TOMB = 1UL;                                     // 0001
+static const mem_hash_t TOMB = 1ULL;                                     // 0001
 static const mem_hash_t NONE = (mem_hash_t)-1;
 
 static inline mem_hash_t *
@@ -335,7 +335,7 @@ fset_create (size_t key_length, size_t data_length, size_t init_size,
     dbs->key_length = key_length;
     dbs->data_length = data_length;
     dbs->total_length = data_length + key_length;
-    dbs->size_max = 1UL << max_size;
+    dbs->size_max = 1ULL << max_size;
     dbs->data = RTalign (CACHE_LINE_SIZE, dbs->total_length * dbs->size_max);
     dbs->todo_data = RTalign (CACHE_LINE_SIZE, dbs->total_length * dbs->size_max);
     dbs->hash = RTalignZero (CACHE_LINE_SIZE, sizeof(mem_hash_t) * dbs->size_max);

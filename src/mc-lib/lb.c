@@ -106,7 +106,7 @@ request_random (lb_t *lb, size_t id)
     do {
         res = rand_r (&lb->local[id]->seed) % lb->threads;
     } while (res == id);
-    fetch_or (&lb->local[res]->requests, 1L << id);
+    fetch_or (&lb->local[res]->requests, 1LL << id);
     Debug ("Requested %zu", res);
     return 1;
 }
@@ -121,7 +121,7 @@ handoff (lb_t *lb, int id, size_t requests, size_t *my_load,
     size_t j = 0;
     for (size_t oid = 0; oid < lb->threads; oid++) {
         todo[j] = oid;
-        j += (0 != ((1L<<oid) & requests));
+        j += (0 != ((1LL<<oid) & requests));
     }
     
     // handle the requests
@@ -204,7 +204,7 @@ lb_create_max (size_t threads, size_t gran, size_t max)
     lb->stopped = 0;
     lb->max_handoff = max;
     HREassert (gran < 32, "wrong granularity");
-    lb->granularity = 1UL << gran;
+    lb->granularity = 1ULL << gran;
     lb->mask = lb->granularity - 1;
     return lb;
 }
