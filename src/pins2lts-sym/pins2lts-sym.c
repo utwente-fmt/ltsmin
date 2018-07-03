@@ -433,7 +433,7 @@ static void actual_main(void *arg)
     init_domain(VSET_IMPL_AUTOSELECT);
 
     vset_t initial = vset_create(domain, -1, NULL);
-    int *src = RTmalloc (sizeof(int[N]));
+    int src[N];
     GBgetInitialState(model, src);
     vset_add(initial, src);
 
@@ -528,7 +528,6 @@ static void actual_main(void *arg)
     }
 #endif
 
-    RTfree (src);
     GBExit(model);
 }
 
