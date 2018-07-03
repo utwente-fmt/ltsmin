@@ -1,4 +1,8 @@
 # Changelog
+## July 3, 2018: 3.0.2
+
+- Fix an issue where libxml2 was unnecessarily made a mandatory dependency.
+
 ## July 2, 2018: 3.0.1
 
 - Fix an issue on macOS where libxml2 is not detected correctly.

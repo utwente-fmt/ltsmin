@@ -1,5 +1,5 @@
 AC_PREREQ(2.65)
-AC_INIT([ltsmin],[3.0.1],[ltsmin-support@lists.utwente.nl])
+AC_INIT([ltsmin],[3.0.2],[ltsmin-support@lists.utwente.nl])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([autotools])
 AM_INIT_AUTOMAKE([1.14 foreign subdir-objects])
@@ -407,7 +407,7 @@ AS_IF([test "x$enable_pnml" != "xno"], [
             AC_MSG_WARN([[Please refer to http://ltsmin.utwente.nl/#libxml2 how to resolve this issue.]])
         ])
         CPPFLAGS="$SAVE_CPPFLAGS"
-    ])
+    ], [:])
 ])
 AS_IF([test "x$acx_pnml" != "xyes"], [
     AC_MSG_WARN(No acceptable libxml2 package found. Not building PNML front-end)
