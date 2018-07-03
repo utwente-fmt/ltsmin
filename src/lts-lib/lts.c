@@ -26,12 +26,12 @@ void lts_free(lts_t lts){
     RTfree(lts);
 }
 
-static void build_block(uint32_t states,uint32_t transitions,u_int32_t *begin,u_int32_t *block,u_int32_t *label,u_int32_t *other){
+static void build_block(uint32_t states,uint32_t transitions,uint32_t *begin,uint32_t *block,uint32_t *label,uint32_t *other){
     int has_label=(label!=NULL);
     uint32_t i;
     uint32_t loc1,loc2;
-    u_int32_t tmp_label1=0,tmp_label2=0;
-    u_int32_t tmp_other1,tmp_other2;
+    uint32_t tmp_label1=0,tmp_label2=0;
+    uint32_t tmp_other1,tmp_other2;
 
     for(i=0;i<states;i++) begin[i]=0;
     for(i=0;i<transitions;i++) begin[block[i]]++;
@@ -84,10 +84,10 @@ void lts_set_type(lts_t lts,LTS_TYPE type){
     Debug("first change to LTS_LIST");
     switch(lts->type){
         case LTS_LIST:
-            lts->begin=(u_int32_t*)RTmalloc(sizeof(u_int32_t)*(lts->states+1));
+            lts->begin=(uint32_t*)RTmalloc(sizeof(uint32_t)*(lts->states+1));
             break;
         case LTS_BLOCK:
-            lts->src=(u_int32_t*)RTmalloc(sizeof(u_int32_t)*(lts->transitions));
+            lts->src=(uint32_t*)RTmalloc(sizeof(uint32_t)*(lts->transitions));
             for(i=0;i<lts->states;i++){
                 for(j=lts->begin[i];j<lts->begin[i+1];j++){
                     lts->src[j]=i;
@@ -95,7 +95,7 @@ void lts_set_type(lts_t lts,LTS_TYPE type){
             }
             break;
         case LTS_BLOCK_INV:
-            lts->dest=(u_int32_t*)RTmalloc(sizeof(u_int32_t)*(lts->transitions));
+            lts->dest=(uint32_t*)RTmalloc(sizeof(uint32_t)*(lts->transitions));
             for(i=0;i<lts->states;i++){
                 for(j=lts->begin[i];j<lts->begin[i+1];j++){
                     lts->dest[j]=i;
@@ -134,12 +134,12 @@ static void lts_realloc(lts_t lts){
     }
     uint32_t size;
     // realloc root_list
-    size=sizeof(u_int32_t)*lts->root_count;
+    size=sizeof(uint32_t)*lts->root_count;
     lts->root_list=(uint32_t*)RTrealloc(lts->root_list,size);
     if (size && lts->root_list==NULL) Abort("out of memory");
     // realloc properties
     if (N>0) {
-        size=sizeof(u_int32_t)*lts->states;
+        size=sizeof(uint32_t)*lts->states;
         lts->properties=(uint32_t*)RTrealloc(lts->properties,size);
         if (size && lts->properties==NULL) Abort("out of memory");
     } else {
@@ -159,13 +159,13 @@ static void lts_realloc(lts_t lts){
     switch(lts->type){
         case LTS_BLOCK:
         case LTS_BLOCK_INV:
-            size=sizeof(u_int32_t)*(lts->states+1);
+            size=sizeof(uint32_t)*(lts->states+1);
             break;
         case LTS_LIST:
             size=0;
             break;
     }
-    lts->begin=(u_int32_t*)RTrealloc(lts->begin,size);
+    lts->begin=(uint32_t*)RTrealloc(lts->begin,size);
     if (size && lts->begin==NULL) Abort("out of memory");
     // realloc src
     switch(lts->type){
@@ -174,10 +174,10 @@ static void lts_realloc(lts_t lts){
             break;
         case LTS_BLOCK_INV:
         case LTS_LIST:
-            size=sizeof(u_int32_t)*(lts->transitions);
+            size=sizeof(uint32_t)*(lts->transitions);
             break;
     }
-    lts->src=(u_int32_t*)RTrealloc(lts->src,size);
+    lts->src=(uint32_t*)RTrealloc(lts->src,size);
     if (size && lts->src==NULL) Abort("out of memory");
     // realloc dest
     switch(lts->type){
@@ -186,14 +186,14 @@ static void lts_realloc(lts_t lts){
             break;
         case LTS_BLOCK:
         case LTS_LIST:
-            size=sizeof(u_int32_t)*(lts->transitions);
+            size=sizeof(uint32_t)*(lts->transitions);
             break;
     }
-    lts->dest=(u_int32_t*)RTrealloc(lts->dest,size);
+    lts->dest=(uint32_t*)RTrealloc(lts->dest,size);
     if (size && lts->dest==NULL) Abort("out of memory");
     // realloc label
-    size=(K>0)?(sizeof(u_int32_t)*(lts->transitions)):0;
-    lts->label=(u_int32_t*)RTrealloc(lts->label,size);
+    size=(K>0)?(sizeof(uint32_t)*(lts->transitions)):0;
+    lts->label=(uint32_t*)RTrealloc(lts->label,size);
     if (size && lts->label==NULL) Abort("out of memory");
 }
 
@@ -243,7 +243,7 @@ void lts_set_sig(lts_t lts,lts_type_t type){
     lts_set_sig_given(lts,type,values);
 }
 
-void lts_set_size(lts_t lts,u_int32_t roots,u_int32_t states,u_int32_t transitions){
+void lts_set_size(lts_t lts,uint32_t roots,uint32_t states,uint32_t transitions){
     lts->root_count=roots;
     lts->states=states;
     lts->transitions=transitions;
