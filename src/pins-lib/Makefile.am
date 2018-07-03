@@ -69,7 +69,6 @@ libpins_la_SOURCES += pg-types.c pg-types.h
 libpins_la_SOURCES += pins2pins-mucalc.c pins2pins-mucalc.h
 libpins_la_SOURCES += pins2pins-ltl.c pins2pins-ltl.h
 libpins_la_SOURCES += property-semantics.c property-semantics.h
-libpins_la_CPPFLAGS = $(AM_CPPFLAGS) -I${top_srcdir}/ltl2ba
 libpins_la_LIBADD   = ../lts-io/liblts-io.la
 libpins_la_LIBADD  += ../ltsmin-lib/libmucalc.la
 libpins_la_LIBADD  += ../hre-io/libhre-io.la
@@ -77,7 +76,6 @@ libpins_la_LIBADD  += ../hre/libhre.la
 libpins_la_LIBADD  += ../ltsmin-lib/libltsmin.la
 libpins_la_LIBADD  += ../dm/libdm.la
 libpins_la_LIBADD  += por/libpor.la
-libpins_la_LIBADD  += $(top_builddir)/lib/libgnu.la
 
 if HAVE_BOOST
 libpins_la_LIBADD  += ../dm/libdm_boost.la

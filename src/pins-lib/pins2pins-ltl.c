@@ -3,10 +3,6 @@
 #include <limits.h>
 #include <stdlib.h>
 
-// Should be first to avoid collision with LTSmin print macros
-#include <ltl2ba.h>
-#undef Debug
-
 #include <dm/dm.h>
 #include <hre/unix.h>
 #include <hre/user.h>
