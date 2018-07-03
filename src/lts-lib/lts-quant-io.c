@@ -410,7 +410,7 @@ void lts_write_tra(const char*tra_name,lts_t lts){
         }
         int first=1;
         if (lts_type_get_edge_label_count(lts->ltstype)!=2){
-            for(u_int32_t j=0;j<lts->root_count;j++){
+            for(uint32_t j=0;j<lts->root_count;j++){
                 if (lts->root_list[j]==i){
                     fprintf(lab,"%u init",i+1);
                     first=0;
