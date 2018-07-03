@@ -662,7 +662,7 @@ cndfs_print_stats   (run_t *run, wctx_t *ctx)
     }
 
     cndfs_reduced_t        *cred = (cndfs_reduced_t *) run->reduced;
-    double mem3 = ((double)((cred->max_load * sizeof(ref_t[2])))) / (1UL<<20);
+    double mem3 = ((double)((cred->max_load * sizeof(ref_t[2])))) / (1ULL<<20);
     Warning (info, " ");
     Warning (info, "Total memory used for local state coloring: %.1fMB", mem3);
 }

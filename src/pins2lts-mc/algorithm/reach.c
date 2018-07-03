@@ -647,7 +647,7 @@ reach_init_shared (run_t *run)
     run_set_stop (run, reach_stop);
 
     if (trc_output) {
-        run->shared->parent_ref = RTmallocZero (sizeof(ref_t[1UL<<dbs_size]));
+        run->shared->parent_ref = RTmallocZero (sizeof(ref_t[1ULL<<dbs_size]));
     }
 }
 

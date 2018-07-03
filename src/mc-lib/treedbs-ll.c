@@ -14,8 +14,8 @@
 
 
 static const int        TABLE_SIZE = 26;
-static const uint64_t   EMPTY = 0UL;
-static const uint64_t   EMPTY_1 = -1UL;
+static const uint64_t   EMPTY = 0ULL;
+static const uint64_t   EMPTY_1 = -1ULL;
 static const size_t     CACHE_LINE_64 = (1 << CACHE_LINE) / sizeof (uint64_t);
 static const size_t     CL_MASK = -((1 << CACHE_LINE) / sizeof (uint64_t));
 
@@ -166,7 +166,7 @@ TreeDBSLLtry_set_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
 {
     uint64_t            old_val, old_bits, new_v;
     uint64_t            mask = (1ULL << bits) - 1;
-    HREassert (new_val < (1UL << dbs->root.sat_bits), "new_val too high");
+    HREassert (new_val < (1ULL << dbs->root.sat_bits), "new_val too high");
     HREassert ((new_val & mask) == new_val, "new_val too high w.r.t. bits");
 
     mask <<= offs;
@@ -187,7 +187,7 @@ TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
     do {
         bits = atomic_read (dbs->root.table+ref);
         new_val = b2s (dbs, bits);
-        HREassert (new_val < (1UL << dbs->root.sat_bits), "Too many sat bit incs");
+        HREassert (new_val < (1ULL << dbs->root.sat_bits), "Too many sat bit incs");
         new_val += 1;
     } while ( !cas_sat_bits(dbs, ref, bits, new_val) );
     return new_val;

@@ -46,7 +46,7 @@ typedef struct local_s {
     size_t              id;
     size_t              next_store;
     lm_store_t         *table;
-} __attribute__ ((aligned(1UL<<CACHE_LINE))) local_t;
+} __attribute__ ((aligned(1ULL<<CACHE_LINE))) local_t;
 
 struct lm_s {
     size_t              size;
@@ -373,7 +373,7 @@ void
 lm_set_status (lm_t *map, lm_loc_t location, lm_status_t status)
 {
     location = follow (location);
-    HREassert (status < (1UL << 3), "Only 3 status bits are reserved.");
+    HREassert (status < (1ULL << 3), "Only 3 status bits are reserved.");
     lm_store_t store = lm_get_store (location);
     switch (store.internal) {
     case LM_STATUS_LATTICE:

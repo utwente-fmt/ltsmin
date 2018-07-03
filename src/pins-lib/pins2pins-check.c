@@ -383,7 +383,7 @@ type_max (check_ctx_t *ctx, int idx)
         case LTStypeTrilean:
             return 2;
         case LTStypeSInt32:
-            return (1UL<<31) - 1;
+            return (1ULL<<31) - 1;
         default: {
                 HREassert(false);
                 return -1;

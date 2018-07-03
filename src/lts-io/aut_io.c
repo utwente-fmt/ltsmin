@@ -61,7 +61,7 @@ static void aut_write_edge(lts_file_t file,int src_seg,void* src_state,
 }
 
 static void aut_write_close(lts_file_t file){
-    if (fseek(file->f, 0L, SEEK_SET)){
+    if (fseek(file->f, 0LL, SEEK_SET)){
         AbortCall("while rewinding %s",lts_file_get_name(file));
     }
     fprintf(file->f,"des(%llu,%llu,%llu)",file->root,file->trans,file->states);

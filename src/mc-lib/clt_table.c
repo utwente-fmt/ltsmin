@@ -21,7 +21,7 @@ static const struct timespec BO = {0, 2500};
 #define EMPTY 1
 #define LEFT 2
 #define RIGHT 3
-#define CLT_REM(k)      (k & ((1UL << R_BITS) - 1))
+#define CLT_REM(k)      (k & ((1ULL << R_BITS) - 1))
 #define CLT_HASH(d,k)   (k >> d->diff) //monotonic hash function
 
 typedef struct __attribute__ ((__packed__)) clt_bucket {
@@ -140,7 +140,7 @@ clt_unlock (const clt_dbs_t* dbs, size_t pos)
 int
 clt_find_or_put (const clt_dbs_t* dbs, uint64_t k, bool insert)
 {
-    HREassert (k < (1UL << dbs->keysize), "Cleary table: invalid key");
+    HREassert (k < (1ULL << dbs->keysize), "Cleary table: invalid key");
     clt_bucket_t        check, oldval, newval;
     uint32_t            rem = CLT_REM (k);
     uint64_t            idx = CLT_HASH (dbs,k) + dbs->b_space; // add breathing space
@@ -325,7 +325,7 @@ clt_create (uint32_t ksize, uint32_t log_size)
     HREassert (ksize > log_size, "Cleary keysize to small for good distribution "
                "(logsize:2^%u, keysize: %u)", log_size, ksize);
     clt_dbs_t              *dbs = RTmalloc (sizeof(clt_dbs_t));
-    dbs->size = 1UL << log_size;
+    dbs->size = 1ULL << log_size;
     dbs->thresh = dbs->size / 64;
     dbs->thresh = min (dbs->thresh, 1ULL << 20);
     dbs->mask = dbs->size - 1;

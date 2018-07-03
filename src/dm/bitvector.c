@@ -70,7 +70,7 @@ int
 bitvector_isset_or_set (bitvector_t *bv, size_t idx)
 {
     // isset_or_set
-    size_t              mask = 1UL << bv_ofs (idx);
+    size_t              mask = 1ULL << bv_ofs (idx);
     size_t              word = bv_seg (idx);
     int                 res = (bv->data[word] & mask) != 0;
     bv->data[word] |= mask;
@@ -81,7 +81,7 @@ void
 bitvector_set2 (bitvector_t *bv, size_t idx, size_t v)
 {
     // isset_or_set2
-    size_t              mask = 3UL << bv_ofs (idx);
+    size_t              mask = 3ULL << bv_ofs (idx);
     size_t              value = v << bv_ofs (idx);
     size_t              word = bv_seg (idx);
     bv->data[word] &= ~mask;
@@ -92,7 +92,7 @@ int
 bitvector_isset_or_set2 (bitvector_t *bv, size_t idx, size_t v)
 {
     // isset_or_set2
-    size_t              mask = 3UL << bv_ofs (idx);
+    size_t              mask = 3ULL << bv_ofs (idx);
     size_t              value = v << bv_ofs (idx);
     size_t              word = bv_seg (idx);
     int                 res = (bv->data[word] & mask) == value;
@@ -104,7 +104,7 @@ bitvector_isset_or_set2 (bitvector_t *bv, size_t idx, size_t v)
 int
 bitvector_get2 (const bitvector_t *bv, size_t idx)
 {
-    size_t              mask = 3UL << bv_ofs (idx);
+    size_t              mask = 3ULL << bv_ofs (idx);
     return (bv->data[bv_seg (idx)] & mask) >> bv_ofs (idx);
 }
 
@@ -112,7 +112,7 @@ void
 bitvector_set_atomic (bitvector_t *bv, size_t idx)
 {
     // set bit
-    size_t              mask = 1UL << bv_ofs (idx);
+    size_t              mask = 1ULL << bv_ofs (idx);
     __sync_fetch_and_or (bv->data + bv_seg(idx), mask);
 }
 
@@ -120,7 +120,7 @@ void
 bitvector_set (bitvector_t *bv, size_t idx)
 {
     // set bit
-    size_t              mask = 1UL << bv_ofs (idx);
+    size_t              mask = 1ULL << bv_ofs (idx);
     bv->data[bv_seg (idx)] |= mask;
 }
 
@@ -128,14 +128,14 @@ void
 bitvector_unset (bitvector_t *bv, size_t idx)
 {
     // set bit
-    size_t              mask = ~(1UL << bv_ofs (idx));
+    size_t              mask = ~(1ULL << bv_ofs (idx));
     bv->data[bv_seg (idx)] &= mask;
 }
 
 int
 bitvector_is_set (const bitvector_t *bv, size_t idx)
 {
-    size_t              mask = 1UL << bv_ofs (idx);
+    size_t              mask = 1ULL << bv_ofs (idx);
     return (bv->data[bv_seg (idx)] & mask) != 0;
 }
 
@@ -204,7 +204,7 @@ bitvector_invert(bitvector_t *bv)
 
     // don't invert the unused bits!
     size_t              used_bits = WORD_BITS - (bv->n_words * WORD_BITS - bv->n_bits);
-    size_t              mask = (1UL << (used_bits))-1;
+    size_t              mask = (1ULL << (used_bits))-1;
     if (used_bits < WORD_BITS)
         bv->data[bv->n_words-1] &= mask;
 }
