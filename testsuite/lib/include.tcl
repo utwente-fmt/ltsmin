@@ -172,10 +172,6 @@ proc runmytest { test_name command_line exp_output} {
             fail "$test_name: error: $expect_out(buffer)"
         }
 
-        "error" {
-            fail "An error message was encountered in the application output.";
-        }
-
         timeout {
             fail "Program takes to long to execute"
             exec kill -9 $PID
