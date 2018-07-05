@@ -1078,7 +1078,7 @@ rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
 }
 
 /**
- * Implementation of (parallel) saturation.
+ * Implementation of (sequential) saturation.
  * Assumes: set is of long vectors; relations are ordered on first variable.
  */
 TASK_4(BDD, go_sat, BDD, set, vrel_t*, rels, int, count, int, id)
@@ -1138,9 +1138,8 @@ TASK_4(BDD, go_sat, BDD, set, vrel_t*, rels, int, count, int, id)
         result = set;
     } else {
         /* Recursive computation */
-        mtbdd_refs_spawn(SPAWN(go_sat, sylvan_low(set), rels, count, id));
+        BDD low = mtbdd_refs_push(CALL(go_sat, sylvan_low(set), rels, count, id));
         BDD high = mtbdd_refs_push(CALL(go_sat, sylvan_high(set), rels, count, id));
-        BDD low = mtbdd_refs_sync(SYNC(go_sat));
         mtbdd_refs_pop(1);
         result = sylvan_makenode(sylvan_var(set), low, high);
     }
@@ -1150,11 +1149,82 @@ TASK_4(BDD, go_sat, BDD, set, vrel_t*, rels, int, count, int, id)
     return result;
 }
 
-static void
-set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
+/**
+ * Implementation of (parallel) saturation.
+ * Assumes: set is of long vectors; relations are ordered on first variable.
+ */
+TASK_4(BDD, go_sat_par, BDD, set, vrel_t*, rels, int, count, int, id)
 {
-    // Create copy of rels
-    vrel_t rels[rel_count];
+    /* Terminal cases */
+    if (set == sylvan_false) return sylvan_false;
+    if (count == 0) return set;
+
+    /* Consult the cache */
+    BDD result;
+    BDD _set = set;
+    if (cache_get3(200LL<<40, _set, (uint64_t)rels, id, &result)) return result;
+    mtbdd_refs_pushptr(&_set);
+
+    /* Check if the relation should be applied */
+    uint32_t var = sylvan_var(rels[0]->all_variables);
+    if (set == sylvan_true || var <= sylvan_var(set)) {
+        /* Count the number of relations starting here */
+        int n = 1;
+        while (n < count && var == sylvan_var(rels[n]->all_variables)) n++;
+        /*
+         * Compute until fixpoint:
+         * - SAT deeper
+         * - learn and chain-apply all current level once
+         */
+        BDD prev = sylvan_false;
+        BDD step = sylvan_false;
+        struct vector_set dummy;
+        mtbdd_refs_pushptr(&set);
+        mtbdd_refs_pushptr(&prev);
+        mtbdd_refs_pushptr(&step);
+        while (prev != set) {
+            prev = set;
+            // SAT deeper
+            set = CALL(go_sat_par, set, rels+n, count-n, id);
+            // learn and chain-apply all current level once
+            for (int i=0;i<n;i++) {
+                if (rels[i]->expand != NULL) {
+                    // project set
+                    dummy.dom = rels[i]->dom;
+                    dummy.k = rels[i]->r_k;
+                    dummy.proj = rels[i]->r_proj;
+                    dummy.state_variables = rels[i]->state_variables;
+                    dummy.bdd = sylvan_project(set, dummy.state_variables);
+                    // call expand callback
+                    mtbdd_refs_pushptr(&dummy.bdd);
+                    rels[i]->expand(rels[i], &dummy, rels[i]->expand_ctx);
+                    mtbdd_refs_popptr(1);
+                }
+                // and then step
+                step = sylvan_relnext(set, rels[i]->bdd, rels[i]->all_variables);
+                set = sylvan_or(set, step);
+                step = sylvan_false; // unset, for gc
+            }
+        }
+        mtbdd_refs_popptr(3);
+        result = set;
+    } else {
+        /* Recursive computation */
+        mtbdd_refs_spawn(SPAWN(go_sat_par, sylvan_low(set), rels, count, id));
+        BDD high = mtbdd_refs_push(CALL(go_sat_par, sylvan_high(set), rels, count, id));
+        BDD low = mtbdd_refs_sync(SYNC(go_sat_par));
+        mtbdd_refs_pop(1);
+        result = sylvan_makenode(sylvan_var(set), low, high);
+    }
+    // Store in cache
+    cache_put3(200LL<<40, _set, (uint64_t)rels, id, result);
+    mtbdd_refs_popptr(1);
+    return result;
+}
+
+static int
+init_least_fixpoint(vrel_t rels[], vrel_t _rels[], int rel_count)
+{
     memcpy(rels, _rels, sizeof(vrel_t[rel_count]));
 
     // Sort the rels (using gnome sort)
@@ -1173,11 +1243,33 @@ set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
 
     // Get next id (for cache)
     static volatile int id = 0;
-    int _id = __sync_fetch_and_add(&id, 1);
+    return __sync_fetch_and_add(&id, 1);
+}
+
+static void
+set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
+{
+    // Create copy of rels
+    vrel_t rels[rel_count];
+
+    int id = init_least_fixpoint(rels, _rels, rel_count);
 
     // Go!
     LACE_ME;
-    dst->bdd = CALL(go_sat, src->bdd, rels, rel_count, _id);
+    dst->bdd = CALL(go_sat, src->bdd, rels, rel_count, id);
+}
+
+static void
+set_least_fixpoint_par(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
+{
+    // Create copy of rels
+    vrel_t rels[rel_count];
+
+    int id = init_least_fixpoint(rels, _rels, rel_count);
+
+    // Go!
+    LACE_ME;
+    dst->bdd = CALL(go_sat_par, src->bdd, rels, rel_count, id);
 }
 
 static void
@@ -1314,6 +1406,7 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.set_next=set_next;
     dom->shared.set_prev=set_prev;
     dom->shared.set_least_fixpoint=set_least_fixpoint;
+    dom->shared.set_least_fixpoint_par=set_least_fixpoint_par;
 
     dom->shared.reorder=set_reorder;
     dom->shared.set_dot=set_dot;

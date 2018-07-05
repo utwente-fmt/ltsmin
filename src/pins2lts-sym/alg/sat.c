@@ -66,7 +66,8 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
             (*eg_count)++;
         }
         if (dlk_detect) vset_copy(deadlocks, visited);
-        vset_least_fixpoint(visited, visited, group_next, nGrps);
+        if (USE_PARALLELISM) vset_least_fixpoint_par(visited, visited, group_next, nGrps);
+        else vset_least_fixpoint(visited, visited, group_next, nGrps);
         (*next_count)++;
         check_invariants(visited, level);
         if (dlk_detect) {
@@ -271,7 +272,8 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
 
     if (trc_output != NULL) save_level(visited);
     stats_and_progress_report(NULL, visited, 0);
-    vset_least_fixpoint(visited, visited, group_next, nGrps);
+    if (USE_PARALLELISM) vset_least_fixpoint_par(visited, visited, group_next, nGrps);
+    else vset_least_fixpoint(visited, visited, group_next, nGrps);
     stats_and_progress_report(NULL, visited, 1);
 
     check_invariants(visited, -1);

@@ -235,6 +235,12 @@ default_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     Abort("Decision diagram package does not support least fixpoint");
 }
 
+static void
+default_least_fixpoint_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    default_least_fixpoint(dst, src, rels, rel_count);
+}
+
 struct default_set_update_context
 {
     vset_t set; // set to add to
@@ -300,15 +306,16 @@ void vdom_init_shared(vdom_t dom,int n)
 {
     memset(&dom->shared, 0, sizeof(dom->shared));
 
-	dom->shared.size=n;
-	dom->shared.set_example_match=default_set_example_match;
-	dom->shared.set_zip=default_zip;
+    dom->shared.size=n;
+    dom->shared.set_example_match=default_set_example_match;
+    dom->shared.set_zip=default_zip;
     dom->shared.rel_update=default_rel_update;
     dom->shared.rel_update_seq=default_rel_update;  // is actually sequential
     dom->shared.set_update=default_set_update;
     dom->shared.set_update_seq=default_set_update;  // is actually sequential
-	dom->shared.reorder=default_reorder;
-	dom->shared.set_least_fixpoint=default_least_fixpoint;
+    dom->shared.reorder=default_reorder;
+    dom->shared.set_least_fixpoint=default_least_fixpoint;
+    dom->shared.set_least_fixpoint_par=default_least_fixpoint_par;
     dom->shared.set_project_minus=default_set_project_minus;
     dom->shared.set_next_union=default_set_next_union;
     dom->shared.set_visit_par=default_set_visit_par;
@@ -717,6 +724,10 @@ void vrel_set_expand(vrel_t rel, expand_cb cb, void *context) {
 
 void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
     src->dom->shared.set_least_fixpoint(dst, src, rels, rel_count);
+}
+
+void vset_least_fixpoint_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
+    src->dom->shared.set_least_fixpoint_par(dst, src, rels, rel_count);
 }
 
 void vset_dot(FILE* fp, vset_t src) {
