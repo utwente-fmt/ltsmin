@@ -20,18 +20,19 @@ set EXAMPLES_BUILD_PATH "$LTSMIN_BUILDDIR/examples"
 proc find_alg_backends { filter } {
     global LTSMIN_BUILDDIR
     global base_dir
+    global exeext
     set backends [list]
     set lts_backends [glob -directory "$base_dir/../src" -type d pins2lts-$filter ]
     foreach dir $lts_backends {
-        set lts_bins [glob -nocomplain -directory $dir -type f *2lts-$filter ]
+        set lts_bins [glob -nocomplain -directory $dir -type f *2lts-$filter$exeext ]
         foreach path $lts_bins {
             lappend backends $path
         }
-        set lts_bins [glob -nocomplain -directory $dir/gcc -type f *2lts-$filter ]
+        set lts_bins [glob -nocomplain -directory $dir/gcc -type f *2lts-$filter$exeext ]
         foreach path $lts_bins {
             lappend backends $path
         }
-        set lts_bins [glob -nocomplain -directory $dir/mpicc -type f *2lts-$filter ]
+        set lts_bins [glob -nocomplain -directory $dir/mpicc -type f *2lts-$filter$exeext ]
         foreach path $lts_bins {
             lappend backends $path
         }
@@ -55,7 +56,6 @@ proc find_lang_frontends { filter } {
 }
 
 proc runmytest { test_name command_line exp_output} {
-    send_user "starting $command_line\n"
 
     # NOTE: this is ugly. If the exp_output is not set, put an unfindable string in it.
     set unfindable_string "adhadkhaslkdLKHLKHads876"
@@ -64,7 +64,13 @@ proc runmytest { test_name command_line exp_output} {
         set exp_output $unfindable_string
     }
 
-    set PID [ eval spawn $command_line ]
+    global wine
+
+    set starter "$wine $command_line"
+
+    send_user "starting $starter\n"
+
+    set PID [ eval spawn $starter ]
 
     set expected false
     match_max 1000000

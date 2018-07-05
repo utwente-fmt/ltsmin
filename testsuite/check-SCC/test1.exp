@@ -13,40 +13,51 @@ puts   "----------------------------------------------\n"
 
 set commands [dict create]
 
-compile_promela {}
+global test_dve
+global test_promela
+if { "$test_promela" != "yes" || "$test_dve" != "yes" } {
+    puts "Skipping some tests due to configuration\n"
+}
 
+compile_promela {}
 
 set strategies [list "renault" 2 "tarjan" 1 "ufscc" 2]
 
-# anderson:
-foreach {s t} $strategies {
-    dict set commands test_anderson_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=$t \
-	    -n --strategy=$s $EXAMPLES_SRC_PATH/anderson.1.prop4.dve"
-    dict set commands test_anderson_dve_mc_$s exp "scc count: *281301"
-}
+if { "$test_dve" == "yes"} {
 
-# iprotocol
-foreach {s t} $strategies {
-    dict set commands test_iprotocol_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=$t \
-	-n --strategy=$s $EXAMPLES_SRC_PATH/iprotocol.2.prop4.dve"
-    dict set commands test_iprotocol_dve_mc_$s exp "scc count: *25985"
-}
-
-set prom_models [list \
- 	"peterson3.pml" 88197 \
- 	"zune.pml" 1042 \
- 	"i4" 9738 \
-]
-# 	"TimingWithoutTimeout9OnTheFlynessShallow.promela" ?? \ #huge
-
-foreach {m sccs} $prom_models {
-
-    compile_promela $m
-	
+    # anderson:
     foreach {s t} $strategies {
-        dict set commands test_${m}_seq_$s cmd "$binpaths(prom2lts-mc) --threads=$t \
-    	--strategy=$s -n $m.spins"
-        dict set commands test_${m}_seq_$s exp "scc count: *$sccs"
+        dict set commands test_anderson_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=$t \
+                -n --strategy=$s $EXAMPLES_SRC_PATH/anderson.1.prop4.dve"
+        dict set commands test_anderson_dve_mc_$s exp "scc count: *281301"
+    }
+
+    # iprotocol
+    foreach {s t} $strategies {
+        dict set commands test_iprotocol_dve_mc_$s cmd "$binpaths(dve2lts-mc) --threads=$t \
+            -n --strategy=$s $EXAMPLES_SRC_PATH/iprotocol.2.prop4.dve"
+        dict set commands test_iprotocol_dve_mc_$s exp "scc count: *25985"
+    }
+}
+
+if { "$test_promela" == "yes" } {
+
+    set prom_models [list \
+            "peterson3.pml" 88197 \
+            "zune.pml" 1042 \
+            "i4" 9738 \
+    ]
+    # 	"TimingWithoutTimeout9OnTheFlynessShallow.promela" ?? \ #huge
+
+    foreach {m sccs} $prom_models {
+
+        compile_promela $m
+
+        foreach {s t} $strategies {
+            dict set commands test_${m}_seq_$s cmd "$binpaths(prom2lts-mc) --threads=$t \
+            --strategy=$s -n $m.spins"
+            dict set commands test_${m}_seq_$s exp "scc count: *$sccs"
+        }
     }
 }
 

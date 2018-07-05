@@ -13,62 +13,72 @@ puts   "----------------------------------------------\n"
 
 set commands [dict create]
 
-compile_promela {"i4" "p312.pml"}
+global test_dve
+global test_promela
+if { "$test_promela" != "yes" || "$test_dve" != "yes" } {
+    puts "Skipping some tests due to configuration\n"
+}
 
-# TEST 13:
+if { "$test_promela" == "yes" } {
 
-dict set commands test13_seq cmd "$binpaths(prom2lts-seq) i4.spins -d -n"
-dict set commands test13_seq exp "Deadlocks: 501"
+    compile_promela {"i4" "p312.pml"}
 
-dict set commands test13_mc cmd "$binpaths(prom2lts-mc) i4.spins -d -n"
-dict set commands test13_mc exp "Deadlocks: 501"
+    # TEST 13:
 
-dict set commands test13_dist cmd "$binpaths(prom2lts-dist) i4.spins -d -n"
-dict set commands test13_dist exp "Deadlocks: 501"
+    dict set commands test13_seq cmd "$binpaths(prom2lts-seq) i4.spins -d -n"
+    dict set commands test13_seq exp "Deadlocks: 501"
 
-dict set commands test13_sym cmd "$binpaths(prom2lts-sym) i4.spins -d"
-dict set commands test13_sym exp ""
+    dict set commands test13_mc cmd "$binpaths(prom2lts-mc) i4.spins -d -n"
+    dict set commands test13_mc exp "Deadlocks: 501"
+
+    dict set commands test13_dist cmd "$binpaths(prom2lts-dist) i4.spins -d -n"
+    dict set commands test13_dist exp "Deadlocks: 501"
+
+    dict set commands test13_sym cmd "$binpaths(prom2lts-sym) i4.spins -d"
+    dict set commands test13_sym exp ""
 
 
-# TEST 14:
+    # TEST 14:
 
-dict set commands test14_seq cmd "$binpaths(prom2lts-seq) p312.pml.spins --action=assert --trace=t14_seq.gcf"
-dict set commands test14_seq exp ""
+    dict set commands test14_seq cmd "$binpaths(prom2lts-seq) p312.pml.spins --action=assert --trace=t14_seq.gcf"
+    dict set commands test14_seq exp ""
 
-dict set commands test14_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --action=assert --trace=t14_mc.gcf"
-dict set commands test14_mc exp ""
+    dict set commands test14_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --action=assert --trace=t14_mc.gcf"
+    dict set commands test14_mc exp ""
 
-dict set commands test14_sym cmd "$binpaths(prom2lts-sym) p312.pml.spins --action=assert --trace=t14_sym-"
-dict set commands test14_sym exp "found action: assert"
+    dict set commands test14_sym cmd "$binpaths(prom2lts-sym) p312.pml.spins --action=assert --trace=t14_sym-"
+    dict set commands test14_sym exp "found action: assert"
+}
 
-# TEST 15:
+if { "$test_dve" == "yes" } {
 
-dict set commands test15_seq cmd "$binpaths(dve2lts-seq) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv -n"
-dict set commands test15_seq exp ""
+    # TEST 15:
 
-dict set commands test15_mc cmd "$binpaths(dve2lts-mc) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv -n"
-dict set commands test15_mc exp ""
+    dict set commands test15_seq cmd "$binpaths(dve2lts-seq) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv -n"
+    dict set commands test15_seq exp ""
 
-dict set commands test15_dist cmd "$binpaths(dve2lts-dist) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv -n"
-dict set commands test15_dist exp ""
+    dict set commands test15_mc cmd "$binpaths(dve2lts-mc) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv -n"
+    dict set commands test15_mc exp ""
 
-# TEST 16 (count invariants violations):
+    dict set commands test15_dist cmd "$binpaths(dve2lts-dist) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv -n"
+    dict set commands test15_dist exp ""
 
-dict set commands test16_seq cmd "$binpaths(dve2lts-seq) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
-dict set commands test16_seq exp "violations: 397410"
+    # TEST 16 (count invariants violations):
 
-dict set commands test16_mc cmd "$binpaths(dve2lts-mc) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
-dict set commands test16_mc exp "violations: 397410"
+    dict set commands test16_seq cmd "$binpaths(dve2lts-seq) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
+    dict set commands test16_seq exp "violations: 397410"
 
-dict set commands test16_dist cmd "$binpaths(dve2lts-dist) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
-dict set commands test16_dist exp "violations: 397410"
+    dict set commands test16_mc cmd "$binpaths(dve2lts-mc) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
+    dict set commands test16_mc exp "violations: 397410"
 
+    dict set commands test16_dist cmd "$binpaths(dve2lts-dist) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
+    dict set commands test16_dist exp "violations: 397410"
+}
 
 foreach testcase [dict keys $commands] {
     set command [dict get $commands $testcase cmd]
     set exp [dict get $commands $testcase exp]
     runmytest $testcase $command $exp
 }
-
 
 cd ".."

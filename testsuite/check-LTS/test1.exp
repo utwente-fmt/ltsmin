@@ -10,15 +10,21 @@ puts "\n----------------------------------------------"
 puts   "TESTING: LTS generation: state spaces, traces and ETFs"
 puts   "----------------------------------------------\n"
 
-
-
+global test_promela
+global test_dve
+global test_lps
+if { "$test_promela" != "yes" || "$test_dve" != "yes" || "$test_lps" != "yes" } {
+    puts "Skipping some tests due to configuration\n"
+}
 
 set commands [dict create]
 
 # TEST 8:
 
-dict set commands test8 cmd "$binpaths(dve2lts-sym) $EXAMPLES_SRC_PATH/gear.1.dve gear.1.etf --lace-workers=1"
-dict set commands test8 exp "state space has 2689"
+if { "$test_dve" == "yes"} {
+    dict set commands test8 cmd "$binpaths(dve2lts-sym) $EXAMPLES_SRC_PATH/gear.1.dve gear.1.etf --lace-workers=1"
+    dict set commands test8 exp "state space has 2689"
+}
 
 
 dict set commands test8_check cmd "$binpaths(etf2lts-seq) gear.1.etf"
@@ -27,90 +33,98 @@ dict set commands test8_check exp "2689 states 3567 transitions"
 
 # TEST 9:
 
-dict set commands test9_seq cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
-dict set commands test9_seq exp "state space 20 levels, 74 states 92 transitions"
+if { "$test_lps" == "yes" } {
+    dict set commands test9_seq cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
+    dict set commands test9_seq exp "state space 20 levels, 74 states 92 transitions"
 
-dict set commands test9_dist cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
-dict set commands test9_dist exp "state space has 20 levels 74 states 92 transitions"
+    dict set commands test9_dist cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
+    dict set commands test9_dist exp "state space has 20 levels 74 states 92 transitions"
+}
 
 
 # TEST 10:
-compile_promela {"p117.pml"}
+if { "$test_promela" == "yes" } {
+    compile_promela {"p117.pml"}
 
-dict set commands test10_mc cmd "$binpaths(prom2lts-mc) p117.pml.spins -d --trace=a.gcf"
-dict set commands test10_mc exp "Deadlock found"
+    dict set commands test10_mc cmd "$binpaths(prom2lts-mc) p117.pml.spins -d --trace=a.gcf"
+    dict set commands test10_mc exp "Deadlock found"
 
-dict set commands test10_seq cmd "$binpaths(prom2lts-seq) --strategy=dfs p117.pml.spins -d --trace=a.gcf"
-dict set commands test10_seq exp "found at depth"
+    dict set commands test10_seq cmd "$binpaths(prom2lts-seq) --strategy=dfs p117.pml.spins -d --trace=a.gcf"
+    dict set commands test10_seq exp "found at depth"
 
-dict set commands test10_sym cmd "$binpaths(prom2lts-sym) p117.pml.spins -d --trace=a.gcf"
-dict set commands test10_sym exp "deadlock found"
-
+    dict set commands test10_sym cmd "$binpaths(prom2lts-sym) p117.pml.spins -d --trace=a.gcf"
+    dict set commands test10_sym exp "deadlock found"
+}
 
 #set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs" "ufscc"}
 set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ufscc"}
 
-foreach s $strategies {
-    dict set commands test_trace_dve_mc_$s cmd "$binpaths(dve2lts-mc) \
-	--trace=a.gcf --strategy=$s $EXAMPLES_SRC_PATH/iprotocol.2.prop4.dve"
-    dict set commands test_trace_dve_mc_$s exp "Accepting cycle FOUND"
+if { "$test_dve" == "yes" } {
+    foreach s $strategies {
+        dict set commands test_trace_dve_mc_$s cmd "$binpaths(dve2lts-mc) \
+            --trace=a.gcf --strategy=$s $EXAMPLES_SRC_PATH/iprotocol.2.prop4.dve"
+        dict set commands test_trace_dve_mc_$s exp "Accepting cycle FOUND"
+    }
 }
 
 # TODO: Validate the traces of this test by using ltsmin-printtrace
 
 
-# TEST 11:
-# gcf is already tested and created in test 9.
-#dict set commands test11_gcf cmd "$binpaths(lps2lts-seq) $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
-#dict set commands test11_gcf exp ""
+if { "$test_lps" == "yes" } {
+    # TEST 11:
+    # gcf is already tested and created in test 9.
+    #dict set commands test11_gcf cmd "$binpaths(lps2lts-seq) $EXAMPLES_BUILD_PATH/abp.lps model.gcf --mcrl2-rewriter=jitty"
+    #dict set commands test11_gcf exp ""
 
-dict set commands test11_bcg cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.bcg --mcrl2-rewriter=jitty"
-dict set commands test11_bcg exp ""
+    dict set commands test11_bcg cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.bcg --mcrl2-rewriter=jitty"
+    dict set commands test11_bcg exp ""
 
-# can not write state labels to .aut
-#dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.aut --mcrl2-rewriter=jitty"
-#dict set commands test11_aut exp ""
+    # can not write state labels to .aut
+    #dict set commands test11_aut cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.aut --mcrl2-rewriter=jitty"
+    #dict set commands test11_aut exp ""
 
-dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.dir --mcrl2-rewriter=jitty"
-dict set commands test11_dir exp "state space 20 levels, 74 states 92 transitions"
+    dict set commands test11_dir cmd "$binpaths(lps2lts-seq) --strategy=bfs $EXAMPLES_BUILD_PATH/abp.lps model.dir --mcrl2-rewriter=jitty"
+    dict set commands test11_dir exp "state space 20 levels, 74 states 92 transitions"
 
-# create fsm
-dict set commands test11_fsm cmd "$binpaths(ltsmin-convert) --rdwr model.dir model.fsm"
-dict set commands test11_fsm exp ""
+    # create fsm
+    dict set commands test11_fsm cmd "$binpaths(ltsmin-convert) --rdwr model.dir model.fsm"
+    dict set commands test11_fsm exp ""
 
-# compare the output to eachother
+    # compare the output to eachother
 
-#TODO: selecting an appropriate comparing method, now just using "-b" because that one does not crash
-dict set commands test11_check1 cmd "$binpaths(ltsmin-compare) -b model.gcf model.bcg"
-dict set commands test11_check1 exp "LTSs are equivalent"
+    #TODO: selecting an appropriate comparing method, now just using "-b" because that one does not crash
+    dict set commands test11_check1 cmd "$binpaths(ltsmin-compare) -b model.gcf model.bcg"
+    dict set commands test11_check1 exp "LTSs are equivalent"
 
-# can not write state labels to .aut
-#dict set commands test11_check2 cmd "$binpaths(ltsmin-compare) -b model.gcf model.aut"
-#dict set commands test11_check2 exp "LTSs are equivalent"
+    # can not write state labels to .aut
+    #dict set commands test11_check2 cmd "$binpaths(ltsmin-compare) -b model.gcf model.aut"
+    #dict set commands test11_check2 exp "LTSs are equivalent"
 
-# no submodule can open fsm
-#dict set commands test11_check3 cmd "$binpaths(ltsmin-compare) -b model.gcf model.fsm"
-#dict set commands test11_check3 exp "LTSs are equivalent"
+    # no submodule can open fsm
+    #dict set commands test11_check3 cmd "$binpaths(ltsmin-compare) -b model.gcf model.fsm"
+    #dict set commands test11_check3 exp "LTSs are equivalent"
 
-dict set commands test11_check4 cmd "$binpaths(ltsmin-compare) -b model.gcf model.dir"
-dict set commands test11_check4 exp "LTSs are equivalent"
+    dict set commands test11_check4 cmd "$binpaths(ltsmin-compare) -b model.gcf model.dir"
+    dict set commands test11_check4 exp "LTSs are equivalent"
 
-dict set commands test11_check5 cmd "$binpaths(ltsmin-compare) -b model.gcf model.bcg"
-dict set commands test11_check5 exp "LTSs are equivalent"
+    dict set commands test11_check5 cmd "$binpaths(ltsmin-compare) -b model.gcf model.bcg"
+    dict set commands test11_check5 exp "LTSs are equivalent"
 
 
-# TEST 12:
+    # TEST 12:
 
-dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model_dist.gcf --mcrl2-rewriter=jitty"
-dict set commands test12_gcf exp "state space has 20 levels 74 states 92 transitions"
+    dict set commands test12_gcf cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model_dist.gcf --mcrl2-rewriter=jitty"
+    dict set commands test12_gcf exp "state space has 20 levels 74 states 92 transitions"
 
-dict set commands test12_dir cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model_dist.dir --mcrl2-rewriter=jitty"
-dict set commands test12_dir exp "state space has 20 levels 74 states 92 transitions"
+    dict set commands test12_dir cmd "$binpaths(lps2lts-dist) $EXAMPLES_BUILD_PATH/abp.lps model_dist.dir --mcrl2-rewriter=jitty"
+    dict set commands test12_dir exp "state space has 20 levels 74 states 92 transitions"
 
-# NOTE: The working of the following code has never been tested since no correct output was available
-dict set commands test12_check cmd "$binpaths(ltsmin-compare) -b model_dist.dir model_dist.gcf"
-dict set commands test12_check exp "LTSs are equivalent"
+    # NOTE: The working of the following code has never been tested since no correct output was available
+    dict set commands test12_check cmd "$binpaths(ltsmin-compare) -b model_dist.dir model_dist.gcf"
+    dict set commands test12_check exp "LTSs are equivalent"
 
+
+}
 
 foreach testcase [dict keys $commands] {
     set command [dict get $commands $testcase cmd]

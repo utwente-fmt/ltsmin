@@ -1,7 +1,8 @@
 AUTOMAKE_OPTIONS = dejagnu
 #RUNTESTDEFAULTFLAGS = -v -v
 
-EXTRA_DIST =	ltsmin.exp \
+EXTRA_DIST =	wine.exp.in \
+		ltsmin.exp \
 		lib/backends.tcl \
 		lib/include.tcl \
 		lib/default.exp \
@@ -30,14 +31,32 @@ clean-local:
 	rm -rf out/*
 	rm -rf out
 
-DISTCLEANFILES = site.exp
+DISTCLEANFILES = site.exp wine.exp
+
+EXTRA_DEJAGNU_SITE_CONFIG = wine.exp
 
 export DEJAGNU
 
 .NOTPARALLEL:
 .PHONY: $(EXTRA_CHECKS) check-long
+
 $(EXTRA_CHECKS):
+if WINE_MISSING
+       $(error To run tests you need to install Wine, and re-run configure.)
+else
+if NEEDS_WINE
+	export WINEPREFIX=$(top_srcdir)/wine
+	echo "Starting persistent wineserver..."
+	$(WINESERVER) -p || echo "wineserver already running"
+endif
 	$(MAKE) $(AM_MAKEFLAGS) check DEJATOOL="$@"
+if NEEDS_WINE
+	echo "killing wineserver..."
+	$(WINESERVER) -k || echo "wineserver not running"
+endif
+endif
+
+$(EXTRA_CHECKS)-hook:
 
 check-long: $(EXTRA_CHECKS)
 

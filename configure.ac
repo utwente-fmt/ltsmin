@@ -408,6 +408,7 @@ AC_ARG_WITH([sylvan],
 AS_IF([test "x$with_sylvan" != "xno"], [
     PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.4.0 sylvan < 1.5],[
         have_sylvan=yes
+        AC_SUBST([TEST_SYLVAN], [yes]) dnl to make sure dejagnu tests with Sylvan
     ], [
         AC_MSG_WARN([Sylvan >= 1.4.0, < 1.5 is not installed.])
     ])
@@ -418,6 +419,18 @@ AC_DEFINE(
     [do { if (!(cond)) __builtin_unreachable(); } while (0)],
     [Provide a hint to the optimizer]
 )
+
+dnl Check if we need to have Wine to run tests.
+dnl Wine is required on when x-compiling a Windows target.
+AM_CONDITIONAL([NEEDS_WINE], [test "x$BUILD_EXEEXT" != "x$EXEEXT" -a "x$EXEEXT" = "x.exe"])
+AM_COND_IF([NEEDS_WINE], [
+    AC_CHECK_PROG([WINE], [wine], [wine$BUILD_EXEEXT])
+    dnl check for wineserver, this speeds up Wine loading time
+    AC_CHECK_PROG([WINESERVER], [wineserver], [wineserver$BUILD_EXEEXT])
+    AM_CONDITIONAL([WINE_MISSING], [
+        test "x$WINE" != "xwine$BUILD_EXEEXT" -o "x$WINESERVER" != "xwineserver$BUILD_EXEEXT"])
+    AM_COND_IF([WINE_MISSING], [AC_MSG_WARN([[Wine could not be found, tests can not be run.]])])
+], [AM_CONDITIONAL([WINE_MISSING], [false])])
 
 #AM_CONDITIONAL([HAVE_POSIX], [test x"$POSIX_SHARED" = "xyes"])
 AM_CONDITIONAL([HAVE_SCOOP], [test x"$have_scoop" = "xyes"])
@@ -455,15 +468,30 @@ AM_COND_IF([HAVE_SPOT], [AC_DEFINE([HAVE_SPOT],, [Define if using Spot.])])
 AM_CONDITIONAL([HAVE_BUDDY], [test x"$acx_buddy" != x])
 AM_COND_IF([HAVE_BUDDY], [AC_DEFINE([HAVE_BUDDY],, [Define if using BuDDy.])])
 
-EXTRA_CHECKS="check-DVE check-ETF"
+AC_ARG_ENABLE([check_DVE], [AS_HELP_STRING([--disable-check-DVE], [Disable DVE tests])])
+AC_ARG_ENABLE([check_Promela], [AS_HELP_STRING([--disable-check-Promela], [Disable Promela tests])])
+
+EXTRA_CHECKS="check-ETF"
+AS_IF([test "x$enable_check_DVE" != "xno"], [
+   EXTRA_CHECKS="$EXTRA_CHECKS check-DVE"
+   AC_SUBST([TEST_DVE], [yes])
+])
 AM_COND_IF([HAVE_LIBMCRL], [EXTRA_CHECKS="$EXTRA_CHECKS check-LPO"])
-AM_COND_IF([HAVE_LIBMCRL2], [EXTRA_CHECKS="$EXTRA_CHECKS check-LPS"])
+AM_COND_IF([HAVE_LIBMCRL2], [
+    EXTRA_CHECKS="$EXTRA_CHECKS check-LPS"
+    AC_SUBST([TEST_LPS], [yes])
+])
 AM_COND_IF([HAVE_SCOOP], [EXTRA_CHECKS="$EXTRA_CHECKS check-MAPA"])
 AM_COND_IF([HAVE_OPAAL_COMPILER], [EXTRA_CHECKS="$EXTRA_CHECKS check-OPAAL"])
 AM_COND_IF([HAVE_LIBMCRL2], [EXTRA_CHECKS="$EXTRA_CHECKS check-PBES"])
 AM_COND_IF([HAVE_PNML], [EXTRA_CHECKS="$EXTRA_CHECKS check-PNML"])
 AM_COND_IF([HAVE_PROB], [EXTRA_CHECKS="$EXTRA_CHECKS check-ProB"])
-AM_COND_IF([HAVE_SPINS_COMPILER], [EXTRA_CHECKS="$EXTRA_CHECKS check-Promela"])
+AS_IF([test "x$enable_check_Promela" != "xno"], [
+    AM_COND_IF([HAVE_SPINS_COMPILER], [
+        EXTRA_CHECKS="$EXTRA_CHECKS check-Promela"
+        AC_SUBST([TEST_PROMELA], [yes])
+    ])
+])
 EXTRA_CHECKS="$EXTRA_CHECKS check-DFS-FIFO check-LTL"
 AM_COND_IF([HAVE_LIBMCRL2], [EXTRA_CHECKS="$EXTRA_CHECKS check-LTS"])
 EXTRA_CHECKS="$EXTRA_CHECKS check-MU check-POR check-safety check-SCC"
@@ -522,6 +550,7 @@ AC_CONFIG_FILES([
        src/dm/Makefile
        src/bignum/Makefile
        src/ce/Makefile
+       src/tests/wine-wrapper.sh
        src/torx/Makefile
        src/scripts/Makefile
        src/tests/Makefile
@@ -530,6 +559,7 @@ AC_CONFIG_FILES([
        doc/Makefile
        lemon/Makefile
        testsuite/Makefile
+       testsuite/wine.exp
 ])
 
 AC_CONFIG_LINKS([src/ltsmin-lib/lempar.c:lemon/lempar.c])
