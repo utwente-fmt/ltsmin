@@ -49,6 +49,6 @@ endif
 .PHONY: $(EXTRA_CHECKS) check-long
 $(EXTRA_CHECKS): check
 	cd testsuite && $(MAKE) $(AM_MAKEFLAGS) $@
-check-long:
+check-long: check
 	cd testsuite && $(MAKE) $(AM_MAKEFLAGS) $@
 
