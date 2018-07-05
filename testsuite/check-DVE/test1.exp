@@ -13,25 +13,29 @@ puts "\n-----------------------------"
 puts   "TESTING: Algorithmic backend for the DVE language"
 puts   "-----------------------------\n"
 
-set langs [dict create]
+global test_dve
+if { "$test_dve" == "yes" } {
+    set langs [dict create]
 
-# Language frontends:
-# -------------------
+    # Language frontends:
+    # -------------------
 
-set DVE_model "gear.1.dve"
-compile_DVE $DVE_model
+    set DVE_model "gear.1.dve"
+    compile_DVE $DVE_model
 
-# dve:
-dict set langs dve model "${DVE_model}2C"
+    # dve:
+    dict set langs dve model "${DVE_model}2C"
 
-dict set langs dve exp_output "2689 states 3567 transitions"
-set alg_be [ find_alg_backends "{dist,mc,seq}" ]
-run_test_for_alg_backends $alg_be $langs $backends
+    dict set langs dve exp_output "2689 states 3567 transitions"
+    set alg_be [ find_alg_backends "{dist,mc,seq}" ]
+    run_test_for_alg_backends $alg_be $langs $backends
 
-# different output for symbolic tool:
-dict set langs dve exp_output "state space has 2689"
-set alg_be [ find_alg_backends "{sym}" ]
-run_test_for_alg_backends $alg_be $langs $backends
-
+    # different output for symbolic tool:
+    dict set langs dve exp_output "state space has 2689"
+    set alg_be [ find_alg_backends "{sym}" ]
+    run_test_for_alg_backends $alg_be $langs $backends
+} {
+    puts "Skipping DVE tests due to configuration\n"
+}
 
 cd ".."

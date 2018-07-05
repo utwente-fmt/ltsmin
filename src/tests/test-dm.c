@@ -105,12 +105,12 @@ eq_rows(matrix_t *m, int rowa, int rowb, void *context)
     return 1;
 }
 
-static int
-eq_cols(matrix_t *m, int rowa, int rowb, void *context)
-{
-    (void) *m; (void) rowa; (void) rowb; (void) context;
-    return 1;
-}
+//static int
+//eq_cols(matrix_t *m, int rowa, int rowb, void *context)
+//{
+//    (void) *m; (void) rowa; (void) rowb; (void) context;
+//    return 1;
+//}
 
 int
 main (void)
@@ -118,9 +118,6 @@ main (void)
 
     bitvector_t         b1;
     bitvector_t         b2;
-
-    bitvector_free (&b2);
-    bitvector_free (&b1);
 
     bitvector_create (&b1, 20);
 
@@ -237,6 +234,7 @@ main (void)
     print_matrix (&m1);
 
     printf ("copy\n");
+    dm_create(&m2, dm_nrows(&m1), dm_ncols(&m1));
     dm_copy (&m1, &m2);
     // TODO: needs some more work
     print_matrix (&m2);
@@ -414,9 +412,9 @@ main (void)
     // dm_flatten(&m1);
     printf ("max col first:\n");
     print_matrix (&m1);
-    printf ("subsume columns:\n");
-    dm_subsume_cols (&m1, &eq_cols, NULL);
-    dm_subsume_rows (&m1, &eq_rows, NULL);
+    //printf ("subsume columns:\n");
+    //dm_subsume_cols (&m1, &eq_cols, NULL);
+    //dm_subsume_rows (&m1, &eq_rows, NULL);
     print_matrix (&m1);
     printf ("column permutation:\n");
     dm_print_perm (&(m1.col_perm));
@@ -425,16 +423,16 @@ main (void)
     dm_optimize (&m1);
     print_matrix (&m1);
 
-    printf ("ungroup columns:\n");
-    dm_ungroup_cols (&m1);
-    print_matrix (&m1);
+    //printf ("ungroup columns:\n");
+    //dm_ungroup_cols (&m1);
+    //print_matrix (&m1);
 
 
-    printf ("all permutations:\n");
-    dm_set (&m1, 0, 9);
-    dm_nub_cols(&m1, &eq_cols, NULL);
-    print_matrix (&m1);
-    dm_all_perm (&m1);
+    //printf ("all permutations:\n");
+    //dm_set (&m1, 0, 9);
+    //dm_nub_cols(&m1, &eq_cols, NULL);
+    //print_matrix (&m1);
+    //dm_all_perm (&m1);
 
     dm_free (&m2);
     dm_free (&m1);

@@ -11,95 +11,108 @@ puts   "----------------------------------------------\n"
 
 set commands [dict create]
 
+global test_dve
+global test_promela
+if { "$test_promela" != "yes" || "$test_dve" != "yes" } {
+    puts "Skipping some tests due to configuration\n"
+}
+
 # SAFETY TESTS
 
-compile_promela {"i4" "p312.pml"}
+if { "$test_promela" == "yes" } {
 
-# TEST 12
+    compile_promela {"i4" "p312.pml"}
 
-dict set commands test12_seq cmd "$binpaths(dve2lts-seq) -d --por --check -n $EXAMPLES_SRC_PATH/gear.1.dve"
-dict set commands test12_seq exp "Deadlocks: 16"
+    # TEST 12
 
-dict set commands test12_mc cmd "$binpaths(dve2lts-mc) -d --por --check -n $EXAMPLES_SRC_PATH/gear.1.dve --threads=2"
-dict set commands test12_mc exp "Deadlocks: 16"
+    dict set commands test12_seq cmd "$binpaths(dve2lts-seq) -d --por --check -n $EXAMPLES_SRC_PATH/gear.1.dve"
+    dict set commands test12_seq exp "Deadlocks: 16"
 
-dict set commands test12_dist cmd "$binpaths(dve2lts-dist) --por --check -d -n $EXAMPLES_SRC_PATH/gear.1.dve"
-dict set commands test12_dist exp "Deadlocks: 16"
+    dict set commands test12_mc cmd "$binpaths(dve2lts-mc) -d --por --check -n $EXAMPLES_SRC_PATH/gear.1.dve --threads=2"
+    dict set commands test12_mc exp "Deadlocks: 16"
 
-# TEST 13:
+    dict set commands test12_dist cmd "$binpaths(dve2lts-dist) --por --check -d -n $EXAMPLES_SRC_PATH/gear.1.dve"
+    dict set commands test12_dist exp "Deadlocks: 16"
 
-dict set commands test13_seq cmd "$binpaths(prom2lts-seq) i4.spins -d --por --check -n"
-dict set commands test13_seq exp "Deadlocks: 501"
+    # TEST 13:
 
-dict set commands test13_mc cmd "$binpaths(prom2lts-mc) i4.spins -d --por --check -n"
-dict set commands test13_mc exp "Deadlocks: 501"
+    dict set commands test13_seq cmd "$binpaths(prom2lts-seq) i4.spins -d --por --check -n"
+    dict set commands test13_seq exp "Deadlocks: 501"
 
-dict set commands test13_dist cmd "$binpaths(prom2lts-dist) i4.spins --por --check -d -n"
-dict set commands test13_dist exp "Deadlocks: 501"
+    dict set commands test13_mc cmd "$binpaths(prom2lts-mc) i4.spins -d --por --check -n"
+    dict set commands test13_mc exp "Deadlocks: 501"
 
-# TEST 14:
+    dict set commands test13_dist cmd "$binpaths(prom2lts-dist) i4.spins --por --check -d -n"
+    dict set commands test13_dist exp "Deadlocks: 501"
 
-dict set commands test14_seq cmd "$binpaths(prom2lts-seq) p312.pml.spins --por --check --action=assert --trace=t14_seq.gcf"
-dict set commands test14_seq exp ""
+    # TEST 14:
 
-# JM: the --check and --trace are not compatible here.
-dict set commands test14a_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --por --check --action=assert"
-dict set commands test14a_mc exp ""
+    dict set commands test14_seq cmd "$binpaths(prom2lts-seq) p312.pml.spins --por --check --action=assert --trace=t14_seq.gcf"
+    dict set commands test14_seq exp ""
 
-dict set commands test14b_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --por --action=assert --trace=t14_mc.gcf"
-dict set commands test14b_mc exp ""
+    # JM: the --check and --trace are not compatible here.
+    dict set commands test14a_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --por --check --action=assert"
+    dict set commands test14a_mc exp ""
 
-# TEST 15:
+    dict set commands test14b_mc cmd "$binpaths(prom2lts-mc) p312.pml.spins --por --action=assert --trace=t14_mc.gcf"
+    dict set commands test14b_mc exp ""
+}
 
-dict set commands test15_seq cmd "$binpaths(dve2lts-seq) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv --por --check -n"
-dict set commands test15_seq exp ""
+if { "$test_dve" == "yes" } {
 
-dict set commands test15_mc cmd "$binpaths(dve2lts-mc) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv --por --check -n"
-dict set commands test15_mc exp ""
+    # TEST 15:
 
-# TEST 16 (invariants violations)
+    dict set commands test15_seq cmd "$binpaths(dve2lts-seq) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv --por --check -n"
+    dict set commands test15_seq exp ""
 
-dict set commands test16_seq cmd "$binpaths(dve2lts-seq) $EXAMPLES_SRC_PATH/elevator.3.dve --por --check --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
-dict set commands test16_seq exp "violations: 3"
+    dict set commands test15_mc cmd "$binpaths(dve2lts-mc) $EXAMPLES_SRC_PATH/elevator.3.dve --invariant=$EXAMPLES_SRC_PATH/elevator.3.inv --por --check -n"
+    dict set commands test15_mc exp ""
 
-dict set commands test16_mc cmd "$binpaths(dve2lts-mc) $EXAMPLES_SRC_PATH/elevator.3.dve --por --check --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
-dict set commands test16_mc exp "violations: 3"
+    # TEST 16 (invariants violations)
 
+    dict set commands test16_seq cmd "$binpaths(dve2lts-seq) $EXAMPLES_SRC_PATH/elevator.3.dve --por --check --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
+    dict set commands test16_seq exp "violations: 3"
 
-# LTL TESTS
-
-# TEST 18:
-dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --por --check --proviso=cndfs --strategy=cndfs \
-	$EXAMPLES_SRC_PATH/iprotocol.2.dve --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
-dict set commands test18_mc exp "Accepting cycle FOUND"
-
-# NOTE: the difference in the use of captitals in the expected output between this and previous test
-dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --por --check --strategy=scc \
-	$EXAMPLES_SRC_PATH/iprotocol.2.dve --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
-dict set commands test18_seq exp "Accepting cycle FOUND"
-
-dict set commands test18_color cmd "$binpaths(dve2lts-seq) --por --check --strategy=scc \
-	--proviso=color \
-	$EXAMPLES_SRC_PATH/iprotocol.2.dve --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
-dict set commands test18_color exp "Accepting cycle FOUND"
+    dict set commands test16_mc cmd "$binpaths(dve2lts-mc) $EXAMPLES_SRC_PATH/elevator.3.dve --por --check --invariant=$EXAMPLES_SRC_PATH/elevator.3-false.inv -n"
+    dict set commands test16_mc exp "violations: 3"
 
 
-# TEST 19:
+    # LTL TESTS
 
-dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=cndfs \
-	--por --check --proviso=cndfs \
-	$EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"]
-dict set commands test19_mc exp "78528 are accepting"
+    # TEST 18:
+    dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --por --check --proviso=cndfs --strategy=cndfs \
+            $EXAMPLES_SRC_PATH/iprotocol.2.dve --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
+    dict set commands test18_mc exp "Accepting cycle FOUND"
 
-dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	$EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl \
-	--por --check"
-dict set commands test19_seq exp "493859 states"
+    # NOTE: the difference in the use of captitals in the expected output between this and previous test
+    dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --por --check --strategy=scc \
+            $EXAMPLES_SRC_PATH/iprotocol.2.dve --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
+    dict set commands test18_seq exp "Accepting cycle FOUND"
 
-dict set commands test19_color cmd "$binpaths(dve2lts-seq) --strategy=scc --por --check \
-	--proviso=color \
-	$EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"
-dict set commands test19_color exp "493735 states"
+    dict set commands test18_color cmd "$binpaths(dve2lts-seq) --por --check --strategy=scc \
+            --proviso=color \
+            $EXAMPLES_SRC_PATH/iprotocol.2.dve --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
+    dict set commands test18_color exp "Accepting cycle FOUND"
+
+
+    # TEST 19:
+
+    dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=cndfs \
+            --por --check --proviso=cndfs \
+            $EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"]
+    dict set commands test19_mc exp "78528 are accepting"
+
+    dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
+            $EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl \
+            --por --check"
+    dict set commands test19_seq exp "493859 states"
+
+    dict set commands test19_color cmd "$binpaths(dve2lts-seq) --strategy=scc --por --check \
+            --proviso=color \
+            $EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"
+    dict set commands test19_color exp "493735 states"
+
+}
 
 foreach testcase [dict keys $commands] {
     set command [dict get $commands $testcase cmd]
@@ -109,6 +122,5 @@ foreach testcase [dict keys $commands] {
 
     runmytest $testcase $command $exp
 }
-
 
 cd ".."

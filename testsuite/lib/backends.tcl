@@ -11,10 +11,21 @@ dict set backends mc options {"-z6" "--no-ref" "--perm=rr" "--perm=dynamic" ""}
 
 
 # 1 row for every param and a list of possible values
-dict set backends sym params "--order=" {bfs-prev bfs chain-prev chain par par-prev}
+if { "$test_sylvan" == "yes" } {
+    dict set backends sym params "--order=" {bfs-prev bfs chain-prev chain par par-prev}
+} else {
+    dict set backends sym params "--order=" {bfs-prev bfs chain-prev chain}
+}
 dict set backends sym params "--saturation=" {none sat-like sat-loop sat-fix sat}
-# internal and BuDDy
-dict set backends sym params "--vset=" {"ldd --lace-workers=1" "fdd --lace-workers=1" "ldd64 --lace-workers=1" "lddmc --lace-workers=2 --sylvan-sizes=19,19,19,19" "sylvan --lace-workers=2 --sylvan-bits=32 --sylvan-sizes=22,22,22,22"}
+
+if { "$test_sylvan" == "yes" } {
+    # internal, buddy and Sylvan
+    dict set backends sym params "--vset=" {"ldd --lace-workers=1" "fdd --lace-workers=1" "ldd64 --lace-workers=1" "lddmc --lace-workers=2 --sylvan-sizes=19,19,19,19" "sylvan --lace-workers=2 --sylvan-bits=32 --sylvan-sizes=22,22,22,22"}
+} else {
+    # internal and BuDDy
+    dict set backends sym params "--vset=" {"ldd" "fdd" "ldd64"}
+}
+
 dict set backends sym options {"-g" "-rga" "-g -rga" ""}
 
 # 1 row for every param and a list of possible values
@@ -60,6 +71,10 @@ proc run_test_for_alg_backends { alg_be langs backends} {
         set tokens [split $path "/"]
         set command [lindex $tokens end]
         set be [lindex [split $command "-"] 1]
+
+        # fix for Windows's exe extension
+        set be [lindex [split $be "."] 0]
+
         set lang_fe [lindex [split $command "2"] 0]
         
         # the model is a required value

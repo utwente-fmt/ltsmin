@@ -13,28 +13,34 @@ puts "\n-----------------------------"
 puts   "TESTING: Algorithmic backends for Mcrl2"
 puts   "-----------------------------\n"
 
-set langs [dict create]
+global test_lps
+if { "$test_lps" == "yes" } {
 
-# Language frontends:
-# -------------------
+    set langs [dict create]
 
-# lps:
-dict set langs lps model "abp.lps"
-dict set langs lps options mc "--mcrl2-rewriter=jitty"
-dict set langs lps options dist "--mcrl2-rewriter=jitty"
-dict set langs lps options seq "--mcrl2-rewriter=jitty"
-dict set langs lps options sym "--mcrl2-rewriter=jitty"
+    # Language frontends:
+    # -------------------
 
-dict set langs lps exp_output "74 states 92 transitions"
-set alg_be [ find_alg_backends "{dist,mc,seq}" ]
-run_test_for_alg_backends $alg_be $langs $backends
+    # lps:
+    dict set langs lps model "abp.lps"
+    dict set langs lps options mc "--mcrl2-rewriter=jitty"
+    dict set langs lps options dist "--mcrl2-rewriter=jitty"
+    dict set langs lps options seq "--mcrl2-rewriter=jitty"
+    dict set langs lps options sym "--mcrl2-rewriter=jitty"
 
-# different output for symbolic tool:
-dict set langs lps exp_output "state space has 74"
-# below, disable the -g option, this fails in 201409.1, but fixed in newer SVN version.
-dict set backends sym options {"-rga" ""}
-set alg_be [ find_alg_backends "{sym}" ]
-run_test_for_alg_backends $alg_be $langs $backends
+    dict set langs lps exp_output "74 states 92 transitions"
+    set alg_be [ find_alg_backends "{dist,mc,seq}" ]
+    run_test_for_alg_backends $alg_be $langs $backends
+
+    # different output for symbolic tool:
+    dict set langs lps exp_output "state space has 74"
+    # below, disable the -g option, this fails in 201409.1, but fixed in newer SVN version.
+    dict set backends sym options {"-rga" ""}
+    set alg_be [ find_alg_backends "{sym}" ]
+    run_test_for_alg_backends $alg_be $langs $backends
+} {
+    puts "Skipping LPS tests due to configuration\n"
+}
 
 
 cd ".."

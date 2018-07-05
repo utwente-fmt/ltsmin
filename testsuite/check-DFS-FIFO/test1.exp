@@ -13,25 +13,30 @@ puts   "----------------------------------------------\n"
 
 set commands [dict create]
 
-compile_promela {"i4" "TimingWithoutTimeout9OnTheFlynessShallow.promela"}
+global test_promela
+if { "$test_promela" == "yes" } {
 
-dict set commands test13_mc cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo -v i4.spins"
-dict set commands test13_mc exp "Elements: 78977"
+    compile_promela {"i4" "TimingWithoutTimeout9OnTheFlynessShallow.promela"}
 
-dict set commands test13_por cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo --por -v i4.spins"
-dict set commands test13_por exp "Elements: 49220"
+    dict set commands test13_mc cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo -v i4.spins"
+    dict set commands test13_mc exp "Elements: 78977"
 
-dict set commands test14_mc cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo TimingWithoutTimeout9OnTheFlynessShallow.promela.spins"
-dict set commands test14_mc exp "Non-progress cycle FOUND"
+    dict set commands test13_por cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo --por -v i4.spins"
+    dict set commands test13_por exp "Elements: 49220"
 
-dict set commands test14_por cmd "$binpaths(prom2lts-mc) --por --strategy=dfsfifo TimingWithoutTimeout9OnTheFlynessShallow.promela.spins"
-dict set commands test14_por exp "Non-progress cycle FOUND"
+    dict set commands test14_mc cmd "$binpaths(prom2lts-mc) --strategy=dfsfifo TimingWithoutTimeout9OnTheFlynessShallow.promela.spins"
+    dict set commands test14_mc exp "Non-progress cycle FOUND"
+
+    dict set commands test14_por cmd "$binpaths(prom2lts-mc) --por --strategy=dfsfifo TimingWithoutTimeout9OnTheFlynessShallow.promela.spins"
+    dict set commands test14_por exp "Non-progress cycle FOUND"
+} {
+    puts "Skipping some tests due to configuration\n"
+}
 
 foreach testcase [dict keys $commands] {
     set command [dict get $commands $testcase cmd]
     set exp [dict get $commands $testcase exp]
     runmytest $testcase $command $exp
 }
-
 
 cd ".."

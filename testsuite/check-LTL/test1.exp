@@ -11,89 +11,107 @@ puts   "----------------------------------------------\n"
 
 set commands [dict create]
 
+global test_promela
+global test_dve
+
+if { "$test_promela" != "yes" || "$test_dve" != "yes" } {
+    puts "Skipping some tests due to configuration\n"
+}
+
 # TEST 16:
 
 set strategies {"cndfs" "lndfs" "endfs" "endfs,lndfs" "endfs,endfs,ndfs" "ndfs" "ufscc"}
 
-# anderson:
-compile_DVE {"anderson.1.prop4.dve"}
+if { "$test_dve" == "yes" } {
+    # anderson:
+    compile_DVE {"anderson.1.prop4.dve"}
 
-foreach s $strategies {
-    dict set commands test16_dve_mc_$s cmd "$binpaths(dve2lts-mc) \
-    	--strategy=$s anderson.1.prop4.dve2C"
-    dict set commands test16_dve_mc_$s exp "633945 states|unique states count:        633945"
+    foreach s $strategies {
+        dict set commands test16_dve_mc_$s cmd "$binpaths(dve2lts-mc) \
+            --strategy=$s anderson.1.prop4.dve2C"
+        dict set commands test16_dve_mc_$s exp "633945 states|unique states count:        633945"
+    }
+    dict set commands test_16_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
+            anderson.1.prop4.dve2C"
+    # This expected value is assumed to be the same as previous multicore results. This is untested!
+    dict set commands test_16_dve_seq exp "633945 states"
 }
-dict set commands test_16_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	anderson.1.prop4.dve2C"
-# This expected value is assumed to be the same as previous multicore results. This is untested!
-dict set commands test_16_dve_seq exp "633945 states"
 
+if { "$test_promela" == "yes" } {
+    # p117
+    compile_promela {"p117.pml"}
 
-# p117
-compile_promela {"p117.pml"}
-
-foreach s $strategies {
-    dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) \
-	--strategy=$s p117.pml.spins"
-    dict set commands test16_seq_$s exp "354 states|unique states count:        354"
+    foreach s $strategies {
+        dict set commands test16_seq_$s cmd "$binpaths(prom2lts-mc) \
+            --strategy=$s p117.pml.spins"
+        dict set commands test16_seq_$s exp "354 states|unique states count:        354"
+    }
+    dict set commands test16_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
+                                            p117.pml.spins"
+    dict set commands test16_prom_seq exp "354 states"
 }
-dict set commands test16_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
-					p117.pml.spins"
-dict set commands test16_prom_seq exp "354 states"
 
 # TEST 17:
 
-# iprotocol
-compile_DVE {"iprotocol.2.prop4.dve"}
+if { "$test_dve" == "yes" } {
+    # iprotocol
+    compile_DVE {"iprotocol.2.prop4.dve"}
 
-foreach s $strategies {
-    dict set commands test17_dve_mc_$s cmd "$binpaths(dve2lts-mc) \
-	--strategy=$s iprotocol.2.prop4.dve2C"
-    dict set commands test17_dve_mc_$s exp "Accepting cycle FOUND"
+    foreach s $strategies {
+        dict set commands test17_dve_mc_$s cmd "$binpaths(dve2lts-mc) \
+            --strategy=$s iprotocol.2.prop4.dve2C"
+        dict set commands test17_dve_mc_$s exp "Accepting cycle FOUND"
+    }
+    dict set commands test_17_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
+            iprotocol.2.prop4.dve2C"
+    dict set commands test_17_dve_seq exp "Accepting cycle FOUND"
 }
-dict set commands test_17_dve_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	iprotocol.2.prop4.dve2C"
-dict set commands test_17_dve_seq exp "Accepting cycle FOUND"
 
-# zune:
-compile_promela {"zune.pml"}
+if { "$test_promela" == "yes" } {
+    # zune:
+    compile_promela {"zune.pml"}
 
-foreach s $strategies {
-    dict set commands test17_prom_mc_$s cmd "$binpaths(prom2lts-mc) \
-	--strategy=$s zune.pml.spins"
-    dict set commands test17_prom_mc_$s exp "Accepting cycle FOUND"
+    foreach s $strategies {
+        dict set commands test17_prom_mc_$s cmd "$binpaths(prom2lts-mc) \
+            --strategy=$s zune.pml.spins"
+        dict set commands test17_prom_mc_$s exp "Accepting cycle FOUND"
+    }
+    dict set commands test17_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
+                                            zune.pml.spins"
+    dict set commands test17_prom_seq exp "Accepting cycle FOUND"
 }
-dict set commands test17_prom_seq cmd "$binpaths(prom2lts-seq) --strategy=scc \
-					zune.pml.spins"
-dict set commands test17_prom_seq exp "Accepting cycle FOUND"
 
-# TEST 18:
-compile_DVE {"iprotocol.2.dve"}
+if { "$test_dve" == "yes" } {
+    # TEST 18:
+    compile_DVE {"iprotocol.2.dve"}
 
-dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --strategy=ndfs \
-	iprotocol.2.dve2C \
-	--ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
-dict set commands test18_mc exp "Accepting cycle FOUND"
+    dict set commands test18_mc cmd "$binpaths(dve2lts-mc) --strategy=ndfs \
+            iprotocol.2.dve2C \
+            --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
+    dict set commands test18_mc exp "Accepting cycle FOUND"
 
-# NOTE: the difference in the use of captitals in the expected output between this and previous test
-dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	iprotocol.2.dve2C \
-	--ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
-dict set commands test18_seq exp "Accepting cycle FOUND"
+    # NOTE: the difference in the use of captitals in the expected output between this and previous test
+    dict set commands test18_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
+            iprotocol.2.dve2C \
+            --ltl=$EXAMPLES_SRC_PATH/iprotocol.2.ltl"
+    dict set commands test18_seq exp "Accepting cycle FOUND"
+}
 
+if { "$test_dve" == "yes" } {
+    # TEST 19:
+    compile_DVE {"elevator.3.dve"}
 
-# TEST 19:
-compile_DVE {"elevator.3.dve"}
+    dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=ndfs \
+            elevator.3.dve2C \
+            --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"]
+    dict set commands test19_mc exp "495463 states"
 
-dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=ndfs \
-	elevator.3.dve2C \
-	--ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"]
-dict set commands test19_mc exp "495463 states"
+    dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
+            elevator.3.dve2C \
+            --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"
+    dict set commands test19_seq exp "495463 states"
 
-dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
-	elevator.3.dve2C \
-	--ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"
-dict set commands test19_seq exp "495463 states"
+}
 
 foreach testcase [dict keys $commands] {
     set command [dict get $commands $testcase cmd]
@@ -103,6 +121,5 @@ foreach testcase [dict keys $commands] {
 
     runmytest $testcase $command $exp
 }
-
 
 cd ".."

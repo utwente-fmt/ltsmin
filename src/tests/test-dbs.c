@@ -101,7 +101,11 @@ void test() {
         if (seen==0) printf("!%zu", x);
     }
 	struct tms tmp2;
+#ifdef _WIN32
+        float tick = CLK_TCK;
+#else
 	float tick=(float)sysconf(_SC_CLK_TCK);
+#endif
 	float real=(times(&tmp2)-real_time1)/tick;
     stats_t *stat = statistics(dbs);
     int elements = stat->elts;
@@ -170,8 +174,13 @@ void *fill(void *c) {
     }
 
 	struct tms tmp2;
+#ifdef _WIN32
+	float tick=CLK_TCK;
+#else
 	float tick=(float)sysconf(_SC_CLK_TCK);
+#endif
 	float real=(times(&tmp2)-real_time1)/tick;
+
 	float sys=(tmp2.tms_stime-tmp1.tms_stime)/tick;
 	float usr=(tmp2.tms_utime-tmp1.tms_utime)/tick;
 	Warning(info, "filling [%zu]: DONE real=%5.3f, sys=%5.3f, user=%5.3f", id, real,sys,usr);
@@ -371,7 +380,7 @@ main (int c, char **v)
     printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     HREassert ( val == 0, "no empty");
-    printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    //printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     printf("\n");
     //TreeDBSLLinc_sat_bits (dbs, ref);
     HREexit(0);
