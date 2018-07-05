@@ -47,18 +47,6 @@ void parse_file(const char *file, mucalc_parse_env_t env)
     }
 }
 
-char* print_formula(mucalc_parse_env_t env, mucalc_expr_t expr)
-{
-    size_t size;
-    char *buffer;
-    FILE* stream = open_memstream(&buffer, &size);
-    if (stream == NULL)
-        Abort("open_memstream");
-    mucalc_print_formula(stream, env, expr);
-    fclose(stream);
-    return buffer;
-}
-
 void mucalc_parser_test_file(const char *file)
 {
     Print(infoLong, "Mu-calculus parser test for file %s.", file);
@@ -67,8 +55,9 @@ void mucalc_parser_test_file(const char *file)
     if (log_active(infoLong))
     {
         Print(infoLong, "Parser is done.")
-        char* output = print_formula(env, env->formula_tree);
-        Print(infoLong, "output: %s", output);
+        char buf[256];
+        mucalc_print_formula(buf, sizeof(buf), env, env->formula_tree);
+        Print(infoLong, "output: %s", buf);
     }
     mucalc_parse_env_destroy(env);
 }
@@ -78,7 +67,8 @@ void mucalc_parser_test_string(const char *input, const char *expected)
     Print(infoLong, "input:  %s", input);
     mucalc_parse_env_t env = mucalc_parse_env_create();
     parse_string(input, env);
-    char* output = print_formula(env, env->formula_tree);
+    char output[256];
+    mucalc_print_formula(output, sizeof(output), env, env->formula_tree);
     mucalc_parse_env_destroy(env);
     Print(infoLong, "output: %s", output);
     if (expected == NULL)
@@ -90,7 +80,6 @@ void mucalc_parser_test_string(const char *input, const char *expected)
         assert(strlen(expected)==strlen(output) && strncmp(expected, output, strlen(expected))==0);
     }
     Print(infoLong, "succes.");
-    free(output);
 }
 
 void test_formulas()

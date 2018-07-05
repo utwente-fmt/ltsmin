@@ -261,91 +261,99 @@ void mucalc_expr_print(mucalc_parse_env_t env, mucalc_expr_t e)
           e->arg2==NULL ? 0 : e->arg2->idx);
 }
 
-void mucalc_print_formula(FILE* f, mucalc_parse_env_t env, mucalc_expr_t expr)
+size_t mucalc_print_formula(char* b, size_t size, mucalc_parse_env_t env, mucalc_expr_t expr)
 {
-    if (expr == NULL)
-        return;
+#define NEXT_B (b ? b + res : b)
+#define NEXT_SIZE (size ? size - res : size)
+    int res = 0;
+    if (expr == NULL) return res;
     switch(expr->type)
     {
         case MUCALC_FORMULA:
             {
-                mucalc_print_formula(f, env, expr->arg1);
+                res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg1);
             }
             break;
         case MUCALC_MU:
         case MUCALC_NU:
             {
-                fprintf(f, "%s %s . ",
+                res += snprintf(NEXT_B, NEXT_SIZE, "%s %s . ",
                        mucalc_type_print(expr->type),
                        mucalc_fetch_value(env, expr->type, expr->value));
-                mucalc_print_formula(f, env, expr->arg1);
+                res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg1);
             }
             break;
         case MUCALC_MUST:
             {
                 mucalc_action_expression_t action_expr = mucalc_get_action_expression(env, expr->value);
                 const char* label = mucalc_escape_string(mucalc_fetch_action_value(env, action_expr));
-                fprintf(f, "[%s%s%s%s]",
+                res += snprintf(NEXT_B, NEXT_SIZE, "[%s%s%s%s]",
                         (action_expr.negated ? "!" : ""),
                         (strlen(label) == 0 ? "" : "\""),
                         label,
                         (strlen(label) == 0 ? "" : "\""));
-                mucalc_print_formula(f, env, expr->arg1);
+                res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg1);
             }
             break;
         case MUCALC_MAY:
             {
                 mucalc_action_expression_t action_expr = mucalc_get_action_expression(env, expr->value);
                 const char* label = mucalc_escape_string(mucalc_fetch_action_value(env, action_expr));
-                fprintf(f, "<%s%s%s%s>",
+                res += snprintf(NEXT_B, NEXT_SIZE, "<%s%s%s%s>",
                         (action_expr.negated ? "!" : ""),
                         (strlen(label) == 0 ? "" : "\""),
                         label,
                         (strlen(label) == 0 ? "" : "\""));
-                mucalc_print_formula(f, env, expr->arg1);
+                res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg1);
             }
             break;
         case MUCALC_AND:
             {
-                fprintf(f, "(");
-                mucalc_print_formula(f, env, expr->arg1);
-                fprintf(f, " && ");
-                mucalc_print_formula(f, env, expr->arg2);
-                fprintf(f, ")");
+                res += snprintf(NEXT_B, NEXT_SIZE, "(");
+                res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg1);
+                res += snprintf(NEXT_B, NEXT_SIZE, " && ");
+                res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg2);
+                res += snprintf(NEXT_B, NEXT_SIZE, ")");
             }
             break;
         case MUCALC_OR:
             {
-                fprintf(f, "(");
-                mucalc_print_formula(f, env, expr->arg1);
-                fprintf(f, " || ");
-                mucalc_print_formula(f, env, expr->arg2);
-                fprintf(f, ")");
+                res += snprintf(NEXT_B, NEXT_SIZE, "(");
+                res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg1);
+                res += snprintf(NEXT_B, NEXT_SIZE," || ");
+                res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg2);
+                res += snprintf(NEXT_B, NEXT_SIZE, ")");
             }
             break;
         case MUCALC_NOT:
-            fprintf(f, "!");
+            res += snprintf(NEXT_B, NEXT_SIZE, "!");
             // TODO: check if argument is proposition
-            mucalc_print_formula(f, env, expr->arg1);
+            res += mucalc_print_formula(NEXT_B, NEXT_SIZE, env, expr->arg1);
             break;
         case MUCALC_TRUE:
         case MUCALC_FALSE:
             {
-                fputs(mucalc_type_print(expr->type), f);
+                const char *type = mucalc_type_print(expr->type);
+                res += snprintf(NEXT_B, NEXT_SIZE,"%s", type);
             }
             break;
         case MUCALC_PROPOSITION:
             {
-                fprintf(f, "{%s}", mucalc_fetch_value(env, expr->type, expr->value));
+                res += snprintf(NEXT_B, NEXT_SIZE, "{%s}", mucalc_fetch_value(env, expr->type, expr->value));
             }
             break;
         case MUCALC_VAR:
             {
-                fputs(mucalc_fetch_value(env, expr->type, expr->value), f);
+                const char *val = mucalc_fetch_value(env, expr->type, expr->value);
+                res += snprintf(NEXT_B, NEXT_SIZE, "%s", val);
             }
             break;
         default: Abort("mucalc_print_formula: unknown expression type: %d", expr->type);
     }
+
+    return res;
+#undef NEXT_B
+#undef NEXT_SIZE
 }
 
 

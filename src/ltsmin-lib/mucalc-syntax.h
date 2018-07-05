@@ -173,9 +173,11 @@ const char* mucalc_fetch_value(mucalc_parse_env_t env, mucalc_type_enum_t type, 
 void mucalc_expr_print(mucalc_parse_env_t env, mucalc_expr_t e);
 
 /**
- * \brief Prints the expression to f.
+ * \brief Prints the expression to b and returns the number of bytes in b
+ * exclusing the \0 byte. This function writs at most size bytes, including the \0 byte.
+ * Parameter b may be null; then it acts as strcpy.
  */
-void mucalc_print_formula(FILE* f, mucalc_parse_env_t env, mucalc_expr_t expr);
+size_t mucalc_print_formula(char* b, size_t size, mucalc_parse_env_t env, mucalc_expr_t expr);
 
 /**
  * \brief Checks if variables in the formula are in the scope of a corresponding
