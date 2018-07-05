@@ -963,9 +963,8 @@ dom_next_cache_op(vdom_t dom)
 
     return (int) op;
 }
-
 /**
- * Implementation of (parallel) saturation
+ * Implementation of (sequential) saturation
  * (assumes relations are ordered on first variable)
  */
 TASK_5(MDD, lddmc_go_sat, MDD, set, vrel_t*, rels, int, depth, int, count, int, id)
@@ -1024,9 +1023,8 @@ TASK_5(MDD, lddmc_go_sat, MDD, set, vrel_t*, rels, int, depth, int, count, int, 
         result = set;
     } else {
         /* Recursive computation */
-        lddmc_refs_spawn(SPAWN(lddmc_go_sat, lddmc_getright(set), rels, depth, count, id));
+        MDD right = lddmc_refs_push(CALL(lddmc_go_sat, lddmc_getright(set), rels, depth, count, id));
         MDD down = lddmc_refs_push(CALL(lddmc_go_sat, lddmc_getdown(set), rels, depth+1, count, id));
-        MDD right = lddmc_refs_sync(SYNC(lddmc_go_sat));
         lddmc_refs_pop(1);
         result = lddmc_makenode(lddmc_getvalue(set), down, right);
     }
@@ -1036,11 +1034,83 @@ TASK_5(MDD, lddmc_go_sat, MDD, set, vrel_t*, rels, int, depth, int, count, int, 
     return result;
 }
 
-static void
-set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
+
+/**
+ * Implementation of (parallel) saturation
+ * (assumes relations are ordered on first variable)
+ */
+TASK_5(MDD, lddmc_go_sat_par, MDD, set, vrel_t*, rels, int, depth, int, count, int, id)
+{
+    /* Terminal cases */
+    if (set == lddmc_false) return lddmc_false;
+    if (count == 0) return set;
+    assert(set != lddmc_true);
+
+    /* Consult the cache */
+    MDD result;
+    MDD _set = set;
+    if (cache_get3(201LL<<40, _set, (uint64_t)rels, id, &result)) return result;
+    lddmc_refs_pushptr(&_set);
+
+    /* Check if the relation should be applied */
+    int var = rels[0]->topvar;
+    assert(depth <= var);
+    if (depth == var) {
+        /* Count the number of relations starting here */
+        int n = 1;
+        while (n < count && var == rels[n]->topvar) n++;
+        /*
+         * Compute until fixpoint:
+         * - SAT deeper
+         * - learn and chain-apply all current level once
+         */
+        MDD prev = lddmc_false;
+        struct vector_set dummy;
+        lddmc_refs_pushptr(&set);
+        lddmc_refs_pushptr(&prev);
+        while (prev != set) {
+            prev = set;
+            // SAT deeper
+            set = CALL(lddmc_go_sat_par, set, rels+n, depth, count-n, id);
+            // learn and chain-apply all current level once
+            for (int i=0;i<n;i++) {
+                if (rels[i]->expand != NULL) {
+                    // project set
+                    dummy.dom = rels[i]->dom;
+                    dummy.size = rels[i]->r_k;
+                    dummy.meta = rels[i]->r_meta;
+                    dummy.k = rels[i]->r_k;
+                    dummy.proj = rels[i]->r_proj;
+                    dummy.mdd = lddmc_project(set, rels[i]->topread);
+                    // call expand callback
+                    lddmc_refs_pushptr(&dummy.mdd);
+                    rels[i]->expand(rels[i], &dummy, rels[i]->expand_ctx);
+                    lddmc_refs_popptr(1);
+                }
+                // and then step
+                set = lddmc_relprod_union(set, rels[i]->mdd, rels[i]->topmeta, set);
+            }
+        }
+        lddmc_refs_popptr(2);
+        result = set;
+    } else {
+        /* Recursive computation */
+        lddmc_refs_spawn(SPAWN(lddmc_go_sat_par, lddmc_getright(set), rels, depth, count, id));
+        MDD down = lddmc_refs_push(CALL(lddmc_go_sat_par, lddmc_getdown(set), rels, depth+1, count, id));
+        MDD right = lddmc_refs_sync(SYNC(lddmc_go_sat_par));
+        lddmc_refs_pop(1);
+        result = lddmc_makenode(lddmc_getvalue(set), down, right);
+    }
+    // Store in cache
+    cache_put3(201LL<<40, _set, (uint64_t)rels, id, result);
+    lddmc_refs_popptr(1);
+    return result;
+}
+
+static int
+init_least_fixpoint(vrel_t rels[], vrel_t _rels[], int rel_count)
 {
     // Create copy of rels
-    vrel_t rels[rel_count];
     memcpy(rels, _rels, sizeof(vrel_t[rel_count]));
 
     // Sort the rels (using gnome sort)
@@ -1059,11 +1129,30 @@ set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
 
     // Get next id (for cache)
     static volatile int id = 0;
-    int _id = __sync_fetch_and_add(&id, 1);
+
+    return __sync_fetch_and_add(&id, 1);
+}
+
+static void
+set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
+{
+    vrel_t rels[rel_count];
+    int id = init_least_fixpoint(rels, _rels, rel_count);
 
     // Go!
     LACE_ME;
-    dst->mdd = CALL(lddmc_go_sat, src->mdd, rels, 0, rel_count, _id);
+    dst->mdd = CALL(lddmc_go_sat, src->mdd, rels, 0, rel_count, id);
+}
+
+static void
+set_least_fixpoint_par(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
+{
+    vrel_t rels[rel_count];
+    int id = init_least_fixpoint(rels, _rels, rel_count);
+
+    // Go!
+    LACE_ME;
+    dst->mdd = CALL(lddmc_go_sat_par, src->mdd, rels, 0, rel_count, id);
 }
 
 static void
@@ -1102,6 +1191,7 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_next_union=set_next_union;
     dom->shared.set_prev=set_prev;
     dom->shared.set_least_fixpoint=set_least_fixpoint;
+    dom->shared.set_least_fixpoint_par=set_least_fixpoint_par;
 
     dom->shared.rel_create_rw=rel_create_rw;
     dom->shared.rel_destroy=rel_destroy;
