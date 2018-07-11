@@ -481,17 +481,11 @@ get_state_label_long(model_t model, int label, int *src) {
     switch (label) {
         case PROB_IS_INIT_EQUALS_FALSE_GUARD: {
             int res = src[prob_ctx->num_vars];
-//            chunk c = pins_chunk_get(model, prob_ctx->var_type[prob_ctx->num_vars + 1], src[prob_ctx->num_vars + 1]);
-//            printf("%d\n", c.len);
-//            int res = *((int*) c.data);
             assert(res == 0 || res == 1);
             return res == 0;
         }
         case PROB_IS_INIT_EQUALS_TRUE_GUARD: {
             int res = src[prob_ctx->num_vars];
-            //chunk c = pins_chunk_get(model, prob_ctx->var_type[prob_ctx->num_vars + 1], src[prob_ctx->num_vars + 1]);
-            //printf("%d\n", c.len);
-            //int res = *((int*) c.data);
             assert(res == 0 || res == 1);
             return res == 1;
         }
@@ -960,33 +954,6 @@ prob_connect_atomic(prob_client_t pc, const char* file)
     }
 }
 
-//static void
-//setup_transition_short_matrix(model_t *model, int num_groups)
-//{
-//    prob_context_t* ctx = (prob_context_t*) GBgetContext(model);
-//    short_matrix_t matrix;
-//    matrix.size = num_groups;
-//    matrix.matrix = RTmalloc(sizeof(short_row_t) * num_groups);
-//
-//    int i;
-//    for (i = 0; i < num_groups; i++) {
-//        int len = dm_ones_in_row(GBgetDMInfo(model),i);
-//        matrix.matrix[i] = RTmalloc(sizeof(int) * len);
-//        matrix.matrix.size = len;
-//        int pos = 0;
-//
-//        for (j = 0; j < ctx->num_vars; j++) { // ignore is_init
-//            
-//            matrix.matrix.indices[j]
-//        }
-//        // get amount of ones in matrix
-//        // note which 
-//    }
-//
-//
-//
-//    ctx->transition_short_matrix = matrix;
-//}
 
 static void
 prob_load_model(model_t model)
@@ -1009,7 +976,7 @@ prob_load_model(model_t model)
 
     lts_type_t ltstype = lts_type_create();
     const int bool_type = lts_type_add_type(ltstype, "Boolean", NULL);
-    lts_type_set_format (ltstype, bool_type, LTStypeBool); // TODO: LTStypeBool could be sufficient
+    lts_type_set_format (ltstype, bool_type, LTStypeBool);
     const int guard_type = lts_type_add_type(ltstype, "guard", NULL);
     lts_type_set_format (ltstype, guard_type, LTStypeTrilean); // TODO: LTStypeBool could be sufficient
 
