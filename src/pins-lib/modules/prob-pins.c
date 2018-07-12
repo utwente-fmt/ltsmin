@@ -1050,6 +1050,10 @@ prob_load_model(model_t model)
 
     prob_destroy_initial_response(&init);
 
+    // HACK: get rid of unused functions warnings
+    // I'm not happy with deleting them yet :-) (pk, 2018-07-12)
+    (void) get_successors_long;
+    (void) next_action_long;
     //GBsetNextStateLong(model, get_successors_long);
     GBsetNextStateShortR2W(model, get_successors_short_R2W);
     //GBsetStateLabelLong(model, get_state_label_long);
