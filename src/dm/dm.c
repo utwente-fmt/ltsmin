@@ -1579,7 +1579,7 @@ dm_transform_vector_via_short_default(matrix_t* to, matrix_t* from, int row, int
         } else if (set_in_to && !set_in_from) {
             // the original state did not have the variable,
             // need to add from initial state
-            tgt[tgt_idx] = (s0 == 1 ? 1 : s0[s0_idx]);
+            tgt[tgt_idx] = ((size_t) s0 == 1 ? 1 : s0[s0_idx]);
             tgt_idx++; s0_idx++;
         } else if (!set_in_to && set_in_from) {
             // the original state had the variable but the target shall not contain it
