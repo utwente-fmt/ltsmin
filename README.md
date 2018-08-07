@@ -339,7 +339,7 @@ the patch from <contrib/divine-2.4.patch> to the DiVinE source tree:
 
 Alternatively, download a LTSmin-enabled version of DiVinE via git:
 
-    git clone http://fmt.cs.utwente.nl/tools/scm/divine2.git
+    git clone https://github.com/utwente-fmt/divine2.git
 
 Build with:
 
