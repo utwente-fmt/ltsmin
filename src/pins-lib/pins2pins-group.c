@@ -89,8 +89,8 @@ typedef struct group_context {
     int                *groupmap;
     TransitionCB        cb;
     void               *user_context;
-    int                **group_cpy;
-    int                *cpy;
+    int               **group_cpy;
+    int                 group;
 }                  *group_context_t;
 
 
@@ -98,19 +98,23 @@ static void
 group_cb (void *context, transition_info_t *ti, int *olddst, int*cpy)
 {
     group_context_t     ctx = (group_context_t)(context);
+
+    HREassert(!(ti->group != -1 && ctx->group != -1) || ti->group == ctx->group,
+            "group numbers do not match");
+    if (ti->group == -1) ti->group = ctx->group;
+    HREassert(ti->group != -1, "must set group number");
+
     int                 len = ctx->len;
     int                 newdst[len];
     int                 newcpy[len];
+    memcpy(newcpy, ctx->group_cpy[ti->group], sizeof(int[len]));
 
     // possibly fix group and cpy in case it is merged
-    if (ti->group != -1) {
-        if (ctx->cpy == NULL) ctx->cpy = ctx->group_cpy[ti->group];
-        ti->group = ctx->groupmap[ti->group];
-    }
+    ti->group = ctx->groupmap[ti->group];
 
     for (int i = 0; i < len; i++) {
         newdst[i] = olddst[ctx->statemap[i]];
-        newcpy[i] = (ctx->cpy[i] || (cpy != NULL && cpy[ctx->statemap[i]]));
+        if (cpy != NULL) newcpy[i] |= cpy[ctx->statemap[i]];
     }
 
     ctx->cb (ctx->user_context, ti, newdst, newcpy);
@@ -137,7 +141,7 @@ long_ (model_t self, int group, int *newsrc, TransitionCB cb,
 
     for (int j = begin; j < end; j++) {
         int                 g = ctx.transmap[j];
-        ctx.cpy = ctx.group_cpy[g];
+        ctx.group = g;
         Ntrans += long_proc (parent, g, oldsrc, group_cb, &ctx);
     }
 
