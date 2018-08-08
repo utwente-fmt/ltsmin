@@ -6,6 +6,18 @@ SYM_CPP_FLAGS = $(AM_CPPFLAGS) $(PROFILER_CPPFLAGS)
 SYM_LD_FLAGS = $(AM_LDFLAGS) $(PROFILER_LDFLAGS)
 SYM_C_FLAGS = $(AM_CFLAGS) $(PROFILER_CFLAGS)
 
+LIBZZZ  = libpins2lts_sym.la
+LIBZZZ += ../pins-lib/libpins.la
+LIBZZZ += ../vset-lib/libvset.la
+LIBZZZ += maxsum/libmaxsum.la
+LIBZZZ += ../spg-lib/libspg.la
+LIBZZZ += ../mc-lib/libmc.la
+LIBZZZ += $(top_builddir)/lib/libgnu.la
+
+if HAVE_SYLVAN
+LIBZZZ += $(SYLVAN_LIBS)
+SYM_C_FLAGS += $(SYLVAN_CFLAGS)
+endif
 
 noinst_LTLIBRARIES  = libpins2lts_sym.la
 
@@ -21,20 +33,8 @@ libpins2lts_sym_la_SOURCES  += alg/sat.c alg/sat.h
 libpins2lts_sym_la_SOURCES  += aux/output.c aux/output.h
 libpins2lts_sym_la_SOURCES  += aux/prop.c aux/prop.h
 libpins2lts_sym_la_CPPFLAGS = $(SYM_CPP_FLAGS)
+libpins2lts_sym_la_CFLAGS   = $(SYM_C_FLAGS)
 libpins2lts_sym_la_LDFLAGS  = $(SYM_LD_FLAGS)
-
-LIBZZZ  = libpins2lts_sym.la
-LIBZZZ += ../pins-lib/libpins.la
-LIBZZZ += ../vset-lib/libvset.la
-LIBZZZ += maxsum/libmaxsum.la
-LIBZZZ += ../spg-lib/libspg.la
-LIBZZZ += ../mc-lib/libmc.la
-LIBZZZ += $(top_builddir)/lib/libgnu.la
-
-if HAVE_SYLVAN
-LIBZZZ += $(SYLVAN_LIBS)
-SYM_C_FLAGS += $(SYLVAN_CFLAGS)
-endif
 
 PROB_LIB_LIBS = ../prob-lib/libprob.la
 
