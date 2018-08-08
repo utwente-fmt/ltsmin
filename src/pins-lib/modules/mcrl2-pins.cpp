@@ -11,6 +11,13 @@
 #include <utility>
 
 #include <mcrl2/utilities/logger.h>
+
+/* Undef restrict if necessary. This may be defined by gnulib, while
+ * mCRL2 defines it too. See: https://github.com/mCRL2org/mCRL2/issues/1473.
+ */
+#ifdef restrict
+# undef restrict
+#endif
 #include <mcrl2/lps/ltsmin.h>
 
 extern "C" {
