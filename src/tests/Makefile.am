@@ -137,6 +137,10 @@ test_treedbs_LDADD     += ../util-lib/libutil.la $(top_builddir)/lib/libgnu.la
 test_vset_SOURCES               = test-vset.c
 test_vset_LDADD                 = $(VSET_LIB) $(PINS_LIBS)
 test_vset_LDADD                += $(AM_LDFLAGS) $(top_builddir)/lib/libgnu.la
+if HAVE_SYLVAN
+test_vset_LDADD                += $(SYLVAN_LIBS)
+test_vset_CFLAGS                = $(AM_CFLAGS) $(SYLVAN_CFLAGS)
+endif
 nodist_EXTRA_test_vset_SOURCES  = automake-force-linker.cxx # req. by vset
 
 .PHONY: wine-wrapper
