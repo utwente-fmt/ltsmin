@@ -131,11 +131,11 @@ void *fill(void *c) {
         int part_size = NUM/((float)NUM_THREADS);   
         start = part_size*id;
         end = start + part_size;
-	    if (vt==NULL) {
-            if (id==NUM_THREADS-1) end+=NUM%NUM_THREADS;
-        } else {
-            if (id<NUM%NUM_THREADS) end++;
-        }
+        //if (vt==NULL) {
+        //    if (id==NUM_THREADS-1) end+=NUM%NUM_THREADS;
+        //} else {
+        if (id<NUM%NUM_THREADS) end++;
+        //}
         str = 0;
     } else if (SHARED_DB==4) {
         readfile(id);
@@ -156,22 +156,22 @@ void *fill(void *c) {
     int idx;
     struct tms tmp1;
 	clock_t real_time1=times(&tmp1);
-    if (vt==NULL) {
-	    int ar[ARRAY_SIZE];
-        for (size_t x = start; x<end; x++) {
-	    	for (size_t y = 0; y<ARRAY_SIZE; y++) ar[y]=x+y;
-            int seen = lookup_ret(dbs, ar, &idx);
-            if (!seen)
-                res->count++;
-	    }
-    } else {
-        for (size_t x = start; x<end; x++) {
-            int *ar = &vt[str][x*ARRAY_SIZE];
-            int seen = lookup_ret(dbs, ar, &idx);
-            if (!seen)
-                res->count++;
-        }
+    //if (vt==NULL) {
+    //        int ar[ARRAY_SIZE];
+    //    for (size_t x = start; x<end; x++) {
+    //        	for (size_t y = 0; y<ARRAY_SIZE; y++) ar[y]=x+y;
+    //        int seen = lookup_ret(dbs, ar, &idx);
+    //        if (!seen)
+    //            res->count++;
+    //        }
+    //} else {
+    for (size_t x = start; x<end; x++) {
+        int *ar = &vt[str][x*ARRAY_SIZE];
+        int seen = lookup_ret(dbs, ar, &idx);
+        if (!seen)
+            res->count++;
     }
+    //}
 
 	struct tms tmp2;
 #ifdef _WIN32
