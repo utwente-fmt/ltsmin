@@ -262,7 +262,7 @@ main (void)
 
     printf ("nub sorted\n");
 
-    dm_nub_rows (&m1, &eq_rows, NULL);
+    //dm_nub_rows (&m1, &eq_rows, NULL);
 
     print_matrix (&m1);
 
