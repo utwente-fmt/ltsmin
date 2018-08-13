@@ -24,7 +24,7 @@ export SPOT_URL="http://www.lrde.epita.fr/dload/spot/$SPOT_NAME.tar.gz"
 mkdir -p "$HOME/ltsmin-deps"
 
 # install Sylvan from source
-if [ ! -f "$HOME/ltsmin-deps/lib/libsylvan.a" ]; then
+if [ ! -f "$HOME/ltsmin-deps/lib/libsylvan.a" -a "$BUILD_TARGET" != "windows" ]; then
     wget "$SYLVAN_URL" -P /tmp
     tar -xf "/tmp/v$SYLVAN_VERSION.tar.gz" -C /tmp
     pushd /tmp/sylvan-$SYLVAN_VERSION
@@ -39,7 +39,7 @@ fi
 # install zmq from source, since libzmq3-dev in apt is missing dependencies for
 # a full static LTSmin build (pgm and sodium are missing)
 # I filed a bug report here: https://github.com/travis-ci/travis-ci/issues/5701
-if [ ! -f "$HOME/ltsmin-deps/lib/libzmq.a" ]; then
+if [ ! -f "$HOME/ltsmin-deps/lib/libzmq.a" -a "$BUILD_TARGET" != "windows" ]; then
     wget "$ZMQ_URL" -P /tmp
     tar -xf "/tmp/$ZMQ_NAME.tar.gz" -C /tmp
     pushd /tmp/$ZMQ_NAME
@@ -55,7 +55,7 @@ fi
 # since czmq is not distributed in Ubuntu.
 # the LDFLAGS is necessary, because of a bug: https://github.com/zeromq/czmq/issues/1323
 # the CFLAGS is necessary, because we need to unset NDEBUG: https://github.com/zeromq/czmq/issues/1519
-if [ ! -f "$HOME/ltsmin-deps/lib/libczmq.a" ]; then
+if [ ! -f "$HOME/ltsmin-deps/lib/libczmq.a" -a "$BUILD_TARGET" != "windows" ]; then
     wget "$CZMQ_URL" -P /tmp
     tar -xf "/tmp/v$CZMQ_VERSION.tar.gz" -C /tmp
     pushd /tmp/czmq-$CZMQ_VERSION
@@ -71,13 +71,14 @@ if [ ! -f "$HOME/ltsmin-deps/lib/libspot.a" ]; then
     wget "$SPOT_URL" -P /tmp
     tar xf "/tmp/$SPOT_NAME.tar.gz" -C /tmp
     pushd "/tmp/$SPOT_NAME"
-    ./configure --disable-dependency-tracking --disable-python --enable-static --disable-shared --prefix="$HOME/ltsmin-deps"
+    ./configure --disable-dependency-tracking --disable-python --enable-static --disable-shared --prefix="$HOME/ltsmin-deps" || cat config.log
+    make
     make install
     popd
 fi
 
 # install ViennaCL on linux
-if [ ! -d "$HOME/ltsmin-deps/include/viennacl" -a "$TRAVIS_OS_NAME" = "linux" ]; then
+if [ ! -d "$HOME/ltsmin-deps/include/viennacl" -a "$BUILD_TARGET" = "linux" ]; then
     wget "$VIENNACL_URL" -P /tmp &&
     tar xf "/tmp/$VIENNACL_NAME.tar.gz" -C /tmp &&
     cp -R "/tmp/$VIENNACL_NAME/viennacl" "$HOME/ltsmin-deps/include"

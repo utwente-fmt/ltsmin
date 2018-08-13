@@ -2,14 +2,31 @@
 set -e
 #set -o xtrace
 
-export LTSMIN_LDFLAGS="-all-static -Wl,--no-export-dynamic"
-# the lto-type-mismatch warnings seems to be a bug in the GCC-6 compiler
-export LTSMIN_CFLAGS="-Wno-lto-type-mismatch"
-export LTSMIN_CXXFLAGS="-Wno-lto-type-mismatch"
-export STRIP_FLAGS="-s"
-export MCRL2_LIB_DIR=""
+. travis/configure-linux.sh --disable-doxygen-doc \
+    "--prefix=/tmp/$TAG_OR_BRANCH --enable-pkgconf-static"  ""
 
-. travis/build-release-generic.sh
+export MAKEFLAGS=-j2
+
+# make sure we compile LTSmin with a patched Boost
+export CPLUS_INCLUDE_PATH="$CPLUS_INCLUDE_PATH:$TRAVIS_BUILD_DIR/travis/include-fix"
+
+make CPPFLAGS="-DNDEBUG" \
+    CFLAGS="-flto -O3 -Wno-lto-type-mismatch" \
+    CXXFLAGS="-flto -O3 -Wno-lto-type-mismatch" \
+    LDFLAGS="-flto -O3 -all-static -Wl,--no-export-dynamic"
+make install
+
+# install DiVinE so that it is included in the distribution
+. travis/install-DiVinE.sh
+
+strip -s /tmp/$TAG_OR_BRANCH/bin/* || true
+cp "$HOME/ltsmin-deps/bin/divine" "/tmp/$TAG_OR_BRANCH/bin"
+cp "$HOME/ltsmin-deps/bin/txt2lps" "/tmp/$TAG_OR_BRANCH/bin"
+cp "$HOME/ltsmin-deps/bin/txt2pbes" "/tmp/$TAG_OR_BRANCH/bin"
+
+pushd /tmp
+tar cfz "$LTSMIN_DISTNAME.tgz" "$TAG_OR_BRANCH"
+popd
 
 set +e
 
