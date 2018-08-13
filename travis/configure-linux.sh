@@ -15,6 +15,8 @@ export NM="gcc-nm-6"
 
 export MCRL2_LIB_DIR=""
 
+export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$HOME/ltsmin-deps/lib/pkgconfig"
+
 . travis/configure-generic.sh "$@"
 
 set +e
