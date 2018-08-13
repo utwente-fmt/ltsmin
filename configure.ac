@@ -379,7 +379,11 @@ AS_IF([test "x$acx_pnml" != "xyes"], [
     AC_MSG_WARN(No acceptable libxml2 package found. Not building PNML front-end)
 ])
 
-PKG_CHECK_MODULES([POPT], [popt],,[
+PKG_CHECK_MODULES([POPT], [popt],[
+    dnl just substitute them, because popt is needed everywhere
+    AC_SUBST([LIBS], ["$LIBS $POPT_LIBS"])
+    AC_SUBST([AM_CFLAGS], ["$AM_CFLAGS $POPT_CFLAGS"])
+],[
     AC_MSG_ERROR(Missing required package popt please install popt.)
 ])
 
