@@ -164,6 +164,21 @@ in Section [Build Dependencies](#build-dependencies) below.
     # Configure
     $ ./configure --disable-dependency-tracking --prefix /path/
 
+### Building a Windows target
+
+If you are building a Windows target with MinGW you need to pass additional variables and flags to `./configure`:
+
+1. You need to set the correct C compiler: `CC=x86_64-w64-mingw32-gcc`,
+1. You need to set the correct C++ compiler with the correct threading model: `CXX=x86_64-w64-mingw32-g++-posix`,
+1. You need to set the correct host triplet: `--host=--host=x86_64-w64-mingw32`.
+1. You need to add additional linker flags: `LDFLAGS='-static-libgcc -static-libstdc++ -Wl,-Bstatic,--whole-archive -Wl,-lwinpthread -L/home/jeroen/.local-win/lib -lmman -Wl,--no-whole-archive'`.
+
+So the whole commanline becomes:
+
+    $ ./configure CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++-posix --host=x86_64-w64-mingw32 LDFLAGS='-static-libgcc -static-libstdc++ -Wl,-Bstatic,--whole-archive -Wl,-lwinpthread -L/path/to/libmman.a -lmman -Wl,--no-whole-archive' PKG_CONFIG_PATH=/path/to/Windows/packages/lib/pkgconfig  --disable-dependency-tracking --prefix /path/ 
+
+Note that this example assumes the MinGW compiler that is shipped by default with Debian/Ubuntu, hence the host triplet is `x86_64-w64-mingw32`. If you are using [MXE](http://pkg.mxe.cc/), the host triplet to use is `x86_64-w64-mingw32.static`, and you may omit specifying the variables `CC`, and `CXX`. However, you must specify the location of `pkgconf` packages using `PKG_CONFIG_PATH_x86_64_w64_mingw32_static`, instead of `PKG_CONFIG_PATH`.
+
 ### Some notes on configuring pkgconf
 
 If you have installed `pkgconf` in a non-standard location, you may
@@ -250,10 +265,15 @@ The following additional make targets are supported:
 We list the external libraries and tools which are required to build
 this software.
 
+If you want to compile a Windows target using MinGW we recommend using [MXE](http://pkg.mxe.cc/).
+MXE provides pre-built Windows libraries as Debian packages.
+This is useful if you don't want to compile LTSmin's dependencies manually.
+
 #### popt
 
 Download popt (>= 1.7) from <http://rpm5.org/files/popt/>.  We tested
-with popt 1.14.
+with popt 1.16. If you are compiling popt for Windows with MinGW make sure to apply
+[this](https://github.com/mxe/mxe/blob/master/src/popt-1-win32.patch) patch.
 
 #### zlib
 
@@ -273,6 +293,11 @@ JavaCC task support for Ant.
 #### pkgconf
 
 Download pkgconf from <https://github.com/pkgconf/pkgconf>.
+
+#### mman (Windows only)
+
+If you are compiling LTSmin for Windows using MinGW, you need an additional
+wrapper library for `mman`, which can be downloaded from: https://github.com/witwall/mman-win32/.
 
 ### Optional Dependencies
 
