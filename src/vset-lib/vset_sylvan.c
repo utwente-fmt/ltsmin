@@ -605,6 +605,19 @@ set_example(vset_t set, int *e)
     state_from_cube(set->dom, set->k, set->proj, e, cube);
 }
 
+
+/**
+ * Compute the intersection of two short vectors into <dst>.
+ * The vectors can be different projections.
+ */
+static void
+set_join(vset_t dst, vset_t left, vset_t right)
+{
+    LACE_ME;
+
+    dst->bdd = sylvan_and(left->bdd, right->bdd);
+}
+
 /**
  * Enumerate all states that match partial state <match>
  * <match> is p_len long
@@ -1296,6 +1309,7 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.set_enum_match=set_enum_match;
     dom->shared.set_copy=set_copy;
     dom->shared.set_copy_match=set_copy_match;
+    dom->shared.set_join=set_join;
     // copy_match_proj
     // proj_create
     dom->shared.set_example=set_example;
