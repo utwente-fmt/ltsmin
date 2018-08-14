@@ -499,6 +499,17 @@ static void actual_main(void *arg)
 
     if (sccs) detect_sccs (visited);
 
+    for (int i = 0; i < nGrps; i++) {
+        long int n;
+        double e;
+
+        //vset_project ( visited);
+
+        vset_count (group_explored[i], &n, &e);
+        Warning (info, "Local read: %.0f",  e);
+    }
+
+
     /* report states */
     final_stat_reporting(visited);
 
