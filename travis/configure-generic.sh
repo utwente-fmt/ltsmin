@@ -12,7 +12,7 @@ autoreconf -i
 
 export PATH="$PATH:$HOME/ltsmin-deps/bin:$HOME/ProB"
 
-. travis/check-build-cache.sh
+#. travis/check-build-cache.sh
 
 set +e
 
