@@ -9,7 +9,7 @@ export CXX="x86_64-w64-mingw32.static-g++"
 
 echo "deb http://pkg.mxe.cc/repos/apt/debian wheezy main" \
     | sudo tee /etc/apt/sources.list.d/mxeapt.list
-sudo apt-key adv --keyserver x-hkp://keys.gnupg.net \
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 \
     --recv-keys D43A795B73B16ABE9643FE1AFD8FFF16DB45C6AB
 
 sudo apt-get update
