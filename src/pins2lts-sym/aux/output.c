@@ -323,11 +323,11 @@ stats_and_progress_report(vset_t current, vset_t visited, int level)
     if (log_active (infoLong) || peak_nodes) {
         if (current != NULL) {
             int digs = vset_count_fn (current, &n_count, &e_count);
-            Print(infoLong, "level %d has %.*Lg states ( %ld nodes )", level, digs, e_count, n_count);
+            Print(infoLong, "level %'d has %'.*Lg states ( %'ld nodes )", level, digs, e_count, n_count);
             if (n_count > max_lev_count) max_lev_count = n_count;
         }
         int digs = vset_count_fn (visited, &n_count, &e_count);
-        Print(infoLong, "visited %d has %.*Lg states ( %ld nodes )", level, digs, e_count, n_count);
+        Print(infoLong, "visited %'d has %'.*Lg states ( %'ld nodes )", level, digs, e_count, n_count);
 
         if (n_count > max_vis_count) max_vis_count = n_count;
 
@@ -426,7 +426,7 @@ final_stat_reporting(vset_t visited)
 
     int is_precise = strstr(states, "e") == NULL && strstr(states, "inf") == NULL;
 
-    Print(infoShort, "state space has%s %s states, %ld nodes", precise && is_precise ? " precisely" : "", states, n_count);
+    Print(infoShort, "state space has%s %s states, %'ld nodes", precise && is_precise ? " precisely" : "", states, n_count);
 
     if (!is_precise && precise) {
         if (vdom_supports_precise_counting(domain)) {
@@ -454,15 +454,15 @@ final_stat_reporting(vset_t visited)
         if (peak_nodes) l = info;
         else l = infoLong;
         if (max_lev_count == 0) {
-            Print(l, "( %ld final BDD nodes; %ld peak nodes )", n_count, max_vis_count);
+            Print(l, "( %'ld final BDD nodes; %'ld peak nodes )", n_count, max_vis_count);
         } else {
             Print(l,
-                  "( %ld final BDD nodes; %ld peak nodes; %ld peak nodes per level )",
+                  "( %'ld final BDD nodes; %'ld peak nodes; %'ld peak nodes per level )",
                   n_count, max_vis_count, max_lev_count);
         }
 
         if (log_active (debug)) {
-            Debug("( peak transition cache: %ld nodes; peak group explored: " "%ld nodes )\n",
+            Debug("( peak transition cache: %'ld nodes; peak group explored: " "%'ld nodes )\n",
                   max_trans_count, max_grp_count);
         }
     }
@@ -479,17 +479,17 @@ final_final_stats_reporting ()
     double explored_total_vector_count = 0;
     for (int i = 0; i < nGrps; i++) {
         vrel_count (group_next[i], &n_count, &e_count);
-        Print(infoLong, "group_next[%d]: %.*g short vectors %ld nodes", i,
+        Print(infoLong, "group_next[%d]: %'.*g short vectors %'ld nodes", i,
               DBL_DIG, e_count, n_count);
         total_node_count += n_count;
         vset_count (group_explored[i], &n_count, &e_count);
-        Print(infoLong, "group_explored[%d]: %.*g short vectors, %ld nodes", i,
+        Print(infoLong, "group_explored[%d]: %'.*g short vectors, %'ld nodes", i,
               DBL_DIG, e_count, n_count);
         explored_total_node_count += n_count;
         explored_total_vector_count += e_count;
     }
-    Print(info, "group_next: %ld nodes total", total_node_count);
-    Print(info, "group_explored: %ld nodes, %.*g short vectors total",
+    Print(info, "group_next: %'ld nodes total", total_node_count);
+    Print(info, "group_explored: %'ld nodes, %'.*g short vectors total",
           explored_total_node_count, DBL_DIG, explored_total_vector_count);
     if (PINS_USE_GUARDS) {
         long total_false = 0;
@@ -497,19 +497,19 @@ final_final_stats_reporting ()
         explored_total_vector_count = 0;
         for (int i = 0; i < nGuards; i++) {
             vset_count (label_false[i], &n_count, &e_count);
-            Print(infoLong, "guard_false[%d]: %.*g short vectors, %ld nodes", i,
+            Print(infoLong, "guard_false[%d]: %'.*g short vectors, %'ld nodes", i,
                   DBL_DIG, e_count, n_count);
             total_false += n_count;
             explored_total_vector_count += e_count;
             vset_count (label_true[i], &n_count, &e_count);
-            Print(infoLong, "guard_true[%d]: %.*g short vectors, %ld nodes", i,
+            Print(infoLong, "guard_true[%d]: %'.*g short vectors, %'ld nodes", i,
                   DBL_DIG, e_count, n_count);
             total_true += n_count;
             explored_total_vector_count += e_count;
         }
-        Print(info, "guard_false: %ld nodes total", total_false);
-        Print(info, "guard_true: %ld nodes total", total_true);
-        Print(info, "guard: %.*g short vectors total", DBL_DIG,
+        Print(info, "guard_false: %'ld nodes total", total_false);
+        Print(info, "guard_true: %'ld nodes total", total_true);
+        Print(info, "guard: %'.*g short vectors total", DBL_DIG,
               explored_total_vector_count);
     }
 }

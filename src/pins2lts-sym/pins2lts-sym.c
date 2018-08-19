@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <dirent.h>
 #include <limits.h>
+#include <locale.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -371,6 +372,8 @@ VOID_TASK_1(actual_main, void*, arg)
 static void actual_main(void *arg)
 #endif
 {
+    setlocale(LC_NUMERIC, "en_US");
+
     int argc = ((struct args_t*)arg)->argc;
     char **argv = ((struct args_t*)arg)->argv;
 
