@@ -168,7 +168,7 @@ static void reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vse
         dummy->eg_count = 1;
 
         // Compute successor states
-        vset_next_fn(dummy->container, dummy->container, group_next[dummy->index]);
+        vset_next_fn(dummy->container, dummy->container, dummy->index);
         dummy->next_count = 1;
 
         // Compute ancestor states
@@ -372,7 +372,7 @@ VOID_TASK_3(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
         dummy->eg_count = 1;
 
         // Compute successor states
-        vset_next_fn(dummy->container, dummy->container, group_next[dummy->index]);
+        vset_next_fn(dummy->container, dummy->container, dummy->index);
         dummy->next_count = 1;
 
         // Compute ancestor states

@@ -200,7 +200,7 @@ find_trace_to(int trace_end[][N], int end_count, int level, vset_t *levels,
 
             for(int j = 0; j < nGrps; j++) {
                 reduce(j, temp);
-                vset_next_fn(temp, src_set, group_next[j]);
+                vset_next_fn(temp, src_set, j);
                 vset_union(dst_set, temp);
             }
 
@@ -886,7 +886,7 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         vset_copy(new_reduced[i], deadlocks);
         learn_guards_reduce(new_reduced[i], i, NULL, guard_maybe, false_states, maybe_states, tmp);
         expand_group_next(i, new_reduced[i]);
-        vset_next_fn(next_temp, new_reduced[i], group_next[i]);
+        vset_next_fn(next_temp, new_reduced[i], i);
         vset_prev(prev_temp, next_temp, group_next[i],new_reduced[i]);
         reduce(i, prev_temp);
         vset_minus(deadlocks, prev_temp);

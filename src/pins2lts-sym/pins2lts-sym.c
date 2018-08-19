@@ -36,6 +36,7 @@
 #include <pins2lts-sym/alg/reach.h>
 #include <pins2lts-sym/alg/sat.h>
 #include <pins2lts-sym/alg/scc.h>
+#include <pins2lts-sym/alg/sweep.h>
 #include <pins2lts-sym/aux/options.h>
 #include <pins2lts-sym/aux/output.h>
 #include <pins2lts-sym/aux/prop.h>
@@ -64,7 +65,21 @@ int vset_count_ldbl(vset_t set, long* nodes, long double* elements);
 
 vset_count_t vset_count_fn = &vset_count_dbl;
 
-vset_next_t vset_next_fn = vset_next;
+
+static void
+vset_next_union_src(vset_t dst, vset_t src, int group)
+{
+    vset_next_union(dst, src, group_next[group], src);
+}
+
+static void
+vset_next_normal(vset_t dst, vset_t src, int group)
+{
+    vset_next(dst, src, group_next[group]);
+}
+
+vset_next_t vset_next_fn_old = NULL;
+vset_next_t vset_next_fn = vset_next_normal;
 
 int
 vset_count_dbl(vset_t set, long* nodes, long double* elements)
@@ -90,14 +105,6 @@ vset_count_ldbl(vset_t set, long* nodes, long double* elements)
 {
     vset_ccount(set, nodes, elements);
     return LDBL_DIG;
-}
-
-typedef void(*vset_next_t)(vset_t dst, vset_t src, vrel_t rel);
-
-static void
-vset_next_union_src(vset_t dst, vset_t src, vrel_t rel)
-{
-    vset_next_union(dst, src, rel, src);
 }
 
 static void
@@ -315,7 +322,11 @@ static void run_reachability(vset_t states, char *etf_output)
 
     switch (guide_strategy) {
     case UNGUIDED:
-        guided_proc = unguided;
+        if (sweep) {
+            guided_proc = sweep_search;
+        } else {
+            guided_proc = unguided;
+        }
         break;
     case DIRECTED:
         guided_proc = directed;
@@ -434,6 +445,13 @@ static void actual_main(void *arg)
     }
 
     if (next_union) vset_next_fn = vset_next_union_src;
+
+    if (sweep) {
+        sweep_idx = lts_type_find_state(ltstype, sweep);
+        if (sweep_idx == -1) Abort("Sweep line method: state slot '%s' does not exist.", sweep);
+        vset_next_fn_old = vset_next_fn;
+        vset_next_fn = sweep_vset_next;
+    }
 
     init_domain(VSET_IMPL_AUTOSELECT);
 

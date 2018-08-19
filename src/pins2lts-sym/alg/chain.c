@@ -83,7 +83,7 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 reach_chain_stop();
                 (*eg_count)++;
                 (*next_count)++;
-                vset_next_fn(temp, new_reduced, group_next[i]);
+                vset_next_fn(temp, new_reduced, i);
                 vset_clear(new_reduced);
                 if (dlk_detect) {
                     vset_prev(dlk_temp, temp, group_next[i], deadlocks);
@@ -166,7 +166,7 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             reach_chain_stop();
             (*eg_count)++;
             (*next_count)++;
-            vset_next_fn(temp, new_reduced, group_next[i]);
+            vset_next_fn(temp, new_reduced, i);
             vset_clear(new_reduced);
             vset_union(visited, temp);
             if (dlk_detect) {

@@ -175,7 +175,7 @@ typedef int(*vset_count_t)(vset_t set, long* nodes, long double* elements);
 
 extern vset_count_t vset_count_fn;
 
-typedef void(*vset_next_t)(vset_t dst, vset_t src, vrel_t rel);
+typedef void(*vset_next_t)(vset_t dst, vset_t src, int group);
 
 extern vset_next_t vset_next_fn;
 

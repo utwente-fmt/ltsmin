@@ -55,6 +55,8 @@ int   action_typeno;
 int   ErrorActions = 0; // count number of found errors (action/deadlock/invariant)
 int   precise = 0;
 int   next_union = 0;
+char *sweep = NULL;
+int   sweep_idx = -1;
 
 int   sat_granularity = 10;
 int   save_sat_levels = 0;
@@ -244,6 +246,7 @@ struct poptOption options[] = {
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options",NULL},
     { "no-soundness-check", 0, POPT_ARG_VAL, &no_soundness_check, 1, "disable checking whether the model specification is sound for guards", NULL },
     { "precise", 0, POPT_ARG_NONE, &precise, 0, "Compute the final number of states precisely", NULL},
+    { "sweep", 0, POPT_ARG_STRING, &sweep, 0, "Swepline method", NULL },
     { "next-union", 0, POPT_ARG_NONE, &next_union, 0, "While computing successor states; unify simultaneously with current states", NULL },
     { "peak-nodes", 0, POPT_ARG_NONE, &peak_nodes, 0, "record peak nodes and report after reachability analysis", NULL },
     {NULL, 0, POPT_ARG_INCLUDE_TABLE, maxsum_options, 0, "Integer arithmetic options", NULL},
