@@ -144,6 +144,8 @@ extern void lts_type_set_state_typeno(lts_type_t  t,int idx,int typeno);
 /// Get the type number of a state slot.
 extern int lts_type_get_state_typeno(lts_type_t  t,int idx);
 
+extern int lts_type_find_state(lts_type_t  t, const char *name);
+
 extern void lts_type_set_state_label_count(lts_type_t  t,int count);
 extern int lts_type_get_state_label_count(lts_type_t  t);
 extern void lts_type_set_state_label_name(lts_type_t  t,int label,const char*name);

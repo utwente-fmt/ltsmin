@@ -227,6 +227,14 @@ char* lts_type_get_state_type(lts_type_t  t,int idx){
 	}
 }
 
+int lts_type_find_state(lts_type_t t, const char *name) {
+    for (int i = 0; i < lts_type_get_state_length(t); i++) {
+        char *n = lts_type_get_state_name(t, i);
+        if (strcmp(n, name) == 0) return i;
+    }
+    return -1;
+}
+
 void lts_type_set_state_typeno(lts_type_t  t,int idx,int typeno){
     HREassert (idx < t->state_length);
 	t->state_type[idx]=typeno;
