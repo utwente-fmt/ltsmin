@@ -26,7 +26,6 @@ addons:
       - libpopt-dev
       - libz-dev
       - xmlto
-      - pastebinit
 
 stage: cache warmup
 

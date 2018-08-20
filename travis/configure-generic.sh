@@ -10,7 +10,7 @@ CONFIGURE_FLAGS="$CONFIGURE_FLAGS --disable-dependency-tracking"
 export CONFIGURE_FLAGS="$CONFIGURE_FLAGS --with-mcrl2=$HOME/ltsmin-deps$MCRL2_LIB_DIR $@"
 
 autoreconf -i
-./configure $CONFIGURE_FLAGS || { pastebinit -b slexy.org config.log && exit 1; }
+./configure $CONFIGURE_FLAGS || { cat config.log && exit 1; }
 
 export PATH="$PATH:$HOME/ltsmin-deps/bin:$HOME/ProB"
 
