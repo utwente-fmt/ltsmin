@@ -14,7 +14,6 @@ viennacl \
 ant \
 popt \
 libtool \
-pastebinit \
 dejagnu
 #ghc \
 #cabal-install \
