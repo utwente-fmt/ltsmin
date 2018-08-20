@@ -11,13 +11,13 @@ cache:
 addons:
   apt:
     sources:
-      - ubuntu-toolchain-r-test # for gcc-7
+      - ubuntu-toolchain-r-test # for gcc-6
     packages:
       - asciidoc
       - dejagnu
       - doxygen
-      - g++-7
-      - gcc-7
+      - g++-6
+      - gcc-6
       - libboost-dev
       - libhwloc-dev
       - libgmp-dev
