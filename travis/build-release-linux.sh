@@ -15,7 +15,7 @@ cp /usr/lib/x86_64-linux-gnu/libnuma.a "$HOME/static-libs"
 cp /usr/lib/x86_64-linux-gnu/libz.a "$HOME/static-libs"
 
 export LTSMIN_LDFLAGS="-L$HOME/static-libs -static-libgcc -static-libstdc++"
-# the lto-type-mismatch warnings seems to be a bug in the GCC-7 compiler
+## the lto-type-mismatch warnings seems to be a bug in the GCC-6 compiler
 export LTSMIN_CFLAGS="-Wno-lto-type-mismatch"
 export LTSMIN_CXXFLAGS="-Wno-lto-type-mismatch"
 export STRIP_FLAGS="-s"
