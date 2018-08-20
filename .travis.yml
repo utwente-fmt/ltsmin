@@ -24,7 +24,7 @@ addons:
       - liblzma-dev
       - libnuma-dev
       - libpopt-dev
-      - libz-dev
+      - zlib1g-dev
       - xmlto
 
 stage: cache warmup
