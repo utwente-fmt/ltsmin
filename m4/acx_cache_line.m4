@@ -58,6 +58,9 @@ size_t cache_line_size() {
 
 #elif defined(linux)
 
+#include <math.h>
+#include <stdio.h>
+
 size_t cache_line_size() {
     FILE * p = 0;
     p = fopen("/sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size", "r");
@@ -74,9 +77,6 @@ size_t cache_line_size() {
     return 0;
 }
 #endif
-
-#include <math.h>
-#include <stdio.h>
 
 /* return log2(cache_line_size) */
 int main() {
@@ -100,7 +100,7 @@ int main() {
         [acx_cl2=6;AC_MSG_WARN([Cannot determine cache line size due to x-compilation, using 2^6.])]
     )
 
-    [let "acx_cl=1<<$acx_cl2"]
+    acx_cl=$((1<<$acx_cl2))
 
     AC_DEFINE_UNQUOTED([CACHE_LINE], [$acx_cl2], [Log2 size of the machine's cache line])
     AC_DEFINE_UNQUOTED([CACHE_LINE_SIZE], [$acx_cl], [Size of the machine's cache line])
