@@ -1,5 +1,5 @@
 # Changelog
-## Unreleased: x.x.x
+## Unreleased: 3.1.0
 
 - Improvements to the symbolic back-end (*lts-sym):
     - The ProB front-end now allows low level parallel decision diagram
@@ -8,6 +8,7 @@
     - Great refactor of the symbolic back-end to make it more
       accessible to developers.
     - Build completely static Linux binaries.
+    - Add support for Windows.
 
 ## July 3, 2018: 3.0.2
 

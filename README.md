@@ -146,6 +146,7 @@ More manpages can be found at [here](assets/man/).
  - MacOS X, version 10.6 "Snow Leopard" (no multi-core muCRL/mCRL2)
  - MacOS X, version 10.5 "Leopard" (no multi-core muCRL/mCRL2)
  - Cygwin/Windows (tested on Windows 7 with Cygwin 1.7)
+ - Windows (native, with MinGW/MSYS)
  
 For the use of the multi-core BDD package Sylvan and the multi-core
 reachability algorithms (`*2lts-mc`), we further recommend using a 64-bit OS.
