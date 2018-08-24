@@ -172,7 +172,7 @@ If you are building a Windows target with MinGW you need to pass additional vari
 1. You need to set the correct C compiler: `CC=x86_64-w64-mingw32-gcc`,
 1. You need to set the correct C++ compiler with the correct threading model: `CXX=x86_64-w64-mingw32-g++-posix`,
 1. You need to set the correct host triplet: `--host=--host=x86_64-w64-mingw32`.
-1. You need to add additional linker flags: `LDFLAGS='-static-libgcc -static-libstdc++ -Wl,-Bstatic,--whole-archive -Wl,-lwinpthread -L/home/jeroen/.local-win/lib -lmman -Wl,--no-whole-archive'`.
+1. You need to add additional linker flags: `LDFLAGS='-static-libgcc -static-libstdc++ -Wl,-Bstatic,--whole-archive -Wl,-lwinpthread -L/path/to/libmman.a -lmman -Wl,--no-whole-archive'`.
 
 So the whole commanline becomes:
 
