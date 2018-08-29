@@ -492,6 +492,7 @@ reach_local_setup   (run_t *run, wctx_t *ctx)
     if (inv_detect) { // local parsing
         ctx->local->env = LTSminParseEnvCreate();
         ctx->local->inv_expr = pred_parse_file (inv_detect, ctx->local->env, GBgetLTStype(ctx->model));
+        set_groups_of_edge(ctx->model, ctx->local->inv_expr);
         set_pins_semantics (ctx->model, ctx->local->inv_expr, ctx->local->env, NULL, NULL);
     }
 

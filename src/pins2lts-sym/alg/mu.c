@@ -186,6 +186,7 @@ mu_compute(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited,
         bitvector_t deps;
         bitvector_create(&deps, N);
 
+        set_groups_of_edge(model, mu_expr);
         set_pins_semantics(model, mu_expr, env, &deps, NULL);
         rel_expr_info_t ctx;
 
@@ -390,6 +391,7 @@ mu_rec(ltsmin_expr_t mu_expr, ltsmin_parse_env_t env, vset_t visited, mu_object_
         bitvector_t deps;
         bitvector_create(&deps, N);
 
+        set_groups_of_edge(model, mu_expr);
         set_pins_semantics(model, mu_expr, env, &deps, NULL);
         rel_expr_info_t ctx;
 

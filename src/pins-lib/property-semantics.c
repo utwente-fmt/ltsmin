@@ -25,6 +25,30 @@
 #define GROUP_NOT_FOUND_HINT\
     "To change this error into a warning use option --allow-undefined-edges"
 
+void set_groups_of_edge(model_t model, ltsmin_expr_t e)
+{
+    switch (e->node_type) {
+        case BINARY_OP: {
+            set_groups_of_edge(model, e->arg1);
+            set_groups_of_edge(model, e->arg2);
+            break;
+        }
+        case UNARY_OP: {
+            set_groups_of_edge(model, e->arg1);
+            break;
+        }
+        case EVAR: {
+            HREassert(e->n_groups == -1 && e->groups == NULL, "groups already set");
+            e->groups = RTmalloc(sizeof(int[pins_get_group_count(model)]));
+            e->n_groups = GBgroupsOfEdge(model, e->idx, e->chunk_cache, e->groups);
+            e->groups = RTrealloc(e->groups, sizeof(int[e->n_groups]));
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps, bitvector_t *sl_deps)
 {
     const lts_type_t lts_type = GBgetLTStype(model);
@@ -60,10 +84,10 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
 
             e->chunk_cache = pins_chunk_put(model, type, c);
 
-            e->groups = RTmalloc(sizeof(int[pins_get_group_count(model)]));
-            e->n_groups = GBgroupsOfEdge(model, e->idx, e->chunk_cache, e->groups);
-            e->groups = RTrealloc(e->groups, sizeof(int[e->n_groups]));
+            HREassert(e->n_groups > -1, "groups not set");
+
             if (e->n_groups > 0) {
+                HREassert(e->groups != NULL, "groups not set");
                 for (int k = 0; k < e->n_groups; k++) {
                     const int group = e->groups[k];
                     if (PINS_POR) pins_add_group_visible(model, group);

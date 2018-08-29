@@ -17,6 +17,8 @@
 #include <pins-lib/pins-util.h>
 #include <util-lib/util.h>
 
+extern void set_groups_of_edge(model_t model, ltsmin_expr_t e);
+
 /* set visibility in PINS and dependencies in deps (if not NULL) */
 extern void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps, bitvector_t *sl_deps);
 

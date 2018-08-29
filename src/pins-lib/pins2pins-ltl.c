@@ -631,6 +631,9 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
             ba->env = env;
             print_ltsmin_buchi(ba, env);
         }
+        for (int k=0; k < ba->predicate_count; k++) {
+            set_groups_of_edge(model, ba->predicates[k]);
+        }
         atomic_write (&shared_ba, ba);
         HREbarrier(HREglobal());
     } else {
