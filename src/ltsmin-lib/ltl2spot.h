@@ -10,7 +10,9 @@ extern "C" {
 
 #include <ltsmin-lib/ltsmin-buchi.h>
 
-void ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba, ltsmin_parse_env_t env);
+typedef enum { SPOT_AUT_TYPE_TGBA, SPOT_AUT_TYPE_BA, SPOT_AUT_TYPE_MONITOR } spot_aut_type_t;
+
+void ltsmin_ltl2spot(ltsmin_expr_t e, spot_aut_type_t type, ltsmin_parse_env_t env);
 ltsmin_buchi_t *ltsmin_hoa_buchi(ltsmin_parse_env_t env);
 void ltsmin_hoa_destroy();
 

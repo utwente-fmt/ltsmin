@@ -43,6 +43,7 @@ typedef enum {
     PINS_BUCHI_TYPE_BA,
     PINS_BUCHI_TYPE_TGBA,
     PINS_BUCHI_TYPE_SPOTBA,
+    PINS_BUCHI_TYPE_MONITOR,
 } pins_buchi_type_t;
 
 /**

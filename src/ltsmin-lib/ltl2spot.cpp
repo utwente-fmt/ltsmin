@@ -14,7 +14,7 @@
 #include <spot/twa/bddprint.hh>
 #include <spot/twaalgos/translate.hh>
 #include <spot/twaalgos/isdet.hh>
-#include <spot/twaalgos/hoa.hh>
+#include <spot/twaalgos/strength.hh>
 
 extern "C" {
 
@@ -159,7 +159,8 @@ check_edgevar(ltsmin_expr_t e, ltsmin_parse_env_t env)
 }
 
 spot::twa_graph_ptr spot_automaton;
-bool isTGBA;
+spot_aut_type_t spot_aut_type;
+
 
 static int 
 get_predicate_index(std::vector<std::string> pred_vec, std::string predicate) 
@@ -193,13 +194,19 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
 
   // create bitset for the acceptance set
   uint32_t acceptance_set = 0;
-  if (isTGBA) {
-    HREassert (aut->num_sets() <= 32, "No more than 32 TGBA accepting sets supported.")
-    for (size_t i=0; i<aut->num_sets(); i++)
-      acceptance_set |= (1ULL << i);
+  switch (spot_aut_type) {
+    case SPOT_AUT_TYPE_BA:
+    case SPOT_AUT_TYPE_MONITOR: {
+      HREassert(aut->num_sets() == 1, "Multiple acceptance sets for BA");
+      break;
+    }
+    case SPOT_AUT_TYPE_TGBA: {
+      HREassert (aut->num_sets() <= 32, "No more than 32 TGBA accepting sets supported.");
+      for (size_t i=0; i<aut->num_sets(); i++)
+        acceptance_set |= (1ULL << i);
+      break;
+    }
   }
-  else 
-    HREassert(aut->num_sets() == 1, "Multiple acceptance sets for BA");
   ba->acceptance_set = acceptance_set;
 
   // the initial state is not always 0, thus we create a map for the state numbers
@@ -255,10 +262,17 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
       transition_count * sizeof(ltsmin_buchi_transition_t));
     bs->transition_count = transition_count;
 
-    if (isTGBA) 
-      bs->accept = 0;
-    else 
-      bs->accept = aut->state_is_accepting(s);
+    switch (spot_aut_type) {
+      case SPOT_AUT_TYPE_BA:
+      case SPOT_AUT_TYPE_MONITOR: {
+        bs->accept = aut->state_is_accepting(s);
+        break;
+      }
+      case SPOT_AUT_TYPE_TGBA: {
+        bs->accept = 0;
+        break;
+      }
+    }
 
     // iterate over the transitions
     int trans_index = 0;
@@ -270,7 +284,7 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
 
         // parse the acceptance sets
         bs->transitions[trans_index].acc_set  = 0;
-        if (isTGBA) {
+        if (spot_aut_type == SPOT_AUT_TYPE_TGBA) {
           for (unsigned acc : t.acc.sets()) {
             bs->transitions[trans_index].acc_set |= (1 << ((uint32_t) acc));
           }
@@ -334,7 +348,7 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
 
 
 void 
-ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba, ltsmin_parse_env_t env) 
+ltsmin_ltl2spot(ltsmin_expr_t e, spot_aut_type_t type, ltsmin_parse_env_t env)
 {
   // construct the LTL formula and store the predicates
   char *buff = ltl_to_store(e, env);
@@ -356,15 +370,36 @@ ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba, ltsmin_parse_env_t env)
   HREassert(!parse_errors, "Parse errors found in conversion of LTL to Spot formula. LTL = %s", buff);
 
   spot::translator trans;
-  isTGBA = to_tgba;
-  if (isTGBA)
-    trans.set_type(spot::postprocessor::TGBA);
-  else
-    trans.set_type(spot::postprocessor::BA);
-  trans.set_pref(spot::postprocessor::Deterministic);
+  spot_aut_type = type;
+
+  int pref = spot::postprocessor::Deterministic;
+  switch (spot_aut_type) {
+    case SPOT_AUT_TYPE_BA: {
+      trans.set_type(spot::postprocessor::BA);
+      break;
+    }
+    case SPOT_AUT_TYPE_TGBA: {
+      trans.set_type(spot::postprocessor::TGBA);
+      break;
+    }
+    case SPOT_AUT_TYPE_MONITOR: {
+      trans.set_type(spot::postprocessor::Monitor);
+      pref |= spot::postprocessor::Complete;
+      break;
+    }
+  }
+  trans.set_pref(pref);
 
   // create the automaton
   spot_automaton = trans.run(f.f);
+
+  if (spot_aut_type == SPOT_AUT_TYPE_MONITOR) {
+    HREassert(spot::is_deterministic(spot_automaton) && spot::is_complete(spot_automaton),
+        "monitor is not deterministic and complete");
+    if (!spot::is_safety_automaton(spot_automaton)) {
+      LTSminLogExpr(info, "LTL formula is not a safety property: ", e, env);
+    }
+  }
 
   // free
   RTfree(buff);

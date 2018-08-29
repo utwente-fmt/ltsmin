@@ -1,5 +1,8 @@
 #include <hre/config.h>
 
+#include <ltsmin-lib/ltsmin-standard.h>
+
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/pins-util.h>
 
 #include <pins2lts-mc/algorithm/ltl.h> // ecd_* && dfs_stack_trace
@@ -489,6 +492,12 @@ reach_local_setup   (run_t *run, wctx_t *ctx)
     }
 
     ctx->local->inv_expr = NULL;
+    if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR) {
+        if (inv_detect == NULL) {
+            inv_detect = LTSMIN_STATE_LABEL_ACCEPTING;
+            Warning(infoLong, "Detecting monitor violation with invariant: '%s'.", inv_detect);
+        } else Warning(info, "Not detecting monitor violations, because an invariant is given.");
+    }
     if (inv_detect) { // local parsing
         ctx->local->env = LTSminParseEnvCreate();
         ctx->local->inv_expr = pred_parse_file (inv_detect, ctx->local->env, GBgetLTStype(ctx->model));

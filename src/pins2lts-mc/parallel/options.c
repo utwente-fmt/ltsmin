@@ -71,7 +71,8 @@ options_static_init      (model_t model, bool timed)
     if (strategy[0] == Strat_None) {
         if (pins_get_weak_ltl_progress_state_label_index(model) != -1 && !PINS_POR) {
             strategy[0] = Strat_DFSFIFO;
-        } else if (pins_get_accepting_state_label_index(model) < 0) {
+        } else if (pins_get_accepting_state_label_index(model) < 0
+                || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR) {
             strategy[0] = timed ? Strat_SBFS : Strat_BFS;
         } else {
             strategy[0] = Strat_CNDFS;

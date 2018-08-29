@@ -120,7 +120,29 @@ ltsmin;;
     Same as spin semantics, but now deadlocks in the LTS do NOT cause the Buchi
     to progress independently.
     This option is the default if edge-based atomic predicates are found
-    in the LTL formula.
+    in the LTL formula or when a monitor is built.
+
+*--buchi-type*='ba|spotba|tgba|monitor'::
+    Select the type of Buchi automaton to build to crossproduct with.
++
+Four options are available; the default is 'ba'.
+
+ba;;
+    Use the Buchi automaton created by ltl2ba.
+
+spotba;;
+    Use the Buchi automaton created by Spot.
+
+tgba;;
+    Use the Transition-based Generalized Buchi Automaton created by Spot.
+
+monitor;;
+    Use the monitor created by Spot. When a monitor is created, LTSmin will
+    compute the crossproduct with this monitor. Every *finite* trace in the
+    crossproduct leading to the rejecting state in the monitor is a violation of
+    the LTL formula. LTSmin will warn the user when the LTL formula is not a
+    safety property. For more information about monitors see:
+    https://spot.lrde.epita.fr/tut11.html.
 endif::ltl[]
 
 *--por*='heur|del'::

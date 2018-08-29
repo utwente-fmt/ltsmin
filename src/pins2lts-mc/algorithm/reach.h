@@ -23,6 +23,7 @@
 #define REACH_H
 
 #include <lts-io/user.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <mc-lib/lb.h>
 #include <mc-lib/statistics.h>
@@ -158,8 +159,10 @@ invariant_detect (wctx_t *ctx)
     loc->counters.violations++;
     if ((!no_exit || trc_output) && run_stop(ctx->run)) {
         Warning (info, " ");
-        Warning (info, "Invariant violation (%s) found at depth %zu!",
-                 inv_detect, ctx->counters->level_cur);
+        const char* violation = strcmp(inv_detect, LTSMIN_STATE_LABEL_ACCEPTING) == 0
+            ? "Monitor" : "Invariant";
+        Warning (info, "%s violation (%s) found at depth %zu!",
+                 violation, inv_detect, ctx->counters->level_cur);
         Warning (info, " ");
         handle_error_trace (ctx);
     }

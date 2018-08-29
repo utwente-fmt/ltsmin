@@ -45,6 +45,7 @@ static si_map_entry db_buchi_type[]={
     {"ba",      PINS_BUCHI_TYPE_BA},
     {"tgba",    PINS_BUCHI_TYPE_TGBA},
     {"spotba",  PINS_BUCHI_TYPE_SPOTBA},
+    {"monitor",  PINS_BUCHI_TYPE_MONITOR},
     {NULL, 0}
 };
 
@@ -96,7 +97,7 @@ struct poptOption ltl_options[] = {
     {"ltl-semantics", 0, POPT_ARG_STRING, &ltl_semantics_name, 0,
      "LTL semantics", "<spin|textbook|ltsmin> (default: \"auto\")"},
     {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
-     "Buchi automaton type", "<ba|tgba|spotba>"},
+     "Buchi automaton type", "<ba|tgba|spotba|monitor>"},
     POPT_TABLEEND
 };
 
@@ -323,6 +324,7 @@ static int
 ltl_spin_all (model_t self, int *src, TransitionCB cb,
               void *user_context)
 {
+    HREassert(PINS_BUCHI_TYPE != PINS_BUCHI_TYPE_MONITOR, "spin semantics incompatible with monitors.");
     ltl_context_t *ctx = GBgetContext(self);
 
     cb_context new_ctx = {self, cb, user_context, src, 0, ctx, 0};
@@ -576,14 +578,17 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
         struct LTL_info LTL_info = {0, 0};
         check_LTL(ltl, env, &LTL_info);
         if (PINS_LTL == PINS_LTL_AUTO) {
-            if (LTL_info.has_EVAR) {
+            if (LTL_info.has_EVAR || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR) {
                 PINS_LTL = PINS_LTL_LTSMIN;
                 Print(info, "Using LTSmin LTL semantics");
             } else {
                 PINS_LTL = PINS_LTL_SPIN;
                 Print(info, "Using Spin LTL semantics");
             }
+        } else if (PINS_LTL == PINS_LTL_SPIN && PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR) {
+            Abort("Monitors (--buchi-type=monitor) and Spin semantics (--ltl-semantics=spin) are incompatible.");
         }
+
         if (LTL_info.has_X && PINS_POR) {
             const char* ex = LTSminPrintExpr(ltl, env);
             Abort("The neXt operator is not allowed in "
@@ -604,12 +609,14 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
             }
         }
 
-        ltsmin_expr_t notltl = LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
+        const ltsmin_expr_t notltl = PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR
+            ? ltl : LTSminExpr(UNARY_OP, LTL_NOT, 0, ltl, NULL);
 
 #ifdef HAVE_SPOT
         if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA ||
-            PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA) {
-            ltsmin_ltl2spot(notltl, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env);
+            PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA ||
+            PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR) {
+            ltsmin_ltl2spot(notltl, (spot_aut_type_t) (PINS_BUCHI_TYPE - 1), env);
             ba = ltsmin_hoa_buchi(env);
         } else {
 #endif
@@ -780,11 +787,12 @@ GBaddLTL (model_t model)
     matrix_t       *p_sl = GBgetStateLabelInfo (model);
     int             sl_count = dm_nrows (p_sl);
 
+    int             new_sl_count = sl_count;
+
     ctx->is_weak = is_weak(ba);
-    int             new_sl_count;
-    if (ctx->is_weak) {
+    if (PINS_BUCHI_TYPE != PINS_BUCHI_TYPE_MONITOR && ctx->is_weak) {
         Print1 (info, "Weak Buchi automaton detected, adding non-accepting as progress label.");
-        new_sl_count = sl_count + 2;
+        new_sl_count += 2;
         lts_type_set_state_label_count (ltstype_new, new_sl_count);
 
         ctx->sl_idx_nonaccept = sl_count + 1;
@@ -792,7 +800,7 @@ GBaddLTL (model_t model)
         lts_type_set_state_label_typeno (ltstype_new, ctx->sl_idx_nonaccept, bool_type);
     } else {
         ctx->sl_idx_nonaccept = -1;
-        new_sl_count = sl_count + 1;
+        new_sl_count++;
         lts_type_set_state_label_count (ltstype_new, new_sl_count);
     }
 
@@ -800,7 +808,6 @@ GBaddLTL (model_t model)
     ctx->sl_idx_accept = sl_count;
     lts_type_set_state_label_name (ltstype_new, ctx->sl_idx_accept, LTSMIN_STATE_LABEL_ACCEPTING);
     lts_type_set_state_label_typeno (ltstype_new, ctx->sl_idx_accept, bool_type);
-
 
     // copy state labels
     for (int i = 0; i < sl_count; ++i) {
@@ -973,7 +980,7 @@ GBaddLTL (model_t model)
         if (bitvector_is_set(&formula_state_dep, j))
             dm_set(p_new_sl, ctx->sl_idx_accept, j+1);
     }
-    
+
     bitvector_clear(&formula_state_dep);
 
     GBsetStateLabelInfo(ltlmodel, p_new_sl);
