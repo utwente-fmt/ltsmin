@@ -99,9 +99,11 @@ group_cb (void *context, transition_info_t *ti, int *olddst, int*cpy)
 {
     group_context_t     ctx = (group_context_t)(context);
 
-    HREassert(!(ti->group != -1 && ctx->group != -1) || ti->group == ctx->group,
-            "group numbers do not match");
     if (ti->group == -1) ti->group = ctx->group;
+
+    // the following assertion may be triggered for the mCRL2 front-end,
+    // because it does not set the group number. This means the combo
+    // of reordering and next-state-all is not available for mCRL2.
     HREassert(ti->group != -1, "must set group number");
 
     int                 len = ctx->len;
@@ -172,6 +174,7 @@ group_all (model_t self, int *newsrc, TransitionCB cb,
     int                 oldsrc[len];
     ctx->cb = cb;
     ctx->user_context = user_context;
+    ctx->group = -1;
 
     for (int i = 0; i < len; i++)
         oldsrc[ctx->statemap[i]] = newsrc[i];
