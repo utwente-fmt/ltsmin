@@ -227,25 +227,25 @@ create_ltl_env(ltsmin_parse_env_t env)
 
 /* Convert weak untils to until or generally */
 static ltsmin_expr_t
-ltl_tree_walker(ltsmin_expr_t in)
+ltl_tree_walker(ltsmin_expr_t in, ltsmin_parse_env_t env)
 {
     ltsmin_expr_t arg1, arg2, u, g;
     // handle sub-expressions
     switch (in->node_type) {
         case UNARY_OP:
-            arg1 = ltl_tree_walker(in->arg1);
+            arg1 = ltl_tree_walker(in->arg1, env);
             in->arg1 = arg1;
             LTSminExprRehash(in);
             break;
         case BINARY_OP:
-            arg1 = ltl_tree_walker(in->arg1);
-            arg2 = ltl_tree_walker(in->arg2);
+            arg1 = ltl_tree_walker(in->arg1, env);
+            arg2 = ltl_tree_walker(in->arg2, env);
             switch (in->token) {
                 case LTL_WEAK_UNTIL:
-                    u = LTSminExpr(BINARY_OP, LTL_UNTIL, 0, arg1, arg2);
-                    g = LTSminExpr(UNARY_OP, LTL_GLOBALLY, 0, arg1, NULL);
+                    u = LTSminExpr(BINARY_OP, LTL_UNTIL, LTSminBinaryIdx(env,LTL_NAME(LTL_UNTIL)), arg1, arg2);
+                    g = LTSminExpr(UNARY_OP, LTL_GLOBALLY, LTSminUnaryIdx(env, LTL_NAME(LTL_GLOBALLY)), arg1, NULL);
                     RTfree (in);
-                    in = LTSminExpr(BINARY_OP, LTL_OR, 0, u, g);
+                    in = LTSminExpr(BINARY_OP, LTL_OR, LTSminBinaryIdx(env, LTL_NAME(LTL_OR)), u, g);
                     break;
                 default:
                     in->arg1 = arg1;
@@ -290,7 +290,7 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
 
-    env->expr = ltl_tree_walker(env->expr);
+    env->expr = ltl_tree_walker(env->expr, env);
 
     return env->expr;
 }
