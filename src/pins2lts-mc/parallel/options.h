@@ -62,7 +62,6 @@ extern proviso_t        proviso;
 extern int              no_exit;
 
 extern char*            trc_output;
-extern int              write_state;
 extern int              inhibit;
 extern char*            label_filter;
 extern char            *files[];

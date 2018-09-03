@@ -50,7 +50,6 @@ strategy_t       strategy[MAX_STRATEGIES] =
                 {Strat_None, Strat_None, Strat_None, Strat_None, Strat_None};
 proviso_t        proviso = Proviso_None;
 char*            trc_output = NULL;
-int              write_state = 0;
 int              inhibit = 0;
 int              no_exit = 0;
 char*            label_filter = NULL;
@@ -229,7 +228,6 @@ alg_popt (poptContext con, enum poptCallbackReason reason,
 
 struct poptOption alg_options_extra[] = {
     {"trace", 0, POPT_ARG_STRING, &trc_output, 0, "file to write trace to", "<lts output>" },
-    {"write-state", 0, POPT_ARG_VAL, &write_state, 1, "write the full state vector", NULL },
     {"filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
      "Select the labels to be written to file from the state vector elements, "
      "state labels and edge labels." , "<patternlist>" },

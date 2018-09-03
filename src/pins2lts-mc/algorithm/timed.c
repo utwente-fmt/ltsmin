@@ -319,7 +319,7 @@ ta_pbfs (wctx_t *ctx)
                     !run_is_stopped (ctx->run)) {
                 if (grab_waiting(ctx, state_data)) {
                     ta_explore_state (ctx);
-                    if (EXPECT_FALSE(loc->lts && write_state)){
+                    if (EXPECT_FALSE(loc->lts != NULL)){
                         state_data_t pins_state = state_info_pins_state (ctx->state);
                         if (SL > 0)
                             GBgetStateLabelsAll (ctx->model, pins_state, labels);

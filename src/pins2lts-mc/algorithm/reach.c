@@ -389,7 +389,7 @@ pbfs (wctx_t *ctx)
                 ctx->counters->explored++;
 
                 run_maybe_report1 (ctx->run, ctx->counters, "");
-                if (EXPECT_FALSE(loc->lts && write_state)){
+                if (EXPECT_FALSE(loc->lts != NULL)){
                     if (SL > 0)
                         GBgetStateLabelsAll (ctx->model, state_data, labels);
                     lts_write_state (loc->lts, ctx->id, state_data, labels);
@@ -516,10 +516,8 @@ reach_local_setup   (run_t *run, wctx_t *ctx)
             string_set_t label_set = SSMcreateSWPset(label_filter);
             Print1 (info, "label filter is \"%s\"", label_filter);
             ctx->local->lts = lts_file_create_filter (files[1], ltstype, label_set, W, template);
-            write_state=1;
         } else {
             ctx->local->lts = lts_file_create (files[1], ltstype, W, template);
-            if (SL > 0) write_state = 1;
         }
         int T = lts_type_get_type_count (ltstype);
         for (int i = 0; i < T; i++)
