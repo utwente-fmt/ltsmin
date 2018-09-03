@@ -1,12 +1,18 @@
 # Changelog
 ## Unreleased: 3.1.0
 
-- Improvements to the symbolic back-end (*lts-sym):
+- Improvements to the multi-core back-end (*2lts-mc):
+    - Add support for checking LTL with monitors through option 
+      '--buchi-type=monitor'. 
+
+- Improvements to the symbolic back-end (*2lts-sym):
     - The ProB front-end now allows low level parallel decision diagram
       operations when using Sylvan.
     - A parallel saturation algorithm is now available.
     - Great refactor of the symbolic back-end to make it more
       accessible to developers.
+
+- Other:
     - Build completely static Linux binaries.
     - Add support for Windows.
 
