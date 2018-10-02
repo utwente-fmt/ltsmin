@@ -258,6 +258,11 @@ bitvector_ll_t *seen_actions;
 vset_t true_states;
 vset_t false_states;
 
+#ifdef LTSMIN_PBES
+bool is_pbes_tool = true;
+#else
+bool is_pbes_tool = false;
+#endif
 int var_pos = 0;
 int var_type_no = 0;
 int variable_projection = 0;

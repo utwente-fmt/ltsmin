@@ -71,11 +71,12 @@ init_spg(model_t model)
     for(int i=0; i<N; i++)
     {
         //Printf(infoLong, "%d: %s (%d [%s])\n", i, lts_type_get_state_name(type, i), lts_type_get_state_typeno(type, i), lts_type_get_state_type(type, i));
-#ifdef LTSMIN_PBES
-        char* str1 = "string"; // for the PBES language module
-#else
-        char* str1 = "mu"; // for the mu-calculus PINS layer
-#endif
+        char* str1;
+        if (is_pbes_tool) {
+            str1 = "string"; // for the PBES language module
+        } else {
+            str1 = "mu"; // for the mu-calculus PINS layer
+        }
         size_t strlen1 = strlen(str1);
         char* str2 = lts_type_get_state_type(type, i);
         size_t strlen2 = strlen(str2);
@@ -209,7 +210,7 @@ lts_to_pg_solve (vset_t visited, int* src)
             if (spg_options->check_strategy) {
                 copy = spg_copy (g);
             }
-            _Bool result = spg_solve (g, &strategy, spg_options);
+            bool result = spg_solve (g, &strategy, spg_options);
             Print(info, " ");
             Print(info, "The result is: %s.", result ? "true" : "false");
             RTstopTimer (pgsolve_timer);

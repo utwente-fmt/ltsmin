@@ -465,11 +465,12 @@ static void actual_main(void *arg)
     init_mu_calculus();
 
     /* determine if we need to generate a symbolic parity game */
-#ifdef LTSMIN_PBES
-    bool spg = true;
-#else
-    bool spg = GBhaveMucalc() ? true : false;
-#endif
+    bool spg;
+    if (is_pbes_tool) {
+	spg = true;
+    } else {
+	spg = GBhaveMucalc() ? true : false;
+    }
 
     /* if spg, then initialize labeling stuff before reachability */
     if (spg) {
