@@ -1,4 +1,4 @@
-LTSmin [![Build Status](https://travis-ci.org/utwente-fmt/ltsmin.svg?branch=master)](https://travis-ci.org/utwente-fmt/ltsmin) [![FMT](http://fmt.cs.utwente.nl/images/fmt-logo.png)](http://fmt.cs.utwente.nl/) [![UT](https://www.symbitron.eu/wp-content/uploads/2013/10/UT_Logo_2400_Black_EN1-300x58.png)](https://www.utwente.nl/)
+LTSmin [![Build Status](https://travis-ci.org/utwente-fmt/ltsmin.svg?branch=master)](https://travis-ci.org/utwente-fmt/ltsmin) [![FMT](assets/img/fmt.png)](http://fmt.cs.utwente.nl/) [![UT](assets/img/ut.png)](https://www.utwente.nl/)
 ===
 
 ## What is LTSmin
