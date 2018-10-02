@@ -3,6 +3,7 @@
 
 #include <limits.h>
 #include <popt.h>
+#include <stdbool.h>
 
 
 #include <dm/dm.h>
@@ -108,6 +109,7 @@ extern bitvector_ll_t *seen_actions;
 extern vset_t true_states;
 extern vset_t false_states;
 
+extern bool is_pbes_tool;
 extern int var_pos;
 extern int var_type_no;
 extern int variable_projection;
