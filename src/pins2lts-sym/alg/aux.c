@@ -176,7 +176,6 @@ static void do_expand_group_next(int group, vset_t set)
     ctx.group = group;
     ctx.set = set;
     vset_project_minus(group_tmp[group], set, group_explored[group]);
-    vset_union(group_explored[group], group_tmp[group]);
 
     if (log_active(infoLong)) {
         double elem_count;
@@ -193,6 +192,7 @@ static void do_expand_group_next(int group, vset_t set)
         vrel_update_seq(group_next[group], group_tmp[group], explore_cb, &ctx);
     }
 
+    vset_union(group_explored[group], group_tmp[group]);
     vset_clear(group_tmp[group]);
 }
 
@@ -210,7 +210,7 @@ expand_group_next_projected(vrel_t rel, vset_t set, void *context)
     (*expand_ctx->eg_count)++;
 
     vset_t group_explored = expand_ctx->group_explored;
-    vset_zip(group_explored, set);
+    vset_minus(set, group_explored);
 
     group_add_info_t group_ctx;
     int group = expand_ctx->group;
@@ -221,6 +221,7 @@ expand_group_next_projected(vrel_t rel, vset_t set, void *context)
     } else {
         vrel_update_seq(rel, set, explore_cb, &group_ctx);
     }
+    vset_union(group_explored, set);
 }
 
 void
