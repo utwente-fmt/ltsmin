@@ -15,6 +15,7 @@
 #include <spot/twaalgos/translate.hh>
 #include <spot/twaalgos/isdet.hh>
 #include <spot/twaalgos/strength.hh>
+#include <spot/twaalgos/complement.hh>
 
 extern "C" {
 
@@ -396,7 +397,7 @@ ltsmin_ltl2spot(ltsmin_expr_t e, spot_aut_type_t type, ltsmin_parse_env_t env)
   if (spot_aut_type == SPOT_AUT_TYPE_MONITOR) {
     HREassert(spot::is_deterministic(spot_automaton) && spot::is_complete(spot_automaton),
         "monitor is not deterministic and complete");
-    if (!spot::is_safety_automaton(spot_automaton)) {
+    if (!spot::is_safety_automaton(spot::dtwa_complement(spot_automaton))) {
       LTSminLogExpr(info, "LTL formula is not a safety property: ", e, env);
     }
   }
