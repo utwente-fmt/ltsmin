@@ -101,7 +101,7 @@ read_formula (const char *file)
     if (in) {
         return stream_input(in);
     } else {
-        Warning(info, "\"%s\" is not a file, parsing as formula...", file);
+        Print1(info, "\"%s\" is not a file, parsing as formula...", file);
         return stream_read_mem((void*)file, strlen(file), used);
     }
 }

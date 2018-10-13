@@ -492,15 +492,16 @@ reach_local_setup   (run_t *run, wctx_t *ctx)
     }
 
     ctx->local->inv_expr = NULL;
+    char* local_inv_detect = inv_detect;
     if (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR) {
-        if (inv_detect == NULL) {
-            inv_detect = LTSMIN_STATE_LABEL_ACCEPTING;
-            Warning(infoLong, "Detecting monitor violation with invariant: '%s'.", inv_detect);
-        } else Warning(info, "Not detecting monitor violations, because an invariant is given.");
+        if (local_inv_detect == NULL) {
+            local_inv_detect = LTSMIN_STATE_LABEL_ACCEPTING;
+            Print1(infoLong, "Detecting monitor violation with invariant: '%s'.", local_inv_detect);
+        } else Print1(info, "Not detecting monitor violations, because an invariant is given!");
     }
-    if (inv_detect) { // local parsing
+    if (local_inv_detect) { // local parsing
         ctx->local->env = LTSminParseEnvCreate();
-        ctx->local->inv_expr = pred_parse_file (inv_detect, ctx->local->env, GBgetLTStype(ctx->model));
+        ctx->local->inv_expr = pred_parse_file (local_inv_detect, ctx->local->env, GBgetLTStype(ctx->model));
         set_groups_of_edge(ctx->model, ctx->local->inv_expr);
         set_pins_semantics (ctx->model, ctx->local->inv_expr, ctx->local->env, NULL, NULL);
     }

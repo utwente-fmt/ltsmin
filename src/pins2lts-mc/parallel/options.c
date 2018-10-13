@@ -104,7 +104,8 @@ options_static_init      (model_t model, bool timed)
         }
     }
 
-    if (PINS_POR && (strategy[0] & Strat_Reach) && (inv_detect || act_detect)) {
+    if (PINS_POR && (strategy[0] & Strat_Reach) && (inv_detect || act_detect
+                || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR)) {
         if (proviso == Proviso_None) {
             proviso = strategy[0] & Strat_DFS ? Proviso_Stack : Proviso_ClosedSet;
             Warning (info, "Forcing use of the an ignoring proviso (%s)", provisos[proviso].key);
@@ -122,7 +123,8 @@ options_static_init      (model_t model, bool timed)
     if (proviso == Proviso_ForceNone) {
         proviso = Proviso_None;
     } else if (PINS_POR && (strategy[0] & Strat_Reach) && proviso != Proviso_None &&
-               act_detect == NULL && inv_detect == NULL && !NO_L12) {
+               act_detect == NULL && inv_detect == NULL
+               && PINS_BUCHI_TYPE != PINS_BUCHI_TYPE_MONITOR && !NO_L12) {
         Warning (info, "POR layer will disregard ignoring proviso in absence of safety property (--invariant or --action). To enforce the (stronger) proviso, use: --no-L12.");
     }
 
@@ -137,7 +139,8 @@ options_static_init      (model_t model, bool timed)
         refs = 1; //The permuter works with references only!
     }
 
-    if (!(Strat_Reach & strategy[0]) && (dlk_detect || act_detect || inv_detect)) {
+    if (!(Strat_Reach & strategy[0]) && (dlk_detect || act_detect || inv_detect
+                || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_MONITOR)) {
         Abort ("Verification of safety properties works only with reachability algorithms.");
     }
 }
