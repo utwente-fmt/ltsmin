@@ -409,6 +409,7 @@ ltsmin_expr_t LTSminExpr(ltsmin_expr_case node_type, int token, int idx,
     E->destroy_context = NULL;
     E->n_groups = -1;
     E->groups = NULL;
+    E->chunk_cache = -1;
     return E;
 }
 

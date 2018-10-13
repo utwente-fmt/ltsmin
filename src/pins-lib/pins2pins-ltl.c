@@ -639,7 +639,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
             print_ltsmin_buchi(ba, env);
         }
         for (int k=0; k < ba->predicate_count; k++) {
-            set_groups_of_edge(model, ba->predicates[k]);
+            set_groups_of_edge(model, ba->predicates[k], ba->env);
         }
         atomic_write (&shared_ba, ba);
         HREbarrier(HREglobal());
@@ -875,7 +875,7 @@ GBaddLTL (model_t model)
     
     // mark the parts the buchi automaton uses for reading
     for (int k=0; k < ba->predicate_count; k++) {
-        set_pins_semantics(model, ba->predicates[k], ba->env, &formula_state_dep, NULL);
+        set_pins_semantics(model, ba->predicates[k], &formula_state_dep, NULL);
     }
 
     // add one column to the matrix

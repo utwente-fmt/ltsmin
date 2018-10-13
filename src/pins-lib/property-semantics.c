@@ -25,54 +25,16 @@
 #define GROUP_NOT_FOUND_HINT\
     "To change this error into a warning use option --allow-undefined-edges"
 
-void set_groups_of_edge(model_t model, ltsmin_expr_t e)
+void set_groups_of_edge(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env)
 {
     switch (e->node_type) {
         case BINARY_OP: {
-            set_groups_of_edge(model, e->arg1);
-            set_groups_of_edge(model, e->arg2);
+            set_groups_of_edge(model, e->arg1, env);
+            set_groups_of_edge(model, e->arg2, env);
             break;
         }
         case UNARY_OP: {
-            set_groups_of_edge(model, e->arg1);
-            break;
-        }
-        case EVAR: {
-            HREassert(e->n_groups == -1 && e->groups == NULL, "groups already set");
-            e->groups = RTmalloc(sizeof(int[pins_get_group_count(model)]));
-            e->n_groups = GBgroupsOfEdge(model, e->idx, e->chunk_cache, e->groups);
-            e->groups = RTrealloc(e->groups, sizeof(int[e->n_groups]));
-            break;
-        }
-        default:
-            break;
-    }
-}
-
-void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps, bitvector_t *sl_deps)
-{
-    const lts_type_t lts_type = GBgetLTStype(model);
-
-    switch (e->node_type) {
-        case BINARY_OP: {
-            set_pins_semantics(model, e->arg1, env, deps, sl_deps);
-            set_pins_semantics(model, e->arg2, env, deps, sl_deps);
-            break;
-        }
-        case UNARY_OP: {
-            set_pins_semantics(model, e->arg1, env, deps, sl_deps);
-            break;
-        }
-        case SVAR: {
-            const int N = lts_type_get_state_length(lts_type);
-            if (e->idx < N) { // state variable
-                if (deps != NULL) bitvector_set(deps, e->idx);
-                if (PINS_POR) pins_add_state_variable_visible(model, e->idx);
-            } else { // state label
-                if (sl_deps != NULL) bitvector_set(sl_deps, e->idx - N);
-                if (deps != NULL) dm_row_union(deps, GBgetStateLabelInfo(model), e->idx - N);
-                if (PINS_POR) pins_add_state_label_visible(model, e->idx - N);
-            }
+            set_groups_of_edge(model, e->arg1, env);
             break;
         }
         case EVAR: {
@@ -82,18 +44,16 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
             chunk c;
             c.data = SIgetC(env->values, value, (int*) &c.len);
 
+            HREassert(e->chunk_cache == -1, "chunk cache already set");
             e->chunk_cache = pins_chunk_put(model, type, c);
 
-            HREassert(e->n_groups > -1, "groups not set");
+            HREassert(e->n_groups == -1 && e->groups == NULL, "groups already set");
+            e->groups = RTmalloc(sizeof(int[pins_get_group_count(model)]));
+            e->n_groups = GBgroupsOfEdge(model, e->idx, e->chunk_cache, e->groups);
+            e->groups = RTrealloc(e->groups, sizeof(int[e->n_groups]));
 
-            if (e->n_groups > 0) {
-                HREassert(e->groups != NULL, "groups not set");
-                for (int k = 0; k < e->n_groups; k++) {
-                    const int group = e->groups[k];
-                    if (PINS_POR) pins_add_group_visible(model, group);
-                    if (deps != NULL) dm_row_union(deps, GBgetDMInfoRead(model), group);
-                }
-            } else {
+            // check if we must warn or abort when there is no group that can produce this edge
+            if (e->n_groups == 0) {
                 char s[c.len * 2 + 6];
                 chunk2string(c, sizeof(s), s);
                 const log_t l = pins_allow_undefined_edges ? info : lerror;
@@ -110,6 +70,7 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
             c.data = SIgetC(env->values, e->idx, (int*) &c.len);
 
             const int n_chunks = pins_chunk_count(model, type);
+            HREassert(e->chunk_cache == -1, "chunk cache already set");
             e->chunk_cache = pins_chunk_put(model, type, c);
             if (lts_type_get_format(GBgetLTStype(model), type) == LTStypeEnum) {
                 if (pins_chunk_count(model, type) != n_chunks) {
@@ -123,6 +84,47 @@ void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, 
                         Abort(ENUM_VALUE_NOT_FOUND_HINT);
                     }
                 }
+            }
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void set_pins_semantics(model_t model, ltsmin_expr_t e, bitvector_t *deps, bitvector_t *sl_deps)
+{
+    const lts_type_t lts_type = GBgetLTStype(model);
+
+    switch (e->node_type) {
+        case BINARY_OP: {
+            set_pins_semantics(model, e->arg1, deps, sl_deps);
+            set_pins_semantics(model, e->arg2, deps, sl_deps);
+            break;
+        }
+        case UNARY_OP: {
+            set_pins_semantics(model, e->arg1, deps, sl_deps);
+            break;
+        }
+        case SVAR: {
+            const int N = lts_type_get_state_length(lts_type);
+            if (e->idx < N) { // state variable
+                if (deps != NULL) bitvector_set(deps, e->idx);
+                if (PINS_POR) pins_add_state_variable_visible(model, e->idx);
+            } else { // state label
+                if (sl_deps != NULL) bitvector_set(sl_deps, e->idx - N);
+                if (deps != NULL) dm_row_union(deps, GBgetStateLabelInfo(model), e->idx - N);
+                if (PINS_POR) pins_add_state_label_visible(model, e->idx - N);
+            }
+            break;
+        }
+        case EVAR: {
+            HREassert(e->n_groups > -1, "groups not set");
+            HREassert(e->n_groups == 0 || e->groups != NULL, "groups not set");
+            for (int k = 0; k < e->n_groups; k++) {
+                const int group = e->groups[k];
+                if (PINS_POR) pins_add_group_visible(model, group);
+                if (deps != NULL) dm_row_union(deps, GBgetDMInfoRead(model), group);
             }
             break;
         }
@@ -179,6 +181,7 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
                 // test whether the state has at least one transition (existential) with a specific edge
                 struct evar_info ctx;
                 ctx.idx = e->idx;
+                HREassert(e->chunk_cache != -1, "chunk cache not set");
                 ctx.num = e->chunk_cache;
                 ctx.exists = 0;
 
@@ -201,6 +204,7 @@ eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_label
             const ltsmin_expr_t other = LTSminExprSibling(e);
             HREassert(other != NULL && (other->token == SVAR || other->token == EVAR));
 #endif
+            HREassert(e->chunk_cache != -1, "chunk cache not set");
             return e->chunk_cache;
         }
         case PRED_NOT:

@@ -391,8 +391,8 @@ init_invariant_detection()
         }
         bitvector_create (&inv_deps[i], N);
         bitvector_create (&inv_sl_deps[i], sLbls);
-        set_groups_of_edge (model, inv_expr[i]);
-        set_pins_semantics (model, inv_expr[i], inv_parse_env[i], &inv_deps[i], &inv_sl_deps[i]);
+        set_groups_of_edge (model, inv_expr[i], inv_parse_env[i]);
+        set_pins_semantics (model, inv_expr[i], &inv_deps[i], &inv_sl_deps[i]);
         size_t n = bitvector_n_high (&inv_deps[i]);
         inv_proj[i] = ci_create (n);
         bitvector_high_bits (&inv_deps[i], inv_proj[i]->data);
@@ -460,8 +460,8 @@ inv_info_prepare(ltsmin_expr_t e, ltsmin_parse_env_t env, int i)
     case PRED_GEQ: {
         bitvector_t deps;
         bitvector_create(&deps, N);
-        set_groups_of_edge(model, e);
-        set_pins_semantics(model, e, env, &deps, NULL);
+        set_groups_of_edge(model, e, env);
+        set_pins_semantics(model, e, &deps, NULL);
 
         const int len = bitvector_n_high(&deps);
 

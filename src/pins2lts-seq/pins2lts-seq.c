@@ -1563,9 +1563,9 @@ gsea_setup(const char *output)
     if (opt.inv_detect) {
         opt.env = LTSminParseEnvCreate();
         opt.inv_expr = pred_parse_file (opt.inv_detect, opt.env, GBgetLTStype(opt.model));
+        set_groups_of_edge(opt.model, opt.inv_expr, opt.env);
         if (PINS_POR) {
-            set_groups_of_edge(opt.model, opt.inv_expr);
-            set_pins_semantics(opt.model, opt.inv_expr, opt.env, NULL, NULL);
+            set_pins_semantics(opt.model, opt.inv_expr, NULL, NULL);
             set_cycle_proviso ();
         }
     }

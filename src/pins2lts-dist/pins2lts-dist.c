@@ -748,6 +748,7 @@ int main(int argc, char*argv[]){
         if (PINS_POR) Abort ("Distributed tool implements no cycle provisos.");
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
         inv_expr = pred_parse_file (inv_detect, env, ltstype);
+        set_groups_of_edge(model, inv_expr, env);
         ctx.env = env;
     }
     HREbarrier(HREglobal());
