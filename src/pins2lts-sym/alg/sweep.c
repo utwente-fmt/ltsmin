@@ -51,7 +51,7 @@ sweep_print_lines ()
     for (int i = sweep_line; i < SWEEP_MAX; i++) {
         vset_count (level[i], &nodes, &states);
         if (states == 0) continue;
-        Printf (info, "%d=%'.0f, ", i, states);
+        Printf (info, "%d=%'.0f (%'ld),   ", i, states, nodes);
     }
     Printf (info, "\n");
 }
@@ -184,7 +184,7 @@ sweep_search(sat_proc_t sat_proc, reach_proc_t reach_proc, vset_t visited,
         Warning(info, "Starting sweep line %'d with %'.0f states", sweep_line, states);
 
         do {
-            if (log_active(infoLong)) {
+            if (log_active(info)) {
                 Printf (info, "\n");
                 sweep_print_lines();
             }
