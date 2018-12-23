@@ -16,7 +16,6 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-group.h>
-#include <pins2lts-sym/alg/aux.h>
 #include <pins2lts-sym/alg/sat.h>
 #include <pins2lts-sym/aux/output.h>
 #include <pins2lts-sym/aux/prop.h>
@@ -38,17 +37,13 @@
 #define lace_resume()
 #endif
 
-
 void
 reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                  long *eg_count, long *next_count, long *guard_count)
 {
     int level = 0;
-    vset_t new_states = vset_create(domain, -1, NULL);
-    vset_t temp = vset_create(domain, -1, NULL);
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t new_reduced = vset_create(domain, -1, NULL);
 
     vset_t guard_maybe[nGuards];
     vset_t tmp = NULL;
@@ -107,10 +102,6 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_reorder(domain);
     }
 
-    vset_destroy(new_states);
-    vset_destroy(temp);
-    vset_destroy(new_reduced);
-
     if (dlk_detect) {
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
@@ -132,11 +123,10 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     (void)visited_old;
 
     int level = 0;
-    vset_t old_vis = vset_create(domain, -1, NULL);
-    vset_t temp = vset_create(domain, -1, NULL);
+    vset_t old_vis = new_states;
+
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
-    vset_t new_reduced = vset_create(domain, -1, NULL);
 
     vset_t guard_maybe[nGuards];
     vset_t tmp = NULL;
@@ -184,10 +174,6 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         if (dlk_detect) deadlock_check(deadlocks, reach_groups);
         vset_reorder(domain);
     }
-
-    vset_destroy(old_vis);
-    vset_destroy(temp);
-    vset_destroy(new_reduced);
 
     if (dlk_detect) {
         vset_destroy(deadlocks);

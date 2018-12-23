@@ -446,19 +446,14 @@ void
 reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
           long *eg_count, long *next_count, long *guard_count)
 {
-    vset_t old_vis = vset_create(domain, -1, NULL);
-    vset_t next_level = vset_create(domain, -1, NULL);
+    vset_t old_vis = new_states;
+    vset_t next_level = new_reduced;
+    vset_clear(old_vis);
+    vset_clear(next_level);
+
     //if (save_sat_levels) vset_minus(current_level, visited_old); // ???
 
-    vset_t maybe[nGrps];
-    if (!no_soundness_check) {
-        for (int i = 0; i < nGrps; i++) {
-            maybe[i] = vset_create(domain, -1, NULL);
-        }
-    }
-
     LACE_ME;
-    struct reach_s *root = reach_prepare(0, nGrps);
 
     int level = 0;
     while (!vset_equal(visited, old_vis)) {
@@ -540,17 +535,9 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_reorder(domain);
     }
 
-    reach_destroy(root);
-    vset_destroy(old_vis);
-    vset_destroy(next_level);
-
-    if (!no_soundness_check) {
-        for(int i = 0; i < nGrps; i++) {
-            vset_destroy(maybe[i]);
-        }
-    }
-
-    return;
+    reach_clear (root);
+    vset_clear(old_vis);
+    vset_clear(next_level);
     (void)visited_old;
 }
 
@@ -558,21 +545,15 @@ void
 reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                long *eg_count, long *next_count, long *guard_count)
 {
-    vset_t current_level = vset_create(domain, -1, NULL);
-    vset_t next_level = vset_create(domain, -1, NULL);
+    vset_t current_level = new_states;
+    vset_t next_level = new_reduced;
+    vset_clear(current_level);
+    vset_clear(next_level);
 
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
 
-    vset_t maybe[nGrps];
-    if (!no_soundness_check) {
-        for (int i = 0; i < nGrps; i++) {
-            maybe[i] = vset_create(domain, -1, NULL);
-        }
-    }
-
     LACE_ME;
-    struct reach_s *root = reach_prepare(0, nGrps);
 
     int level = 0;
     while (!vset_is_empty(current_level)) {
@@ -661,15 +642,9 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_reorder(domain);
     }
 
-    reach_destroy(root);
-    vset_destroy(current_level);
-    vset_destroy(next_level);
-
-    if (!no_soundness_check) {
-        for(int i = 0; i < nGrps; i++) {
-            vset_destroy(maybe[i]);
-        }
-    }
+    reach_clear (root);
+    vset_clear(current_level);
+    vset_clear(next_level);
 }
 #endif
 
@@ -677,21 +652,15 @@ void
 reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                long *eg_count, long *next_count, long *guard_count)
 {
-    vset_t current_level = vset_create(domain, -1, NULL);
-    vset_t next_level = vset_create(domain, -1, NULL);
+    vset_t current_level = new_states;
+    vset_t next_level = new_reduced;
+    vset_clear(current_level);
+    vset_clear(next_level);
 
     vset_copy(current_level, visited);
     if (save_sat_levels) vset_minus(current_level, visited_old);
 
-    vset_t maybe[nGrps];
-    if (!no_soundness_check) {
-        for (int i = 0; i < nGrps; i++) {
-            maybe[i] = vset_create(domain, -1, NULL);
-        }
-    }
-
     LACE_ME;
-    struct reach_s *root = reach_prepare(0, nGrps);
 
     int level = 0;
     while (!vset_is_empty(current_level)) {
@@ -782,34 +751,22 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_reorder(domain);
     }
 
-    reach_destroy(root);
-    vset_destroy(current_level);
-    vset_destroy(next_level);
-
-    if (!no_soundness_check) {
-        for(int i = 0; i < nGrps; i++) {
-            vset_destroy(maybe[i]);
-        }
-    }
+    reach_clear (root);
+    vset_clear(current_level);
+    vset_clear(next_level);
 }
 
 void
 reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
           long *eg_count, long *next_count, long *guard_count)
 {
-    vset_t old_vis = vset_create(domain, -1, NULL);
-    vset_t next_level = vset_create(domain, -1, NULL);
+    vset_t old_vis = new_states;
+    vset_t next_level = new_reduced;
+    vset_clear(old_vis);
+    vset_clear(next_level);
     //if (save_sat_levels) vset_minus(current_level, visited_old); // ???
 
-    vset_t maybe[nGrps];
-    if (!no_soundness_check) {
-        for (int i = 0; i < nGrps; i++) {
-            maybe[i] = vset_create(domain, -1, NULL);
-        }
-    }
-
     LACE_ME;
-    struct reach_s *root = reach_prepare(0, nGrps);
 
     int level = 0;
     while (!vset_equal(visited, old_vis)) {
@@ -893,16 +850,8 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         vset_reorder(domain);
     }
 
-    reach_destroy(root);
-    vset_destroy(old_vis);
-    vset_destroy(next_level);
-
-    if (!no_soundness_check) {
-        for(int i = 0; i < nGrps; i++) {
-            vset_destroy(maybe[i]);
-        }
-    }
-
-    return;
+    reach_clear (root);
+    vset_clear(old_vis);
+    vset_clear(next_level);
     (void)visited_old;
 }

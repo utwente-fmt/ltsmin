@@ -76,10 +76,6 @@ typedef struct reach_red_s
     int group; // which transition group
 } reach_red_t;
 
-extern struct reach_red_s *reach_red_prepare(size_t left, size_t right, int group);
-
-extern void reach_red_destroy(struct reach_red_s *s);
-
 typedef struct reach_s
 {
     vset_t container;
@@ -95,9 +91,14 @@ typedef struct reach_s
     int unsound_group;
 } reach_t;
 
-extern struct reach_s *reach_prepare(size_t left, size_t right);
+extern vset_t *maybe;
+extern reach_t *root;
 
-extern void reach_destroy(struct reach_s *s);
+extern void reach_clear   (reach_t *s);
+
+extern void reach_init ();
+
+extern void reach_deinit ();
 
 
 #endif //ALG_REACH_H

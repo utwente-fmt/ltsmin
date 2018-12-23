@@ -508,6 +508,9 @@ static void actual_main(void *arg)
 
     /* fix level 0 */
     visited = vset_create(domain, -1, NULL);
+    temp = vset_create(domain, -1, NULL);
+    new_reduced = vset_create(domain, -1, NULL);
+    new_states = vset_create(domain, -1, NULL);
     vset_copy(visited, initial);
 
     /* check the invariants at level 0 */
@@ -516,7 +519,9 @@ static void actual_main(void *arg)
     if (local) run_local (initial, visited);
 
     /* run reachability */
+    reach_init ();
     run_reachability(visited, files[1]);
+    reach_deinit ();
 
     if (sccs) detect_sccs (visited);
 

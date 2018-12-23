@@ -2,6 +2,7 @@
 #define ALG_SEARCH_H
 
 #include <pins-lib/pins.h>
+#include <pins2lts-sym/alg/aux.h>
 #include <vset-lib/vector_set.h>
 
 
@@ -30,6 +31,7 @@ extern void directed(sat_proc_t sat_proc, reach_proc_t reach_proc,
 
 extern void reach_chain_stop();
 
-extern void reach_stop (struct reach_s *node);
+extern void reach_stop (reach_t *node);
 
 #endif //ALG_SEARCH_H
+

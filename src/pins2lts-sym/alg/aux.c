@@ -501,6 +501,21 @@ reach_red_prepare(size_t left, size_t right, int group)
 }
 
 void
+reach_red_clear(reach_red_t *s)
+{
+    if (s->index == -1) {
+        reach_red_clear(s->left);
+        reach_red_clear(s->right);
+    }
+    vset_clear(s->true_container);
+    if (!no_soundness_check) {
+        vset_clear(s->false_container);
+        vset_clear(s->left_maybe);
+        vset_clear(s->right_maybe);
+    }
+}
+
+void
 reach_red_destroy(reach_red_t *s)
 {
     if (s->index == -1) {
@@ -516,7 +531,7 @@ reach_red_destroy(reach_red_t *s)
     RTfree(s);
 }
 
-reach_t*
+reach_t *
 reach_prepare(size_t left, size_t right)
 {
     reach_t *result = (reach_t *)RTmalloc(sizeof(reach_t));
@@ -561,3 +576,51 @@ reach_destroy(reach_t *s)
 
     RTfree(s);
 }
+
+void
+reach_clear(reach_t *s)
+{
+    if (s->index == -1) {
+        reach_clear(s->left);
+        reach_clear(s->right);
+    }
+
+    vset_clear(s->container);
+    if (s->ancestors != NULL) vset_clear(s->ancestors);
+    if (s->deadlocks != NULL) vset_clear(s->deadlocks);
+
+    if (s->red != NULL) reach_red_clear(s->red);
+}
+
+vset_t *maybe;
+reach_t *root;
+
+void
+reach_init ()
+{
+    maybe = RTmalloc(sizeof(vset_t[nGrps]));
+
+    //if (save_sat_levels) vset_minus(current_level, visited_old); // ???
+    if (!no_soundness_check) {
+        for (int i = 0; i < nGrps; i++) {
+            maybe[i] = vset_create (domain, -1, NULL);
+        }
+    }
+
+    root = reach_prepare (0, nGrps);
+}
+
+void
+reach_deinit ()
+{
+    reach_destroy (root);
+
+    if (!no_soundness_check) {
+        for (int i = 0; i < nGrps; i++) {
+            vset_destroy (maybe[i]);
+        }
+    }
+
+    RTfree (maybe);
+}
+
