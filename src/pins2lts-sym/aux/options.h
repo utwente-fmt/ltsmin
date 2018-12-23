@@ -83,6 +83,8 @@ extern int   action_typeno;
 extern int   ErrorActions; // count number of found errors (action/deadlock/invariant)
 extern int   precise;
 extern int   next_union;
+extern char *sweep;
+extern int   sweep_idx;
 
 extern int   sat_granularity;
 extern int   save_sat_levels;

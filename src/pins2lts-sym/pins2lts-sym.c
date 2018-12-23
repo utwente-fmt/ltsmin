@@ -79,7 +79,6 @@ vset_next_normal(vset_t dst, vset_t src, int group)
     vset_next(dst, src, group_next[group]);
 }
 
-vset_next_t vset_next_fn_old = NULL;
 vset_next_t vset_next_fn = vset_next_normal;
 
 int
@@ -448,13 +447,6 @@ static void actual_main(void *arg)
     }
 
     if (next_union) vset_next_fn = vset_next_union_src;
-
-    if (sweep) {
-        sweep_idx = lts_type_find_state(ltstype, sweep);
-        if (sweep_idx == -1) Abort("Sweep line method: state slot '%s' does not exist.", sweep);
-        vset_next_fn_old = vset_next_fn;
-        vset_next_fn = sweep_vset_next;
-    }
 
     init_domain(VSET_IMPL_AUTOSELECT);
 
