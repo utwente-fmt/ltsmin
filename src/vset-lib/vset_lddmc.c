@@ -273,7 +273,10 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int *proj, int *match)
         for (int i=0; i<vector_size; i++) {
             if (k == p_len) break; // end of match
             if (src->k == -1 || src->proj[j] == i) {
-                if (proj[k] == i) meta[j++] = 1;
+                if (proj[k] == i) {
+                    meta[j++] = 1;
+                    k++;
+                }
                 else meta[j++] = 0;
             }
         }
@@ -282,6 +285,37 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int *proj, int *match)
         MDD cube = lddmc_refs_push(lddmc_cube((uint32_t*)match, p_len));
         dst->mdd = lddmc_match(src->mdd, cube, meta_mdd);
         lddmc_refs_pop(2);
+    }
+}
+
+static void
+set_copy_match_set(vset_t dst, vset_t src, vset_t match, int p_len, int *proj)
+{
+    LACE_ME;
+
+    assert(dst->meta == src->meta); // for now, require same meta
+
+    if (p_len == 0) {
+        dst->mdd = src->mdd;
+    } else {
+        const int vector_size = src->dom->shared.size;
+        uint32_t meta[vector_size+1];
+        int j=0; // current index in src proj
+        int k=0; // current index in match proj
+        for (int i=0; i<vector_size; i++) {
+            if (k == p_len) break; // end of match
+            if (src->k == -1 || src->proj[j] == i) {
+                if (proj[k] == i) {
+                    meta[j++] = 1;
+                    k++;
+                }
+                else meta[j++] = 0;
+            }
+        }
+        meta[j++] = -1; // = rest not in match
+        MDD meta_mdd = lddmc_refs_push(lddmc_cube(meta, j));
+        dst->mdd = lddmc_match(src->mdd, match->mdd, meta_mdd);
+        lddmc_refs_pop(1);
     }
 }
 
