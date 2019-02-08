@@ -10,6 +10,63 @@
 #include <hre-io/raf_object.h>
 #include <hre-io/user.h>
 
+// add pread/pwrite functions for WIN32, those in gnulib are buggy.
+#ifdef _WIN32
+#include <windows.h>
+
+ssize_t pread(int fd, void *buf, size_t count, off_t offset)
+{
+  OVERLAPPED o;
+  memset(&o, 0, sizeof(OVERLAPPED));
+  HANDLE fh = (HANDLE)_get_osfhandle(fd);
+  uint64_t off = offset;
+  DWORD bytes;
+  BOOL ret;
+
+  if (fh == INVALID_HANDLE_VALUE) {
+    errno = EBADF;
+    return -1;
+  }
+
+  o.Offset = off & 0xffffffff;
+  o.OffsetHigh = (off >> 32) & 0xffffffff;
+
+  ret = ReadFile(fh, buf, (DWORD)count, &bytes, &o);
+  if (!ret) {
+    errno = EIO;
+    return -1;
+  }
+
+  return (ssize_t)bytes;
+}
+
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
+{
+  OVERLAPPED o;
+  memset(&o, 0, sizeof(OVERLAPPED));
+  HANDLE fh = (HANDLE)_get_osfhandle(fd);
+  uint64_t off = offset;
+  DWORD bytes;
+  BOOL ret;
+
+  if (fh == INVALID_HANDLE_VALUE) {
+    errno = EBADF;
+    return -1;
+  }
+
+  o.Offset = off & 0xffffffff;
+  o.OffsetHigh = (off >> 32) & 0xffffffff;
+
+  ret = WriteFile(fh, buf, (DWORD)count, &bytes, &o);
+  if (!ret) {
+    errno = EIO;
+    return -1;
+  }
+
+  return (ssize_t)bytes;
+}
+#endif
+
 struct raf_struct_s {
     struct raf_object shared;
     int fd;

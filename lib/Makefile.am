@@ -43,9 +43,7 @@
 #  havelib \
 #  lstat \
 #  mkdtemp \
-#  pread \
 #  progname \
-#  pwrite \
 #  qsort_r \
 #  random_r \
 #  sigaction \
@@ -693,17 +691,6 @@ libgnu_la_SOURCES += glthread/lock.h glthread/lock.c
 endif
 ## end   gnulib module lock
 
-## begin gnulib module lseek
-
-if gl_GNULIB_ENABLED_lseek
-
-endif
-EXTRA_DIST += lseek.c
-
-EXTRA_libgnu_la_SOURCES += lseek.c
-
-## end   gnulib module lseek
-
 ## begin gnulib module lstat
 
 
@@ -1128,15 +1115,6 @@ EXTRA_DIST += pathmax.h
 
 ## end   gnulib module pathmax
 
-## begin gnulib module pread
-
-
-EXTRA_DIST += pread.c
-
-EXTRA_libgnu_la_SOURCES += pread.c
-
-## end   gnulib module pread
-
 ## begin gnulib module printf-frexp
 
 if gl_GNULIB_ENABLED_2f551a684aab5400633cbfd56df3bf94
@@ -1164,15 +1142,6 @@ EXTRA_libgnu_la_SOURCES += printf-frexp.c
 libgnu_la_SOURCES += progname.h progname.c
 
 ## end   gnulib module progname
-
-## begin gnulib module pwrite
-
-
-EXTRA_DIST += pwrite.c
-
-EXTRA_libgnu_la_SOURCES += pwrite.c
-
-## end   gnulib module pwrite
 
 ## begin gnulib module qsort_r
 
@@ -1202,17 +1171,6 @@ EXTRA_DIST += random_r.c
 EXTRA_libgnu_la_SOURCES += random_r.c
 
 ## end   gnulib module random_r
-
-## begin gnulib module read
-
-if gl_GNULIB_ENABLED_read
-
-endif
-EXTRA_DIST += read.c
-
-EXTRA_libgnu_la_SOURCES += read.c
-
-## end   gnulib module read
 
 ## begin gnulib module readlink
 
@@ -2526,17 +2484,6 @@ endif
 EXTRA_DIST += wctype.in.h
 
 ## end   gnulib module wctype-h
-
-## begin gnulib module write
-
-if gl_GNULIB_ENABLED_write
-
-endif
-EXTRA_DIST += write.c
-
-EXTRA_libgnu_la_SOURCES += write.c
-
-## end   gnulib module write
 
 ## begin gnulib module xalloc-oversized
 

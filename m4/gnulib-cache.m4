@@ -48,9 +48,7 @@
 #  havelib \
 #  lstat \
 #  mkdtemp \
-#  pread \
 #  progname \
-#  pwrite \
 #  qsort_r \
 #  random_r \
 #  sigaction \
@@ -74,9 +72,7 @@ gl_MODULES([
   havelib
   lstat
   mkdtemp
-  pread
   progname
-  pwrite
   qsort_r
   random_r
   sigaction
