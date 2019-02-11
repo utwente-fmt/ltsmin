@@ -7,10 +7,13 @@ export BUILD_HOST="x86_64-w64-mingw32.static"
 export CC="x86_64-w64-mingw32.static-gcc"
 export CXX="x86_64-w64-mingw32.static-g++"
 
-echo "deb http://pkg.mxe.cc/repos/apt/debian wheezy main" \
-    | sudo tee /etc/apt/sources.list.d/mxeapt.list
-sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 \
-    --recv-keys D43A795B73B16ABE9643FE1AFD8FFF16DB45C6AB
+#echo "deb http://pkg.mxe.cc/repos/apt/debian wheezy main" \
+#    | sudo tee /etc/apt/sources.list.d/mxeapt.list
+#sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 \
+#    --recv-keys D43A795B73B16ABE9643FE1AFD8FFF16DB45C6AB
+# use new mirror: https://github.com/mxe/mxe/issues/2253
+sudo add-apt-repository 'deb [arch=amd64] http://mirror.mxe.cc/repos/apt trusty main'
+sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 86B72ED9
 
 sudo apt-get update
 
