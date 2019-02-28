@@ -11,6 +11,7 @@
 #include <iostream>
 
 #include <boost/config.hpp>
+#include <dm/sloan_ordering.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/cuthill_mckee_ordering.hpp>
@@ -18,7 +19,6 @@
 #include <boost/graph/bandwidth.hpp>
 #include <boost/graph/profile.hpp>
 #include <boost/graph/wavefront.hpp>
-#include <boost/graph/sloan_ordering.hpp>
 #include <boost/graph/minimum_degree_ordering.hpp>
 #include <boost/graph/king_ordering.hpp>
 
@@ -123,10 +123,18 @@ parse_ordering(std::vector<Vertex> inv_perm, typename property_map<Graph, vertex
 {
     Warning(infoLong, "Parsing ordering");
     int r = 0, c = 0;
+    unsigned int nrows = dm_nrows(m);
+    unsigned int ncols = dm_ncols(m);
     for (typename std::vector<Vertex>::const_iterator i=inv_perm.begin(); i != inv_perm.end(); ++i) {
-        if (index_map[*i] < (unsigned int) dm_nrows(m) + dm_ncols(m)) {
-            if (index_map[*i] < (unsigned int) dm_nrows(m)) row_perm[r++] = index_map[*i];
-            else col_perm[c++] = index_map[*i] - dm_nrows(m);
+        int ip = *i;
+        if (index_map[ip] < (unsigned int) dm_nrows(m) + dm_ncols(m)) {
+            if (index_map[ip] < (unsigned int) dm_nrows(m)) {
+                if (r >= nrows) break; // trigger error
+                row_perm[r++] = index_map[ip];
+            } else {
+                if (c >= ncols) break; // trigger error
+                col_perm[c++] = index_map[ip] - dm_nrows(m);
+            }
         }
     }
     if (r != dm_nrows(m) || c != dm_ncols(m)) {
