@@ -61,7 +61,7 @@ static void process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
 static void process_exit(hre_context_t ctx,int code){
     (void)ctx;
     if (code) {
-        exit(HRE_EXIT_FAILURE);
+        exit(code);
     } else {
         exit(HRE_EXIT_SUCCESS);
     }
@@ -135,6 +135,7 @@ void HREctxExit(hre_context_t ctx,int code){
 
 void HREbarrier(hre_context_t ctx){
     HREcheckAny(ctx,0);
+    Debug ("BARRIER OUT %d", HREme(HREglobal()));
 }
 
 const char* HREclass(hre_context_t ctx){
@@ -260,7 +261,7 @@ uint32_t HREactionCreate(hre_context_t context,uint32_t comm,uint32_t size,hre_r
 
 void HREactionDelete(hre_context_t context,uint32_t comm,uint32_t tag){
     if (context->recv) {
-        Print(error,"cancellation mechanism needed!");
+        Print(lerror,"cancellation mechanism needed!");
     } else {
         context->comm[comm].action[tag].action=NULL;
     }

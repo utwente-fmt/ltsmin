@@ -68,7 +68,7 @@ void readfile(const size_t i) {
     stream_read(s[i], vt[i], size);
     stream_close(&s[i]);
     NUM+=n[i];
-    char *fname = rindex(filename, '/');
+    char *fname = strrchr(filename, '/');
     Warning(info, "Read %s into memory (%zu x %zu)", fname==NULL? filename : fname+1, ARRAY_SIZE, n[i]);
     return;
 }
@@ -101,7 +101,11 @@ void test() {
         if (seen==0) printf("!%zu", x);
     }
 	struct tms tmp2;
+#ifdef _WIN32
+        float tick = CLK_TCK;
+#else
 	float tick=(float)sysconf(_SC_CLK_TCK);
+#endif
 	float real=(times(&tmp2)-real_time1)/tick;
     stats_t *stat = statistics(dbs);
     int elements = stat->elts;
@@ -117,7 +121,7 @@ pthread_key_t *thread_id_key;
 static size_t dones = 0;
 
 void *fill(void *c) {
-    set_label(program);
+    set_label(program, "");
     context_t ctx = c;
     size_t id = ctx->id;
     DBS_T dbs = ctx->db;
@@ -127,11 +131,11 @@ void *fill(void *c) {
         int part_size = NUM/((float)NUM_THREADS);   
         start = part_size*id;
         end = start + part_size;
-	    if (vt==NULL) {
-            if (id==NUM_THREADS-1) end+=NUM%NUM_THREADS;
-        } else {
-            if (id<NUM%NUM_THREADS) end++;
-        }
+        //if (vt==NULL) {
+        //    if (id==NUM_THREADS-1) end+=NUM%NUM_THREADS;
+        //} else {
+        if (id<NUM%NUM_THREADS) end++;
+        //}
         str = 0;
     } else if (SHARED_DB==4) {
         readfile(id);
@@ -152,26 +156,31 @@ void *fill(void *c) {
     int idx;
     struct tms tmp1;
 	clock_t real_time1=times(&tmp1);
-    if (vt==NULL) {
-	    int ar[ARRAY_SIZE];
-        for (size_t x = start; x<end; x++) {
-	    	for (size_t y = 0; y<ARRAY_SIZE; y++) ar[y]=x+y;
-            int seen = lookup_ret(dbs, ar, &idx);
-            if (!seen)
-                res->count++;
-	    }
-    } else {
-        for (size_t x = start; x<end; x++) {
-            int *ar = &vt[str][x*ARRAY_SIZE];
-            int seen = lookup_ret(dbs, ar, &idx);
-            if (!seen)
-                res->count++;
-        }
+    //if (vt==NULL) {
+    //        int ar[ARRAY_SIZE];
+    //    for (size_t x = start; x<end; x++) {
+    //        	for (size_t y = 0; y<ARRAY_SIZE; y++) ar[y]=x+y;
+    //        int seen = lookup_ret(dbs, ar, &idx);
+    //        if (!seen)
+    //            res->count++;
+    //        }
+    //} else {
+    for (size_t x = start; x<end; x++) {
+        int *ar = &vt[str][x*ARRAY_SIZE];
+        int seen = lookup_ret(dbs, ar, &idx);
+        if (!seen)
+            res->count++;
     }
+    //}
 
 	struct tms tmp2;
+#ifdef _WIN32
+	float tick=CLK_TCK;
+#else
 	float tick=(float)sysconf(_SC_CLK_TCK);
+#endif
 	float real=(times(&tmp2)-real_time1)/tick;
+
 	float sys=(tmp2.tms_stime-tmp1.tms_stime)/tick;
 	float usr=(tmp2.tms_utime-tmp1.tms_utime)/tick;
 	Warning(info, "filling [%zu]: DONE real=%5.3f, sys=%5.3f, user=%5.3f", id, real,sys,usr);
@@ -371,7 +380,7 @@ main (int c, char **v)
     printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     HREassert ( val == 0, "no empty");
-    printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
+    //printf("%u ", val); val = TreeDBSLLdec_sat_bits (dbs, ref);
     printf("\n");
     //TreeDBSLLinc_sat_bits (dbs, ref);
     HREexit(0);

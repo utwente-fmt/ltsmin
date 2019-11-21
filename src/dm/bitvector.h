@@ -18,12 +18,8 @@ typedef struct bitvector {
  *  Create a new bitvector
  *   1) unused bitvector_t struct
  *   2) number of bits in the vector
- *
- *  return values:
- *   0: n-bit bitvector has been allocated
- *  -1: error
  */
-extern int          bitvector_create (bitvector_t *, size_t);
+extern void         bitvector_create (bitvector_t *, size_t);
 
 /**
  * bitvector_clear
@@ -51,12 +47,8 @@ extern void         bitvector_free (bitvector_t *);
  *  Copy a bitvector to another bitvector
  *   1) unused bitvector_t struct
  *   2) source bitvector
- *
- *  return value:
- *   0: new bitvector is created in the target, all bits are copied
- *  -1: error
  */
-extern int          bitvector_copy (bitvector_t *, const bitvector_t *);
+extern void         bitvector_copy (bitvector_t *, const bitvector_t *);
 
 /**
  * bitvector_size
@@ -208,5 +200,37 @@ extern int          bitvector_is_disjoint(const bitvector_t *, const bitvector_t
  *   All bits that were not set are now set and vice versa
  */
 extern void         bitvector_invert(bitvector_t *);
+
+/**
+ * Returns the number of high bits
+ */
+extern size_t       bitvector_n_high(bitvector_t *);
+
+/**
+ * Sets the bits that are high
+ */
+extern void         bitvector_high_bits(bitvector_t *, int *);
+
+/**
+ * Test whether two bitvectors are equal.
+ *
+ *  result:
+ *   true: all bits are equal
+ *   false: not all bits are equal or the bitvectors are not of the same size
+ */
+extern int          bitvector_equal(const bitvector_t *bv1, const bitvector_t *bv2);
+
+/**
+ * bitvector_xor
+ *  xor two bitvectors
+ *   1) the target bitvector
+ *      the bitvector should be created with bitvector_create or bitvector_copy
+ *      and should be of the same size as the source bitvector
+ *   2) the source bitvector
+ *
+ *  result:
+ *   the target bitvector has only those bits set that were not set in both
+ */
+extern void         bitvector_xor(bitvector_t *, const bitvector_t *);
 
 #endif                          // BITVECTOR_H

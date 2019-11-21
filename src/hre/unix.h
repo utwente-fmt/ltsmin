@@ -47,6 +47,25 @@ extern char *mkdtemp(char *);
 #  define hton_64(x) (x)
 #  define ntoh_64(x) (x)
 # endif
+#elif defined(_WIN32)
+#define bswap_16 __builtin_bswap16
+#define bswap_32 __builtin_bswap32
+#define bswap_64 __builtin_bswap64
+# if __BYTE_ORDER == __LITTLE_ENDIAN
+#  define hton_16(x) __builtin_bswap16(x)
+#  define ntoh_16(x) __builtin_bswap16(x)
+#  define hton_32(x) __builtin_bswap32(x)
+#  define ntoh_32(x) __builtin_bswap32(x)
+#  define hton_64(x) __builtin_bswap64(x)
+#  define ntoh_64(x) __builtin_bswap64(x)
+# else
+#  define hton_16(x) (x)
+#  define ntoh_16(x) (x)
+#  define hton_32(x) (x)
+#  define ntoh_32(x) (x)
+#  define hton_64(x) (x)
+#  define ntoh_64(x) (x)
+# endif
 #elif defined(__NetBSD__)
 #define bswap_16 bswap16
 #define bswap_32 bswap32
@@ -60,11 +79,6 @@ extern char *mkdtemp(char *);
 #else
 #error "Don't know how to deal with endianness on this platform."
 #endif
-
-extern void qsortr(void *base, size_t num, size_t width,
-                   int (*comp)(const void *, const void *,void *ExtraArgs),
-                   void *ExtraArgs);
-
 
 /**
  * Spin lock implementation (for incomplete pthread libraries as on OSX)

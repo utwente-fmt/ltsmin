@@ -77,7 +77,7 @@ int main() {
 
 	printf("Testing pop, expected fail:\n");
 	res = isba_pop_int(b);
-	fprintf(stdout, "last: %d !! %d \n", res[0], res[1]);
+	//fprintf(stdout, "last: %d !! %d \n", res[0], res[1]);
 	isba_destroy(b);
 	return 0;
 }

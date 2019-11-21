@@ -16,12 +16,14 @@ AC_ARG_WITH([fink],
 
 case "$with_fink" in
   no|disable) acx_fink=no ;;
-  *) AC_CHECK_FILE([$with_fink/etc/fink.conf],
-       [acx_fink=yes],
-       [if test x"$acx_fink" != xcheck; then
-          AC_MSG_WARN([--with-fink was given, but test for fink.conf failed])
+  *) if test -f "$with_fink/etc/fink.conf"; then
+        acx_fink=yes
+     else
+        if test x"$acx_fink" != xcheck; then
+            AC_MSG_WARN([--with-fink was given, but test for fink.conf failed])
         fi
-        acx_fink=no])
+        acx_fink=no
+     fi
      ;;
 esac
 

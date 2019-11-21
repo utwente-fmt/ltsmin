@@ -19,7 +19,7 @@ struct lts_file_s{
 };
 
 static void aut_write_init(lts_file_t lts,int seg,void* state){
-    assert(seg==0);
+    assert(seg==0); (void) seg;
     if (lts->root < lts->states) Abort("at most one root allowed in AUT");
     uint32_t root=*((uint32_t*)state);
     if (root!=0) Print(infoShort,"Detected non-zero root in AUT");
@@ -61,7 +61,7 @@ static void aut_write_edge(lts_file_t file,int src_seg,void* src_state,
 }
 
 static void aut_write_close(lts_file_t file){
-    if (fseek(file->f, 0L, SEEK_SET)){
+    if (fseek(file->f, 0LL, SEEK_SET)){
         AbortCall("while rewinding %s",lts_file_get_name(file));
     }
     fprintf(file->f,"des(%llu,%llu,%llu)",file->root,file->trans,file->states);

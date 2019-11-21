@@ -3,6 +3,9 @@ noinst_LTLIBRARIES += libmucalc.la
 
 pkginclude_HEADERS = lts-type.h ltsmin-standard.h
 
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
 # libltsmin
 libltsmin_la_SOURCES  =
 libltsmin_la_SOURCES += ltsmin-grammar.lemon
@@ -11,6 +14,8 @@ libltsmin_la_SOURCES += etf-objects.c etf-objects.h
 libltsmin_la_SOURCES += etf-parser.c
 libltsmin_la_SOURCES += etf-util.c etf-util.h
 libltsmin_la_SOURCES += ltl2ba-lex.c ltl2ba-lex.h
+libltsmin_la_SOURCES += ltl2ba-lex-helper.c ltl2ba-lex-helper.h
+
 libltsmin_la_SOURCES += lts-type.c lts-type.h
 libltsmin_la_SOURCES += ltsmin-buchi.h
 libltsmin_la_SOURCES += ltsmin-parse-env.h
@@ -20,10 +25,25 @@ libltsmin_la_SOURCES += ltsmin-grammar.c ltsmin-grammar.h
 libltsmin_la_SOURCES += ltsmin-lexer.c ltsmin-lexer.h
 libltsmin_la_SOURCES += ltsmin-lexer.l
 libltsmin_la_SOURCES += ltsmin-standard.h
+libltsmin_la_SOURCES += ltsmin-type-system.c ltsmin-type-system.h
 
 libltsmin_la_LIBADD   = $(top_builddir)/ltl2ba/libltl2ba.la
+libltsmin_la_LIBADD  += ../dm/libdm.la
+libltsmin_la_LIBADD  += $(top_builddir)/lib/libgnu.la
+
+libltsmin_la_CXXFLAGS = $(AM_CXXFLAGS)
+
 libltsmin_la_CPPFLAGS = -DNXT
-libltsmin_la_CPPFLAGS+= -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS)
+libltsmin_la_CPPFLAGS+= -I${top_srcdir}/ltl2ba $(AM_CPPFLAGS) 
+libltsmin_la_CPPFLAGS+= -I${top_srcdir}
+
+# spot
+if HAVE_SPOT
+libltsmin_la_SOURCES    += ltl2spot.cpp ltl2spot.h
+libltsmin_la_LIBADD     += $(SPOT_LDFLAGS) $(SPOT_LIBS)
+libltsmin_la_CPPFLAGS   += $(SPOT_CPPFLAGS)
+libltsmin_la_CXXFLAGS   += $(SPOT_CFLAGS)
+endif
 
 # mu-calculus parser
 libmucalc_la_SOURCES  =
@@ -55,9 +75,11 @@ MAINTAINERCLEANFILES =
 MAINTAINERCLEANFILES += ltsmin-tokens.c ltsmin-tokens.h
 LEMON_FLAGS = -s
 
+.NOTPARALLEL:
+
 %.c %.h: %.lemon lempar.c
-	cd $(top_builddir)/lemon && $(MAKE) $(AM_MAKEFLAGS) lemon$(EXEEXT)
-	$(top_builddir)/lemon/lemon$(EXEEXT) $(LEMON_FLAGS) $<
+	$(MAKE) $(MAKE_AMFLAGS) -C $(top_builddir)/lemon
+	$(top_builddir)/lemon/lemon$(BUILD_EXEEXT) $(LEMON_FLAGS) $<
 	@if test -f $@; then touch $@; fi
 
 %.c %.h: %.l

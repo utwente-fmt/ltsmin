@@ -10,6 +10,7 @@
 
 #include <mc-lib/treedbs-ll.h>
 #include <mc-lib/dbs-ll.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/timed.h> // LATTICE_BLOCK_SIZE
 #include <pins2lts-mc/parallel/global.h>
@@ -109,12 +110,47 @@ z_rehash (const void *v, int b, hash64_t seed)
     (void)b; (void)v;
 }
 
+static int
+num_stategies ()
+{
+    for (int i = 0; i < MAX_STRATEGIES; i++) {
+        if (strategy[i] == Strat_None) return i;
+    }
+    return MAX_STRATEGIES;
+}
+
+
+static int
+get_global_bits ()
+{
+    int bits = 0;
+    for (int i = 0; i < num_stategies(); i++) {
+        bits += num_global_bits (strategy[i]);
+    }
+    return bits;
+}
+
+static int
+get_local_bits ()
+{
+    int bits = 0;
+    for (int i = 0; i < num_stategies(); i++) {
+        bits += (~Strat_DFSFIFO & Strat_LTL & ~Strat_UFSCC & ~Strat_CNDFS
+                 & strategy[i] ? 2 : 0);
+    }
+    return bits;
+}
+
 void
 state_store_static_init ()
 {
     // Determine database size
     char* end;
     dbs_size = strtol (table_size, &end, 10);
+    if (N == 1 && db_type != HashTable) {
+        Print1 (info, "Switching to a hash table to accommodate state vectors of length 1.");
+        db_type = HashTable;
+    }
     if (dbs_size == 0)
         Abort("Not a valid table size: -s %s", table_size);
     if (*end == '%') {
@@ -124,6 +160,21 @@ state_store_static_init ()
         dbs_size = (int)log2 (db_el_size);
         dbs_size = dbs_size > DB_SIZE_MAX ? DB_SIZE_MAX : dbs_size;
     }
+
+    int bits = get_local_bits () + get_global_bits ();
+    if ((db_type | Tree) && bits + 2 * (dbs_size-ratio) > 64) {
+        int new_dbs_size = (64 - bits) / 2 + ratio;
+        Print1 (info, "Reducing table size from %d to %d in order to fit data tree buckets", dbs_size, new_dbs_size);
+        Print1 (info, "Increase --ratio or use algorithm with less satelite bits to increase table size");
+        dbs_size = new_dbs_size;
+    }
+
+    if (db_type == ClearyTree && 2 * (dbs_size-ratio) > (size_t)dbs_size + R_BITS) {
+        int new_dbs_size = R_BITS + 2 * ratio;
+        Print1 (info, "Reducing table size from %d to %d in order to fit data Cleary compact tree buckets", dbs_size, new_dbs_size);
+        Print1 (info, "Increase --ratio to increase table size");
+        dbs_size = new_dbs_size;
+    }
 }
 
 state_store_t *
@@ -131,21 +182,16 @@ state_store_init (model_t model, bool timed)
 {
     state_store_t      *store = RTmallocZero (sizeof(state_store_t));
     matrix_t           *m = GBgetDMInfo (model);
-
-    int i = 0;
-    store->global_bits = 0;
-    store->local_bits = 0;
-    while (Strat_None != strategy[i] && i < MAX_STRATEGIES) {
-        store->global_bits += num_global_bits (strategy[i]);
-        store->local_bits += (~Strat_DFSFIFO & Strat_LTL & strategy[i++] ? 2 : 0);
-    }
-    store->count_bits = (Strat_LNDFS == strategy[i - 1] ? ceil (log2 (W + 1)) :
-            (Strat_CNDFS == strategy[i - 1] && PINS_POR ? 2 : 0) );
+    store->global_bits = get_global_bits ();
+    store->local_bits = get_local_bits ();
+    int                 n = num_stategies();
+    store->count_bits = (Strat_LNDFS == strategy[n - 1] ? ceil (log2 (W + 1)) :
+            (Strat_CNDFS == strategy[n - 1] && PINS_POR ? 2 : 0) );
     store->count_mask = (1<<store->count_bits) - 1;
     size_t              bits = store->global_bits + store->count_bits;
 
     // Wrap functions
-    indexing = NULL != trc_output || ((Strat_TA | Strat_LTLG) & strategy[0]);
+    indexing = NULL != trc_output || ((Strat_TA | Strat_LTL) & strategy[0]);
     switch (db_type) {
     case HashTable:
         store->statistics = (dbs_stats_f) DBSLLstats;
@@ -167,6 +213,7 @@ state_store_init (model_t model, bool timed)
     case ClearyTree:
         if (indexing) Abort ("Cleary tree not supported in combination with "
                               "error trails or the MCNDFS algorithms.");
+        // fall through
     case TreeTable:
         if (ZOBRIST)
             Abort ("Zobrist and treedbs is not implemented");
@@ -191,7 +238,7 @@ state_store_init (model_t model, bool timed)
     }
 
     if (timed) {
-        store->lmap = lm_create (W, 1UL<<dbs_size, LATTICE_BLOCK_SIZE);
+        store->lmap = lm_create (W, 1ULL<<dbs_size, LATTICE_BLOCK_SIZE);
     }
 
     return store;
@@ -274,11 +321,27 @@ state_store_get_wip (ref_t ref)
             & global->store->count_mask;
 }
 
+uint32_t
+state_store_get_colors (ref_t ref)
+{
+    return global->store->get_sat_bits (global->store->dbs, ref)
+            >> global->store->count_bits;
+}
+
 int
-state_store_try_set_colors (ref_t ref, size_t bits, uint64_t old_val,
-                            uint64_t new_val)
+state_store_try_set_counters (ref_t ref, size_t bits,
+                              uint64_t old_val, uint64_t new_val)
+{
+    return global->store->try_set_sat_bits (global->store->dbs, ref, bits, 0,
+                                            old_val, new_val);
+}
+
+int
+state_store_try_set_colors (ref_t ref, size_t bits,
+                            uint64_t old_val, uint64_t new_val)
 {
     return global->store->try_set_sat_bits (global->store->dbs, ref, bits,
+                                            global->store->count_bits,
                                             old_val, new_val);
 }
 
@@ -499,6 +562,22 @@ store_first (store_t *store, state_data_t data)
     Debug ("First state %"PRIu32" --> %zu (H:%"PRIu64")",
            MurmurHash32 (data, D*4, 0), store->ref[0], store->hash64);
     return ctx.seen;
+}
+
+int
+store_find (store_t *store, state_data_t data,
+            transition_info_t *ti, store_t *src)
+{
+    ref_t ref;
+    switch (db_type) {
+    case HashTable:
+        return DBSLLfind_hash (global->store->dbs, data, &ref, NULL);
+    case ClearyTree:
+    case TreeTable:
+        return TreeDBSLLfind_dm (global->store->dbs, data, store_tree(src),
+                                 store->tmp, ti->group);
+    default: Abort ("State store not implemented");
+    }
 }
 
 void

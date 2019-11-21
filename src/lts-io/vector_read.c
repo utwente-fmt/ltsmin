@@ -101,7 +101,7 @@ static int read_init(lts_file_t file,int *seg,void* state){
         *((uint32_t*)state)=DSreadS32(file->init);
         break;
     case SegVector:
-        *seg=DSreadS32(file->init);
+        *seg=DSreadS32(file->init); // fall through
     case Vector:
         {
             lts_type_t ltstype=lts_file_get_type(file);
@@ -172,6 +172,9 @@ static value_table_t set_table(lts_file_t file,int type_no,value_table_t table){
     switch(lts_type_get_format(ltstype,type_no)){
     case LTStypeDirect:
     case LTStypeRange:
+    case LTStypeBool:
+    case LTStypeTrilean:
+    case LTStypeSInt32:
         Abort("attempt to set table for an integer type");
         break;
     case LTStypeChunk:
@@ -189,9 +192,7 @@ static value_table_t set_table(lts_file_t file,int type_no,value_table_t table){
         int len=DSreadVL(ds);
         char data[len];
         DSread(ds,data,len);
-        if (VTputChunk(table,chunk_ld(len,data))!=L){
-             Abort("position of chunk %u was not preserved",L);
-        }
+        VTputAtChunk (table, chunk_ld(len,data), L);
         Debug("element %u length %d",L,len);
     }
     if (L == 0) {
@@ -343,7 +344,7 @@ lts_file_t vector_open(archive_t archive){
     Debug("file type is %s",description);
     if (strlen(description)==0) {
         if (31==DSreadS16(ds)) {
-            Print(error,"this tool does not support legacy DIR");
+            Print(lerror,"this tool does not support legacy DIR");
             Abort("the file can be converted with ltstrans");
         }
     }

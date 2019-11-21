@@ -1,0 +1,37 @@
+# include the general include file which contains the functions
+source $srcdir/lib/include.tcl
+# use the nclude file containing several procedures
+source $srcdir/lib/backends.tcl
+
+#cd into the test dir such that output files are placed here.
+if { [file exists $binpaths(out) ] != 1 } {
+    file mkdir $binpaths(out)
+}
+cd $binpaths(out)
+
+puts "\n-----------------------------"
+puts   "TESTING: Algorithmic backends for PBES"
+puts   "-----------------------------\n"
+
+set langs [dict create]
+
+# Language frontends:
+# -------------------
+
+# pbes:
+dict set langs pbes model "abp.pbes"
+dict set langs pbes options mc "--mcrl2-rewriter=jitty"
+dict set langs pbes options dist "--mcrl2-rewriter=jitty"
+dict set langs pbes options seq "--mcrl2-rewriter=jitty"
+dict set langs pbes options sym "--mcrl2-rewriter=jitty"
+dict set langs pbes exp_output "74 states 92 transitions"
+set alg_be [ find_alg_backends "{dist,mc,seq}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
+# different output for symbolic tool:
+dict set langs pbes exp_output "state space has 74"
+set alg_be [ find_alg_backends "{sym}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
+
+cd ".."

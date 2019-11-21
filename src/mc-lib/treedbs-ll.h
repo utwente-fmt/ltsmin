@@ -2,6 +2,8 @@
 #ifndef TREEDBS_LL_H
 #define TREEDBS_LL_H
 
+#include <stdbool.h>
+
 #include <dm/dm.h>
 #include <mc-lib/stats.h>
 
@@ -60,6 +62,8 @@
 #define             DB_ROOTS_FULL -2
 #define             DB_LEAFS_FULL -3
 
+#define             R_BITS 28      // related to cleary table key size
+
 /**
 Abstract type tree database.
 */
@@ -104,12 +108,12 @@ extern uint32_t     TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_re
 extern uint32_t     TreeDBSLLdec_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref);
 extern int          TreeDBSLLtry_set_sat_bits (const treedbs_ll_t dbs,
                                                const tree_ref_t ref,
-                                               size_t bits, uint64_t exp,
-                                               uint64_t new_val);
+                                               size_t bits, size_t offs,
+                                               uint64_t exp, uint64_t new_val);
 
-extern int          TreeDBSLLlookup (const treedbs_ll_t dbs, const int *v);
-extern int          TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v,
-                                          tree_t prev, tree_t next);
+extern int          TreeDBSLLfop (const treedbs_ll_t dbs, const int *v, bool insert);
+extern int          TreeDBSLLfop_incr (const treedbs_ll_t dbs, const int *v,
+                                          tree_t prev, tree_t next, bool insert);
 
 /**
 \brief Find a vector with respect to a database and insert it if it cannot be
@@ -121,8 +125,43 @@ found.
 \param group the group to do incremental lookup for (-1 unknown)
 \return 1 if the vector was present, 0 if it was added
 */
-extern int          TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, 
-                                        tree_t prev, tree_t next, int group);
+extern int          TreeDBSLLfop_dm (const treedbs_ll_t dbs, const int *v,
+                                        tree_t prev, tree_t next, int group, bool insert);
+
+
+static inline int
+TreeDBSLLlookup (const treedbs_ll_t dbs, const int *v)
+{
+    return TreeDBSLLfop (dbs, v, true);
+}
+static inline int
+TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev, tree_t next)
+{
+    return TreeDBSLLfop_incr (dbs, v, prev, next, true);
+}
+static inline int
+TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v,
+                    tree_t prev, tree_t next, int group)
+{
+    return TreeDBSLLfop_dm (dbs, v, prev, next, group, true);
+}
+static inline int
+TreeDBSLLfind (const treedbs_ll_t dbs, const int *v)
+{
+    return TreeDBSLLfop (dbs, v, false);
+}
+static inline int
+TreeDBSLLfind_incr (const treedbs_ll_t dbs, const int *v, tree_t prev, tree_t next)
+{
+    return TreeDBSLLfop_incr (dbs, v, prev, next, false);
+}
+static inline int
+TreeDBSLLfind_dm (const treedbs_ll_t dbs, const int *v,
+                    tree_t prev, tree_t next, int group)
+{
+    return TreeDBSLLfop_dm (dbs, v, prev, next, group, false);
+}
+
 
 extern tree_t       TreeDBSLLget (const treedbs_ll_t dbs, const tree_ref_t ref, 
                                   int *dst);

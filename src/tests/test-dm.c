@@ -13,7 +13,6 @@ print_matrix (matrix_t *m)
     dm_print (stdout, m);
     printf ("\n");
 }
-
 void
 user_bitvector_print (bitvector_t *bv)
 {
@@ -24,182 +23,94 @@ user_bitvector_print (bitvector_t *bv)
         printf ("%c", bitvector_is_set (bv, i) ? '1' : '0');
     printf ("\n");
 }
-
 int
-max_row_first (matrix_t *r, matrix_t *w, int rowa, int rowb)
+max_row_first (matrix_t *m, int rowa, int rowb)
 {
     int                 i,
                         ra,
-                        wa,
-                        rb,
-                        wb;
+                        rb;
 
-    for (i = 0; i < dm_ncols (r); i++) {
-        ra = dm_is_set (r, rowa, i);
-        wa = dm_is_set (w, rowa, i);
-        rb = dm_is_set (r, rowb, i);
-        wb = dm_is_set (w, rowb, i);
+    for (i = 0; i < dm_ncols (m); i++) {
+        ra = dm_is_set (m, rowa, i);
+        rb = dm_is_set (m, rowb, i);
 
-        if ((ra && wa && rb && wb) || (!ra && !wa && !rb && !wb))
+        if ((ra && rb) || (!ra && !rb))
             continue;
-        return (rb + wb - ra - wa);
+        return (rb - ra);
+    }
+
+    return 0;
+}
+int
+min_row_first (matrix_t *m, int rowa, int rowb)
+{
+    int                 i,
+                        ra,
+                        rb;
+
+    for (i = 0; i < dm_ncols (m); i++) {
+        ra = dm_is_set (m, rowa, i);
+        rb = dm_is_set (m, rowb, i);
+
+        if ((ra && rb) || (!ra && !rb))
+            continue;
+        return (ra - rb);
     }
 
     return 0;
 }
 
 int
-min_row_first (matrix_t *r, matrix_t *w, int rowa, int rowb)
+max_col_first (matrix_t *m, int cola, int colb)
 {
     int                 i,
-                        ra,
-                        wa,
-                        rb,
-                        wb;
+                        ca,
+                        cb;
 
-    for (i = 0; i < dm_ncols (r); i++) {
-        ra = dm_is_set (r, rowa, i);
-        wa = dm_is_set (w, rowa, i);
-        rb = dm_is_set (r, rowb, i);
-        wb = dm_is_set (w, rowb, i);
+    for (i = 0; i < dm_nrows (m); i++) {
+        ca = dm_is_set (m, i, cola);
+        cb = dm_is_set (m, i, colb);
 
-        if ((ra && wa && rb && wb) || (!ra && !wa && !rb && !wb))
+        if ((ca && cb) || (!ca && !cb))
             continue;
-        return (ra + wa - rb - wb);
+        return (cb - ca);
     }
 
     return 0;
 }
 
 int
-max_col_first (matrix_t *r, matrix_t *w, int cola, int colb)
+min_col_first (matrix_t *m, int cola, int colb)
 {
     int                 i,
-                        ra,
-                        wa,
-                        rb,
-                        wb;
+                        ca,
+                        cb;
 
-    for (i = 0; i < dm_nrows (r); i++) {
-        ra = dm_is_set (r, cola, i);
-        wa = dm_is_set (w, cola, i);
-        rb = dm_is_set (r, colb, i);
-        wb = dm_is_set (w, colb, i);
+    for (i = 0; i < dm_nrows (m); i++) {
+        ca = dm_is_set (m, i, cola);
+        cb = dm_is_set (m, i, colb);
 
-        if ((ra && wa && rb && wb) || (!ra && !wa && !rb && !wb))
+        if ((ca && cb) || (!ca && !cb))
             continue;
-        return (rb + wb - ra - wa);
+        return (ca - cb);
     }
 
     return 0;
 }
 
-int
-min_col_first (matrix_t *r, matrix_t *w, int cola, int colb)
+static int
+eq_rows(matrix_t *m, int rowa, int rowb, void *context)
 {
-    int                 i,
-                        ra,
-                        wa,
-                        rb,
-                        wb;
-
-    for (i = 0; i < dm_nrows (r); i++) {
-        ra = dm_is_set (r, cola, i);
-        wa = dm_is_set (w, cola, i);
-        rb = dm_is_set (r, colb, i);
-        wb = dm_is_set (w, colb, i);
-
-        if ((ra && wa && rb && wb) || (!ra && !wa && !rb && !wb))
-            continue;
-        return (ra + wa - rb - wb);
-    }
-
-    return 0;
+    (void) *m; (void) rowa; (void) rowb; (void) context;
+    return 1;
 }
 
-int
-eq_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, void *context) {
-    if (    dm_ones_in_row (r, rowa) != dm_ones_in_row (r, rowb) ||
-            dm_ones_in_row (mayw, rowa) != dm_ones_in_row (mayw, rowb) ||
-            dm_ones_in_row (mustw, rowa) != dm_ones_in_row (mustw, rowb))
-        return 0;
-    int                 i;
-    for (i = 0; i < dm_ncols (r); i++) {
-        int                 ar = dm_is_set (r, rowa, i);
-        int                 br = dm_is_set (r, rowb, i);
-        int                 amayw = dm_is_set (mayw, rowa, i);
-        int                 bmayw = dm_is_set (mayw, rowb, i);
-        int                 amustw = dm_is_set (mustw, rowa, i);
-        int                 bmustw = dm_is_set (mustw, rowb, i);
-        if (ar != br || amayw != bmayw || amustw != bmustw)
-            return 0;                  // unequal
-    }
-    return 1;                          // equal
-    (void)context;
-}
-
-int
-eq_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
-    if (    dm_ones_in_col (r, cola) != dm_ones_in_col (r, colb) ||
-            dm_ones_in_col (mayw, cola) != dm_ones_in_col (mayw, colb) ||
-            dm_ones_in_col (mustw, cola) != dm_ones_in_col (mustw, colb))
-        return 0;
-    int                 i;
-    for (i = 0; i < dm_nrows (r); i++) {
-        int                 ar = dm_is_set (r, i, cola);
-        int                 br = dm_is_set (r, i, colb);
-        int                 amayw = dm_is_set (mayw, i, cola);
-        int                 bmayw = dm_is_set (mayw, i, colb);
-        int                 amustw = dm_is_set (mustw, i, cola);
-        int                 bmustw = dm_is_set (mustw, i, colb);
-        if (ar != br || amayw != bmayw || amustw != bmustw)
-            return 0;                  // unequal
-    }
-    return 1;                          // equal
-}
-
-
-int
-subsume_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, void *context) {
-    int                 i;
-    for (i = 0; i < dm_ncols (r); i++) {
-        int a = 4;
-        if (dm_is_set(mayw, rowa, i)) a |= 1;
-        if (dm_is_set(mustw, rowa, i)) a = 1;
-        if (dm_is_set(r, rowa, i)) a |= 6;
-
-        int b = 4;
-        if (dm_is_set(mayw, rowb, i)) b |= 1;
-        if (dm_is_set(mustw, rowb, i)) b = 1;
-        if (dm_is_set(r, rowb, i)) b |= 6;
-
-        if (a < (a|b))
-            return 0;                  // not subsumed
-    }
-    return 1;                          // subsumed
-    (void)context;
-}
-
-int
-subsume_cols(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int cola, int colb) {
-    int                 i;
-    for (i = 0; i < dm_nrows (r); i++) {
-        int a = 4;
-        if (dm_is_set(mayw, i, cola)) a |= 1;
-        if (dm_is_set(mustw, i, cola)) a = 1;
-        if (dm_is_set(r, i, cola)) a |= 6;
-
-        int b = 4;
-        if (dm_is_set(mayw, i, colb)) b |= 1;
-        if (dm_is_set(mustw, i, colb)) b = 1;
-        if (dm_is_set(r, i, colb)) b |= 6;
-
-        if (a < (a|b))
-            return 0;                  // not subsumed
-    }
-    return 1;                          // equal
-}
-
+//static int
+//eq_cols(matrix_t *m, int rowa, int rowb, void *context)
+//{
+//    (void) *m; (void) rowa; (void) rowb; (void) context;
+//    return 1;
+//}
 
 int
 main (void)
@@ -207,13 +118,6 @@ main (void)
 
     bitvector_t         b1;
     bitvector_t         b2;
-
-    // test size zero bitvectors
-    printf ("bitvector_create(&b1, 0) = %d (should be 0)\n", bitvector_create (&b1, 0));
-    printf ("bitvector_copy(&b2, &b1) = %d (should be 0)\n", bitvector_copy (&b2, &b1));
-
-    bitvector_free (&b2);
-    bitvector_free (&b1);
 
     bitvector_create (&b1, 20);
 
@@ -285,7 +189,6 @@ main (void)
 
     matrix_t            m1;
     matrix_t            m2;
-    matrix_t            m3;
     dm_create (&m1, 10, 10);
 
     print_matrix (&m1);
@@ -331,16 +234,16 @@ main (void)
     print_matrix (&m1);
 
     printf ("copy\n");
+    dm_create(&m2, dm_nrows(&m1), dm_ncols(&m1));
     dm_copy (&m1, &m2);
     // TODO: needs some more work
     print_matrix (&m2);
 
-    dm_copy(&m1, &m3);
 
-    dm_sort_rows (&m1, &m2, &m3, &min_row_first);
+    dm_sort_rows (&m1, &min_row_first);
     print_matrix (&m1);
 
-    dm_sort_rows (&m1, &m2, &m3, &max_row_first);
+    dm_sort_rows (&m1, &max_row_first);
     print_matrix (&m1);
 
     dm_print_perm (&(m1.row_perm));
@@ -348,7 +251,7 @@ main (void)
     printf ("to nub rows added & resorted\n");
     dm_set (&m1, 7, 3);
     dm_set (&m1, 8, 4);
-    dm_sort_rows (&m1, &m2, &m3, &max_row_first);
+    dm_sort_rows (&m1, &max_row_first);
     print_matrix (&m1);
 
     printf ("flatten \n");
@@ -359,7 +262,7 @@ main (void)
 
     printf ("nub sorted\n");
 
-    dm_nub_rows (&m1, &m2, &m3, &eq_rows, NULL);
+    //dm_nub_rows (&m1, &eq_rows, NULL);
 
     print_matrix (&m1);
 
@@ -383,12 +286,12 @@ main (void)
 
     printf ("before\n");
     print_matrix (&m1);
-    dm_optimize (&m1, &m2, &m3);
+    dm_optimize (&m1);
     printf ("after\n");
     print_matrix (&m1);
 
     printf ("resorted\n");
-    dm_sort_rows (&m1, &m2, &m3, &max_row_first);
+    dm_sort_rows (&m1, &max_row_first);
     print_matrix (&m1);
 
 /*
@@ -402,19 +305,8 @@ main (void)
     bitvector_create (&b1, 6);
     bitvector_create (&b2, 10);
 
-    printf ("get bitvector row, invalid size\n"
-            "returns %d (should be -1)\n",
-            dm_bitvector_row(&b1, &m1, 0));
-    printf ("get bitvector row, correct size\n"
-            "returns %d (should be 0)\n",
-            dm_bitvector_row(&b2, &m1, 0));
-
     printf ("bitvector of row 0\n");
     user_bitvector_print (&b2);
-
-    printf ("get bitvector col, correct size\n"
-            "returns %d (should be 0)\n",
-            dm_bitvector_col(&b1, &m1, 8));
 
     printf ("bitvector of col 8\n");
     user_bitvector_print (&b1);
@@ -492,7 +384,7 @@ main (void)
     dm_swap_rows (&m1, 1, 2);
     dm_flatten (&m1);
     print_matrix (&m1);
-    dm_subsume_rows (&m1, &m2, &m3, &subsume_rows, NULL);
+    dm_subsume_rows (&m1, &eq_rows, NULL);
     printf ("after subsumption:\n");
     print_matrix (&m1);
     printf ("\n");
@@ -505,10 +397,10 @@ main (void)
     printf ("column sort test:\n");
     dm_flatten (&m1);
     printf ("max col first:\n");
-    dm_sort_cols (&m1, &m2, &m3, &max_col_first);
+    dm_sort_cols (&m1, &max_col_first);
     print_matrix (&m1);
     printf ("min col first:\n");
-    dm_sort_cols (&m1, &m2, &m3, &min_col_first);
+    dm_sort_cols (&m1, &min_col_first);
     print_matrix (&m1);
 
     printf ("nub columns test:\n");
@@ -516,33 +408,31 @@ main (void)
     dm_set (&m1, 3, 1);
     dm_set (&m1, 3, 4);
     dm_set (&m1, 3, 5);
-    dm_copy(&m1, &m2);
-    dm_copy(&m1, &m3);
-    dm_sort_cols (&m1, &m2, &m3, &max_col_first);
+    dm_sort_cols (&m1, &max_col_first);
     // dm_flatten(&m1);
     printf ("max col first:\n");
     print_matrix (&m1);
-    printf ("nub columns:\n");
-    dm_subsume_cols (&m1, &m2, &m3, &subsume_cols);
-    dm_subsume_rows (&m1, &m2, &m3, &subsume_rows, NULL);
+    //printf ("subsume columns:\n");
+    //dm_subsume_cols (&m1, &eq_cols, NULL);
+    //dm_subsume_rows (&m1, &eq_rows, NULL);
     print_matrix (&m1);
     printf ("column permutation:\n");
     dm_print_perm (&(m1.col_perm));
 
     printf ("optimize columns:\n");
-    dm_optimize (&m1, &m2, &m3);
+    dm_optimize (&m1);
     print_matrix (&m1);
 
-    printf ("ungroup columns:\n");
-    dm_ungroup_cols (&m1);
-    print_matrix (&m1);
+    //printf ("ungroup columns:\n");
+    //dm_ungroup_cols (&m1);
+    //print_matrix (&m1);
 
 
-    printf ("all permutations:\n");
-    dm_set (&m1, 0, 9);
-    dm_nub_cols(&m1, &m2, &m3, &eq_cols);
-    print_matrix (&m1);
-    dm_all_perm (&m1, &m2, &m3);
+    //printf ("all permutations:\n");
+    //dm_set (&m1, 0, 9);
+    //dm_nub_cols(&m1, &eq_cols, NULL);
+    //print_matrix (&m1);
+    //dm_all_perm (&m1);
 
     dm_free (&m2);
     dm_free (&m1);

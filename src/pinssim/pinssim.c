@@ -47,6 +47,7 @@
 #include <pins-lib/property-semantics.h>
 #include <pins-lib/dlopen-api.h>
 #include <pins-lib/dlopen-pins.h>
+#include <pins-lib/pins2pins-group.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
@@ -799,7 +800,7 @@ loadTraceGCF(char * file){
 		        //             fprintf(opf, "edge_lbls[%d]: %d\n", j, edge_lbls[j]);
 		        //             chunk c = chunk_str(tmp);
     						// int act_index = GBchunkPut(model, typeno, c);
-    						// if (GBhasGuardsInfo(model)){
+    						// if (pins_has_guards(model)){
 	    					// 	int labels[189];
 	    					// 	for (int k = 0; k < 189; k++)
 	        	// 					labels[k] = edge_lbls[j] == k ? act_index : -1;
@@ -1026,11 +1027,7 @@ int main (int argc, char *argv[]){
 	// Warning(info, "opening %s", files[0]);
     model = GBcreateBase();
 
-    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),
-                      HREgreyboxI2C,
-                      HREgreyboxC2I,
-                      HREgreyboxCAtI,
-                      HREgreyboxCount);
+    GBsetChunkMap (model, HREgreyboxTableFactory());
 
     // Load model from file
     GBloadFile(model, files[0], &model);
@@ -1056,8 +1053,10 @@ int main (int argc, char *argv[]){
     eLbls = lts_type_get_edge_label_count(ltstype);
     sLbls = lts_type_get_state_label_count(ltstype);
     nGrps = dm_nrows(GBgetDMInfo(model));
-    if (GBhasGuardsInfo(model)){
-        nGuards = GBgetStateLabelGroupInfo(model, GB_SL_ALL)->count;
+    if (PINS_USE_GUARDS) {
+        sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_ALL);
+        HREassert (guards, "No guards present.");
+        nGuards = guards->count;
         fprintf(stdout,CYAN "INFO: " RESET " Number of guards %d.", nGuards);
     }
         

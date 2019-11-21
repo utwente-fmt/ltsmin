@@ -4,6 +4,8 @@
  *  Created on: 30 Oct 2012
  *      Author: kant
  */
+#include <hre/config.h>
+
 #include <hre/user.h>
 #include <pins-lib/pg-types.h>
 

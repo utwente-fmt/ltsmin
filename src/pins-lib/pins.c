@@ -7,7 +7,13 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-cache.h>
+#include <pins-lib/pins2pins-group.h>
+#include <pins-lib/pins2pins-guards.h>
+#include <pins-lib/pins2pins-check.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/pins2pins-mucalc.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <util-lib/treedbs.h>
 
 /** \file pins.c */
@@ -19,27 +25,23 @@ struct grey_box_model {
 	matrix_t *dm_read_info;
 	matrix_t *dm_may_write_info;
 	matrix_t *dm_must_write_info;
-	int supports_copy;
 	matrix_t *sl_info;
-    sl_group_t* sl_groups[GB_SL_GROUP_COUNT];
-    guard_t** guards;
+    sl_group_t *sl_groups[GB_SL_GROUP_COUNT];
+    guard_t **guards;
     matrix_t *commutes_info; // commutes info
     matrix_t *gce_info; // guard co-enabled info
     matrix_t *dna_info; // do not accord info
     matrix_t *gnes_info; // guard necessary enabling set
     matrix_t *gnds_info; // guard necessary disabling set
-    int sl_idx_buchi_accept;
-    int sl_idx_progress;
-    int sl_idx_valid_end;
     int *group_visibility;
     int *label_visibility;
 	int *s0;
-	int *guard_status;
-	int use_guards;
-	void*context;
+	void *context;
     next_method_grey_t next_short;
+    next_method_grey_t next_short_r2w;
 	next_method_grey_t next_long;
     next_method_grey_t actions_short;
+    next_method_grey_t actions_short_r2w;
     next_method_grey_t actions_long;
 	next_method_matching_t next_matching;
 	next_method_black_t next_all;
@@ -47,27 +49,24 @@ struct grey_box_model {
 	get_label_method_t state_labels_long;
 	get_label_group_method_t state_labels_group;
 	get_label_all_method_t state_labels_all;
-	transition_in_group_t transition_in_group;
+	groups_of_edge_t groups_of_edge;
 	covered_by_grey_t covered_by;
     covered_by_grey_t covered_by_short;
-	void* newmap_context;
-	newmap_t newmap;
-	int2chunk_t int2chunk;
-	chunk2int_t chunk2int;
-    chunkatint_t chunkatint;
-	get_count_t get_count;
+    table_factory_t chunk_factory;
+	void **map;
 	chunk2pretty_t chunk2pretty;
-	void** map;
 	string_set_t default_filter;
-	matrix_t *expand_matrix;
-	matrix_t *project_matrix;
-	
-	int mucalc_node_count;
 
 	/** Index of static information matrices. */
 	string_index_t static_info_index;
 	/** Array of static information matrices. */
 	struct static_info_matrix * static_info_matrices;
+
+	ExitCB exit;
+
+	int *var_perm;
+	int *group_perm;
+    int *groups_of_edge_default;
 };
 
 struct static_info_matrix{
@@ -134,14 +133,31 @@ struct nested_cb {
 
 void project_dest(void*context,transition_info_t*ti,int*dst,int*cpy){
 #define info ((struct nested_cb*)context)
-    int len = dm_ones_in_row(GBgetProjectMatrix(info->model), info->group);
+    int len = dm_ones_in_row(GBgetDMInfo(info->model), info->group);
     int short_dst[len];
 
-    dm_project_vector(GBgetProjectMatrix(info->model), info->group, dst, short_dst);
+    dm_project_vector(GBgetDMInfo(info->model), info->group, dst, short_dst);
     ti->group = info->group;
     if (cpy != NULL) {
         int short_cpy[len];
-        dm_project_vector(GBgetProjectMatrix(info->model), info->group, cpy, short_cpy);
+        dm_project_vector(GBgetDMInfo(info->model), info->group, cpy, short_cpy);
+        info->cb(info->user_ctx,ti,short_dst,short_cpy);
+    } else {
+        info->cb(info->user_ctx,ti,short_dst,NULL);
+    }
+#undef info
+}
+
+void project_dest_write(void*context,transition_info_t*ti,int*dst,int*cpy){
+#define info ((struct nested_cb*)context)
+    int len = dm_ones_in_row(GBgetDMInfoMayWrite(info->model), info->group);
+    int short_dst[len];
+
+    dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, dst, short_dst);
+    ti->group = info->group;
+    if (cpy != NULL) {
+        int short_cpy[len];
+        dm_project_vector(GBgetDMInfoMayWrite(info->model), info->group, cpy, short_cpy);
         info->cb(info->user_ctx,ti,short_dst,short_cpy);
     } else {
         info->cb(info->user_ctx,ti,short_dst,NULL);
@@ -150,24 +166,45 @@ void project_dest(void*context,transition_info_t*ti,int*dst,int*cpy){
 }
 
 int default_short(model_t self,int group,int*src,TransitionCB cb,void*context){
-	struct nested_cb info;
-	info.model = self;
-	info.group = group;
-	info.src=src;
-	info.cb=cb;
-	info.user_ctx=context;
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
 
-    int long_src[dm_ncols(GBgetExpandMatrix(self))];
-    dm_expand_vector(GBgetExpandMatrix(self), group, self->s0, src, long_src);
+    int long_src[dm_ncols(GBgetDMInfo(self))];
+    dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
 
     return self->next_long(self,group,long_src,project_dest,&info);
 }
 
+int default_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context){
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
+
+    int long_src[dm_ncols(GBgetDMInfoRead(self))];
+    dm_expand_vector(GBgetDMInfoRead(self), group, self->s0, src, long_src);
+
+    return self->next_long(self,group,long_src,project_dest_write,&info);
+}
+
 void expand_dest(void*context,transition_info_t*ti,int*dst, int*cpy){
 #define info ((struct nested_cb*)context)
-	int long_dst[dm_ncols(GBgetProjectMatrix(info->model))];
-	dm_expand_vector(GBgetProjectMatrix(info->model), info->group, info->src, dst, long_dst);
-	info->cb(info->user_ctx,ti,long_dst,cpy);
+    int len = dm_ncols (GBgetDMInfo(info->model));
+    int long_dst[len];
+	dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_dst);
+    if (cpy != NULL) {
+        int long_cpy[len];
+        dm_expand_vector(GBgetDMInfo(info->model), info->group, info->src, dst, long_cpy);
+        info->cb(info->user_ctx,ti,long_dst,long_cpy);
+    } else {
+        info->cb(info->user_ctx,ti,long_dst,NULL);
+    }
 #undef info
 }
 
@@ -179,9 +216,9 @@ int default_long(model_t self,int group,int*src,TransitionCB cb,void*context){
 	info.cb=cb;
 	info.user_ctx=context;
 
-	int len = dm_ones_in_row(GBgetExpandMatrix(self), group);
+	const int len = dm_ones_in_row(GBgetDMInfo(self), group);
 	int src_short[len];
-	dm_project_vector(GBgetExpandMatrix(self), group, src, src_short);
+	dm_project_vector(GBgetDMInfo(self), group, src, src_short);
 
 	return self->next_short(self,group,src_short,expand_dest,&info);
 }
@@ -194,9 +231,24 @@ int default_actions_short(model_t self,int group,int*src,TransitionCB cb,void*co
     info.cb=cb;
     info.user_ctx=context;
 
-    int long_src[dm_ncols(GBgetExpandMatrix(self))];
-    dm_expand_vector(GBgetExpandMatrix(self), group, self->s0, src, long_src);
+    int long_src[dm_ncols(GBgetDMInfo(self))];
+    dm_expand_vector(GBgetDMInfo(self), group, self->s0, src, long_src);
     return self->actions_long(self,group,long_src,project_dest,&info);
+}
+
+int default_actions_short_r2w(model_t self,int group,int*src,TransitionCB cb,void*context){
+    struct nested_cb info;
+    info.model = self;
+    info.group = group;
+    info.src=src;
+    info.cb=cb;
+    info.user_ctx=context;
+
+    matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+
+    int long_src[dm_ncols(read)];
+    dm_expand_vector(read, group, self->s0, src, long_src);
+    return self->actions_long(self,group,long_src,project_dest_write,&info);
 }
 
 int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*context){
@@ -207,14 +259,14 @@ int default_actions_long(model_t self,int group,int*src,TransitionCB cb,void*con
     info.cb=cb;
     info.user_ctx=context;
 
-    int len = dm_ones_in_row(GBgetExpandMatrix(self), group);
+    matrix_t* read = GBgetMatrix(self, GBgetMatrixID(self, LTSMIN_MATRIX_ACTIONS_READS));
+
+    const int len = dm_ones_in_row(read, group);
     int src_short[len];
-    dm_project_vector(GBgetExpandMatrix(self), group, src, src_short);
+    dm_project_vector(read, group, src, src_short);
 
     return self->actions_short(self,group,src_short,expand_dest,&info);
 }
-
-
 
 int GBgetTransitionsMarked(model_t self,matrix_t* matrix,int row,int*src,TransitionCB cb,void*context){
     int N=dm_ncols(matrix);
@@ -283,16 +335,24 @@ state_labels_default_all(model_t model, int *state, int *labels)
 }
 
 static int
-transition_in_group_default(model_t model, int* labels, int group)
+groups_of_edge_default(model_t model, int edgeno, int index, int *groups)
 {
-    (void)model; (void)labels; (void)group;
-    return 1;
+    (void) edgeno; (void) index;
+    for (int i = 0; i < (int) pins_get_group_count(model); i++) groups[i] = i;
+
+    return pins_get_group_count(model);
 }
 
 int
 wrapped_default_short (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
     return GBgetTransitionsShort (GBgetParent(self), group, src, cb, context);
+}
+
+int
+wrapped_default_short_r2w (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetTransitionsShortR2W (GBgetParent(self), group, src, cb, context);
 }
 
 int
@@ -305,6 +365,12 @@ int
 wrapped_default_actions_short (model_t self,int group,int*src,TransitionCB cb,void*context)
 {
     return GBgetActionsShort (GBgetParent(self), group, src, cb, context);
+}
+
+int
+wrapped_default_actions_short_r2w (model_t self,int group,int*src,TransitionCB cb,void*context)
+{
+    return GBgetActionsShortR2W (GBgetParent(self), group, src, cb, context);
 }
 
 int
@@ -343,6 +409,18 @@ wrapped_state_labels_default_all(model_t model, int *state, int *labels)
     return GBgetStateLabelsAll(GBgetParent(model), state, labels);
 }
 
+static void
+wrapped_exit_default(model_t model)
+{
+    GBExit(GBgetParent(model));
+}
+
+static int
+wrapped_default_groups_of_edge(model_t model, int edgeno, int index, int *groups)
+{
+    return GBgroupsOfEdge(GBgetParent(model), edgeno, index, groups);
+}
+
 struct filter_context {
     void *user_ctx;
     TransitionCB user_cb;
@@ -376,7 +454,7 @@ static int next_matching_default(model_t model,int label_idx,int value,int*src,T
     ctx.group_idx=lts_type_find_edge_label(model->ltstype,LTSMIN_EDGE_TYPE_HYPEREDGE_GROUP);
     ctx.value=value;
     ctx.count=0;
-    ctx.group_val=0;        
+    ctx.group_val=0;
     GBgetTransitionsAll(model,src,matching_callback,&ctx);
     return ctx.count;
 }
@@ -390,7 +468,6 @@ model_t GBcreateBase(){
 	model->dm_read_info=NULL;
 	model->dm_may_write_info=NULL;
 	model->dm_must_write_info=NULL;
-	model->supports_copy=-1;
 	model->sl_info=NULL;
     for(int i=0; i < GB_SL_GROUP_COUNT; i++)
         model->sl_groups[i]=NULL;
@@ -402,14 +479,13 @@ model_t GBcreateBase(){
     model->dna_info=NULL;
     model->gnes_info=NULL;
     model->gnds_info=NULL;
-    model->sl_idx_buchi_accept = -1;
-    model->sl_idx_progress = -1;
-    model->sl_idx_valid_end = -1;
 	model->s0=NULL;
 	model->context=0;
     model->next_short=default_short;
+    model->next_short_r2w=default_short_r2w;
 	model->next_long=default_long;
     model->actions_short=default_actions_short;
+    model->actions_short_r2w=default_actions_short_r2w;
     model->actions_long=default_actions_long;
 	model->next_matching=next_matching_default;
 	model->next_all=default_all;
@@ -417,22 +493,19 @@ model_t GBcreateBase(){
 	model->state_labels_long=state_labels_default_long;
 	model->state_labels_group=state_labels_default_group;
 	model->state_labels_all=state_labels_default_all;
-	model->transition_in_group=transition_in_group_default;
-	model->newmap_context=NULL;
-	model->newmap=NULL;
-	model->int2chunk=NULL;
-	model->chunk2int=NULL;
-	model->chunk2pretty=NULL;
+	model->groups_of_edge=groups_of_edge_default;
 	model->map=NULL;
-	model->get_count=NULL;
-	model->expand_matrix=NULL;
-	model->project_matrix=NULL;
-	model->use_guards=0;
-	model->mucalc_node_count = 0;
-	
+	model->chunk_factory=NULL;
+
 	model->static_info_index=SIcreate();
 	model->static_info_matrices=NULL;
 	ADD_ARRAY(SImanager(model->static_info_index),model->static_info_matrices,struct static_info_matrix);
+
+	model->exit = NULL;
+
+	model->var_perm = NULL;
+	model->group_perm = NULL;
+
 	return model;
 }
 
@@ -478,7 +551,6 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
         else
             model->dm_must_write_info = model->dm_info;
     }
-    if (model->supports_copy == -1) model->supports_copy = default_src->supports_copy;
     if (model->dm_info == NULL)
         model->dm_info = default_src->dm_info;
 
@@ -512,14 +584,18 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->gnds_info == NULL)
         GBsetGuardNDSInfo(model, GBgetGuardNDSInfo (default_src));
 
-    if (GBgetAcceptingStateLabelIndex (default_src) >= 0)
-        GBsetAcceptingStateLabelIndex(model, GBgetAcceptingStateLabelIndex (default_src));
+    if (model->default_filter == NULL)
+        GBsetDefaultFilter (model, GBgetDefaultFilter(default_src));
 
-    if (GBgetProgressStateLabelIndex (default_src) >= 0)
-        GBsetProgressStateLabelIndex(model, GBgetProgressStateLabelIndex (default_src));
-
-    if (GBgetValidEndStateLabelIndex (default_src) >= 0)
-        GBsetValidEndStateLabelIndex(model, GBgetValidEndStateLabelIndex (default_src));
+    for (int i = 0; i < GBgetMatrixCount(default_src); i++) {
+        const char* name = GBgetMatrixName(default_src, i);
+        if (GBgetMatrixID(model, (char*) name) == SI_INDEX_FAILED) {
+            pins_strictness_t strictness = GBgetMatrixStrictness(default_src, i);
+            index_class_t row_info = GBgetMatrixRowInfo(default_src, i);
+            index_class_t column_info = GBgetMatrixColumnInfo(default_src, i);
+            GBsetMatrix(model, name, GBgetMatrix(default_src, i), strictness, row_info, column_info);
+        }
+    }
 
     if (model->s0 == NULL) {
         int N = lts_type_get_state_length (GBgetLTStype (default_src));
@@ -551,15 +627,19 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
      * implements a next_all.
      */
     if (model->next_short == default_short &&
+        model->next_short_r2w == default_short_r2w &&
         model->next_long == default_long &&
-        model->actions_short == default_short &&
-        model->actions_long == default_long &&
+        model->actions_short == default_actions_short &&
+        model->actions_short_r2w == default_actions_short_r2w &&
+        model->actions_long == default_actions_long &&
         model->next_all == default_all) {
         GBsetNextStateShort (model, wrapped_default_short);
+        GBsetNextStateShortR2W (model, wrapped_default_short_r2w);
         GBsetNextStateLong (model, wrapped_default_long);
         GBsetNextStateAll (model, wrapped_default_all);
         GBsetActionsLong (model, wrapped_default_actions_long);
         GBsetActionsShort (model, wrapped_default_actions_short);
+        GBsetActionsShortR2W (model, wrapped_default_actions_short_r2w);
     }
 
     if (model->state_labels_short == state_labels_default_short &&
@@ -575,10 +655,14 @@ void GBinitModelDefaults (model_t *p_model, model_t default_src)
     if (model->covered_by_short == NULL)
         GBsetIsCoveredByShort(model, default_src->covered_by_short);
 
-    if (model->expand_matrix == NULL) model->expand_matrix=default_src->expand_matrix;
-    if (model->project_matrix == NULL) model->project_matrix=default_src->project_matrix;
-    if (model->use_guards == 0) model->use_guards=default_src->use_guards;
-    if (model->mucalc_node_count==0) model->mucalc_node_count = default_src->mucalc_node_count;
+    model->exit = wrapped_exit_default;
+
+    model->var_perm = default_src->var_perm;
+    model->group_perm = default_src->group_perm;
+
+    if (model->groups_of_edge == groups_of_edge_default) {
+        GBsetGroupsOfEdge(model, wrapped_default_groups_of_edge);
+    }
 }
 
 void* GBgetContext(model_t model){
@@ -596,7 +680,7 @@ void GBsetLTStype(model_t model,lts_type_t info){
 	    int N=lts_type_get_type_count(info);
 	    model->map=RTmallocZero(N*sizeof(void*));
 	    for(int i=0;i<N;i++){
-		    model->map[i]=model->newmap(model->newmap_context);
+		    model->map[i] = TFnewTable (model->chunk_factory);
 	    }
     }
 }
@@ -641,28 +725,6 @@ matrix_t *GBgetDMInfoRead(model_t model) {
         return model->dm_info;
     }
 	return model->dm_read_info;
-}
-
-matrix_t *GBgetExpandMatrix(model_t model) {
-    if (model->expand_matrix == NULL) {
-        model->expand_matrix = GBgetDMInfoRead(model);
-    }
-    return model->expand_matrix;
-}
-
-matrix_t *GBgetProjectMatrix(model_t model) {
-    if (model->project_matrix == NULL) {
-        model->project_matrix = GBgetDMInfoMayWrite(model);
-    }
-    return model->project_matrix;
-}
-
-void GBsetExpandMatrix(model_t model, matrix_t *dm_info) {
-    model->expand_matrix = dm_info;
-}
-
-void GBsetProjectMatrix(model_t model, matrix_t *dm_info) {
-    model->project_matrix = dm_info;
 }
 
 static int write_checked=0;
@@ -710,14 +772,6 @@ matrix_t *GBgetDMInfoMustWrite(model_t model) {
     return model->dm_must_write_info;
 }
 
-int GBsupportsCopy(model_t model) {
-    if (model->supports_copy == -1) model->supports_copy = 0;
-    return model->supports_copy;
-}
-void GBsetSupportsCopy(model_t model) {
-    model->supports_copy = 1;
-}
-
 void GBsetStateLabelInfo(model_t model, matrix_t *info){
 	if (model->sl_info != NULL)  Abort("state info already set");
 	model->sl_info=info;
@@ -749,8 +803,16 @@ void GBsetActionsShort(model_t model,next_method_grey_t method){
     model->actions_short=method;
 }
 
+void GBsetActionsShortR2W(model_t model, next_method_grey_t method) {
+    model->actions_short_r2w=method;
+}
+
 int GBgetActionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
     return model->actions_short(model,group,src,cb,context);
+}
+
+int GBgetActionsShortR2W(model_t model,int group,int*src,TransitionCB cb,void*context){
+    return model->actions_short_r2w(model,group,src,cb,context);
 }
 
 void GBsetActionsLong(model_t model,next_method_grey_t method){
@@ -765,8 +827,16 @@ void GBsetNextStateShort(model_t model,next_method_grey_t method){
     model->next_short=method;
 }
 
+void GBsetNextStateShortR2W(model_t model,next_method_grey_t method){
+    model->next_short_r2w=method;
+}
+
 int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context){
     return model->next_short(model,group,src,cb,context);
+}
+
+int GBgetTransitionsShortR2W(model_t model,int group,int*src,TransitionCB cb,void*context){
+    return model->next_short_r2w(model,group,src,cb,context);
 }
 
 void GBsetNextStateLong(model_t model,next_method_grey_t method){
@@ -854,8 +924,6 @@ void GBsetStateLabelGroupInfo(model_t model, sl_group_enum_t group, sl_group_t* 
     model->sl_groups[group] = group_info;
 }
 
-int GBhasGuardsInfo(model_t model) { return model->guards != NULL; }
-
 void GBsetGuardsInfo(model_t model, guard_t** guards) {
     model->guards = guards;
 }
@@ -865,6 +933,7 @@ guard_t** GBgetGuardsInfo(model_t model) {
 }
 
 void GBsetGuard(model_t model, int group, guard_t* guard) {
+    HREassert (guard->count > 0, "group must have at least one guard");
     model->guards[group] = guard;
 }
 
@@ -935,23 +1004,16 @@ matrix_t *GBgetGuardNDSInfo(model_t model) {
     return model->gnds_info;
 }
 
-void GBsetTransitionInGroup(model_t model,transition_in_group_t method){
-	model->transition_in_group=method;
+void GBsetGroupsOfEdge(model_t model,groups_of_edge_t method){
+    model->groups_of_edge=method;
 }
 
-int GBtransitionInGroup(model_t model,int* labels,int group){
-	return model->transition_in_group(model,labels,group);
+int GBgroupsOfEdge(model_t model, int edgeno, int index, int *groups){
+    return model->groups_of_edge(model,edgeno,index,groups);
 }
 
-void GBsetChunkMethods(model_t model,newmap_t newmap,void*newmap_context,
-	int2chunk_t int2chunk,chunk2int_t chunk2int,chunkatint_t chunkatint,
-	get_count_t get_count){
-	model->newmap_context=newmap_context;
-	model->newmap=newmap;
-	model->int2chunk=int2chunk;
-	model->chunk2int=chunk2int;
-	model->chunkatint=chunkatint;
-	model->get_count=get_count;
+void GBsetChunkMap(model_t model, table_factory_t factory){
+	model->chunk_factory = factory;
 }
 
 void GBcopyChunkMaps(model_t dst, model_t src)
@@ -960,13 +1022,7 @@ void GBcopyChunkMaps(model_t dst, model_t src)
  * copying, bad things are likely to happen when dst is used.
  */
 {
-
-    dst->newmap_context = src->newmap_context;
-    dst->newmap = src->newmap;
-    dst->int2chunk = src->int2chunk;
-    dst->chunk2int = src->chunk2int;
-    dst->chunkatint = src->chunkatint;
-    dst->get_count = src->get_count;
+    dst->chunk_factory = src->chunk_factory;
 
     int N    = lts_type_get_type_count(GBgetLTStype(src));
     dst->map = RTmallocZero(N*sizeof(void*));
@@ -979,59 +1035,30 @@ void GBcopyChunkMaps(model_t dst, model_t src)
 void GBgrowChunkMaps(model_t model, int old_n)
 {
     void **old_map = model->map;
-    int N=lts_type_get_type_count(GBgetLTStype(model));
-    model->map=RTmallocZero(N*sizeof(void*));
-    for(int i=0;i<N;i++){
+    int N = lts_type_get_type_count(GBgetLTStype(model));
+    model->map = RTmallocZero(N*sizeof(void*));
+    for(int i=0; i < N; i++) {
         HREassert(old_map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
         if (i < old_n) {
             model->map[i] = old_map[i];
         } else {
-            model->map[i]=model->newmap(model->newmap_context);
+            model->map[i] = TFnewTable (model->chunk_factory);
         }
     }
     RTfree (old_map);
 }
 
-void GBchunkPutAt(model_t model,int type_no,const chunk c,int pos){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-    model->chunkatint(model->map[type_no],c.data,c.len,pos);
+void GBsetPrettyPrint(model_t model, chunk2pretty_t chunk2pretty) {
+    model->chunk2pretty = chunk2pretty;
 }
 
-int GBchunkPut(model_t model,int type_no,const chunk c){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-	return model->chunk2int(model->map[type_no],c.data,c.len);
-}
-
-chunk GBchunkGet(model_t model,int type_no,int chunk_no){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-	chunk_len len;
-	int tmp;
-	char* data=(char*)model->int2chunk(model->map[type_no],chunk_no,&tmp);
-	len=(chunk_len)tmp;
-	return chunk_ld(len,data);
-}
-
-int GBchunkPrettyPrint(model_t model,int pos,int chunk_no){
-    if (model->chunk2pretty == NULL)
-    {
-        if (model->parent == NULL)
-        {
-            return chunk_no;
-        }
+int GBchunkPrettyPrint(model_t model, int pos, int chunk_no){
+    if (model->chunk2pretty == NULL) {
+        if (model->parent == NULL) return chunk_no;
         return GBchunkPrettyPrint(model->parent, pos, chunk_no);
     }
     return model->chunk2pretty(model, pos, chunk_no);
 }
-
-void GBsetPrettyPrint(model_t model,chunk2pretty_t chunk2pretty){
-    model->chunk2pretty = chunk2pretty;
-}
-
-int GBchunkCount(model_t model,int type_no){
-    HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
-	return model->get_count(model->map[type_no]);
-}
-
 
 void GBprintDependencyMatrix(FILE* file, model_t model) {
     Printf (info, "\nDependency matrix (combined read/write):\n");
@@ -1054,7 +1081,7 @@ void GBprintDependencyMatrixMustWrite(FILE* file, model_t model) {
 }
 
 void GBprintDependencyMatrixCombined(FILE* file, model_t model) {
-    matrix_t *dm_r = GBgetExpandMatrix(model);
+    matrix_t *dm_r = GBgetDMInfoRead(model);
     matrix_t *dm_may_w = GBgetDMInfoMayWrite(model);
     matrix_t *dm_must_w = GBgetDMInfoMustWrite(model);
 
@@ -1107,7 +1134,7 @@ void GBprintStateLabelInfo(FILE* file, model_t model) {
 }
 
 void GBprintStateLabelGroupInfo(FILE* file, model_t model) {
-    if (GBhasGuardsInfo(model))
+    if (pins_has_guards(model))
     {
         int nGroups = dm_nrows (GBgetDMInfo (model));
         Printf(info, "State label group info:\n");
@@ -1122,31 +1149,11 @@ void GBprintStateLabelGroupInfo(FILE* file, model_t model) {
     }
 }
 
-int guards_all(model_t self,int*src,TransitionCB cb,void*context){
-
-    // fill guard status, request all guard values
-    GBgetStateLabelsAll (self, src, self->guard_status);
-
-    int res = 0;
-    for (size_t i = 0; i < pins_get_group_count(self); i++) {
-        guard_t *gt = self->guards[i];
-        int enabled = 1;
-        for (int j = 0; j < gt->count && enabled; j++) {
-            enabled &= self->guard_status[gt->guard[j]] != 0;
-        }
-        if (enabled) {
-            res+=self->next_long(self,i,src,cb,context);
-        }
-    }
-
-    return res;
-}
 
 /**********************************************************************
  * Grey box factory functionality
  */
 
-#define                 USE_GUARDS_OPTION "pins-guards"
 #define                 MAX_TYPES 16
 static char*            model_type[MAX_TYPES];
 static pins_loader_t    model_loader[MAX_TYPES];
@@ -1155,26 +1162,7 @@ static char            *model_type_pre[MAX_TYPES];
 static pins_loader_t    model_preloader[MAX_TYPES];
 static int              registered_pre=0;
 static int              matrix=0;
-static int              use_guards=0;
 static int              labels=0;
-static int              cache=0;
-pins_por_t              PINS_POR = PINS_POR_NONE;
-pins_ltl_type_t         PINS_LTL = PINS_LTL_NONE;
-static const char      *regroup_options = NULL;
-
-static char *mucalc_file = NULL;
-
-int GBhaveMucalc() {
-    return (mucalc_file) ? 1 : 0;
-}
-
-int GBgetMucalcNodeCount(model_t model) {
-    return model->mucalc_node_count;
-}
-
-void GBsetMucalcNodeCount(model_t model, int node_count) {
-    model->mucalc_node_count = node_count;
-}
 
 void chunk_table_print(log_t log, model_t model) {
     lts_type_t t = GBgetLTStype(model);
@@ -1182,10 +1170,10 @@ void chunk_table_print(log_t log, model_t model) {
     int N=lts_type_get_type_count(t);
     int idx = 0;
     for(int i=0;i<N;i++){
-        int V = GBchunkCount(model, i);
-        for(int j=0;j<V;j++){
-            char *type = lts_type_get_type(t, i);
-            chunk c = GBchunkGet(model, i, j);
+        char *type = lts_type_get_type(t, i);
+        table_iterator_t it = pins_chunk_iterator  (model, i);
+        while (IThasNext(it)) {
+            chunk c = ITnext (it);
             char name[c.len*2+6];
             chunk2string(c, sizeof name, name);
             HREprintf(log,"%4d: %s (%s)\n",idx, name, type);
@@ -1194,83 +1182,95 @@ void chunk_table_print(log_t log, model_t model) {
     }
 }
 
-void
-GBloadFile (model_t model, const char *filename, model_t *wrapped)
+static model_t
+wrapModel(model_t model)
 {
-    char               *extension = strrchr (filename, '.');
+    /* add fork layer */
+    //model = GBaddFork (model);
+
+    /* add GBlong guard evaluation layer (Deprecated) */
+    model = GBaddGuards (model);
+
+    /* add dependency checking layer */
+    model = GBaddCheck (model);
+
+    /* add cache */
+    model = GBaddCache (model);
+
+    /* add partial order reduction */
+    model = GBaddPOR (model);
+
+    /* add LTL crossproduct layer */
+    model = GBaddLTL (model);
+
+    /* add regrouping */
+    model = GBregroup (model);
+
+    /* add mu calculus */
+    model = GBaddMucalc (model); // Only adds LTL when a mu formula is provided
+
+    /* if 'print matrix', print matrix and abort */
+    if (matrix) {
+        if (HREme(HREglobal()) == 0) {
+            /* if we are the main process, then print */
+            GBprintDependencyMatrixCombined(stdout, model);
+            if (log_active(infoLong)) {
+                GBprintStateLabelInfo(stdout, model);
+                GBprintStateLabelGroupInfo(stdout, model);
+                GBprintPORMatrix(stdout, model);
+            }
+            /* synchronize with other processes */
+            HREbarrier(HREglobal());
+        } else {
+            /* wait for main process */
+            HREbarrier(HREglobal());
+        }
+        HREabort(LTSMIN_EXIT_SUCCESS);
+    }
+
+    /* if 'print labels', print and abort */
+    if (labels) {
+        if (HREme(HREglobal()) == 0) {
+            /* if we are the main process, then print */
+            if (log_active(info)) {
+                lts_type_printf(info, GBgetLTStype(model));
+            }
+            chunk_table_print(info, model);
+            /* synchronize with other processes */
+            HREbarrier(HREglobal());
+        } else {
+            /* wait for main process */
+            HREbarrier(HREglobal());
+        }
+        HREabort(LTSMIN_EXIT_SUCCESS);
+    }
+
+    return model;
+}
+
+static pins_loader_t
+find_loader (const char* filename)
+{
+    char* extension = strrchr (filename, '.');
     if (extension) {
         extension++;
         for (int i = 0; i < registered; i++) {
-            if (0==strcmp (model_type[i], extension)) {
-                model_loader[i] (model, filename);
-                model->use_guards=use_guards;
-
-                if (GBgetUseGuards(model)) {
-                   if (model->next_long == default_long)
-                       Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                   sl_group_t* guards = GBgetStateLabelGroupInfo (model, GB_SL_GUARDS);
-                   if (model->guards == NULL || guards == NULL || guards->count == 0)
-                       Abort ("No long next-state function implemented for this language module (--"USE_GUARDS_OPTION").");
-                   model->guard_status = RTmalloc (sizeof(int[pins_get_state_label_count(model)]));
-                   model->next_all = guards_all;
-                   model->expand_matrix=GBgetMatrix(model, GBgetMatrixID(model, LTSMIN_MATRIX_ACTIONS_READS));
-                   if (model->expand_matrix == NULL) {
-                       Abort ("Matrix not available for --"USE_GUARDS_OPTION);
-                   }
-                }
-
-                if (wrapped) {
-                    if (PINS_POR == PINS_POR_ON)
-                        model = GBaddPOR (model);
-                    else if (PINS_POR == PINS_POR_CHECK)
-                        model = GBaddPORCheck (model);
-                    model = GBaddLTL (model);
-                    if (regroup_options != NULL)
-                        model = GBregroup (model, regroup_options);
-                    if (mucalc_file) {
-                        if (PINS_LTL)
-                            Abort("The -mucalc option and -ltl options can not be combined.");
-                        if (PINS_POR)
-                            Abort("The -mucalc option and -por options can not be combined.");
-                        model = GBaddMucalc (model, mucalc_file);
-                    }
-                    if (cache)
-                        model = GBaddCache (model);
-                    *wrapped = model;
-                }
-
-                if (matrix) {
-                    if (HREme(HREglobal()) == 0) {
-                        GBprintDependencyMatrixCombined(stdout, model);
-                        if (log_active(infoLong)) {
-                            GBprintStateLabelInfo(stdout, model);
-                            GBprintStateLabelGroupInfo(stdout, model);
-                            GBprintPORMatrix(stdout, model);
-                        }
-                        HREbarrier (HREglobal());
-                        HREabort (LTSMIN_EXIT_SUCCESS);
-                    }
-                    HREbarrier (HREglobal());
-                } else if (labels) {
-                    if (HREme(HREglobal()) == 0) {
-                        if (log_active(info)){
-                            lts_type_printf(info, GBgetLTStype(model));
-                        }
-                        chunk_table_print(info, model);
-                        HREbarrier (HREglobal());
-                        HREabort (LTSMIN_EXIT_SUCCESS);
-                    }
-                    HREbarrier (HREglobal());
-                }
-                return;
+            if (0 == strcmp (model_type[i], extension)) {
+                return model_loader[i];
             }
         }
-        Abort("No factory method has been registered for %s models",
-               extension);
+        Abort("No factory method has been registered for %s models", extension);
     } else {
-        Abort("filename %s doesn't have an extension",
-               filename);
+        Abort("filename %s doesn't have an extension", filename);
     }
+}
+
+void
+GBloadFile(model_t model, const char *filename, model_t *wrapped)
+{
+    pins_loader_t   model_loader = find_loader (filename);
+    model_loader (model, filename);
+    *wrapped = wrapModel(model);
 }
 
 void
@@ -1310,95 +1310,20 @@ void GBregisterPreLoader(const char*extension,pins_loader_t loader){
     }
 }
 
-int
-GBgetAcceptingStateLabelIndex (model_t model)
-{
-    return model->sl_idx_buchi_accept;
-}
-
-int
-GBsetAcceptingStateLabelIndex (model_t model, int idx)
-{
-    int oldidx = model->sl_idx_buchi_accept;
-    model->sl_idx_buchi_accept = idx;
-    return oldidx;
-}
-
-int
-GBbuchiIsAccepting (model_t model, int *state)
-{
-    return model->sl_idx_buchi_accept >= 0 &&
-        GBgetStateLabelLong(model, model->sl_idx_buchi_accept, state);
-}
-
-int
-GBgetProgressStateLabelIndex (model_t model)
-{
-    return model->sl_idx_progress;
-}
-
-int
-GBsetProgressStateLabelIndex (model_t model, int idx)
-{
-    int oldidx = model->sl_idx_progress;
-    model->sl_idx_progress = idx;
-    return oldidx;
-}
-
-int
-GBstateIsProgress (model_t model, int *state)
-{
-    return model->sl_idx_progress >= 0 &&
-        GBgetStateLabelLong(model, model->sl_idx_progress, state);
-}
-
-int
-GBgetValidEndStateLabelIndex (model_t model)
-{
-    return model->sl_idx_valid_end;
-}
-
-int
-GBsetValidEndStateLabelIndex (model_t model, int idx)
-{
-    int oldidx = model->sl_idx_valid_end;
-    model->sl_idx_valid_end = idx;
-    return oldidx;
-}
-
-int
-GBstateIsValidEnd (model_t model, int *state)
-{
-    return model->sl_idx_valid_end >= 0 &&
-        GBgetStateLabelLong(model, model->sl_idx_valid_end, state);
-}
-
 struct poptOption greybox_options[]={
     { "labels", 0, POPT_ARG_VAL, &labels, 1, "print state variable and type names, and state and action labels", NULL },
 	{ "matrix" , 'm' , POPT_ARG_VAL , &matrix , 1 , "print the dependency matrix for the model and exit" , NULL},
-	{ USE_GUARDS_OPTION , 'g' , POPT_ARG_VAL , &use_guards , 1 , "use guards in combination with the long next-state function to speed up the next-state function" , NULL},
-	{ "cache" , 'c' , POPT_ARG_VAL , &cache , 1 , "enable caching of PINS calls" , NULL },
-	{ "regroup" , 'r' , POPT_ARG_STRING, &regroup_options , 0 ,
-          "enable regrouping; available transformations T: "
-          "gs, ga, gsa, gc, gr, cs, cn, cw, ca, csa, rs, rn, ru, w2W, r2+, w2+, W2+, rb4w", "<(T,)+>" },
-    {"mucalc", 0, POPT_ARG_STRING, &mucalc_file, 0, "modal mu-calculus formula or file with modal mu-calculus formula",
-          "<mucalc-file>.mcf|<mucalc formula>"},
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, mucalc_options, 0 , NULL, NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, cache_options, 0 , NULL, NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, guards_options, 0 , NULL, NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, check_options, 0 , NULL, NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, pins_util_options, 0 , NULL, NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, por_options , 0 , "Partial Order Reduction options", NULL },
-	POPT_TABLEEND	
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, group_options, 0 , "Regrouping options", NULL },
+	POPT_TABLEEND
 };
 
-struct poptOption greybox_options_ltl[]={
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , NULL, NULL },
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
-    POPT_TABLEEND
-};
-
-int
-GBgetUseGuards(model_t model) {
-    return model->use_guards;
-}
-
-void*
+value_table_t
 GBgetChunkMap(model_t model,int type_no)
 {
     HREassert(model->map != NULL, "Map not correctly initialized, make sure to call GBsetLTStype, before using chunk mapping.");
@@ -1415,4 +1340,30 @@ string_set_t GBgetDefaultFilter(model_t model){
 
 void ltsmin_abort(int code) {
     HREabort (code);
+}
+
+void GBsetExit(model_t model, ExitCB exit)
+{
+    model->exit = exit;
+}
+
+void GBExit(model_t model)
+{
+    if (model->exit != NULL) model->exit(model);
+}
+
+void GBsetVarPerm(model_t model, int* perm) {
+    model->var_perm = perm;
+}
+
+int* GBgetVarPerm(model_t model) {
+    return model->var_perm;
+}
+
+void GBsetGroupPerm(model_t model, int* perm) {
+    model->group_perm = perm;
+}
+
+int* GBgetGroupPerm(model_t model) {
+    return model->group_perm;
 }

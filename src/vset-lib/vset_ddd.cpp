@@ -302,13 +302,10 @@ set_minus_ddd(vset_t dst, vset_t src)
 }
 
 void
-set_count_ddd(vset_t set, long *nodes, bn_int_t *elements)
+set_count_ddd(vset_t set, long *nodes, double *elements)
 {
     if (nodes != NULL) *nodes = set->ddd->size();
-    if (elements != NULL) {
-        double count = set->ddd->nbStates();
-        bn_double2int(count, elements);
-    }
+    if (elements != NULL) *elements = set->ddd->nbStates();
 }
 
 vrel_t
@@ -376,11 +373,10 @@ rel_add_ddd(vrel_t rel, const int *src, const int *dst)
 }
 
 void
-rel_count_ddd(vrel_t rel, long *nodes, bn_int_t *elements)
+rel_count_ddd(vrel_t rel, long *nodes, double *elements)
 {
-    *nodes = rel->ddd->size();
-    double count = rel->ddd->nbStates();
-    bn_double2int(count, elements);
+    if (nodes != NULL) *nodes = rel->ddd->size();
+    if (elements != NULL) *elements = rel->ddd->nbStates();
 }
 
 void

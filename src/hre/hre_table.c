@@ -163,13 +163,14 @@ static int get_count(value_table_t vt){
 }
 
 value_table_t HREcreateTable(hre_context_t ctx,const char* name){
-    if (HREpeers(ctx)==1) return chunk_table_create(ctx,(char*)name);
+    if (HREpeers(ctx)==1) return simple_chunk_table_create(ctx,(char*)name);
     value_table_t vt=VTcreateBase((char*)name,sizeof(struct value_table_s));
     VTdestroySet(vt,destroy);
     VTputChunkSet(vt,put_chunk);
     VTputAtChunkSet(vt,put_at_chunk);
     VTgetChunkSet(vt,get_chunk);
     VTgetCountSet(vt,get_count);
+    VTiteratorSet(vt,simple_iterator_create);
     vt->index=SIcreate();
     vt->ctx=ctx;
     vt->msg_pending=0;
@@ -191,8 +192,9 @@ value_table_t HREcreateTable(hre_context_t ctx,const char* name){
     return vt;
 }
 
-void* HREgreyboxNewmap(void*newmap_context){
-    return HREcreateTable((hre_context_t)newmap_context,"<greybox table>");
+void *HREgreyboxNewmap(void*newmap_context){
+    return HREcreateTable (HREglobal(), "<greybox table>");
+    (void) newmap_context;
 }
 
 int HREgreyboxC2I(void*map,void*data,int len){
@@ -203,7 +205,7 @@ void HREgreyboxCAtI(void*map,void*data,int len,int pos){
     return VTputAtChunk((value_table_t)map,chunk_ld(len,data),pos);
 }
 
-void* HREgreyboxI2C(void*map,int idx,int*len){
+void *HREgreyboxI2C(void*map,int idx,int*len){
     chunk c=VTgetChunk((value_table_t)map,idx);
     *len=c.len;
     return c.data;
@@ -213,4 +215,16 @@ int HREgreyboxCount(void*map){
     return VTgetCount((value_table_t)map);
 }
 
+table_iterator_t HREgreyboxIterator (void*map) {
+    return VTiterator ((value_table_t)map);
+}
 
+
+struct table_factory_s {
+};
+
+table_factory_t HREgreyboxTableFactory() {
+    table_factory_t tf = TFcreateBase (0);
+    TFnewTableSet (tf, (tf_new_map_t) HREgreyboxNewmap);
+    return tf;
+}

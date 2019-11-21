@@ -1,15 +1,3 @@
-HRE_LIB = ../../hre/libhre.la
-DIST_CPPFLAGS = $(AM_CPPFLAGS)
-PINS_LIBS  =
-PINS_LIBS += ../../lts-io/liblts-io.la
-PINS_LIBS += ../../hre-io/libhre-io.la
-PINS_LIBS += $(HRE_LIB)
-PINS_LIBS += ../../pins-lib/libpins.la
-PINS_LIBS += ../../ltsmin-lib/libltsmin.la
-PINS_LIBS += ../../util-lib/libutil.la
-PINS_LIBS += ../../dm/libdm.la
-MC_LIBS = ../../mc-lib/libmc.la $(PINS_LIBS)
-
 noinst_LTLIBRARIES = libalgorithm.la
 
 libalgorithm_la_SOURCES  = algorithm.c
@@ -29,10 +17,18 @@ libalgorithm_la_SOURCES += owcty.c
 libalgorithm_la_SOURCES += owcty.h
 libalgorithm_la_SOURCES += reach.c
 libalgorithm_la_SOURCES += reach.h
+libalgorithm_la_SOURCES += renault-tarjan.c
+libalgorithm_la_SOURCES += renault-tarjan.h
+libalgorithm_la_SOURCES += tarjan-scc.c
+libalgorithm_la_SOURCES += tarjan-scc.h
 libalgorithm_la_SOURCES += timed-cndfs.c
 libalgorithm_la_SOURCES += timed-cndfs.h
 libalgorithm_la_SOURCES += timed.c
 libalgorithm_la_SOURCES += timed.h
+libalgorithm_la_SOURCES += ufscc.c
+libalgorithm_la_SOURCES += ufscc.h
+libalgorithm_la_SOURCES += util.c
+libalgorithm_la_SOURCES += util.h
 
 libalgorithm_la_CPPFLAGS = $(AM_CPPFLAGS)
-libalgorithm_la_LIBADD   = $(MC_LIBS) ../parallel/libparallel.la
+libalgorithm_la_LIBADD   = ../parallel/libparallel.la

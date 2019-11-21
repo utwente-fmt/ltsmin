@@ -2,6 +2,10 @@
 #ifndef HRE_FEEDBACK_H
 #define HRE_FEEDBACK_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include <errno.h>
 #include <popt.h>
 #include <stdlib.h>
@@ -12,6 +16,7 @@
 #endif
 
 #define HRE_EXIT_FAILURE    255
+#define HRE_EXIT_TIMEOUT    254
 #define HRE_EXIT_SUCCESS    0
 
 /**
@@ -27,7 +32,7 @@ extern log_t assertion;
 /**
 \brief Log stream for error messages.
 */
-extern log_t error;
+extern log_t lerror;
 
 /**
 \brief Log stream for providing information.
@@ -72,14 +77,20 @@ extern FILE* log_get_stream(log_t log);
 */
 extern void log_message(log_t log,const char*file,int line,int errnum,
                         const char *fmt,...)
-                        __attribute__ ((format (printf, 5, 6)));
+#ifdef _GNU_C_SOURCE
+                        __attribute__ ((format (printf, 5, 6)))
+#endif
+                        ;
 
 /**
 \brief Output directly to a log stream.
 \deprecated Please use the Printf macro instead.
 */
 extern void log_printf(log_t log,const char*file,const char *fmt,...)
-                       __attribute__ ((format (printf, 3, 4)));
+#ifdef _GNU_C_SOURCE
+                       __attribute__ ((format (printf, 3, 4)))
+#endif
+                       ;
 
 /**
 \brief Test if the given log is active.
@@ -165,7 +176,7 @@ extern log_t hre_debug;
 \brief Macro that prints an error messages and then aborts.
 */
 #define Abort(...) {\
-    log_message(error,__FILE__,__LINE__,0,__VA_ARGS__);\
+    log_message(lerror,__FILE__,__LINE__,0,__VA_ARGS__);\
     HREabort(HRE_EXIT_FAILURE);\
 }
 
@@ -173,15 +184,20 @@ extern log_t hre_debug;
 \brief Macro that prints an error message about a system call and then aborts.
 */
 #define AbortCall(...) {\
-    log_message(error,__FILE__,__LINE__,errno,__VA_ARGS__);\
+    log_message(lerror,__FILE__,__LINE__,errno,__VA_ARGS__);\
     HREabort(HRE_EXIT_FAILURE);\
 }
 
 #define Warning Print
-#define Print1(log,...) if (HREme(HREglobal()) == 0) HREmessage(log,__VA_ARGS__);
+#define Print1(log,...) if (log && HREme(HREglobal()) == 0) HREmessage(log,__VA_ARGS__);
+#define Printf1(log,...) if (log && HREme(HREglobal()) == 0) HREprintf(log,__VA_ARGS__);
 
 #define Fatal(code,chan,...) Abort(__VA_ARGS__)
 
 extern void HREprintStack ();
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif

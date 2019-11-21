@@ -17,7 +17,9 @@
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <pins-lib/property-semantics.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <mc-lib/dbs-ll.h>
 #include <mc-lib/trace.h>
 #include <util-lib/bitset.h>
@@ -141,21 +143,21 @@ state_db_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_POST: {
             int db = linear_search (db_types, opt.arg_state_db);
             if (db < 0) {
-                Warning (error, "unknown vector storage mode type %s", opt.arg_state_db);
+                Warning (lerror, "unknown vector storage mode type %s", opt.arg_state_db);
                 HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.state_db = db;
 
             int s = linear_search (strategies, opt.arg_strategy);
             if (s < 0) {
-                Warning (error, "unknown search mode %s", opt.arg_strategy);
+                Warning (lerror, "unknown search mode %s", opt.arg_strategy);
                 HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.strategy = s;
 
             int p = linear_search (provisos, opt.arg_proviso);
             if (p < 0) {
-                Warning(error, "unknown proviso %s", opt.arg_proviso);
+                Warning(lerror, "unknown proviso %s", opt.arg_proviso);
                 HREexitUsage (LTSMIN_EXIT_FAILURE);
             }
             opt.proviso = p;
@@ -189,7 +191,8 @@ static struct poptOption options[] = {
       "select proviso for ltl/por", "<closedset|stack|color>"},
     { "max" , 0 , POPT_ARG_LONGLONG|POPT_ARGFLAG_SHOW_DEFAULT , &opt.max , 0 ,"maximum search depth", "<int>"},
     SPEC_POPT_OPTIONS,
-    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options_ltl , 0 , "PINS options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, greybox_options , 0 , "PINS options", NULL },
+    { NULL, 0 , POPT_ARG_INCLUDE_TABLE, ltl_options , 0 , "LTL options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, vset_options , 0 , "Vector set options", NULL },
     { NULL, 0 , POPT_ARG_INCLUDE_TABLE, development_options , 0 , "Development options" , NULL },
     POPT_TABLEEND
@@ -221,13 +224,6 @@ static struct {
     .violations     = 0,
     .errors         = 0,
 };
-
-
-static void *
-new_string_index (void *context)
-{
-    return chunk_table_create (context, "GSEA table");
-}
 
 typedef struct gsea_state {
     int* state;
@@ -296,6 +292,7 @@ typedef union gsea_queue {
                 void (*state_next)(gsea_state_t*, void*);
             } color;
         } proviso;
+        gsea_state_t ce;
 
         // queue/store specific callbacks
         void (*push)(gsea_state_t*, void*);
@@ -317,7 +314,6 @@ typedef union gsea_queue {
         queue_t queue;
     } fifo;
     */
-
 } gsea_queue_t;
 
 typedef void(*gsea_void)(gsea_state_t*,void*);
@@ -1073,7 +1069,7 @@ scc_open_extract(gsea_state_t *state, void *arg)
     //if (accepting state) // there is precisely one accept set (NO GBA support)
     // fiddle accepting/not accepting in as single a bit
     int r = state->tree.tree_idx << 1;
-    if (GBbuchiIsAccepting(opt.model, state->state)) {
+    if (pins_state_is_accepting(opt.model, state->state)) {
         r |= 1;
     }
 
@@ -1168,7 +1164,7 @@ scc_state_matched(gsea_state_t *state, void *arg)
             if (b) {
                 opt.threshold = global.visited-1;
                 gc.report_progress (arg);
-                Warning (info, "accepting cycle found!");
+                Warning (info, "Accepting cycle FOUND!");
                 if (opt.trc_output && gc.goal_trace) {
                     while (gc.store.scc.dfsnum[r>>1] > gc.store.scc.dfsnum[state->tree.tree_idx])
                         r = *dfs_stack_pop (gc.store.scc.roots);
@@ -1176,6 +1172,9 @@ scc_state_matched(gsea_state_t *state, void *arg)
                     closing.tree.tree_idx = r>>1;
                     scc_current_reconstruct (state, &closing);
                     gc.goal_trace (NULL, arg);
+                }
+                if (!opt.no_exit) {
+                    GBExit(opt.model);
                 }
                 Warning (info, "exiting now");
                 HREabort (LTSMIN_EXIT_COUNTER_EXAMPLE);
@@ -1243,6 +1242,7 @@ do_trace(gsea_state_t *state, void *arg, char *type, char *name)
     Warning (info, "%s (%s) found at depth %zu!", type, name, global.depth);
     Warning (info, " ");
     if (opt.trc_output && gc.goal_trace) gc.goal_trace(state, arg);
+    GBExit(opt.model);
     Warning(info, "exiting now");
     HREabort(LTSMIN_EXIT_COUNTER_EXAMPLE);
 }
@@ -1255,7 +1255,7 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
 
     if (state->count != 0) return; // no deadlock
     global.deadlocks++;
-    if (GBstateIsValidEnd(opt.model, state->state)) return; // valid end state
+    if (pins_state_is_valid_end(opt.model, state->state)) return; // valid end state
     if ( !opt.inv_expr ) global.violations++;
     do_trace(NULL, arg, "deadlock", ""); // state still on stack
 }
@@ -1263,7 +1263,7 @@ gsea_dlk_wrapper(gsea_state_t *state, void *arg)
 static void
 gsea_invariant_check(gsea_state_t *state, void *arg)
 {
-    if ( eval_predicate(opt.model, opt.inv_expr, NULL, state->state, global.N, opt.env) ) return; // invariant holds
+    if ( eval_state_predicate(opt.model, opt.inv_expr, state->state, opt.env) ) return; // invariant holds
 
     global.violations++;
     do_trace(NULL, arg, "Invariant violation", opt.inv_detect); // state still on stack
@@ -1274,9 +1274,19 @@ gsea_action_check(gsea_state_t *src, transition_info_t *ti, gsea_state_t *dst)
 {
     if (NULL != ti->labels && ti->labels[opt.act_label] == opt.act_index) {
         global.errors++;
-        do_trace(dst, NULL, "Error action", opt.act_detect);
+        gc.queue.filo.ce = *dst;
     }
     (void) src;
+}
+
+static void
+gsea_action_check2(gsea_state_t *state, void *arg)
+{
+    if (gc.queue.filo.ce.tree.tree_idx != -1) {
+        do_trace(&gc.queue.filo.ce, NULL, "Error action", opt.act_detect);
+    }
+    (void) state;
+    (void) arg;
 }
 
 static int
@@ -1387,7 +1397,7 @@ gsea_setup_default()
         break;
     case Strategy_SCC:
         // exception for Strat_SCC, only works in combination with ltl formula
-        if (GBgetAcceptingStateLabelIndex(opt.model) < 0) {
+        if (pins_get_accepting_state_label_index(opt.model) < 0) {
             Abort("SCC search only works in combination with an accepting state label"
                   " (see LTL options)");
         }
@@ -1458,14 +1468,19 @@ gsea_setup_default()
 
     // invariant violation detection?
     if (opt.inv_detect) {
-        assert (!gc.post_state_next);
+        if (gc.post_state_next) {
+            Abort("Deadlock detection and invariant violation detection"
+                    " not possible simultaneously.");
+        }
         gc.post_state_next = gsea_invariant_check;
     }
 
     // action label detection?
     if (-1 != opt.act_index) {
         if (gc.state_process) Abort("LTS output incompatible with action detection.");
+        gc.queue.filo.ce.tree.tree_idx = -1;
         gc.state_process = gsea_action_check;
+        gc.post_state_next = gsea_action_check2;
     }
 
     // maximum search depth?
@@ -1493,7 +1508,7 @@ static void
 set_strategy (const char *output)
 {
     if (opt.strategy == Strategy_None) {
-        if (GBgetAcceptingStateLabelIndex(opt.model) >= 0) {
+        if (pins_get_accepting_state_label_index(opt.model) >= 0) {
             opt.strategy = Strategy_SCC;
         } else if (output) {
             opt.strategy = Strategy_BFS;
@@ -1501,6 +1516,29 @@ set_strategy (const char *output)
             opt.strategy = Strategy_DFS;
         }
     }
+}
+
+static int
+state_find_tree (int *state, transition_info_t *ti, void *t)
+{
+    int idx;
+    return TreeFold_ret(gc.store.tree.dbs, state, &idx);
+    (void) ti; (void) t;
+}
+
+static int
+state_find_table (int *state, transition_info_t *ti, void *t)
+{
+    dbs_ref_t idx;
+    return DBSLLlookup_ret(gc.store.table.dbs, state, &idx);
+    (void) ti; (void) t;
+}
+
+static int
+state_find_vset (int *state, transition_info_t *ti, void *t)
+{
+    return vset_member(gc.store.vset.closed_set, state);
+    (void) ti; (void) t;
 }
 
 static void
@@ -1515,7 +1553,7 @@ gsea_setup(const char *output)
             Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         int typeno = lts_type_get_edge_label_typeno(ltstype, opt.act_label);
         chunk c = chunk_str(opt.act_detect);
-        opt.act_index = GBchunkPut(opt.model, typeno, c);
+        opt.act_index = pins_chunk_put (opt.model, typeno, c);
         Warning(info, "Detecting action \"%s\"", opt.act_detect);
         if (PINS_POR) {
             pins_add_edge_label_visible (opt.model, opt.act_label, opt.act_index);
@@ -1524,9 +1562,9 @@ gsea_setup(const char *output)
     }
     if (opt.inv_detect) {
         opt.env = LTSminParseEnvCreate();
-        opt.inv_expr = parse_file_env (opt.inv_detect, pred_parse_file, opt.model, opt.env);
+        opt.inv_expr = pred_parse_file (opt.inv_detect, opt.env, GBgetLTStype(opt.model));
         if (PINS_POR) {
-            mark_visible (opt.model, opt.inv_expr, opt.env);
+            set_pins_semantics(opt.model, opt.inv_expr, opt.env, NULL, NULL);
             set_cycle_proviso ();
         }
     }
@@ -1580,7 +1618,7 @@ gsea_setup(const char *output)
             gc.closed_insert = bfs_vset_closed_insert;
 
             gc.context = RTmalloc(sizeof(int) * global.N);
-            gc.store.vset.domain = vdom_create_domain (global.N, VSET_IMPL_AUTOSELECT);
+            gc.store.vset.domain = vdom_create_domain (global.N, VSET_ListDD);
             gc.store.vset.closed_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.store.vset.next_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.store.vset.current_set = vset_create(gc.store.vset.domain, -1, NULL);
@@ -1598,7 +1636,7 @@ gsea_setup(const char *output)
     case Strategy_SCC:
         if (opt.dlk_detect || opt.act_detect || opt.inv_detect)
             Abort ("Verification of safety properties works only with reachability algorithms.");
-        set_cycle_proviso ();
+        set_cycle_proviso (); // fall through
     case Strategy_DFS:
         if (output) Abort("Use BFS to write the state space to an lts file.");
         switch (opt.state_db) {
@@ -1657,7 +1695,7 @@ gsea_setup(const char *output)
             gc.queue.filo.state_to_stack = dfs_vset_state_to_stack;
 
             gc.context = RTmalloc(sizeof(int) * global.N);
-            gc.store.vset.domain = vdom_create_domain (global.N, VSET_IMPL_AUTOSELECT);
+            gc.store.vset.domain = vdom_create_domain (global.N, VSET_ListDD);
             gc.store.vset.closed_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.store.vset.next_set = vset_create(gc.store.vset.domain, -1, NULL);
             gc.store.vset.current_set = vset_create(gc.store.vset.domain, -1, NULL);
@@ -1707,6 +1745,20 @@ gsea_setup(const char *output)
     case Strategy_None: Abort ("No strategy selected?");
     default:
         Abort ("unimplemented strategy");
+    }
+
+    switch (opt.state_db) {
+    case DB_TreeDBS:
+        if (PINS_POR) por_set_find_state (state_find_tree, &gc);
+        break;
+    case DB_Vset:
+        if (PINS_POR) por_set_find_state (state_find_vset, &gc);
+        break;
+    case DB_DBSLL:
+        if (PINS_POR) por_set_find_state (state_find_table, &gc);
+        break;
+    default:
+        Abort ("unimplemented storage %s", opt.arg_state_db );
     }
 }
 
@@ -1797,6 +1849,7 @@ gsea_progress(void *arg) {
 
 static void
 gsea_finished(void *arg) {
+    if (opt.strategy == Strategy_SCC) Warning(info,"Empty product with LTL!");
     if (global.n_transitions < global.n_targets){
         Warning (info, "state space %zu levels, %zu states %zu transitions %zu targets",
              global.max_depth, global.explored, global.n_transitions, global.n_targets);
@@ -1804,11 +1857,11 @@ gsea_finished(void *arg) {
         Warning (info, "state space %zu levels, %zu states %zu transitions",
              global.max_depth, global.explored, global.n_transitions);
     }
-    
-    if (opt.no_exit || log_active(infoLong))
-        HREprintf (info, "\nDeadlocks: %zu\nInvariant violations: %zu\n"
-             "Error actions: %zu\n", global.deadlocks,global.violations,
-             global.errors);
+
+    if (opt.dlk_detect) Warning(info, "Deadlocks: %s%zu", opt.no_exit ? "" : ">= ", global.deadlocks);
+    if (opt.inv_detect) Warning(info, "Invariant violations: %s%zu", opt.no_exit ? "" : ">= ", global.violations);
+    if (opt.act_detect) Warning(info, "Error actions: %s%zu", opt.no_exit ? "" : ">= ", global.errors);
+
     (void)arg;
 }
 
@@ -1846,12 +1899,8 @@ main (int argc, char *argv[])
     HREinitStart(&argc,&argv,1,2,(char**)files,"<model> [<lts>]");
 
     Warning (info, "Loading model from %s", files[0]);
-    opt.model=GBcreateBase();
-    GBsetChunkMethods(opt.model,new_string_index,NULL,
-                      (int2chunk_t)HREgreyboxI2C,
-                      (chunk2int_t)HREgreyboxC2I,
-                      (chunkatint_t)HREgreyboxCAtI,
-                      (get_count_t)HREgreyboxCount);
+    opt.model = GBcreateBase();
+    GBsetChunkMap (opt.model, simple_table_factory_create());
 
     GBloadFile(opt.model,files[0],&opt.model);
 
@@ -1869,6 +1918,8 @@ main (int argc, char *argv[])
     gsea_setup_default();
     gsea_print_setup ();
     gsea_search(src);
+
+    GBExit(opt.model);
 
     HREexit(LTSMIN_EXIT_SUCCESS);
 }

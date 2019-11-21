@@ -49,8 +49,39 @@ An enumerated type is a finite chunk type.
 It is not allowed to remove values and it is not allowed to change the
 numbering.
 */
-LTStypeEnum
+LTStypeEnum,
+
+/**
+The Boolean type.
+
+Only two values allowed 0, and 1.
+*/
+LTStypeBool,
+
+/**
+The trilean type.
+
+Only three values allowed 0, 1, and 2.
+Where 0 and 1 are Boolean values and 2 indicates maybe.
+*/
+LTStypeTrilean,
+
+/**
+The signed 32 bit integer type.
+
+Allows arithmetic operators.
+*/
+LTStypeSInt32,
+
 } data_format_t;
+
+#define DATA_FORMAT_SIZE LTStypeSInt32 - LTStypeDirect + 1
+
+/// Return the string representation of the data format of \p typeno.
+extern const char* data_format_string(lts_type_t  t,int typeno);
+
+/// Return the string representation of \p format.
+extern const char* data_format_string_generic(data_format_t format);
 
 /// Create a new empty lts type.
 extern lts_type_t lts_type_create();
@@ -67,13 +98,35 @@ extern void lts_type_destroy(lts_type_t *t);
 /// Print the lts type to the output stream;
 extern void lts_type_printf(void* l, lts_type_t t);
 
-/// Set state length.
+/**
+ * Set the length of the state vector in the specified LTS structure
+ * descriptor.
+ * It is allowed to specify a LARGER state vector, for example to grow
+ * the state vector incrementally.
+ * It is allowed to specify a length of 0, which will remove any information
+ * about the state vector from the LTS structure descriptor.
+ * It is NOT allowed to shrink the state vector.
+ * @param t The LTS structure descriptor
+ * @param length The length of the state vector
+ */
 extern void lts_type_set_state_length(lts_type_t  t,int length);
 
-/// Get state length.
+/**
+ * Get the length of the state vector of the specified LTS structure
+ * descriptor.
+ * @param t The LTS structure descriptor
+ * @return The length of the state vector of the LTS structure descriptor.
+ */
 extern int lts_type_get_state_length(lts_type_t  t);
 
-/// Set the name of a state slot.
+/**
+ * Sets the name of the specified variable slot in the state vector to the
+ * specified name.
+ * @param t The LTS structure descriptor in question.
+ * @param idx The index of the variable slot of which the name will be set.
+ * @param name The new name of the specified variable slot.
+ * @pre 0 <= idx < lts_type_get_state_length(t)
+ */
 extern void lts_type_set_state_name(lts_type_t  t,int idx,const char* name);
 
 /// Get the name of a state slot.

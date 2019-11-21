@@ -1,0 +1,183 @@
+language: cpp
+
+dist: trusty
+sudo: false
+
+cache:
+  directories:
+    - $HOME/ltsmin-deps
+#    - $HOME/.cabal
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test # for gcc-6
+    packages:
+      - asciidoc
+      - dejagnu
+      - doxygen
+      - g++-6
+      - gcc-6
+      - libboost-dev
+      - libgmp-dev
+      - liblzma-dev
+      - libpopt-dev
+      - zlib1g-dev
+      - xmlto
+
+stage: cache warmup
+
+before_install:
+  - travis/before_install-$TRAVIS_OS_NAME.sh
+  - export TAG_OR_BRANCH=${TRAVIS_TAG:-$TRAVIS_BRANCH}
+  - export BUILD_TARGET=${BUILD_TARGET:-$TRAVIS_OS_NAME}
+  - export LTSMIN_DISTNAME="ltsmin-$TAG_OR_BRANCH-$BUILD_TARGET"
+
+jobs:
+  include:
+    - compiler: clang
+      os: osx
+      install: travis/install-osx.sh
+      script: skip
+    - compiler: gcc
+      os: linux
+      install: travis/install-linux.sh
+      script: skip
+    - compiler: clang
+      os: osx
+      install: travis/install-mCRL2-osx.sh
+      script: skip
+    - compiler: gcc
+      os: linux
+      install: travis/install-mCRL2-linux.sh
+      script: skip
+    - compiler: gcc
+      os: linux
+      sudo: required
+      install: travis/install-windows.sh
+      script: skip
+      env:
+        - CACHE_NAME=Windows BUILD_TARGET=windows
+    - os: osx
+      compiler: clang
+      install: travis/install-osx.sh
+      before_script:
+        - travis/install-DiVinE.sh
+        - travis/install-ProB-osx.sh
+      script: travis/test-1.sh
+      stage: test
+    - os: linux
+      compiler: gcc
+      install: travis/install-linux.sh
+      before_script:
+        - travis/install-DiVinE.sh
+        - travis/install-ProB-linux.sh
+      script: travis/test-1.sh
+      stage: test
+    - os: osx
+      compiler: clang
+      install:
+        - travis/install-osx.sh
+        - travis/install-mCRL2-osx.sh
+      before_script:
+        - travis/install-DiVinE.sh
+      script: travis/test-2.sh
+      stage: test
+    - os: linux
+      compiler: gcc
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
+      before_script:
+        - travis/install-DiVinE.sh
+      script: travis/test-2.sh
+      stage: test
+    - compiler: gcc
+      os: linux
+      sudo: required
+      install: travis/install-windows.sh
+      script: travis/test-windows.sh
+      env:
+        - CACHE_NAME=Windows BUILD_TARGET=windows
+      stage: test
+    - compiler: gcc # here starts 'deploy' stage
+      os: linux
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
+      script:
+        - travis/build-source.sh
+        - travis/build-web.sh
+        - . travis/ltsmin-version.sh
+      deploy:
+        - provider: releases
+          # define $GITHUB_TOKEN in Travis CI build environment.
+          api_key: $GITHUB_TOKEN
+          file:
+            - "ltsmin-$TRAVIS_TAG-source.tgz"
+          skip_cleanup: true
+          on:
+            tags: true
+        - provider: pages
+          local_dir: www/_site
+          skip_cleanup: true
+          # define $GITHUB_TOKEN in Travis CI build environment.
+          github_token: $GITHUB_TOKEN
+          on:
+            tags: true
+            condition: "x$TRAVIS_TAG = xv$LTSMIN_VERSION"
+      stage: deploy
+    - compiler: gcc
+      os: linux
+      install:
+        - travis/install-linux.sh
+        - travis/install-mCRL2-linux.sh
+      script:
+        - travis/build-release-linux.sh
+      deploy:
+        - provider: releases
+          # define $GITHUB_TOKEN in Travis CI build environment.
+          api_key: $GITHUB_TOKEN
+          file:
+            - "/tmp/$LTSMIN_DISTNAME.tgz"
+          skip_cleanup: true
+          on:
+            tags: true
+      stage: deploy
+    - compiler: clang
+      os: osx
+      install:
+        - travis/install-osx.sh
+        - travis/install-mCRL2-osx.sh
+      script:
+        - travis/build-release-osx.sh
+      deploy:
+        - provider: releases
+          # define $GITHUB_TOKEN in Travis CI build environment.
+          api_key: $GITHUB_TOKEN
+          file:
+            - "/tmp/$LTSMIN_DISTNAME.tgz"
+          skip_cleanup: true
+          on:
+            tags: true
+      stage: deploy
+    - compiler: gcc
+      os: linux
+      sudo: required
+      install:
+        - travis/install-windows.sh
+      script:
+        - travis/build-release-windows.sh
+      deploy:
+        - provider: releases
+          # define $GITHUB_TOKEN in Travis CI build environment.
+          api_key: $GITHUB_TOKEN
+          file:
+            - "/tmp/$LTSMIN_DISTNAME.tgz"
+          skip_cleanup: true
+          on:
+            tags: true
+      stage: deploy
+      env:
+        - CACHE_NAME=Windows BUILD_TARGET=windows
+

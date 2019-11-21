@@ -1,0 +1,4 @@
+*--procs*='NUMBER'::
+        Number of processes to use for state space exploration
+        (default: NUMBER=NUM_CORES). Maximum is 64.
+

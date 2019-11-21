@@ -46,6 +46,65 @@ typedef struct dfs_fifo_reduced_s {
 #define setV GRED
 #define setF GGREEN
 
+static inline bool
+has_progress (wctx_t *ctx, transition_info_t *ti, state_info_t *successor)
+{
+    df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
+    if (PINS_LTL) {
+        return pins_state_is_weak_ltl_progress (ctx->model, state_info_state (successor));
+    } else if (loc->progress_trans > 0) {
+        return loc->progress[ti->group] ; // ! progress transition
+    } else {
+        return pins_state_is_progress (ctx->model, state_info_state (successor));
+    }
+}
+
+static void
+construct_np_lasso (wctx_t* ctx, state_info_t* successor)
+{
+    alg_global_t       *sm = ctx->global;
+    alg_shared_t       *shared = ctx->run->shared;
+    work_counter_t     *cnt = ctx->counters;
+    ref_t              *trace;
+    size_t              length;
+    size_t              level = cnt->level_cur;
+
+    Warning (info, " ");
+    Warning (info, "Non-progress cycle FOUND at depth %zu!", cnt->level_cur);
+    Warning (info, " ");
+
+    if (!trc_output) return;
+
+    trace = trc_find_trace (successor->ref, level, shared->parent_ref,
+                            ctx->initial->ref, &length);
+    dfs_stack_t s = dfs_stack_create (state_info_serialize_int_size (ctx->state));
+    for (size_t i = 0; i < length; i++) {
+        raw_data_t d = dfs_stack_push (s, NULL);
+        state_info_set (ctx->state, trace[i], LM_NULL_LATTICE);
+        state_info_serialize (ctx->state, d);
+        dfs_stack_enter (s);
+    }
+    int idx = -1;
+    for (size_t i = 1; i < dfs_stack_nframes (sm->stack); i++) {
+        raw_data_t d = dfs_stack_peek_top (sm->stack, i);
+        state_info_deserialize (ctx->state, d);
+        if (ctx->state->ref == successor->ref) {
+            idx = i;
+            break;
+        }
+    }
+    HREassert(idx != -1, "Could not find successor %zu on DFS-FIFO stack.", successor->ref);
+    for (int i = idx - 1; i >= 1; i--) {
+        raw_data_t d = dfs_stack_peek_top (sm->stack, i);
+        dfs_stack_push (s, d);
+        dfs_stack_enter (s);
+    }
+    raw_data_t d = dfs_stack_push (s, NULL);
+    state_info_serialize (successor, d);
+    find_and_write_dfs_stack_trace (ctx->model, s, true);
+    dfs_stack_destroy (s);
+}
+
 static void
 dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
                  int seen)
@@ -53,12 +112,20 @@ dfs_fifo_handle (void *arg, state_info_t *successor, transition_info_t *ti,
     wctx_t             *ctx = (wctx_t *) arg;
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
     alg_global_t       *sm = ctx->global;
+    alg_shared_t       *shared = ctx->run->shared;
     ctx->counters->trans++;
-    bool is_progress = loc->progress_trans > 0 ? loc->progress[ti->group] : // ! progress transition
-            GBstateIsProgress(ctx->model, state_info_state(successor));     // ! progress state
+    bool                is_progress = has_progress (ctx, ti, successor);
 
-    if (!is_progress && seen && ecd_has_state(loc->cyan, successor))
-        ndfs_report_cycle (ctx->run, ctx->model, sm->stack, successor);
+    if (EXPECT_FALSE( trc_output && !seen && successor->ref != ctx->state->ref &&
+                      ti != &GB_NO_TRANSITION )) // race, but ok:
+        atomic_write (&shared->parent_ref[successor->ref], ctx->state->ref);
+
+    if (!is_progress && seen && ecd_has_state(loc->cyan, successor)) {
+        global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
+        if (run_stop(ctx->run)) {
+            construct_np_lasso (ctx, successor);
+        }
+    }
 
     // dfs_fifo_dfs/dfs_fifo_bfs also check this, but we want a clean stack for LB!
     if (state_store_has_color(ctx->state->ref, setV, 0))
@@ -186,6 +253,15 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
     df_alg_local_t     *loc = (df_alg_local_t *) ctx->local;
 
     loc->cyan = fset_create (sizeof(ref_t), 0, 10, 20);
+
+    if (PINS_LTL) {
+        int     label = pins_get_weak_ltl_progress_state_label_index(ctx->model);
+        HREassert (label != -1, "DFS-FIFO with LTL layer, but no special progress label found!");
+        Print1 (info, "DFS-FIFO for weak LTL, using special progress label %d", label);
+        HREassert (!PINS_POR, "DFS-FIFO for weak LTL is not supported yet in combination with POR.");
+        return;
+    }
+
     // find progress transitions
     lts_type_t      ltstype = GBgetLTStype (ctx->model);
     int             statement_label = lts_type_find_edge_label (
@@ -193,11 +269,11 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
     if (statement_label != -1 && !force_progress_states) {
         int             statement_type = lts_type_get_edge_label_typeno (
                                                  ltstype, statement_label);
-        size_t          count = GBchunkCount (ctx->model, statement_type);
+        size_t          count = pins_chunk_count (ctx->model, statement_type);
         if (count >= K) {
             loc->progress = RTmallocZero (sizeof(int[K]));
             for (size_t i = 0; i < K; i++) {
-                chunk c = GBchunkGet (ctx->model, statement_type, i);
+                chunk c = pins_chunk_get  (ctx->model, statement_type, i);
                 loc->progress[i] = strstr(c.data, LTSMIN_VALUE_STATEMENT_PROGRESS) != NULL;
                 loc->progress_trans += loc->progress[i];
             }
@@ -217,7 +293,7 @@ dfs_fifo_local_init   (run_t *run, wctx_t *ctx)
            // Use progress states
            Print1 (info, "No progress transitions defined for DFS_FIFO, "
                          "using progress states via progress state label")
-           int progress_sl = GBgetProgressStateLabelIndex (ctx->model);
+           int progress_sl = pins_get_progress_state_label_index (ctx->model);
            HREassert (progress_sl >= 0, "No progress labels defined for DFS_FIFO");
            pins_add_state_label_visible (ctx->model, progress_sl);
        }
@@ -252,7 +328,7 @@ dfs_fifo_run  (run_t *run, wctx_t *ctx)
     df_alg_local_t         *loc = (df_alg_local_t *) ctx->local;
     raw_data_t stack_loc = dfs_stack_push (ctx->global->in_stack, NULL);
     state_info_serialize (ctx->initial, stack_loc);
-    int acc = GBbuchiIsAccepting (ctx->model, state_info_state(ctx->initial));
+    int acc = pins_state_is_progress (ctx->model, state_info_state(ctx->initial));
     loc->seed = acc ? (ref_t)-1 : ctx->initial->ref;
     loc->df_counters.progress += acc;
 
@@ -261,6 +337,7 @@ dfs_fifo_run  (run_t *run, wctx_t *ctx)
     } else {
         dfs_fifo_bfs (ctx);
     }
+
     (void) run;
 }
 

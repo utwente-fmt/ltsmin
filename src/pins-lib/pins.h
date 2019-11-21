@@ -5,15 +5,17 @@
 #include <stdio.h>
 
 #ifdef LTSMIN_CONFIG_INCLUDED
-#include <util-lib/string-map.h>
 #include <dm/dm.h>
 #include <ltsmin-lib/lts-type.h>
 #include <util-lib/chunk_support.h>
+#include <util-lib/chunk_table_factory.h>
+#include <util-lib/string-map.h>
 #else
-#include <ltsmin/dm.h>
-#include <ltsmin/string-map.h>
-#include <ltsmin/lts-type.h>
 #include <ltsmin/chunk_support.h>
+#include <ltsmin/chunk_table_factory.h>
+#include <ltsmin/dm.h>
+#include <ltsmin/lts-type.h>
+#include <ltsmin/string-map.h>
 #endif
 
 /**
@@ -177,12 +179,6 @@ typedef struct sl_group {
 extern struct poptOption greybox_options[];
 
 /**
-\brief Options for greybox management module including
-LTL options.
- */
-extern struct poptOption greybox_options_ltl[];
-
-/**
 \brief A struct to store guards per transition group
 */
 typedef struct guard {
@@ -196,56 +192,13 @@ typedef struct guard {
 //@{
 
 /**
-\brief The POR mode:
-
-no POR, POR, or POR with correctness check (invisible)
-*/
-
-typedef enum {
-    PINS_POR_NONE,
-    PINS_POR_ON,
-    PINS_POR_CHECK,
-} pins_por_t;
-
-/**
- * \brief boolean indicating whether PINS uses POR
+ * \brief Factory method for loading models.
+ *
+ * Given a model that has been initialized with data synchronization functions,
+ * this method determines the type of model by extension and loads it.
  */
-extern pins_por_t PINS_POR;
+void GBloadFile(model_t model, const char *filename, model_t *wrapped);
 
-/**
-\brief The behaviour of the ltl buchi product
-
-PINS_LTL_TEXTBOOK adds an initial state to the model and labels
-the incoming edges with the properties of in the buchi automaton
-PINS_LTL_SPIN labels the outgoing edges with the properties of
-the buchi automaton. Additionally, the SPIN semantics accounts
-for deadlocks in the LTS by letting the buchi continues upon deadlock.
-PINS_LTL_LTSMIN Like SPIN semantics, but without the deadlock provision.
-This allows LTSmin to maintain an efficient dependency matrix as
-deadlock detection is non-local (it depends on the conjunction of all
-guards from all transition groups).
-*/
-typedef enum {
-    PINS_LTL_NONE,
-    PINS_LTL_TEXTBOOK,
-    PINS_LTL_SPIN,
-    PINS_LTL_LTSMIN
-} pins_ltl_type_t;
-
-/**
- * \brief boolean indicating whether PINS uses LTL
- */
-extern pins_ltl_type_t PINS_LTL;
-
-/**
-\brief Factory method for loading models.
-
-Given a model that has been initialized with data synchronization functions,
-this method determines the type of model by extension and loads it. If
-the parameter wrapped is not NULL then the default wrappers are applied to
-the model and the result is put in wrapped.
-*/
-extern void GBloadFile(model_t model,const char *filename,model_t *wrapped);
 /**
 \brief Factory method for loading models concurrently.
 
@@ -280,24 +233,52 @@ extern matrix_t *GBgetDMInfo(model_t model);
 extern matrix_t *GBgetDMInfoRead(model_t model);
 extern matrix_t *GBgetDMInfoMayWrite(model_t model);
 extern matrix_t *GBgetDMInfoMustWrite(model_t model);
-extern matrix_t *GBgetExpandMatrix(model_t model);
-extern matrix_t *GBgetProjectMatrix(model_t model);
-extern int      GBsupportsCopy(model_t model);
-extern void     GBsetSupportsCopy(model_t model);
 
 /**
-\brief Set the dependency matrix of the model
-*/
+ * Set the dependency matrix of the specified model to the specified
+ * dependency matrix. This call specifies READ and WRITE dependencies.
+ * Use only once per model.
+ * Claims ownership of the memory used by dm_info.
+ * The dependency matrix should be created by a call to dm_create():
+ *   matrix_t* dm_info = (matrix_t*)malloc(sizeof(matrix_t));
+ *   dm_create(dm_info, nr_transition_groups, state_length);
+ * Where state_length is the number of state vector variables.
+ * @param model The model of which the dependency matrix is to be set.
+ * @param dm_info The dependency matrix to assign to the specified model.
+ */
 extern void GBsetDMInfo(model_t model, matrix_t *dm_info);
+
+/**
+ * Set the dependency matrix of the specified model to the specified
+ * dependency matrix. These calls specify Read, MayWrite, or MustWrite
+ * dependencies.
+ * Use only once per model.
+ * Claims ownership of the memory used by dm_info.
+ * The dependency matrix should be created by a call to dm_create():
+ *   matrix_t* dm_info = (matrix_t*)malloc(sizeof(matrix_t));
+ *   dm_create(dm_info, nr_transition_groups, state_length);
+ * Where state_length is the number of state vector variables.
+ * @param model The model of which the dependency matrix is to be set.
+ * @param dm_info The dependency matrix to assign to the specified model.
+ */
 extern void GBsetDMInfoRead(model_t model, matrix_t *dm_info);
 extern void GBsetDMInfoMayWrite(model_t model, matrix_t *dm_info);
 extern void GBsetDMInfoMustWrite(model_t model, matrix_t *dm_info);
-extern void GBsetExpandMatrix(model_t model, matrix_t *dm_info);
-extern void GBsetProjectMatrix(model_t model, matrix_t *dm_info);
 
-extern void GBgetInitialState(model_t model,int *state);
 /**< @brief Write the initial state of model into state. */
+extern void GBgetInitialState(model_t model, int* state);
 
+/** 
+ * Type of the callback function for returning lists of transitions.
+ * We produce the list of transitions by means of a callback, which
+ * is provided with a user context, an array of labels and a state vector.
+ * The context is usually obtained from either the next_method_black_t
+ * callback or the next_method_grey_t callback.
+ * @param context The context of where to write the new transition to.
+ * @param transition_info The transition group responsible for the new state.
+ * @param dst The new state.
+ * @param cpy Array indicating which indices i of the dst have been written (cpy[i] == 0)
+ */
 typedef void(*TransitionCB)(void*context,transition_info_t*transition_info,int*dst,int*cpy);
 /**< @brief Type of the callback function for returning lists of transitions.
 
@@ -307,6 +288,14 @@ is provided with a user context, an array of labels and a state vector.
 
 extern int GBgetTransitionsShort(model_t model,int group,int*src,TransitionCB cb,void*context);
 /**< @brief Enumerate the transition of a group for a short state.
+
+Given a group number and a short vector for that group, enumerate the local
+    transitions. This function may be non-reentrant. A short state means just the values for the influenced positions.
+ */
+
+
+extern int GBgetTransitionsShortR2W(model_t model,int group,int*src,TransitionCB cb,void*context);
+/**< @brief Enumerate the transition of a group for a read short state.
 
 Given a group number and a short vector for that group, enumerate the local
     transitions. This function may be non-reentrant. A short state means just the values for the influenced positions.
@@ -322,6 +311,13 @@ Given a group number and a long vector for that group, enumerate the local
 
 extern int GBgetActionsShort(model_t model,int group,int*src,TransitionCB cb,void*context);
 /**< @brief Enumerate the actions (without guards) for a short state
+
+Given a group number and a short vector for that group, enumerate the local
+    transitions. This function may be non-reentrant. A short state means just the values for the influenced positions.
+ */
+
+extern int GBgetActionsShortR2W(model_t model,int group,int*src,TransitionCB cb,void*context);
+/**< @brief Enumerate the actions (without guards) for a read short state
 
 Given a group number and a short vector for that group, enumerate the local
     transitions. This function may be non-reentrant. A short state means just the values for the influenced positions.
@@ -418,57 +414,15 @@ extern int GBgetStateAll(model_t model,int*state,int*labels,TransitionCB cb,void
 \brief Get the state labels and all transitions in one call.
 */
 
-extern int GBgetAcceptingStateLabelIndex(model_t model);
+extern int GBgroupsOfEdge(model_t model, int edgeno, int index, int *groups);
 /**<
-\brief Get index of accepting state label
-*/
+\brief Computes group numbers that may produce an edge.
 
-extern int GBsetAcceptingStateLabelIndex(model_t model, int index);
-/**<
-\brief Set index of accepting state label
-*/
-
-extern int GBbuchiIsAccepting(model_t model, int* src);
-/**<
-\brief Return accepting/not-accepting for a given state, false if undefined
-*/
-
-extern int GBgetProgressStateLabelIndex(model_t model);
-/**<
-\brief Get index of progress state label
-*/
-
-extern int GBsetProgressStateLabelIndex(model_t model, int index);
-/**<
-\brief Set index of progress state label
-*/
-
-extern int GBstateIsProgress(model_t model, int* src);
-/**<
-\brief Return progress/non-progress for a given state, false if undefined
-*/
-
-extern int GBgetValidEndStateLabelIndex(model_t model);
-/**<
-\brief Get index of valid end state label
-*/
-
-extern int GBsetValidEndStateLabelIndex(model_t model, int index);
-/**<
-\brief Set index of valid end state label
-*/
-
-extern int GBstateIsValidEnd(model_t model, int* src);
-/**<
-\brief Return valid end/invalid end for a given state, false if undefined
-*/
-
-extern int GBtransitionInGroup(model_t model, int* labels, int group);
-/**<
-\brief Return if a transition labelled with labels potentially occurs in group
-
-The number of labels in the labels parameter should be equal to the number of
-labels with with each transition is labelled.
+Returns the number of groups that may produce an edge with a specific number (edgeno) and value (index).
+Sets groups to the exact groups that may produce the edge. Data in \p groups
+may not be read beyond the returned value of this function. Parameter \p groups
+may be a null pointer, if it is not a null pointer \p groups it must be
+sufficiently large (e.g. the total number of transition groups).
 */
 
 /**
@@ -517,30 +471,46 @@ extern void GBregisterLoader(const char*extension,pins_loader_t loader);
 extern void GBregisterPreLoader(const char*extension,pins_loader_t loader);
 
 /**
-\brief Set a pointer to the user context;
-*/
+ * Assign the specified context to the specified model.
+ * Use this to specify a context pointer to whatever data you want available
+ * during the callbacks. You can obtain this pointer using GBgetContext().
+ * @param model The model of which the context will be set.
+ * @param context The context to assign to the specified model.
+ */
 extern void GBsetContext(model_t model,void*context);
 
 /**
-\brief Get a pointer to the user context;
-*/
+ * Obtain the context of the specified model, assigned earlier using
+ * GBsetContext(). This can be useful duing callbacks.
+ * @param model The model of which the context will be returned.
+ * @return The context of the specified model.
+ */
 extern void* GBgetContext(model_t model);
 
 /**
-\brief Add LTS structure information to a model.
-*/
-extern void GBsetLTStype(model_t model,lts_type_t info);
+ * Add the specified LTS structure information to the specified model.
+ * See lts_type_t for more information about the LTS structure.
+ * @param model The model of which the LTS structure will be set.
+ * @param info The LTS structure information.
+ */
+extern void GBsetLTStype(model_t model, lts_type_t info);
 
 /**
-\brief Add state label information to a model.
-*/
-extern void GBsetStateLabelInfo(model_t model, matrix_t *info);
-
-/**
-\brief Checks whether a transition group has guards
- This method is used for partial order reduction
-*/
-extern int GBhasGuardsInfo(model_t model);
+ * Add the specified state label dependency matrix to the specified model.
+ * This specifies for each label on which state variables the label depends
+ * on.
+ * Use only once per model.
+ * Claims ownership of the memory used by sl_info.
+ * The label dependency matrix should be created by a call to dm_create():
+ *   matrix_t* sl_info = (matrix_t*)malloc(sizeof(matrix_t));
+ *   dm_create(sl_info, nr_state_labels, state_length);
+ * Where state_length is the number of state vector variables, and
+ * nr_state_labels is the value set earlier using:
+ *   lts_type_set_state_label_count (ltstype, nr_state_labels);
+ * @param model The model of which the state label info matrix will be set.
+ * @param sl_info The state label information matrix.
+ */
+extern void GBsetStateLabelInfo(model_t model, matrix_t *sl_info);
 
 /**
 \brief Set the guard array for a model
@@ -634,31 +604,93 @@ extern void GBsetPorStateLabelVisibility(model_t model, int*bv);
 extern int *GBgetPorStateLabelVisibility(model_t model);
 
 /**
-\brief Set the initial state.
-
-The initial state is needed if a short vector next state method
-has to be implemented in terms of a long vector one to fill in
-the empty spaces with legal values.
-*/
-extern void GBsetInitialState(model_t model,int *state);
+ * \brief Set the initial state.
+ *
+ * The initial state is needed if a short vector next state method
+ * has to be implemented in terms of a long vector one to fill in
+ * the empty spaces with legal values.
+ */
+extern void GBsetInitialState(model_t model, int*state);
 
 /**
-\brief Type of the greybox next state method.
-*/
+ * \brief Type of the greybox next state method.
+ * This is the definition of the callback method that will be called in the
+ * search for next states given a current state. See GBsetNextStateLong().
+ * The user_context should be passed to the callback cb when a new transition
+ * has been found.
+ * An example grey box method yielding 6 states:
+ *   typedef struct StateVector {
+ *     uint32_t a;
+ *     uint32_t b;
+ *   } StateVector;
+ *   int gb_next(model_t self, int group, struct StateVector* src, TransitionCB cb, void* user_context) {
+ *     switch(group) {
+ *     case 0:
+ *       StateVector tmp = *src;
+ *       transition_info_t transition_info = { NULL, group };
+ *       tmp.a = (src->a + 1) % 6;
+ *       cb(user_context, &transition_info, (int*)&tmp);
+ *       return 1;
+ *       break;
+ *     }
+ *     return 0;
+ *   }
+ * @param self The model on which this callback method was called.
+ * @param group The transition group to check if it is enabled or not
+ * @param src The current state.
+ * @param cb The callback method to report new transitions. See TransitionCB.
+ * @param user_context The context of where to write the new transition to.
+ * @return The number of new transitions found (how many times cb was called).
+ */
 typedef int(*next_method_grey_t)(model_t self,int group,int*src,TransitionCB cb,void*user_context);
 
 /**
-\brief Set the next state method that works on long vectors.
-
-If this method is not set then the short version is used.
-*/
+ * Set the grey box next state method of the specified model to the specified
+ * function. See next_method_grey_t for a description of the function.
+ * For every transition group the specified callback will be called in the
+ * search of new transitions. The group parameter will be in the range [0,N),
+ * where N is the number of transitions groups specified when the dependency
+ * matrix was set using GBsetDMInfo, GBsetDMInfoRead or GBsetDMInfoWrite.
+ * This is the LONG version, which means the entire current state vector will
+ * be passed as src. This in contrast to the SHORT version, which can be
+ * specified using GBsetNextStateShort().
+ * If this method is not set then the short version is used.
+ * @param model The model on which to set the grey box next state method.
+ * @param method The function that will be assigned to the specified model.
+ */
 extern void GBsetNextStateLong(model_t model,next_method_grey_t method);
 
 /**
-\brief Set the next state method that works on short vectors.
-
-If this method is not set then the long version is used.
-*/
+ * Set the grey box next state method of the specified model to the specified
+ * function. See next_method_grey_t for a description of the function.
+ * For every transition group the specified callback will be called in the
+ * search of new transitions. The group parameter will be in the range [0,N),
+ * where N is the number of transitions groups specified when the dependency
+ * matrix was set using GBsetDMInfo, GBsetDMInfoRead or GBsetDMInfoWrite.
+ * This is the SHORT version, which means only the part of the current state
+ * vector that is either read or written to will be passed as src, based on
+ * the dependency matrix. This in contrast to the SHORT version, which can be
+ * specified using GBsetNextStateLong().
+ * If this method is not set then the long version is used.
+ * An example of a short grey box next state method:
+ * int gb_next_short(model_t self, int group, int const* src, TransitionCB cb, void* user_context) {
+ *   int tmp = *src;
+ *   transition_info_t transition_info = { NULL, group };
+ *   tmp = (*src + 1) % 6;
+ *   cb(user_context, &transition_info, (int*)&tmp);
+ *   return 1;
+ * }
+ * This example uses a 2x2 dependency matrix:
+ *   1 0
+ *   0 1
+ * This means for both the first state vector variable and the second state
+ * vector variable that all integral values in the range [0,6) are iterated,
+ * due to the dependency matrix and the fact that the SHORT version is used.
+ * All combinations are iterated as well, thus yielding 36 states and 72
+ * transitions.
+ * @param model The model on which to set the grey box next state method.
+ * @param method The function that will be assigned to the specified model.
+ */
 extern void GBsetNextStateShort(model_t model,next_method_grey_t method);
 
 /**
@@ -684,6 +716,14 @@ If this method is not set then the long version is used.
 */
 extern void GBsetActionsShort(model_t model,next_method_grey_t method);
 
+/**
+\brief Set the next state method that works on short vectors.
+A short vector is either projected using read dependencies (source state)
+or write dependencies (target state).
+
+If this method is not set then the long version is used.
+*/
+extern void GBsetActionsShortR2W(model_t model,next_method_grey_t method);
 
 /**
 \brief Type of the greybox next state matching method.
@@ -701,22 +741,39 @@ extern void GBsetNextStateMatching(model_t model,next_method_matching_t method);
 typedef int(*next_method_black_t)(model_t self,int*src,TransitionCB cb,void*user_context);
 
 /**
-\brief Set the black box next state method.
-
-If this method is not set explicitly then the grey box calls are iterated.
-*/
-extern void GBsetNextStateAll(model_t model,next_method_black_t method);
-
-/// Type of label retrieval methods.
-typedef void (*get_label_all_method_t)(model_t self,int*src,int *label);
+ * Set the black box next state method of the specified model to the specified
+ * function. See next_method_black_t for a description of the function.
+ * This function will be called in the search of next states given a current
+ * state. See next_method_black_t for an example.
+ * If this method is not set explicitly then the grey box calls are iterated.
+ * @param model The model on which to set the black box next state method.
+ * @param method The function that will be assigned to the specified model.
+ */
+extern void GBsetNextStateAll(model_t model, next_method_black_t method);
 
 /**
-\brief Set the method that retrieves all state labels.
-*/
+ * \brief Type of the get all labels method.
+ * This is the definition of the callback method that will be called to
+ * determine the values of the labels in the specified state (src).
+ * To set the value of a label with index i, write to label:
+ *   label[i] = myValue;
+ * This index corresponds with the index of the label dependency matrix,
+ * specified by GBsetStateLabelInfo().
+ * @param self The model on which this callback method was called.
+ * @param src The state on which the values of the labels should be based.
+ * @param label The array to which the values of the labels will be assigned.
+ */
+typedef void (*get_label_all_method_t)(model_t self, int *src, int *label);
+
+/**
+ * 
+ * @param model The model on which to set the get all labels method.
+ * @param method The function that will be assigned to the specified model.
+ */
 extern void GBsetStateLabelsAll(model_t model,get_label_all_method_t method);
 
 /// Type of label retrieval methods.
-typedef void (*get_label_group_method_t)(model_t self,sl_group_enum_t group, int*src,int *label);
+typedef void (*get_label_group_method_t)(model_t self, sl_group_enum_t group, int *src, int *label);
 
 /**
 \brief Set the method that retrieves a group of state labels.
@@ -724,7 +781,7 @@ typedef void (*get_label_group_method_t)(model_t self,sl_group_enum_t group, int
 extern void GBsetStateLabelsGroup(model_t model,get_label_group_method_t method);
 
 /// Type of label retrieval methods.
-typedef int (*get_label_method_t)(model_t self,int label,int*src);
+typedef int (*get_label_method_t)(model_t self, int label, int *src);
 
 /**
 \brief Set the method that retrieves labels given long vectors.
@@ -736,13 +793,13 @@ extern void GBsetStateLabelLong(model_t model,get_label_method_t method);
 */
 extern void GBsetStateLabelShort(model_t model,get_label_method_t method);
 
-/// Type of transition group retrieval method
-typedef int (*transition_in_group_t)(model_t self,int *labels,int group);
+/// Type of groups of edge method
+typedef int (*groups_of_edge_t)(model_t model,int edgeno,int index,int *groups);
 
 /**
-\brief Set the method for transition group retrieval
+\brief Set the method for groups of edge method.
 */
-extern void GBsetTransitionInGroup(model_t model,transition_in_group_t method);
+extern void GBsetGroupsOfEdge(model_t model,groups_of_edge_t method);
 
 
 /**
@@ -767,30 +824,13 @@ integers split the set into the subsets of even integers and odd integers.
 
 //@{
 
-/** The newmap method creates a new map, given the newmap context.
+/** \brief Set the chunk map.
+ *
+ *  The map factory should produce proper ValueTable objects
+ *  (see util-lib/chunk_table_factory.h)
  */
-typedef void*(*newmap_t)(void*newmap_context);
-/** Translate the given chunk to an integer with repect to the given map.
- */
-typedef int (*chunk2int_t)(void*map,void*chunk,int len);
-/** Put the given chunk at a location in the map.
- */
-typedef void (*chunkatint_t)(void*map,void*chunk,int len,int pos);
-/** Translate the given integer to a chunk with repect to the given map.
- */
-typedef void* (*int2chunk_t)(void*map,int idx,int*len);
 
-typedef int (*get_count_t)(void* object);
-
-/** Set the map factory method and the lookup methods for chunk maps.
- */
-extern void GBsetChunkMethods(model_t model,
-                              newmap_t newmap,
-                              void *newmap_context,
-                              int2chunk_t int2chunk,
-                              chunk2int_t chunk2int,
-                              chunkatint_t chunkat,
-                              get_count_t get_count);
+extern void GBsetChunkMap(model_t model, table_factory_t factory);
 
 /**
 \brief Copy map factory methods, lookup methods AND chunk maps.
@@ -810,42 +850,6 @@ extern void GBgrowChunkMaps(model_t model, int old_n);
 extern void GBinitModelDefaults (model_t *p_model, model_t default_src);
 
 /**
-\brief Get the number of different chunks of type type_no.
-
-Please note that this function is potentially expensive in a distributed setting
-because it requires a non-authoritative database to query the authoritative one.
-Moreover, the result can only be guaranteed to be correct if there are no Put-calls
-in progress anywhere in the system during the time this call is made.
-*/
-extern int GBchunkCount(model_t model,int type_no);
-
-/**
-\brief Put a chunk into a table at a specific index.
-
-WARNING: only to be used at initialization time! Otherwise this operation will
-fail with an error.
-*/
-extern void GBchunkPutAt(model_t model,int type_no,const chunk c,int index);
-
-/**
-\brief Put a chunk into a table.
-
-This call translates a chunk to an integer.
-These integers must be from a range 0..count-1.
-*/
-extern int GBchunkPut(model_t model,int type_no, const chunk c);
-
-/**
-\brief Get the a chunk in a type.
-
-\param type_no The number of the type.
-\param chunk_no The numer of the chunk.
-\returns The requested chunk. The user can assume that the data area of the chunk
-will keep its contents forever. The user is not allowed to change the contents.
-*/
-extern chunk GBchunkGet(model_t model,int type_no,int chunk_no);
-
-/**
 \brief Fetch a chunk, pretty print it and put the pretty printed
        chunk into a table.
 
@@ -863,7 +867,7 @@ extern void GBsetPrettyPrint(model_t model,chunk2pretty_t chunk2pretty);
 
 
 /** Retrieve the map used for a specific type. */
-extern void* GBgetChunkMap(model_t model,int type_no);
+extern value_table_t GBgetChunkMap(model_t model,int type_no);
 
 //@}
 
@@ -871,67 +875,36 @@ extern void* GBgetChunkMap(model_t model,int type_no);
 \defgroup greybox_operators The Greybox operator suite.
 */
 
-//@{
+typedef void(*ExitCB)(model_t model);
 
 /**
-\brief Add caching of grey box short calls.
-*/
-extern model_t GBaddCache(model_t model);
-
-/**
-\brief Add LTL layer on top all other pins layers
-*/
-extern model_t GBaddLTL(model_t model);
-
-extern struct poptOption ltl_options[];
-
-/**
-\brief Add POR layer before LTL layer
-*/
-extern model_t GBaddPOR(model_t model);
-
-extern struct poptOption por_options[];
-
-/**
-\brief Add layer that checks vorrectness of POR reductions before LTL layer
-*/
-extern model_t GBaddPORCheck(model_t model);
-
-/**
-\brief Add mu-calculus layer
-*/
-extern model_t GBaddMucalc (model_t model, const char *mucalc_file);
-
-
-//@{
-
-/**
-\brief Reorder and regroup transitions and state vectors
-*/
-extern model_t GBregroup(model_t model, const char *group_spec);
-
-/**
- * \brief Returns 1 if the mucalc wrapper is active; 0 otherwise.
+ * \brief Set the exit function.
  */
-extern int GBhaveMucalc();
+extern void GBsetExit(model_t model, ExitCB exit);
 
 /**
- * \brief Gets the number of subformulae of the mu-calculus property that is being checked.
- * Needed for the parity game solver.
+ * \brief Run the exit function.
  */
-extern int GBgetMucalcNodeCount(model_t model);
+extern void GBExit(model_t model);
 
 /**
- * \brief Sets the number of subformulae of the mu-calculus property that is being checked.
- * Needed for the parity game solver.
+ * \brief set state vector permutation.
  */
-extern void GBsetMucalcNodeCount(model_t model, int node_count);
-
-//@}
+extern void GBsetVarPerm(model_t model, int* perm);
 
 /**
- * \brief Whether to use guards to speed up next-state computation.
+ * \brief get state vector permutation.
  */
-extern int GBgetUseGuards(model_t model);
+extern int* GBgetVarPerm(model_t model);
+
+/**
+ * \brief set group permutation.
+ */
+extern void GBsetGroupPerm(model_t model, int* perm);
+
+/**
+ * \brief get group permutation.
+ */
+extern int* GBgetGroupPerm(model_t model);
 
 #endif

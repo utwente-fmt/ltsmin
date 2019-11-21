@@ -1,0 +1,146 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+ltsmin-type-system(5)
+=====================
+:Author:  Jeroen Meijer
+:Email:   <j.j.g.meijer@utwente.nl>
+:Date:    2017-05-12
+
+== NAME
+ltsmin-type-system - The LTSmin type system.
+
+== SYNOPSIS
+Description of LTSmin's type system used in the property language.
+
+== DESCRIPTION
+This man page describes LTSmin's type system, used in the property language.
+Specifically this manpage can help users writing atomic predicates, used in
+invariants, LTL, CTL, CTL* and mu-calculus formulas. It will also help the user
+resolving any type checking errors.
+
+In principle, LTSmin's type system is a meta type system for all language
+front-ends. Meaning that whatever type a language defines, there is always
+a corresponding meta type. Such a meta type is also refered to in LTSmin as a
+type format. Every type format is associated with a very similar type in the
+C language, and an enum definition in +lts-type.h+, called +data_format_t+.
+A type format is associated with a state variable, edge variable in an
+instantation of an LTS, and the result of unary, and binary operators such as
+||,+,!, but also temporal operators such as neXt etc.
+
+To find out what kind of type formats are associated with each state variable
+and edge variable you can use the +--labels+ option. For example,
+to view the type formats of a Petri-net, you could type +pnml2lts-sym
+<Petri-net>.pnml --labels+. The list of available type formats is as follows.
+
+.Type formats
+[cols="<,^,^,", options="header, autowidth"]
+|==============================================================================
+|Name          |C type|+data_format_t+|Description
+|direct        |void  |LTStypedirect  |A 32-bit type, with simple semantics.
+|range         |void  |LTStyperange   |A 32-bit type, with a lowerbound and
+upperbound, and simple semantics.
+|chunk         |void* |LTStypechunk   |A 32-bit pointer to data with simple
+semantics.
+|enum          |void* |LTStypeenum    |A 32-bit pointer to predefined data
+with simple semantics.
+|Bool          |bool  |LTStypeBool    |A Boolean value, with the semantics of a
+Boolean.
+|trilean       |int   |LTStypetrilean |A trilean, or three-valued type, similar
+to Boolean, with extra maybe constant.
+|signed integer|int   |LTStypeSInt32  |A 32-bit integer value, with integer
+semantics, that may not underflow or overflow.
+|==============================================================================
+
+The key feature of direct, and range is that only simple operators are defined
+for those, such as equality and inequality. The difference between chunk, and
+enum is that the values for enums are fixed; during state space generation
+values may not be added to enum types. The difference between Bool, and trilean
+is that a trilean may also have the value maybe. This value is typically
+useful for language front-ends that have guards that may not always evaluate
+to true or false, e.g. in process algebras. The difference between direct, and
+signed integer is that for a signed integer basic arithmatic operators are
+defined.
+
+The result of applying unary and binary operators on type formats is defined in
+the following tables (see also file +ltsmin-type-system.h+).
+Some operators are not commutative, for the semantics of each operator see
+manpage:ltsmin-pred[], manpage:ltsmin-ltl[], manpage:ltsmin-ctl[], and
+manpage:ltsmin-mu[].
+
+The following table defines the result of applying some binary math operators.
+They are only defined when both the LHS and RHS are signed integers.
+
+.Atomic binary math operators: *, /, %, +, -
+[cols="h,7*^", options="header, autowidth"]
+|====================================================================
+|              |direct|range|chunk|enum |Bool |trilean|signed integer
+|direct        |error |error|error|error|error|error  |error
+|range         |error |error|error|error|error|error  |error
+|chunk         |error |error|error|error|error|error  |error
+|enum          |error |error|error|error|error|error  |error
+|Bool          |error |error|error|error|error|error  |error
+|trilean       |error |error|error|error|error|error  |error
+|signed integer|error |error|error|error|error|error  |signed integer
+|====================================================================
+
+The following table defines the result of applying standard Boolean operators.
+They are only defined when both the LHS and RHS are Bools.
+
+.Non atomic binary Boolean operators: ||, &&, $$<==>$$, $$=>$$, R, W, U
+[cols="h,7*^", options="header, autowidth"]
+|====================================================================
+|              |direct|range|chunk|enum |Bool |trilean|signed integer
+|direct        |error |error|error|error|error|error  |error
+|range         |error |error|error|error|error|error  |error
+|chunk         |error |error|error|error|error|error  |error
+|enum          |error |error|error|error|error|error  |error
+|Bool          |error |error|error|error|Bool |error  |error
+|trilean       |error |error|error|error|error|error  |error
+|signed integer|error |error|error|error|error|error  |error
+|====================================================================
+
+The following table defines the result of applying order operators.
+They are currently only defined when both the LHS and RHS are signed integers.
+
+.Non atomic binary order operators: <, $$<=$$, >, >=
+[cols="h,7*^", options="header, autowidth"]
+|====================================================================
+|              |direct|range|chunk|enum |Bool |trilean|signed integer
+|direct        |error |error|error|error|error|error  |error
+|range         |error |error|error|error|error|error  |error
+|chunk         |error |error|error|error|error|error  |error
+|enum          |error |error|error|error|error|error  |error
+|Bool          |error |error|error|error|error|error  |error
+|trilean       |error |error|error|error|error|error  |error
+|signed integer|error |error|error|error|error|error  |Bool
+|====================================================================
+
+The following table defines the result of applying equality, inequality,
+and the enabledness operator.
+
+.Non atomic binary relational operators: == !=, ??
+[cols="h,7*^", options="header, autowidth"]
+|====================================================================
+|              |direct|range|chunk|enum |Bool |trilean|signed integer
+|direct        |Bool  |Bool |error|error|error|error  |Bool
+|range         |Bool  |Bool |error|error|error|error  |Bool
+|chunk         |error |error|Bool |Bool |error|error  |error
+|enum          |error |error|Bool |Bool |error|error  |error
+|Bool          |error |error|error|error|Bool |Bool   |error
+|trilean       |error |error|error|error|Bool |Bool   |error
+|signed integer|Bool  |Bool |error|error|error|error  |Bool
+|====================================================================
+
+The following table defines the result of applying several Boolean operators.
+
+.Non atomic unary Boolean operators: !, mu, nu, [], <>, X, A, E
+[cols="7*^", options="header, autowidth"]
+|=====================================================
+|direct|range|chunk|enum |Bool |trilean|signed integer
+|error |error|error|error|Bool |error  |error
+|=====================================================
+
+== SEE ALSO
+manpage:ltsmin-pred[5]
+manpage:ltsmin-ltl[5]
+manpage:ltsmin-ctl[5]
+manpage:ltsmin-mu[5]

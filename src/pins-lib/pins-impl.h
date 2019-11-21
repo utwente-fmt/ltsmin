@@ -2,31 +2,37 @@
 #define SPEC_GREYBOX_H
 
 #if defined(MAPA)
-#include <pins-lib/mapa-pins.h>
+#include <pins-lib/modules/mapa-pins.h>
 #endif
 #if defined(MCRL)
-#include <pins-lib/mcrl-pins.h>
+#include <pins-lib/modules/mcrl-pins.h>
 #endif
 #if defined(MCRL2)
-#include <pins-lib/mcrl2-pins.h>
+#include <pins-lib/modules/mcrl2-pins.h>
 #endif
 #if defined(LTSMIN_PBES)
-#include <pins-lib/pbes-pins.h>
+#include <pins-lib/modules/pbes-pins.h>
 #endif
 #if defined(ETF)
-#include <pins-lib/etf-pins.h>
+#include <pins-lib/modules/etf-pins.h>
 #endif
 #if defined(DIVINE)
-#include <pins-lib/dve-pins.h>
+#include <pins-lib/modules/dve-pins.h>
 #endif
 #if defined(SPINS)
-#include <pins-lib/prom-pins.h>
+#include <pins-lib/modules/prom-pins.h>
 #endif
 #if defined(OPAAL)
-#include <pins-lib/opaal-pins.h>
+#include <pins-lib/modules/opaal-pins.h>
+#endif
+#if defined(PNML)
+#include <pins-lib/modules/pnml-pins.h>
+#endif
+#if defined(PROB)
+#include <pins-lib/modules/prob-pins.h>
 #endif
 #if defined(PINS_DLL)
-#include <pins-lib/dlopen-pins.h>
+#include <pins-lib/modules/dlopen-pins.h>
 #endif
 
 
@@ -77,6 +83,18 @@
 #define SPEC_MT_SAFE 1
 #define SPEC_REL_PERF 10
 #define SPEC_MAYBE_AND_FALSE_IS_FALSE 0
+#endif
+#if defined(PNML)
+#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, pnml_options, 0, "PNML options", NULL }
+#define SPEC_MT_SAFE 1
+#define SPEC_REL_PERF 100
+#define SPEC_MAYBE_AND_FALSE_IS_FALSE 1
+#endif
+#if defined(PROB)
+#define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, prob_options, 0, "ProB options", NULL }
+#define SPEC_MT_SAFE 1
+#define SPEC_REL_PERF 1
+#define SPEC_MAYBE_AND_FALSE_IS_FALSE 1
 #endif
 #if defined(PINS_DLL)
 #define SPEC_POPT_OPTIONS { NULL, 0, POPT_ARG_INCLUDE_TABLE, pins_plugin_options, 0, "PINS plugin options", NULL }

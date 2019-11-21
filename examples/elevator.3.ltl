@@ -1,1 +1,1 @@
-([] (Person_0 == in_elevator -> (<>Person_0 == out)))
+([] (Person_0 == "in_elevator" -> (<>Person_0 == "out")))

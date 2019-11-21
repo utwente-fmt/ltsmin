@@ -165,7 +165,7 @@ endofline   (\n|\r|\n\r|\r\n)
 
 . {
     yyextra->linepos++;
-    HREmessage(error,"Unexpected character %s (%x) at line %d, pos %d",
+    HREmessage(lerror,"Unexpected character %s (%x) at line %d, pos %d",
           yytext,yytext[0],yyextra->lineno+1,yyextra->linepos+1);
     Parse(yyextra->parser,TOKEN_ERROR,0,yyextra);
     /* Because the same lexer is used for multiple languages, we give the

@@ -2,8 +2,13 @@
 #ifndef HRE_USER_H
 #define HRE_USER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #include <popt.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -109,8 +114,8 @@ extern void HREinit(int *argc,char **argv[]);
 /**
 \brief Assertion check, with or without print arguments
 */
-#ifdef DNDEBUG
-#define HREassert(check,...)    ((void)0);
+#ifdef NDEBUG
+#define HREassert(check,...)    ((void) (check));
 #else
 #ifdef LTSMIN_DEBUG
 #define PRINT_STACK HREprintStack();
@@ -275,6 +280,11 @@ Free memory.
 extern void HREfree(hre_region_t region,void* mem);
 
 /**
+Free memory that has been allocated with HREalign, or HREalignZero.
+*/
+extern void HREalignedFree(hre_region_t region,void* mem);
+
+/**
 Macro that allocates room for a new object given the type.
 */
 #define HRE_NEW(region,sort) ((sort*)HREmallocZero(region,sizeof(sort)))
@@ -293,7 +303,7 @@ typedef void(*hre_free_t)(void* area,void*mem);
 Create a new allocater given malloc, align, realloc and free methods.
 */
 
-extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free);
+extern hre_region_t HREcreateRegion(void* area,hre_malloc_t malloc,hre_align_t align,hre_realloc_t realloc,hre_free_t free,hre_free_t aligned_free);
 
 extern hre_region_t RTgetMallocRegion();
 
@@ -324,6 +334,11 @@ extern void* RTrealloc(void *rt_ptr, size_t size);
 extern void RTfree(void *rt_ptr);
 
 /**
+Free memory allocated with RTalign or RTalignZero.
+*/
+extern void RTalignedFree(void *rt_ptr);
+
+/**
 \brief Switch (HREsetRegion) to the global allocator provided by the region
         HREdefaultRegion (shared = true). And back (shared = false).
  */
@@ -340,6 +355,9 @@ extern char* HREstrdup(const char *str);
  */
 extern void RTparseOptions(const char* argline,int *argc_p,char***argv_p);
 
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif
 

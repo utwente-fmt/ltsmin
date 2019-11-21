@@ -20,6 +20,7 @@
 #include <mc-lib/atomics.h>
 #include <mc-lib/stats.h>
 #include <mc-lib/trace.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/parallel/counter.h>
 #include <pins2lts-mc/parallel/global.h>
 #include <pins2lts-mc/parallel/options.h>
@@ -95,12 +96,16 @@ extern void lndfs_shared_init       (run_t *run);
 extern void cndfs_shared_init       (run_t *run);
 extern void owcty_shared_init       (run_t *run);
 extern void dfs_fifo_shared_init    (run_t *run);
+extern void tarjan_shared_init      (run_t *run);
+extern void ufscc_shared_init       (run_t *run);
+extern void renault_shared_init     (run_t *run);
 
 /**
  * Helper functions
  */
 
-extern int alg_state_new_default    (void *ctx, ref_t ref, int seen);
+extern int alg_state_new_default    (void *ctx, transition_info_t *ti,
+                                     ref_t ref, int seen);
 
 extern int num_global_bits (strategy_t s);
 

@@ -35,17 +35,17 @@ bn_double2int (double a, mpz_t *b)
     mpz_set_d (*b, a);
 }
 
-int
+void
 bn_int2string (char *string, size_t size, mpz_t *a)
 {
-    const unsigned int  BASE = 10;
-    unsigned int        needed_size = mpz_sizeinbase (*a, BASE) + 2;
-    assert (string != NULL && size > 0);
-    if (size >= needed_size)
-        mpz_get_str (string, BASE, *a);
-    else
-        string[0] = '\0';
-    return needed_size - 1;
+    (void) size;
+    mpz_get_str (string, 10, *a);
+}
+
+size_t
+bn_strlen (bn_int_t *a)
+{
+    return mpz_sizeinbase (*a, 10) + 1;
 }
 
 double
@@ -61,7 +61,7 @@ bn_add (mpz_t *a, mpz_t *b, mpz_t *c)
 }
 
 void
-bn_set_digit (mpz_t *a, unsigned int digit)
+bn_set_digit (mpz_t *a, int digit)
 {
     mpz_set_ui (*a, digit);
 }

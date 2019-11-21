@@ -140,6 +140,7 @@ static void hre_popt(poptContext con,
         case POPT_CALLBACK_REASON_PRE:
         case POPT_CALLBACK_REASON_POST:
             Abort("unexpected call to hre_popt");
+            break;
         case POPT_CALLBACK_REASON_OPTION:
             if (!strcmp(opt->longName,"threads")){
                 if (!thread_count) return; // ignore if threads disabled.

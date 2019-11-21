@@ -10,9 +10,12 @@ TAGS
 config.h.in
 .libs/
 .metadata/
+.project
+.cproject
+.settings
+*.dirstamp
 aclocal.m4
 autom4te.cache/
-autotools/
 config.log
 config.lt
 config.status
@@ -22,6 +25,7 @@ Makefile
 Makefile.in
 ltsmin-*.tar.gz
 libtool
+ltdl
 bin/
 share/
 include/
@@ -30,6 +34,6 @@ include/
 /src/ltsmin-lib/mucalc-grammar.out
 /src/ltsmin-lib/mucalc-lexer.c
 /src/ltsmin-lib/mucalc-lexer.h
-/examples/brp.lps
-/examples/brp.pbes
-/examples/ieee-11073.lps
+/examples/*.lps
+/examples/abp.pbes
+nbproject

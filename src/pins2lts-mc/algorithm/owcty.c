@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 #include <mc-lib/lb.h>
+#include <pins-lib/pins-util.h>
 #include <pins2lts-mc/algorithm/owcty.h>
 
 // TODO: reuse reachability algorithms with CNDFS recursive run structure
@@ -142,15 +143,28 @@ owcty_reset (wctx_t *ctx)
     return size;
 }
 
+static void
+owcty_CE (run_t *run)
+{
+    /* Stop other workers, exit if some other worker was first here */
+    if ( !run_stop(run) )
+        return;
+    int                 level = -1;
+    Warning (info, " ");
+    Warning (info, "Accepting cycle FOUND at depth %d!", level);
+    Warning (info, " ");
+}
+
 static inline void
 owcty_map (wctx_t *ctx, state_info_t *successor)
 {
     alg_shared_t       *shared = ctx->run->shared;
     ref_t               map_pred = atomic_read (shared->parent_ref+ctx->state->ref);
-    if ( GBbuchiIsAccepting(ctx->model, state_info_state(successor)) ) {
+    if ( pins_state_is_accepting(ctx->model, state_info_state(successor)) ) {
         if (successor->ref == ctx->state->ref || map_pred == successor->ref) {
             //ndfs_report_cycle (ctx, successor);
-            Abort ("cycle found!");
+            owcty_CE(ctx->run);
+            //Abort ("cycle found!");
         }
         size_t              num = successor->ref + 1;
         map_pred = max (num, map_pred);
@@ -165,7 +179,8 @@ owcty_ecd (wctx_t *ctx, state_info_t *successor)
     uint32_t acc_level = ecd_get_state (loc->cyan, successor);
     if (acc_level < ctx->global->ecd.level_cur) {
         //ndfs_report_cycle (ctx, successor);
-        Abort ("Cycle found!");
+        owcty_CE(ctx->run);
+        //Abort ("Cycle found!");
     }
 }
 
@@ -189,7 +204,7 @@ owcty_split (void *arg_src, void *arg_tgt, size_t handoff)
             if (((src_loc->iteration & 1) == 1 || src_loc->iteration == 0) && // only in the initialization / reachability phase
                     Strat_ECD == strategy[1]) {
                 state_info_deserialize (source->state, one);
-                if (GBbuchiIsAccepting(source->model, state_info_state(source->state))) {
+                if (pins_state_is_accepting(source->model, state_info_state(source->state))) {
                     HREassert (src_sm->ecd.level_cur != 0, "Source accepting level counter is off");
                     src_sm->ecd.level_cur--;
                 }
@@ -243,7 +258,7 @@ owcty_reachability_handle (void *arg, state_info_t *successor, transition_info_t
         if (strategy[1] == Strat_ECD)
             owcty_ecd (ctx, successor);
         uint32_t num = owcty_pre_inc (ctx->run, successor->ref, 1);
-        HREassert (num < (1UL<<30)-1, "Overflow in accepting predecessor counter");
+        HREassert (num < (1ULL<<30)-1, "Overflow in accepting predecessor counter");
     }
     if (strategy[1] == Strat_MAP)
         owcty_map (ctx, successor);
@@ -279,7 +294,7 @@ owcty_reachability (wctx_t *ctx)
             state_info_deserialize (ctx->state, state_data);
             dfs_stack_enter (sm->stack);
             increase_level (ctx->counters);
-            bool accepting = GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state));
+            bool accepting = pins_state_is_accepting(ctx->model, state_info_state(ctx->state));
             if (strategy[1] == Strat_ECD) {
                 ecd_add_state (loc->cyan, ctx->state, &sm->ecd.level_cur);
                 sm->ecd.level_cur += accepting;
@@ -307,7 +322,7 @@ owcty_reachability (wctx_t *ctx)
             if (strategy[1] == Strat_ECD) {
                 state_data = dfs_stack_top (sm->stack);
                 state_info_deserialize (ctx->state, state_data);
-                if (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state))) {
+                if (pins_state_is_accepting(ctx->model, state_info_state(ctx->state))) {
                     HREassert (sm->ecd.level_cur != 0, "Accepting level counter is off");
                     sm->ecd.level_cur--;
                 }
@@ -443,7 +458,7 @@ owcty (run_t *run, wctx_t *ctx)
     HREbarrier (HREglobal());
 
     if (strategy[1] == Strat_MAP && 0 == ctx->id &&
-            GBbuchiIsAccepting(ctx->model, state_info_state(ctx->initial)))
+            pins_state_is_accepting(ctx->model, state_info_state(ctx->initial)))
         atomic_write (shared->parent_ref+ctx->initial->ref, ctx->initial->ref + 1);
     owcty_pre_t             reset = { .bit = 0, .acc = 0, .count = 1 };
     uint32_t               *r32 = (uint32_t *) &reset;
@@ -593,12 +608,12 @@ owcty_shared_init   (run_t *run)
 
     run->shared = RTmallocZero (sizeof(alg_shared_t));
     run->shared->pre = RTalignZero (CACHE_LINE_SIZE,
-                                    sizeof(owcty_pre_t[1UL << dbs_size]));
+                                    sizeof(owcty_pre_t[1ULL << dbs_size]));
     run->shared->lb = lb_create_max (W, G, H);
     run_set_is_stopped (run, owcty_is_stopped);
     run_set_stop (run, owcty_stop);
 
     if (strategy[1] == Strat_MAP) {
-        run->shared->parent_ref = RTmalloc (sizeof(ref_t[1UL<<dbs_size]));
+        run->shared->parent_ref = RTmalloc (sizeof(ref_t[1ULL<<dbs_size]));
     }
 }

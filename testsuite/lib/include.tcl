@@ -9,25 +9,30 @@ proc makeAbsolute {pathname} {
 }
 
 set LTSMIN_SRCDIR "[makeAbsolute $srcdir]/.."
+set LTSMIN_BUILDDIR "[makeAbsolute $base_dir]/.."
+
 
 # The directory containing all the models used for testing.
-set EXAMPLES_PATH "$LTSMIN_SRCDIR/examples"
+set EXAMPLES_SRC_PATH "$LTSMIN_SRCDIR/examples"
+set EXAMPLES_BUILD_PATH "$LTSMIN_BUILDDIR/examples"
 
 # filter: filter a specific (list of) backend(s): {mc,sym,seq,dist}
 proc find_alg_backends { filter } {
+    global LTSMIN_BUILDDIR
     global base_dir
+    global exeext
     set backends [list]
     set lts_backends [glob -directory "$base_dir/../src" -type d pins2lts-$filter ]
     foreach dir $lts_backends {
-        set lts_bins [glob -nocomplain -directory $dir -type f *2lts-$filter ]
+        set lts_bins [glob -nocomplain -directory $dir -type f *2lts-$filter$exeext ]
         foreach path $lts_bins {
             lappend backends $path
         }
-        set lts_bins [glob -nocomplain -directory $dir/gcc -type f *2lts-$filter ]
+        set lts_bins [glob -nocomplain -directory $dir/gcc -type f *2lts-$filter$exeext ]
         foreach path $lts_bins {
             lappend backends $path
         }
-        set lts_bins [glob -nocomplain -directory $dir/mpicc -type f *2lts-$filter ]
+        set lts_bins [glob -nocomplain -directory $dir/mpicc -type f *2lts-$filter$exeext ]
         foreach path $lts_bins {
             lappend backends $path
         }
@@ -51,16 +56,21 @@ proc find_lang_frontends { filter } {
 }
 
 proc runmytest { test_name command_line exp_output} {
-    send_user "starting $command_line\n"
 
     # NOTE: this is ugly. If the exp_output is not set, put an unfindable string in it.
-    set unfindable_string "adhadkhaslkdLKHLKHads^*&^876"
+    set unfindable_string "adhadkhaslkdLKHLKHads876"
 
     if { [string length $exp_output] == 0 } {
         set exp_output $unfindable_string
     }
 
-    set PID [ eval spawn $command_line ]
+    global wine
+
+    set starter "$wine $command_line"
+
+    send_user "starting $starter\n"
+
+    set PID [ eval spawn $starter ]
 
     set expected false
     match_max 1000000
@@ -68,6 +78,7 @@ proc runmytest { test_name command_line exp_output} {
 
         # expected last line when execution succeeds
         "writing output took" {
+            exec sync
             pass "Program finished\n"
         }
 
@@ -82,67 +93,78 @@ proc runmytest { test_name command_line exp_output} {
 
         "Zobrist and treedbs is not implemented" {
             xfail "The combination of zobrist and treedbs is not implemented";
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
 	    
         "unimplemented combination --strategy=bfs, --state=table" {
-    	    xfail "unimplemented combination --strategy=bfs, --state=table";
-    	    catch { exp_close }
-    	    return
+            xfail "unimplemented combination --strategy=bfs, --state=table";
+            catch { close }
+            wait
+            return
 	    }
 
         "Decision diagram package does not support least fixpoint" {
-    	    xfail "Decision diagram package does not support least fixpoint";
-    	    catch { exp_close }
-    	    return
+            xfail "Decision diagram package does not support least fixpoint";
+            catch { close }
+            wait
+            return
         }
         
         "SCC search only works in combination with an accepting state label" {
             xfail "SCC search only works in combination with an accepting state label";
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "BCG support was not enabled at compile time." {
             xfail "BCG support was not enabled at compile time."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "cannot write state labels to AUT file" {
             xfail "cannot write state labels to AUT file"
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "Vector set implementation does not support vset_join operation." {
             xfail "Vector set implementation does not support vset_join operation."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "guard-splitting not supported with saturation=" {
             xfail "guard-splitting not supported with saturation="
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "No long next-state function implemented for this language module (--pins-guards)." {
             xfail "No long next-state function implemented for this language module (--pins-guards)."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "Cannot apply branching bisimulation to an LTS with state labels." {
             xfail "Cannot apply branching bisimulation to an LTS with state labels."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
         "Cleary tree not supported in combination with error trails or the MCNDFS algorithms." {
             xfail "Cleary tree not supported in combination with error trails or the MCNDFS algorithms."
-            catch { exp_close }
+            catch { close }
+            wait
             return
         }
         
@@ -156,17 +178,14 @@ proc runmytest { test_name command_line exp_output} {
             fail "$test_name: error: $expect_out(buffer)"
         }
 
-        "error" {
-            fail "An error message was encountered in the application output.";
-        }
-
         timeout {
             fail "Program takes to long to execute"
             exec kill -9 $PID
             return
         }
 
-        $exp_output {
+        -re $exp_output {
+            exec sync
             pass "Expected output $exp_output found"
         }
 	    
@@ -183,8 +202,8 @@ proc runmytest { test_name command_line exp_output} {
         }
 
     }
-    catch { exp_close }
-    set result [exp_wait]
+    catch { close }
+    set result [wait]
     set exit_code [lindex $result 3]
 
     #puts "DEBUG: exit_code: $exit_code"
@@ -207,7 +226,7 @@ set binpaths(spins-jar) "$LTSMIN_SRCDIR/spins/spins.jar"
 set binpaths(ltsmin-compare) "$base_dir/../src/ltsmin-compare/ltsmin-compare"
 set binpaths(ltsmin-convert) "$base_dir/../src/ltsmin-convert/ltsmin-convert"
 set binpaths(ltsmin-printtrace) "$base_dir/../src/ltsmin-printtrace/ltsmin-printtrace"
-set binpaths(spins) "$base_dir/../src/scripts/spins"
+set binpaths(spins) "$LTSMIN_SRCDIR/src/scripts/spins"
 set binpaths(out) "out"
 
 set bins [find_alg_backends "{seq,mc,dist,sym}"]
@@ -218,7 +237,7 @@ foreach path $bins {
 
 proc compile_promela { prom_models } {
     global binpaths
-    global EXAMPLES_PATH
+    global EXAMPLES_SRC_PATH
 
     if { ! [file exists "$binpaths(spins-jar)" ] } {
 	 fail "Cannot find spins binary in $binpaths(spins-jar)"
@@ -226,13 +245,50 @@ proc compile_promela { prom_models } {
     }
 
     foreach prom_model $prom_models {
-        set commands {"$binpaths(spins) $EXAMPLES_PATH/$prom_model"}
-# "mv $prom_model.spins $EXAMPLES_PATH/"
-        foreach command $commands {
-            puts [subst "Executing precommand: '$command'"]
-            eval exec $command
+        puts "Executing precommand: '$binpaths(spins) $EXAMPLES_SRC_PATH/$prom_model'"
+        set rc [catch { exec $binpaths(spins) -o $EXAMPLES_SRC_PATH/$prom_model } msg opt ]
+
+        # check for exit code, and whether there is output on stderr
+        if { $rc != 0 } {
+            set errc [dict get $opt "-errorcode"]
+            if { $errc != "NONE" } {
+                fail "Failed executing precommand"
+                puts "this is what I got on stderr: $msg"
+                exit 1
+            }
         }
     }
     return true
 }
 
+proc compile_DVE { DVE_models } {
+    global EXAMPLES_SRC_PATH
+
+    foreach DVE_model $DVE_models {
+        puts "Executing precommand: 'divine compile -l $EXAMPLES_SRC_PATH/$DVE_model'"
+        set rc [catch { exec divine compile -l $EXAMPLES_SRC_PATH/$DVE_model } msg opt ]
+
+        # check for exit code, and whether there is output on stderr
+        if { $rc != 0 } {
+            set errc [dict get $opt "-errorcode"]
+            if { $errc != "NONE" } {
+                fail "Failed executing precommand"
+                puts "this is what I got on stderr: $msg"
+                exit 1
+            }
+        }
+    }
+    return true
+}
+
+proc start_ProB { model } {
+    global EXAMPLES_SRC_PATH
+
+    puts "Executing precommand: 'probcli $EXAMPLES_SRC_PATH/$model -ltsmin'"
+    set PID [exec probcli $EXAMPLES_SRC_PATH/$model -ltsmin &]
+
+    while { ! [file exists /tmp/ltsmin.probz] } {
+        sleep 1
+    }
+    return $PID
+}

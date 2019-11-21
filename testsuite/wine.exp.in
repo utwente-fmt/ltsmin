@@ -1,0 +1,6 @@
+set wine "@WINE@"
+set exeext "@EXEEXT@"
+set test_sylvan "@TEST_SYLVAN@"
+set test_promela "@TEST_PROMELA@"
+set test_dve "@TEST_DVE@"
+set test_lps "@TEST_LPS@"

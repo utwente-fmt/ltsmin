@@ -50,7 +50,7 @@ static void write_init(lts_file_t file,int seg,void* state){
         DSwriteU32(file->init,*((uint32_t*)state));
         break;
     case SegVector:
-        DSwriteS32(file->init,seg);
+        DSwriteS32(file->init,seg); // fall through
     case Vector:
         {
             lts_type_t ltstype=lts_file_get_type(file);
@@ -125,7 +125,7 @@ static void write_begin(lts_file_t file){
         }
         break;
     case SegVector:
-        write_seg=1;
+        write_seg=1; // fall through
     case Vector:
         if (NV==0) Abort("vector mode unusable if vector undefined");
         file->src_vec=(struct_stream_t*)RTmallocZero(segments*sizeof(struct_stream_t));
@@ -158,7 +158,7 @@ static void write_begin(lts_file_t file){
         }
         break;
     case SegVector:
-        write_seg=1;
+        write_seg=1; // fall through
     case Vector:
         if (NV==0) Abort("vector mode unusable if vector undefined");
         file->dst_vec=(struct_stream_t*)RTmallocZero(segments*sizeof(struct_stream_t));
@@ -196,33 +196,42 @@ static void write_chunk_tables(lts_file_t file){
         value_table_t values=lts_file_get_table(file,i);
         switch(lts_type_get_format(ltstype,i)){
         case LTStypeDirect:
-            if (values && VTgetCount(values)!=0) {
-                Print(error,"direct type %s has table",type_name);
-            }
-            break;
         case LTStypeRange:
-            if (values) {
-                Print(error,"ranged type %s has table",type_name);
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
+            if (values && VTgetCount(values)!=0) {
+                Print(lerror,"non-chunk type %s has table",type_name);
             }
             break;
         case LTStypeChunk:
         case LTStypeEnum:
             if (values==NULL || VTgetCount(values)==0) {
-                Print(error,"table for type %s is missing or empty",type_name);
-                Print(error,"change format for %s to direct",type_name);
+                Print(lerror,"table for type %s is missing or empty",type_name);
+                Print(lerror,"change format for %s to direct",type_name);
                 lts_type_set_format(ltstype,i,LTStypeDirect);
             } else {
                 char stream_name[1024];
                 sprintf(stream_name,"CT-%d",i);
                 ds=arch_write(file->archive,stream_name);
-                int element_count=VTgetCount(values);
+                int element_count = VTgetCount(values);
                 Warning(debug,"type %d has %d elements",i,element_count);
-                for(int j=0;j<element_count;j++){
-                    chunk c=VTgetChunk(values,j);
-                    DSwriteVL(ds,c.len);
-                    DSwrite(ds,c.data,c.len);
+
+                int last_idx = 0;
+                table_iterator_t it = VTiterator (values);
+                while (IThasNext(it)) {
+                    chunk c = ITnext (it);
+                    int idx = VTputChunk (values, c);
+                    while (last_idx < idx) { // fill non-dense indices
+                        DSwriteVL (ds, 0);
+                        DSwrite (ds, "", 0);
+                        last_idx++;
+                    }
+                    DSwriteVL (ds, c.len);
+                    DSwrite (ds, c.data, c.len);
+                    last_idx++;
                 }
-                DSclose(&ds);
+                DSclose (&ds);
             }
             break;
         }
@@ -336,6 +345,9 @@ static void write_header(lts_file_t file){
         switch(lts_type_get_format(ltstype,i)){
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             DSwriteU32(fs,0);
             break;
         case LTStypeChunk:

@@ -19,8 +19,6 @@ int              all_red = 1;
 struct poptOption ndfs_options[] = {
     {"nar", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &all_red, 0,
      "turn off red coloring in the blue search (NNDFS/MCNDFS)", NULL},
-    {"no-ecd", 0, POPT_ARG_VAL | POPT_ARGFLAG_DOC_HIDDEN, &ecd, 0,
-     "turn off early cycle detection (NNDFS/MCNDFS)", NULL},
     POPT_TABLEEND
 };
 
@@ -32,6 +30,7 @@ add_results (counter_t *res, counter_t *cnt)
     res->waits += cnt->waits;
     res->bogus_red += cnt->bogus_red;
     res->exit += cnt->exit;
+    res->ignoring += cnt->ignoring;
 }
 
 static void
@@ -47,7 +46,7 @@ ndfs_red_handle (void *arg, state_info_t *successor, transition_info_t *ti,
         return; // only revisit blue states to determinize POR
     if ( nn_color_eq(color, NNCYAN) ) {
         /* Found cycle back to the stack */
-        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+        ndfs_report_cycle (ctx, ctx->model, loc->stack, successor);
     } else if ( nn_color_eq(color, NNBLUE) && (loc->strat != Strat_LNDFS ||
             !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits)) ) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
@@ -71,10 +70,10 @@ ndfs_blue_handle (void *arg, state_info_t *successor, transition_info_t *ti,
      * on the stack here, in order to calculate all-red correctly later.
      */
     if ( ecd && nn_color_eq(color, NNCYAN) &&
-            (GBbuchiIsAccepting(ctx->model, state_info_state(ctx->state)) ||
-             GBbuchiIsAccepting(ctx->model, state_info_state(successor))) ) {
+            (pins_state_is_accepting(ctx->model, state_info_state(ctx->state)) ||
+             pins_state_is_accepting(ctx->model, state_info_state(successor))) ) {
         /* Found cycle in blue search */
-        ndfs_report_cycle (ctx->run, ctx->model, loc->stack, successor);
+        ndfs_report_cycle (ctx, ctx->model, loc->stack, successor);
     } else if ((loc->strat == Strat_LNDFS && !state_store_has_color(ctx->state->ref, GRED, loc->rec_bits)) ||
                (loc->strat != Strat_LNDFS && !nn_color_eq(color, NNPINK))) {
         raw_data_t stack_loc = dfs_stack_push (loc->stack, NULL);
@@ -91,16 +90,19 @@ ndfs_explore_state_red (wctx_t *ctx)
     dfs_stack_enter (loc->stack);
     increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, ctx->state, ndfs_red_handle, ctx);
+    check_counter_example (ctx, loc->stack, true);
     run_maybe_report (ctx->run, cnt, "[Red ] ");
 }
 
 void
 ndfs_explore_state_blue (wctx_t *ctx)
 {
+    alg_local_t        *loc = ctx->local;
     work_counter_t     *cnt = ctx->counters;
-    dfs_stack_enter (ctx->local->stack);
+    dfs_stack_enter (loc->stack);
     increase_level (cnt);
     cnt->trans += permute_trans (ctx->permute, ctx->state, ndfs_blue_handle, ctx);
+    check_counter_example (ctx, loc->stack, true);
     cnt->explored++;
     run_maybe_report (ctx->run, cnt, "[Blue] ");
 }
@@ -111,7 +113,7 @@ ndfs_red (wctx_t *ctx, ref_t seed)
 {
     alg_local_t        *loc = ctx->local;
     loc->counters.accepting++; //count accepting states
-    ndfs_explore_state_red (ctx);
+    //ndfs_explore_state_red (ctx);
     while ( !run_is_stopped(ctx->run) ) {
         raw_data_t          state_data = dfs_stack_top (loc->stack);
         if (NULL != state_data) {
@@ -165,8 +167,14 @@ ndfs_blue (run_t *run, wctx_t *ctx)
                 dfs_stack_pop (loc->stack);
             }
         } else { //backtrack
-            if (0 == dfs_stack_nframes (loc->stack))
+            if (0 == dfs_stack_nframes (loc->stack)) {
+                if (global->exit_status == LTSMIN_EXIT_SUCCESS && ctx->id == 0) {
+                    Warning(info," ");
+                    Warning(info,"Empty product with LTL!");
+                    Warning(info," ");
+                }
                 return;
+            }
             dfs_stack_leave (loc->stack);
             ctx->counters->level_cur--;
             state_data = dfs_stack_top (loc->stack);
@@ -175,9 +183,9 @@ ndfs_blue (run_t *run, wctx_t *ctx)
                 /* exit if backtrack hits seed, leave stack the way it was */
                 nn_set_color (&loc->color_map, loc->seed->ref, NNPINK);
                 loc->counters.allred++;
-                if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) )
+                if ( pins_state_is_accepting(ctx->model, state_info_state(loc->seed)) )
                     loc->counters.accepting++;
-            } else if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) ) {
+            } else if ( pins_state_is_accepting(ctx->model, state_info_state(loc->seed)) ) {
                 /* call red DFS for accepting states */
                 ndfs_red (ctx, loc->seed->ref);
                 nn_set_color (&loc->color_map, loc->seed->ref, NNPINK);
@@ -195,19 +203,21 @@ void
 ndfs_local_init   (run_t *run, wctx_t *ctx)
 {
     ctx->local = RTmallocZero (sizeof(alg_local_t));
+
     ndfs_local_setup (run, ctx);
+
+    size_t              local_bits = 2;
+    alg_local_t        *loc = ctx->local;
+    bitvector_create (&loc->color_map, local_bits<<dbs_size);
 }
 
 void
 ndfs_local_setup   (run_t *run, wctx_t *ctx)
 {
     alg_local_t        *loc = ctx->local;
-    size_t              local_bits = 2;
-    int res = bitvector_create (&loc->color_map, local_bits<<dbs_size);
-    HREassert (res != -1, "Failure to allocate a color_map bitvector.");
-    if (all_red)
-        res = bitvector_create (&loc->stackbits, MAX_STACK);
-    HREassert (res != -1, "Failure to allocate a all_red bitvector.");
+    if (all_red) {
+        bitvector_create (&loc->stackbits, MAX_STACK);
+    }
     loc->rec_bits = 0;
     loc->strat = get_strategy (run->alg);
     loc->seed = state_info_create ();
@@ -232,11 +242,11 @@ ndfs_local_deinit   (run_t *run, wctx_t *ctx)
 }
 
 int
-ndfs_state_seen (void *ptr, ref_t ref, int seen)
+ndfs_state_seen (void *ptr, transition_info_t *ti, ref_t ref, int seen)
 {
     wctx_t             *ctx = (wctx_t *) ptr;
-    return nn_color_eq(nn_get_color(&ctx->local->color_map, ref), NNWHITE);
-    (void) seen;
+    return !nn_color_eq(nn_get_color(&ctx->local->color_map, ref), NNWHITE);
+    (void) seen; (void) ti;
 }
 
 void
@@ -273,6 +283,9 @@ ndfs_print_state_stats (run_t* run, wctx_t* ctx, int index, float waittime)
                    "transitions: %zu, waits: %zu (%.2f sec)",
             rexplored, ((double)rexplored/db_elts)*100, bogus,
             ((double)bogus/db_elts), rtrans, waits, waittime);
+    if (PINS_POR != 0 && proviso == Proviso_CNDFS) {
+        Warning (infoLong, "Ignoring states: %zu", run->reduced->blue.ignoring);
+    }
 
     if ( all_red )
         Warning (info, "all-red states: %zu (%.2f%%), bogus %zu (%.2f%%)",

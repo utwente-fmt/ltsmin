@@ -1,16 +1,7 @@
-HRE_LIB = ../../hre/libhre.la
-DIST_CPPFLAGS = $(AM_CPPFLAGS)
-PINS_LIBS  =
-PINS_LIBS += ../../lts-io/liblts-io.la
-PINS_LIBS += ../../hre-io/libhre-io.la
-PINS_LIBS += $(HRE_LIB)
-PINS_LIBS += ../../pins-lib/libpins.la
-PINS_LIBS += ../../ltsmin-lib/libltsmin.la
-PINS_LIBS += ../../util-lib/libutil.la
-PINS_LIBS += ../../dm/libdm.la
-MC_LIBS = ../../mc-lib/libmc.la $(PINS_LIBS)
-
 noinst_LTLIBRARIES = libparallel.la
+
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
 
 libparallel_la_SOURCES  = color.c
 libparallel_la_SOURCES += color.h
@@ -33,5 +24,5 @@ libparallel_la_SOURCES += stream-serializer.h
 libparallel_la_SOURCES += worker.h
 libparallel_la_SOURCES += worker.c
 
-libparallel_la_CPPFLAGS = $(AM_CPPFLAGS)
 libparallel_la_LIBADD   = $(MC_LIBS)
+libparallel_la_LIBADD  += $(top_builddir)/lib/libgnu.la

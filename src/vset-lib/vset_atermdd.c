@@ -214,7 +214,7 @@ static long count_set_t2(ATerm set){
 }
 
 static void
-set_count_t(ATerm set, long *nodes, bn_int_t *elements)
+set_count_t(ATerm set, long *nodes, double *elements)
 {
   long idx;
 
@@ -230,7 +230,7 @@ set_count_t(ATerm set, long *nodes, bn_int_t *elements)
   assert(idx<elem_size);
   bn_set_digit(&elem_count[idx],1);
   idx=count_set_t2(set);
-  if (elements != NULL) bn_init_copy(elements,&elem_count[idx]);
+  if (elements != NULL) *elements = bn_int2double(&elem_count[idx]);
   ATindexedSetDestroy(count_is);
   for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
   RTfree(elem_count);
@@ -241,11 +241,11 @@ set_count_t(ATerm set, long *nodes, bn_int_t *elements)
   if (nodes != NULL) *nodes=node_count;
 }
 
-static void set_count_tree(vset_t set,long *nodes,bn_int_t *elements){
+static void set_count_tree(vset_t set,long *nodes,double *elements){
   set_count_t(set->set,nodes,elements);
 }
 
-static void rel_count_tree(vrel_t rel,long *nodes,bn_int_t *elements){
+static void rel_count_tree(vrel_t rel,long *nodes,double *elements){
   set_count_t(rel->rel,nodes,elements);
 }
 
@@ -273,7 +273,7 @@ static long count_set_2(ATerm set){
 }
 
 static void
-count_set(ATerm set, long *nodes, bn_int_t *elements)
+count_set(ATerm set, long *nodes, double *elements)
 {
   long idx;
 
@@ -289,7 +289,7 @@ count_set(ATerm set, long *nodes, bn_int_t *elements)
   assert(idx<elem_size);
   bn_set_digit(&elem_count[idx],1);
   idx=count_set_2(set);
-  bn_init_copy(elements,&elem_count[idx]);
+  if (elements != NULL) *elements = bn_int2double(&elem_count[idx]);
   ATindexedSetDestroy(count_is);
   for(int i=0;i<elem_size;i++) bn_clear(&elem_count[i]);
   RTfree(elem_count);
@@ -300,11 +300,11 @@ count_set(ATerm set, long *nodes, bn_int_t *elements)
   *nodes=node_count;
 }
 
-static void set_count_list(vset_t set,long *nodes,bn_int_t *elements){
+static void set_count_list(vset_t set,long *nodes,double *elements){
   count_set(set->set,nodes,elements);
 }
 
-static void rel_count_list(vrel_t rel,long *nodes,bn_int_t *elements){
+static void rel_count_list(vrel_t rel,long *nodes,double *elements){
   count_set(rel->rel,nodes,elements);
 }
 

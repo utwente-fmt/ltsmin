@@ -76,13 +76,15 @@ typedef struct cndfs_alg_local_s {
     dfs_stack_t         out_stack;
     rt_timer_t          timer;
     alg_local_t        *rec;
-    fset_t             *fset;
+    fset_t             *pink;
     cndfs_successors_t  successors;
+    size_t              accepting_depth;
 } cndfs_alg_local_t;
 
 typedef struct cndfs_reduced_s {
     alg_reduced_t       ndfs;
     size_t              rec;
+    size_t              max_load;
     float               waittime;
 } cndfs_reduced_t;
 
@@ -100,5 +102,7 @@ extern void cndfs_print_stats   (run_t *run, wctx_t *ctx);
 extern void cndfs_reduce        (run_t *run, wctx_t *ctx);
 
 extern void cndfs_local_setup   (run_t *run, wctx_t *ctx);
+
+extern void cndfs_local_deinit   (run_t *run, wctx_t *ctx);
 
 #endif // CNDFS_H

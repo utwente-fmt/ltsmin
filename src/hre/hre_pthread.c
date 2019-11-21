@@ -7,9 +7,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#ifdef __APPLE__
-#define _DARWIN_C_SOURCE
-#endif
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -19,6 +16,13 @@
 
 
 #include <hre/provider.h>
+
+#ifndef SIGKILL
+# define SIGKILL (-1)
+#endif
+#ifndef SIGSTOP
+# define SIGSTOP (-1)
+#endif
 
 /**
  * For pthreads we only use a small shared region for the queues.
@@ -197,9 +201,10 @@ static void* thread_main(void*arg){
 }
 
 void hre_thread_exit(hre_context_t ctx, int code){
-    (void)ctx;(void)code;
-    Debug("thread exit");
-    pthread_exit(NULL);
+    (void) ctx;
+    Debug("thread exit(%d)", code);
+    intptr_t c = code;
+    pthread_exit ((void *) c);
     exit(code); // avoid warning in cygwin
 }
 
@@ -275,7 +280,7 @@ set_thread_stack_size()
     if (pthread_attr_init(&attr)){
         AbortCall("pthread_attr_init");
     }
-    size_t stack_size=32 * 1024 * 1024;
+    size_t stack_size = 128 * 1024 * 1024;
     if (pthread_attr_setstacksize(&attr, stack_size)){
         AbortCall("pthread_attr_setstacksize to %zu",stack_size);
     }
@@ -285,10 +290,9 @@ set_thread_stack_size()
 void HREpthreadRun(int threads){
     pthread_t thr[threads];
     /* Caused huge performance regression in MC tool */
-    //pthread_attr_t attr;
-    //attr = set_thread_stack_size();
+    //pthread_attr_t attr = set_thread_stack_size();
     struct shared_area *shared = create_shared_region(PTHREAD_SHARED_SIZE*threads,false);
-    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
+    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free,area_free);
 
     struct message_queue *queues=HREmallocZero(region,threads*sizeof(struct message_queue));
     hre_context_t thr_ctx[threads];
@@ -316,32 +320,33 @@ void HREpthreadRun(int threads){
         }
     }
     Debug("waiting for threads");
+    int code = HRE_EXIT_SUCCESS;
     for(int i=0;i<threads;i++){
-        if (pthread_join(thr[i],NULL)) {
+        intptr_t c;
+        if (pthread_join(thr[i], (void **)&c)) {
             Abort("couldn't join with thread %d",i);
         }
+        if (c != HRE_EXIT_SUCCESS) code = c;
         Debug("joined with thread %d",i);
         //pthread_attr_destroy(attr+i);
     }
-    HREexit(HRE_EXIT_SUCCESS);
+    HREexit(code);
 }
-
-static void hre_process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
-static void hre_process_exit(hre_context_t ctx,int code){
-    (void)ctx;
-    exit(code);
-}
-
-static const char      *process_class="HRE multi-process";
 
 #define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
+#ifdef HAVE_SHM_OPEN
+
 static size_t           name_counter = 0;
+
+static const char      *process_class="HRE multi-process";
 
 void* hre_posix_shm_get(hre_context_t context,size_t size){
     Debug("Creating posix SHM");
     char                shm_name[LTSMIN_PATHNAME_MAX];
     shm_t               shm = { .ptr = 0, .id = 0 };
+
+    // The first worker sets up the shared memory
     if (HREme(context)==0){
         if (name_counter == 0) {
             struct timeval time;
@@ -368,7 +373,11 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
         }
         Debug("open shared memory %s at %p",shm_name,shm.ptr);
     }
+
+    // Share the data
     HREreduce(context,2,&shm,&shm,Pointer,Max);
+
+    // The other workers attempt to map the shared memory as well
     if (HREme(context)!=0) {
         snprintf(shm_name, LTSMIN_PATHNAME_MAX, "HREprocess%zu", shm.id);
         Debug("trying shared memory %s at %p", shm_name, shm.ptr);
@@ -383,9 +392,51 @@ void* hre_posix_shm_get(hre_context_t context,size_t size){
         }
         HREassert(tmp == shm.ptr, "OS did not respect MAP_FIXED");
     }
+
+    // Synchronize
     HREbarrier(context);
     shm_unlink(shm_name);
     return shm.ptr;
+}
+
+#else
+
+void* hre_posix_shm_get(hre_context_t context,size_t size){
+    (void) context; (void) size;
+    Abort("no shm");
+}
+
+#endif
+
+void* hre_privatefixedmem_get(hre_context_t context, size_t size){
+    Debug("Creating Private Memory at Fixed location");
+    void* fixedMemory = NULL;
+
+    // The first worker sets up the anonymous private memory
+    if (HREme(context)==0){
+        fixedMemory = mmap(NULL,size,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
+        if (fixedMemory == MAP_FAILED || fixedMemory == (void *)-1) {
+            AbortCall("mmap");
+        }
+        Debug("open private fixed memory at %p",fixedMemory);
+    }
+    
+    // Share the data
+    HREreduce(context, 1, &fixedMemory, &fixedMemory, Pointer, Max);
+
+    // The other workers attempt to map anoymous private memory to the same address
+    if (HREme(context)!=0) {
+        Debug("trying private fixed memory at %p", fixedMemory);
+        void* tmp = mmap(fixedMemory,size,PROT_READ|PROT_WRITE,MAP_FIXED|MAP_PRIVATE|MAP_ANON,-1,0);
+        if (tmp == MAP_FAILED || tmp == (void *)-1) {
+            AbortCall("mmap");
+        }
+        HREassert(tmp == fixedMemory, "OS did not respect MAP_FIXED");
+    }
+
+    // Synchronize
+    HREbarrier(context);
+    return fixedMemory;
 }
 
 
@@ -414,6 +465,7 @@ static void fork_popt(poptContext con,
         case POPT_CALLBACK_REASON_PRE:
         case POPT_CALLBACK_REASON_POST:
             Abort("unexpected call to hre_popt");
+            break;
         case POPT_CALLBACK_REASON_OPTION:
             if (!strcmp(opt->longName,"procs")){
                 if (arg) {
@@ -428,6 +480,14 @@ static void fork_popt(poptContext con,
             Abort("unimplemented option: %s",opt->longName);
             exit(HRE_EXIT_FAILURE);
     }
+}
+
+#ifdef HAVE_FORK
+
+static void hre_process_exit(hre_context_t ctx,int code) __attribute__ ((noreturn));
+static void hre_process_exit(hre_context_t ctx,int code){
+    (void)ctx;
+    exit(code);
 }
 
 static void
@@ -450,8 +510,8 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     for(int i=0;i<procs;i++) pid[i]=0;
 
     // this area is mmapped before the fork, so no shm_open is required
-    struct shared_area* shared = create_shared_region(RTmemSize()*4, true);
-    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free);
+    struct shared_area* shared = create_shared_region(RTmemSize()*16, true);
+    hre_region_t region=HREcreateRegion(shared,area_malloc,area_align,area_realloc,area_free,area_free);
 
     struct message_queue *queues=HREmallocZero(region,procs*sizeof(struct message_queue));
     for(int i=0;i<procs;i++){
@@ -462,7 +522,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     for(int i=0;i<procs;i++){
         pid[i]=fork();
         if (pid[i]==-1) {
-            PrintCall(error,"fork");
+            PrintCall(lerror,"fork");
             success=0;
             break;
         }
@@ -503,7 +563,7 @@ static void fork_start(int* argc,char **argv[],int run_threads){
         pid_t res=wait(&status);
         Debug("process %d received %d,%d (exit: %d, signal: %d)", res, WEXITSTATUS(status), status, WIFEXITED(status), WIFSIGNALED(status));
         if (res==-1 ) {
-            PrintCall(error,"wait");
+            PrintCall(lerror,"wait");
             success=0;
         } else {
             int i;
@@ -538,6 +598,15 @@ static void fork_start(int* argc,char **argv[],int run_threads){
     }
     (void)argc;(void)argv;
 }
+
+#else
+
+static void fork_start(int* argc,char **argv[],int run_threads){
+    (void) argc; (void) argv; (void) run_threads;
+    Abort("No multi process");
+}
+
+#endif
 
 void HREenableFork(int procs, bool selected){
     Debug("Enabling process runtime environment.");

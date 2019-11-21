@@ -11,6 +11,17 @@
         With 'sylvan', the parallel BDD package Sylvan is used.
         With 'lddmc', the parallel LDD package LDDmc is used.
         Defaults to first available type in the list.
+*vset-cache-diff*='diff'::
+        Influences the size of operations cache when counting precisely with bignums: 
+        cache size = floor((2log('nodes-to-count') + <diff>)^2). More precisely; LTSmin
+        will bitshift <diff> bits to the left or right on the number of nodes in the vector set,
+        depending on the signedness of <diff>. The default is *0*, meaning that if
+        the cache is full the number of bignums in memory will be equal to the number of nodes
+        in the vector set. The default value seems to work well, even when the number vectors
+        in the vector set is very large relative to the number of nodes. If the number of vectors
+        relative to the number of nodes is lower, <diff> may be decreased. The user may want to
+        set <diff> as low as possible (to save memory), while keeping the operations cache effective.
+        Bignums are not floating point numbers and may thus consume a lot of memory.
 
 include::listdd-options.txt[]
 

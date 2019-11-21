@@ -80,3 +80,18 @@ space.
         a guard evaluates to maybe there is another guard on the left which evaluates to false. For languages such as
         mCRL2 it also checks whether a guard on the right evaluates to false. If for all states this holds then the
         model specification is sound for guard-splitting.
+        
+*--precise*::
+        Compute the final number of states precisely.
+        
+*--next-union*::
+        If supported by the vset implementation; perform the computation of successor states simultaneously with unifying
+        the current states. Simultaneously, means with a single BDD/MDD operation.
+
+*--inv-par*::
+        Checks all invariants in parallel.
+        
+*--inv-bin-par*::
+        Checks both sides of a binary operand in parallel in an invariant, requires *--inv-par*.
+        Note that this option may actually slow down invariant checking, because parallelization
+        of a binary operand disables short-circuit evaluation. 

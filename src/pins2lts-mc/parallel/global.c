@@ -13,6 +13,7 @@
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/reach.h>
 #include <pins2lts-mc/algorithm/timed.h>
@@ -87,7 +88,7 @@ init_action_labels (model_t model)
                   LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         act_type = lts_type_get_edge_label_typeno (ltstype, act_label);
         chunk c = chunk_str(act_detect);
-        act_index = GBchunkPut (model, act_type, c);
+        act_index = pins_chunk_put  (model, act_type, c);
     }
 }
 
@@ -162,6 +163,8 @@ global_print  (model_t model)
         print_options (model);
         state_store_print (global->store);
     }
+
+    HREbarrier (HREglobal()); // just to ensure progress/summary printing is last
 }
 
 void
@@ -176,11 +179,11 @@ global_print_stats (model_t model, size_t local_state_infos, size_t stack)
 
     db_nodes = db_nodes == 0 ? db_elts : db_nodes;
     el_size = db_type & Tree ? (db_type == ClearyTree ? 1 : 2) : D + .5;
-    pagesDB = ((double)(1UL << dbs_size) * SLOT_SIZE * el_size) / (1UL<<20);
-    memC = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1UL<<20);
+    pagesDB = ((double)(1ULL << dbs_size) * SLOT_SIZE * el_size) / (1ULL<<20);
+    memC = ((double)(((((size_t)local_bits)<<dbs_size))/8*W)) / (1ULL<<20);
     memDBB = db_elts * SLOT_SIZE * (D + .5); // D slots + 16bit memoized hash
-    memDB = memDBB / (1UL<<20);
-    fill = (double)((db_elts * 100) / (1UL << dbs_size));
+    memDB = memDBB / (1ULL<<20);
+    fill = (double)((db_elts * 100) / (1ULL << dbs_size));
 
     // print additional local queue/stack memory statistics
     Warning (info, " ");
@@ -192,12 +195,12 @@ global_print_stats (model_t model, size_t local_state_infos, size_t stack)
         size_t          db_leaves = db_nodes - db_elts;
         memTB = db_elts * SLOT_SIZE * (db_type == ClearyTree ? 1 : 2);
         memTB += db_leaves * SLOT_SIZE * 2.0;
-        memT = memTB / (1UL<<20);
+        memT = memTB / (1ULL<<20);
         compr = (memTB / memDBB) * 100;
 
         Warning (info, "Tree memory: %.1fMB, %.1f B/state, compr.: %.1f%%",
                  memT, memTB / db_elts, compr);
-        leaves = (double)((db_leaves * 100) / (1UL << (dbs_size - ratio)));
+        leaves = (double)((db_leaves * 100) / (1ULL << (dbs_size - ratio)));
         Warning (info, "Tree fill ratio (roots/leafs): %.1f%%/%.1f%%", fill, leaves);
 
         memDB = memT;
@@ -205,6 +208,8 @@ global_print_stats (model_t model, size_t local_state_infos, size_t stack)
     } else {
         Warning (info, "Table memory: %.1fMB, fill ratio: %.1f%%", memDB, fill);
     }
+    if (PINS_POR_ALG == POR_LIPTON || PINS_POR_ALG == POR_TR)
+        por_stats (model);
     double chunks = cct_print_stats (info, infoLong, GBgetLTStype(model),
                                      global->tables) / (1<<20);
     Warning (info, "Est. total memory use: %.1fMB (~%.1fMB paged-in)",

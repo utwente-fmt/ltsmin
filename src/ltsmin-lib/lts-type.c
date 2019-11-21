@@ -41,7 +41,7 @@ void lts_type_set_range(lts_type_t  t,int typeno,int min,int max){
     t->type_max[typeno]=max;
 }
 
-static const char* data_format_string(lts_type_t  t,int typeno){
+const char* data_format_string(lts_type_t  t,int typeno){
     switch(t->type_format[typeno]){
     case LTStypeDirect: return "direct";
     case LTStypeRange: {
@@ -51,16 +51,22 @@ static const char* data_format_string(lts_type_t  t,int typeno){
     }
     case LTStypeChunk: return "chunk";
     case LTStypeEnum: return "enum";
+    case LTStypeBool: return "Boolean";
+    case LTStypeTrilean: return "trilean";
+    case LTStypeSInt32: return "Signed 32-bit integer";
     }
     Abort("illegal format value: %d",t->type_format[typeno]);
 }
 
-static const char* data_format_string_generic(data_format_t format){
+const char* data_format_string_generic(data_format_t format){
     switch(format){
     case LTStypeDirect: return "direct";
     case LTStypeRange: return "[.,.]";
     case LTStypeChunk: return "chunk";
     case LTStypeEnum: return "enum";
+    case LTStypeBool: return "Boolean";
+    case LTStypeTrilean: return "trilean";
+    case LTStypeSInt32: return "Signed 32-bit integer";
     }
     Abort("illegal format value: %d",format);
 }
@@ -435,6 +441,9 @@ void lts_type_validate(lts_type_t t){
         }
         case LTStypeChunk: continue;
         case LTStypeEnum: continue;
+        case LTStypeBool: continue;
+        case LTStypeTrilean: continue;
+        case LTStypeSInt32: continue;
         }
         Abort("illegal format value: %d",t->type_format[i]);        
     }

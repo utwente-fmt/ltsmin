@@ -46,7 +46,7 @@ typedef struct local_s {
     size_t              id;
     size_t              next_store;
     lm_store_t         *table;
-} __attribute__ ((aligned(1UL<<CACHE_LINE))) local_t;
+} __attribute__ ((aligned(1ULL<<CACHE_LINE))) local_t;
 
 struct lm_s {
     size_t              size;
@@ -251,7 +251,7 @@ lm_loc_t
 lm_insert_from_cas (lm_t *map, ref_t k, lattice_t l,
                     lm_status_t status, lm_loc_t *start)
 {
-    HREassert (l < 1UL << LATTICE_BITS, "Lattice pointer does not fit in store!");
+    HREassert (l < 1ULL << LATTICE_BITS, "Lattice pointer does not fit in store!");
     HREassert (k < map->size, "Lattice map size does not match |ref_t|.");
     lm_loc_t loc = NULL == start ?  (lm_loc_t)&map->table[k] : *start;
     lm_store_t store = lm_get_store (loc);
@@ -299,7 +299,7 @@ lm_loc_t
 lm_insert_from (lm_t *map, ref_t k, lattice_t l,
                 lm_status_t status, lm_loc_t *start)
 {
-    HREassert (l < 1UL << LATTICE_BITS, "Lattice pointer does not fit in store!");
+    HREassert (l < 1ULL << LATTICE_BITS, "Lattice pointer does not fit in store!");
     HREassert (k < map->size, "Lattice map size does not match |ref_t|.");
     lm_loc_t loc = NULL == start ?  (lm_loc_t)&map->table[k] : *start;
     lm_store_t store = lm_get_store (loc);
@@ -373,7 +373,7 @@ void
 lm_set_status (lm_t *map, lm_loc_t location, lm_status_t status)
 {
     location = follow (location);
-    HREassert (status < (1UL << 3), "Only 3 status bits are reserved.");
+    HREassert (status < (1ULL << 3), "Only 3 status bits are reserved.");
     lm_store_t store = lm_get_store (location);
     switch (store.internal) {
     case LM_STATUS_LATTICE:
@@ -485,10 +485,10 @@ lm_create (size_t workers, size_t size, size_t block_size)
 void
 lm_free (lm_t *map)
 {
-    RTfree (map->table);
+    RTalignedFree (map->table);
     for (size_t i = 0; i < map->workers; i++)
-        if (NULL != map->locals[i]) RTfree (map->locals[i]);
-    RTfree (map);
+        if (NULL != map->locals[i]) RTalignedFree (map->locals[i]);
+    RTalignedFree (map);
 }
 
 size_t

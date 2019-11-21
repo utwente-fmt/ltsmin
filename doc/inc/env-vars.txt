@@ -1,0 +1,15 @@
+== Environment Variables
+LTSmin supports the following list of environment variables.
+
+.Environment Variables:
+[options="header"]
+|==========================================================================
+|Name|Unit|Description
+|LTSMIN_MEM_SIZE|bytes|Sets the amount of system memory to the given value.
+|LTSMIN_NUM_CPUS|constant|Sets the amount of CPUs to the given value.
+|==========================================================================
+
+The variables *LTSMIN_MEM_SIZE*, and *LTSMIN_NUM_CPUS* are particularly
+relevant when neither *sysconf(3)* nor *cgroups(7)* is able to properly detect
+these limits, e.g. when LTSmin runs on Travis CI in a docker container.
+

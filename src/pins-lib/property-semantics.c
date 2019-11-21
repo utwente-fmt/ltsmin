@@ -8,206 +8,266 @@
 
 #include <stdbool.h>
 
+#include <ltsmin-lib/ltsmin-type-system.h>
 #include <pins-lib/property-semantics.h>
 #include <pins-lib/pins-util.h>
+#include <pins-lib/por/pins2pins-por.h>
 
-/**
- * Enums need their values to be present in the tables, hence the strict lookup.
- */
-static void
-lookup_type_value (ltsmin_expr_t e, int type, const chunk c,
-                   model_t m, bool strict)
+#define ENUM_VALUE_NOT_FOUND\
+    "Value '%s' cannot be found in table for enum type \"%s\"."
+
+#define ENUM_VALUE_NOT_FOUND_HINT\
+    "To change this error into a warning use option --allow-undefined-values"
+
+#define GROUP_NOT_FOUND\
+    "There is no group that can produce edge '%s'"
+
+#define GROUP_NOT_FOUND_HINT\
+    "To change this error into a warning use option --allow-undefined-edges"
+
+void set_pins_semantics(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env, bitvector_t *deps, bitvector_t *sl_deps)
 {
-    HREassert (NULL != c.data, "Empty chunk");
-    int count = GBchunkCount(m,type);
-    e->num = GBchunkPut(m,type,c);
-    if (strict && count != GBchunkCount(m,type)) // value was added
-        Warning (info, "Value for identifier '%s' cannot be found in table for enum type '%s'.",
-                 c.data, lts_type_get_type(GBgetLTStype(m),type));
-    e->lts_type = type;
-}
+    const lts_type_t lts_type = GBgetLTStype(model);
 
-static void
-ltsmin_expr_lookup_value(ltsmin_expr_t top, ltsmin_expr_t e, int typeno,
-                         ltsmin_parse_env_t env, model_t model)
-{
-    switch(e->node_type) {
-    case VAR:
-    case CHUNK:
-    case INT:
-        break;
-    default:
-        return;
-    }
-    chunk c;
-    data_format_t format = lts_type_get_format(GBgetLTStype(model), typeno);
-    switch (format) {
-    case LTStypeDirect:
-    case LTStypeRange:
-        if (INT != e->node_type)
-            Abort ("Expected an integer value for comparison: %s", LTSminPrintExpr(top, env));
-        break;
-    case LTStypeEnum:
-    case LTStypeChunk:
-        c.data = env->buffer;
-        c.len = LTSminSPrintExpr(c.data, e, env);
-        HREassert (c.len < ENV_BUFFER_SIZE, "Buffer overflow in print expression");
-        lookup_type_value (e, typeno, c, model, format==LTStypeEnum);
-        Debug ("Bound '%s' to %d in table for type '%s'", c.data,
-               e->num, lts_type_get_state_type(GBgetLTStype(model),typeno));
-        break;
-    }
-}
-
-/* looks up the type values in expressions, e.g.: "init.a == Off" (Off = 2) */
-/* avoid rebuilding the whole tree, by storing extra info for the chunks */
-static int
-ltsmin_expr_lookup_values(ltsmin_expr_t ltl,ltsmin_parse_env_t env,model_t model)
-{ //return type(SVAR) idx or -1
-    if (!ltl) return -1;
-    int left, right;
-    switch(ltl->node_type) {
-    case BINARY_OP:
-        left = ltsmin_expr_lookup_values(ltl->arg1, env, model);
-        right = ltsmin_expr_lookup_values(ltl->arg2, env, model);
-        switch(ltl->token) {
-        case PRED_EQ:
-            if (left >= 0) { // type(SVAR)
-                ltsmin_expr_lookup_value (ltl, ltl->arg2, left, env, model);
-            } else if (right >= 0) { // type(SVAR)
-                ltsmin_expr_lookup_value (ltl, ltl->arg1, right, env, model);
-            }
+    switch (e->node_type) {
+        case BINARY_OP: {
+            set_pins_semantics(model, e->arg1, env, deps, sl_deps);
+            set_pins_semantics(model, e->arg2, env, deps, sl_deps);
+            break;
         }
-        return -1;
-    case UNARY_OP:
-        ltsmin_expr_lookup_values(ltl->arg1, env, model);
-        return -1;
-    default:
-        switch(ltl->token) {
+        case UNARY_OP: {
+            set_pins_semantics(model, e->arg1, env, deps, sl_deps);
+            break;
+        }
         case SVAR: {
-            lts_type_t ltstype = GBgetLTStype (model);
-            int N = lts_type_get_state_length (ltstype);
-            if (ltl->idx < N)
-                return lts_type_get_state_typeno (ltstype, ltl->idx);
-            else
-                return lts_type_get_state_label_typeno (ltstype, ltl->idx - N);
-        }
-        default:
-            return -1;
-        }
-    }
-}
-
-/**
- * Parses file using parser
- * Chunk values are looked up in PINS.
- */
-ltsmin_expr_t
-parse_file_env(const char *file, parse_f parser, model_t model,
-               ltsmin_parse_env_t env)
-{
-    lts_type_t ltstype = GBgetLTStype(model);
-    ltsmin_expr_t expr = parser(file, env, ltstype);
-    ltsmin_expr_lookup_values(expr, env, model);
-    env->expr = NULL;
-    return expr;
-}
-
-ltsmin_expr_t
-parse_file(const char *file, parse_f parser, model_t model)
-{
-    ltsmin_parse_env_t env = LTSminParseEnvCreate();
-    ltsmin_expr_t expr = parse_file_env(file, parser, model, env);
-    LTSminParseEnvDestroy(env);
-    return expr;
-}
-
-void
-mark_predicate (model_t m, ltsmin_expr_t e, int *dep, ltsmin_parse_env_t env)
-{
-    if (!e) return;
-    switch(e->node_type) {
-    case BINARY_OP:
-        mark_predicate(m,e->arg1,dep,env);
-        mark_predicate(m,e->arg2,dep,env);
-        break;
-    case UNARY_OP:
-        mark_predicate(m,e->arg1,dep,env);
-        break;
-    default:
-        switch(e->token) {
-        case PRED_TRUE:
-        case PRED_FALSE:
-        case PRED_NUM:
-        case PRED_VAR:
-        case PRED_CHUNK:
-            break;
-        case PRED_EQ:
-            mark_predicate(m,e->arg1, dep,env);
-            mark_predicate(m,e->arg2, dep,env);
-            break;
-        case PRED_SVAR: {
-            lts_type_t ltstype = GBgetLTStype(m);
-            int N = lts_type_get_state_length (ltstype);
+            const int N = lts_type_get_state_length(lts_type);
             if (e->idx < N) { // state variable
-                dep[e->idx] = 1;
+                if (deps != NULL) bitvector_set(deps, e->idx);
+                if (PINS_POR) pins_add_state_variable_visible(model, e->idx);
             } else { // state label
-                HREassert (e->idx < N + lts_type_get_state_label_count(ltstype));
-                matrix_t *sl = GBgetStateLabelInfo (m);
-                HREassert (N == dm_ncols(sl));
-                for (int i = 0; i < N; i++) {
-                    if (dm_is_set(sl, e->idx - N, i)) dep[i] = 1;
+                if (sl_deps != NULL) bitvector_set(sl_deps, e->idx - N);
+                if (deps != NULL) dm_row_union(deps, GBgetStateLabelInfo(model), e->idx - N);
+                if (PINS_POR) pins_add_state_label_visible(model, e->idx - N);
+            }
+            break;
+        }
+        case EVAR: {
+            const int type = lts_type_get_edge_label_typeno(GBgetLTStype(model), e->idx);
+            const int value = LTSminExprSibling(e)->idx;
+
+            chunk c;
+            c.data = SIgetC(env->values, value, (int*) &c.len);
+
+            e->chunk_cache = pins_chunk_put(model, type, c);
+
+            e->groups = RTmalloc(sizeof(int[pins_get_group_count(model)]));
+            e->n_groups = GBgroupsOfEdge(model, e->idx, e->chunk_cache, e->groups);
+            e->groups = RTrealloc(e->groups, sizeof(int[e->n_groups]));
+            if (e->n_groups > 0) {
+                for (int k = 0; k < e->n_groups; k++) {
+                    const int group = e->groups[k];
+                    if (PINS_POR) pins_add_group_visible(model, group);
+                    if (deps != NULL) dm_row_union(deps, GBgetDMInfoRead(model), group);
+                }
+            } else {
+                char s[c.len * 2 + 6];
+                chunk2string(c, sizeof(s), s);
+                const log_t l = pins_allow_undefined_edges ? info : lerror;
+                Warning(l, GROUP_NOT_FOUND, s);
+                if (!pins_allow_undefined_edges) Abort(GROUP_NOT_FOUND_HINT);
+            }
+            break;
+        }
+        case CHUNK: {
+            const ltsmin_expr_t other = LTSminExprSibling(e);
+            HREassert(other != NULL);
+            const int type = get_typeno(other, GBgetLTStype(model));
+            chunk c;
+            c.data = SIgetC(env->values, e->idx, (int*) &c.len);
+
+            const int n_chunks = pins_chunk_count(model, type);
+            e->chunk_cache = pins_chunk_put(model, type, c);
+            if (lts_type_get_format(GBgetLTStype(model), type) == LTStypeEnum) {
+                if (pins_chunk_count(model, type) != n_chunks) {
+                    char id[c.len * 2 + 6];
+                    chunk2string(c, sizeof(id), id);
+
+                    const log_t l = pins_allow_undefined_values ? info : lerror;
+                    Warning(l, ENUM_VALUE_NOT_FOUND, id,
+                        lts_type_get_type(GBgetLTStype(model),type));
+                    if (!pins_allow_undefined_values) {
+                        Abort(ENUM_VALUE_NOT_FOUND_HINT);
+                    }
                 }
             }
             break;
         }
         default:
-            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
-            HREabort (LTSMIN_EXIT_FAILURE);
-        }
-        break;
+            break;
     }
 }
 
-void
-mark_visible(model_t model, ltsmin_expr_t e, ltsmin_parse_env_t env)
+struct evar_info {
+    int idx; // edge label to look for
+    int num; // edge value to look for
+    int exists; // whether an transition with such an edge exists
+};
+
+static void
+evar_cb(void *context, transition_info_t *ti, int *dst, int *cpy)
 {
-    int *visibility = GBgetPorGroupVisibility (model);
-    HREassert (visibility != NULL, "POR layer present, but no visibility info found.");
-    if (!e) return;
-    switch(e->node_type) {
-    case BINARY_OP:
-        mark_visible(model,e->arg1,env);
-        mark_visible(model,e->arg2,env);
-        break;
-    case UNARY_OP:
-        mark_visible(model,e->arg1,env);
-        break;
-    default:
-        switch(e->token) {
+    (void) dst; (void) cpy;
+    struct evar_info* ctx = (struct evar_info*) context;
+    ctx->exists = ctx->exists || ti->labels[ctx->idx] == ctx->num;
+}
+
+long
+eval_trans_predicate(model_t model, ltsmin_expr_t e, int *state, int* edge_labels, ltsmin_parse_env_t env)
+{
+    const lts_type_t lts_type = GBgetLTStype(model);
+    const int N = lts_type_get_state_length(lts_type);
+
+    switch (e->token) {
         case PRED_TRUE:
+            return 1;
         case PRED_FALSE:
+            return 0;
         case PRED_NUM:
-        case PRED_VAR:
-        case PRED_CHUNK:
-            break;
-        case PRED_EQ:
-            mark_visible(model, e->arg1,env);
-            mark_visible(model, e->arg2,env);
-            break;
-        case PRED_SVAR: {
-            int                 N = pins_get_state_variable_count (model);
-            if (e->idx < N) {
-                pins_add_state_variable_visible (model, e->idx);
+            return e->idx;
+        case PRED_SVAR:
+            if (e->idx < N) { // state variable
+#ifndef NDEBUG
+                // check that we never have a "maybe" value (must be guaranteed by back-end).
+                const data_format_t df = lts_type_get_format(lts_type, lts_type_get_state_typeno(lts_type, e->idx));
+                HREassert(df != LTStypeTrilean || state[e->idx] != 2);
+#endif
+                return state[e->idx];
             } else { // state label
-                HREassert (e->idx < N + (int)pins_get_state_label_count(model));
-                pins_add_state_label_visible (model, e->idx - N);
+#ifndef NDEBUG
+                // check that we never have a "maybe" value (must be guaranteed by back-end).
+                const data_format_t df = lts_type_get_format(lts_type, lts_type_get_state_label_typeno(lts_type, e->idx - N));
+                HREassert(df != LTStypeTrilean || GBgetStateLabelLong(model, e->idx - N, state) != 2);
+#endif
+                return GBgetStateLabelLong(model, e->idx - N, state);
             }
-          } break;
-        default:
-            LTSminLogExpr (error, "Unhandled predicate expression: ", e, env);
-            HREabort (LTSMIN_EXIT_FAILURE);
+        case PRED_EVAR: {
+            if (e->parent->token == PRED_EN) {
+                // test whether the state has at least one transition (existential) with a specific edge
+                struct evar_info ctx;
+                ctx.idx = e->idx;
+                ctx.num = e->chunk_cache;
+                ctx.exists = 0;
+
+                for (int i = 0; i < e->n_groups && ctx.exists == 0; i++) {
+                    GBgetTransitionsLong(model, e->groups[i], state, evar_cb, &ctx);
+                }
+                return ctx.exists ? ctx.num : -1;
+            } else if (edge_labels != NULL) {
+                HREassert(edge_labels[0] != -1, "transition checking on state predicates");
+#ifndef NDEBUG
+                // check that we never have a "maybe" value (must be guaranteed by back-end).
+                const data_format_t df = lts_type_get_format(lts_type, lts_type_get_edge_label_typeno(lts_type, e->idx));
+                HREassert(df != LTStypeTrilean || edge_labels[e->idx] != 2);
+#endif
+                return edge_labels[e->idx];
+            } else return -1;
         }
-        break;
+        case PRED_CHUNK: {
+#ifndef NDEBUG
+            const ltsmin_expr_t other = LTSminExprSibling(e);
+            HREassert(other != NULL && (other->token == SVAR || other->token == EVAR));
+#endif
+            return e->chunk_cache;
+        }
+        case PRED_NOT:
+            return !eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+        case PRED_EN:
+        case PRED_EQ:
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) ==
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_NEQ:
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) !=
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_AND:
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) &&
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_OR:
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) ||
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_IMPLY:
+            return !eval_trans_predicate(model, e->arg1, state, edge_labels, env) ||
+                      eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_EQUIV:
+            return !eval_trans_predicate(model, e->arg1, state, edge_labels, env) ==
+                    !eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_LT:
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) <
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_LEQ:
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) <=
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_GT:
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) >
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_GEQ:
+            return eval_trans_predicate(model, e->arg1, state, edge_labels, env) >=
+                    eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+        case PRED_MULT: {
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+            if (long_mult_overflow(l, r)) {
+                LTSminLogExpr (lerror, "integer overflow in: ", e, env);
+                HREabort(LTSMIN_EXIT_FAILURE);
+            }
+            return l * r;
+        }
+        case PRED_DIV: {
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+            if (r == 0 || ((l == LONG_MIN) && r == -1)) {
+                LTSminLogExpr (lerror, "division by zero in: ", e, env);
+                HREabort(LTSMIN_EXIT_FAILURE);
+            }
+            return l / r;
+        }
+        case PRED_REM: {
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+            if (r == 0 || ((l == LONG_MIN) && r == -1)) {
+                LTSminLogExpr (lerror, "division by zero in: ", e, env);
+                HREabort(LTSMIN_EXIT_FAILURE);
+            }
+            return l % r;
+        }
+        case PRED_ADD: {
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+            if ((r > 0 && l > LONG_MAX - r) || (r < 0 && l < LONG_MIN - r)) {
+                LTSminLogExpr (lerror, "integer overflow in: ", e, env);
+                HREabort(LTSMIN_EXIT_FAILURE);
+            }
+            return l + r;
+        }
+        case PRED_SUB: {
+            const long l = eval_trans_predicate(model, e->arg1, state, edge_labels, env);
+            const long r = eval_trans_predicate(model, e->arg2, state, edge_labels, env);
+            if ((r > 0 && l < LONG_MIN + r) || (r < 0 && l > LONG_MAX + r)) {
+                LTSminLogExpr (lerror, "integer overflow in: ", e, env);
+                HREabort(LTSMIN_EXIT_FAILURE);
+            }
+            return l - r;
+        }
+        default:
+            LTSminLogExpr (lerror, "Unhandled predicate expression: ", e, env);
+            HREabort (LTSMIN_EXIT_FAILURE);
     }
+    return 0;
+}
+
+
+long
+eval_state_predicate(model_t model, ltsmin_expr_t e, int *state, ltsmin_parse_env_t env)
+{
+    static int edge_error[1] = {-1};
+    return eval_trans_predicate(model, e, state, edge_error, env);
 }

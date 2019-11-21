@@ -1,0 +1,34 @@
+# include the general include file which contains the functions
+source $srcdir/lib/include.tcl
+# use the nclude file containing several procedures
+source $srcdir/lib/backends.tcl
+
+#cd into the test dir such that output files are placed here.
+if { [file exists $binpaths(out) ] != 1 } {
+    file mkdir $binpaths(out)
+}
+cd $binpaths(out)
+
+puts "\n-----------------------------"
+puts   "TESTING: Algorithmic backends for OPAAL"
+puts   "-----------------------------\n"
+
+set langs [dict create]
+
+# Language frontends:
+# -------------------
+
+# opaal:
+dict set langs opaal model "fischer4.xml"
+dict set langs opaal exp_output "Elements: 752"
+set alg_be [ find_alg_backends "{dist,mc,seq}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
+# different output for symbolic tool:
+dict set langs opaal exp_output "state space has 752"
+set alg_be [ find_alg_backends "{sym}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
+
+
+cd ".."

@@ -1,5 +1,8 @@
 noinst_LTLIBRARIES = liblts-lib.la
 
+# for gnulib
+AM_CPPFLAGS += -I$(top_srcdir)/lib -I$(top_builddir)/lib
+
 # liblts
 liblts_lib_la_SOURCES  = bfs_reorder.c
 liblts_lib_la_SOURCES += determinize.c
@@ -18,7 +21,8 @@ liblts_lib_la_SOURCES += lowmem_lump.c
 liblts_lib_la_SOURCES += lowmem_s.c
 liblts_lib_la_SOURCES += sigmin-lib.c
 liblts_lib_la_SOURCES += set.c set.h
+liblts_lib_la_SOURCES += setbased_weak.c
 liblts_lib_la_SOURCES += silent_compress.c
 
-liblts_lib_la_CPPFLAGS = $(AM_CPPFLAGS)
+liblts_lib_la_LIBADD   = $(top_builddir)/lib/libgnu.la
 

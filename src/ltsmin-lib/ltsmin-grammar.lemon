@@ -1,6 +1,5 @@
 %include {
 #include <hre/config.h>
-#include <assert.h>
 #include <stdlib.h>
 
 #include <hre/user.h>
@@ -8,6 +7,13 @@
 #include <ltsmin-lib/etf-util.h>
 #include <ltsmin-lib/etf-internal.h>
 #include <ltsmin-lib/ltsmin-parse-env.h>
+#include <ltsmin-lib/ltsmin-standard.h>
+/* solves the issue where lemon parses this file
+ with -Werror and -DNDEBUG */
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+#include <assert.h>
 }
 
 /* Section common parser configuration.
@@ -20,13 +26,13 @@ This section is shared by the parsers for all LTSmin languages.
 %syntax_error {
     (void)yymajor;(void)yyminor;
     if (env->lineno == 0) {
-        HREmessage(error,"syntax error near pos %d",env->linepos+1);
+        HREmessage(lerror,"syntax error near pos %d",env->linepos+1);
     } else {
-        HREmessage(error,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
+        HREmessage(lerror,"syntax error near line %d, pos %d",env->lineno+1,env->linepos+1);
     }
 }
-%parse_failure { HREabort(0); }
-%parse_accept { Warning(infoLong,"success!"); }
+%parse_failure { HREabort(LTSMIN_EXIT_FAILURE); }
+%parse_accept { Print1(infoLong,"success!"); }
 %extra_argument { ltsmin_parse_env_t env }
 %stack_overflow {
     (void)yypMinor;
@@ -61,9 +67,9 @@ etf_spec ::= etf_spec map_section.
 etf_spec ::= etf_spec sort_section.
 
 etf_spec ::= error . {
-    HREprintf (error, "ETF syntax error.  For a description of the ETF syntax, "
+    HREprintf (lerror, "ETF syntax error.  For a description of the ETF syntax, "
                       "refer to the etf(5) man page.\n");
-    HREabort(0);
+    HREabort(LTSMIN_EXIT_FAILURE);
 }
 
 state_section ::= BEGIN STATE decl_list(L) END STATE. {
@@ -314,17 +320,19 @@ that can be reused for other languages (e.g. CTL, CTL* and LTL)
 %type expr { ltsmin_expr_t }
 %destructor expr {
     (void)env;
-     LTSminExprDestroy($$);
+     LTSminExprDestroy($$, 1);
 }
 
 input ::= EXPR expr(E) . {
     (void)E;
-    LTSminLogExpr(info,"Expression is: ",E,env);
     env->expr=E;
 }
 
 %left CONSTANT .
 %right QUANTIFIER .
+%left BIN11 .
+%left BIN10 .
+%left BIN9 .
 %left PREFIX9  .
 %right POSTFIX9 .
 %left BIN8 .
@@ -394,6 +402,15 @@ expr(E) ::= expr(E1) BIN7(OP) expr(E2) . {
     E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
 }
 expr(E) ::= expr(E1) BIN8(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN9(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN10(OP) expr(E2) . {
+    E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
+}
+expr(E) ::= expr(E1) BIN11(OP) expr(E2) . {
     E = LTSminExpr(BINARY_OP, LTSminBinaryToken(env, OP), OP, E1, E2);
 }
 

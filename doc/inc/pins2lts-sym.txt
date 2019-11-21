@@ -32,5 +32,6 @@ http://www.cwi.nl/{tilde}mcrl/[muCRL],
 http://www.mcrl2.org/[mCRL2],
 http://divine.fi.muni.cz/[DiVinE 2.2],
 http://www.mpi-forum.org/[MPI Forum],
-http://buddy.sourceforge.net/[BuDDy], and
-http://eprints.eemcs.utwente.nl/22042/[prom].
+http://buddy.sourceforge.net/[BuDDy],
+http://eprints.eemcs.utwente.nl/22042/[prom], and
+https://www3.hhu.de/stups/prob/index.php/Main_Page[ProB]

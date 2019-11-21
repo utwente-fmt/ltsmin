@@ -29,6 +29,37 @@ static void fix_double_quote(char*str){
     if (str[i-1]!='\"') Abort("string does not end with double quote");
 }
 
+static void
+write_chunk (lts_file_t dst, chunk label_c)
+{
+    char label_s[label_c.len * 2 + 6];
+    chunk2string (label_c, sizeof label_s, label_s);
+    fix_double_quote (label_s);
+    fprintf (dst->f, " %s", label_s);
+}
+
+static void
+write_table (lts_file_t dst, value_table_t table, char *name, char *sort)
+{
+    int C = table ? VTgetCount (table) : 0;
+    fprintf (dst->f, "%s(%d) %s", name, C, sort);
+    if (C > 0) {
+        int last_idx = 0;
+        table_iterator_t it = VTiterator (table);
+        while (IThasNext (it)) {
+            chunk label_c = ITnext (it);
+            int idx = VTputChunk (table, label_c);
+            while (last_idx < idx) { // fill non-dense indices
+                write_chunk(dst, (chunk){0, ""});
+                last_idx++;
+            }
+            write_chunk (dst, label_c);
+            last_idx++;
+        }
+    }
+    fprintf (dst->f, "\n");
+}
+
 static void fsm_pull(lts_file_t dst,lts_file_t src){
     lts_type_t ltstype=lts_file_get_type(src);
     int N1=lts_type_get_state_length(ltstype);
@@ -61,21 +92,7 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
         char* sort=lts_type_get_state_type(ltstype,i);
         int type_no=lts_type_get_state_typeno(ltstype,i);
         value_table_t table=lts_file_get_table(dst,type_no);
-        int C;
-        if (table==NULL){
-            C=0;
-        } else {
-            C=VTgetCount(table);
-        }
-        fprintf(dst->f,"%s(%d) %s",name,C,sort);
-        for(int j=0;j<C;j++){
-            chunk label_c=VTgetChunk(table,j);
-            char label_s[label_c.len*2+6];
-            chunk2string(label_c,sizeof label_s,label_s);
-            fix_double_quote(label_s);
-            fprintf(dst->f," %s",label_s);
-        }
-        fprintf(dst->f,"\n");
+        write_table (dst, table, name, sort);
     }
     Debug("write state label specs.");
     for(int i=0;i<N2;i++){
@@ -83,21 +100,7 @@ static void fsm_pull(lts_file_t dst,lts_file_t src){
         char* sort=lts_type_get_state_label_type(ltstype,i);
         int type_no=lts_type_get_state_label_typeno(ltstype,i);
         value_table_t table=lts_file_get_table(dst,type_no);
-        int C;
-        if (table==NULL){
-            C=0;
-        } else {
-            C=VTgetCount(table);
-        }
-        fprintf(dst->f,"%s(%d) %s",name,C,sort);
-        for(int j=0;j<C;j++){
-            chunk label_c=VTgetChunk(table,j);
-            char label_s[label_c.len*2+6];
-            chunk2string(label_c,sizeof label_s,label_s);
-            fix_double_quote(label_s);
-            fprintf(dst->f," %s",label_s);
-        }
-        fprintf(dst->f,"\n");
+        write_table (dst, table, name, sort);
     }
     fprintf(dst->f,"---\n");
     if (N1+N2>0){

@@ -11,17 +11,17 @@
 #include <mc-lib/atomics.h>
 #include <mc-lib/clt_table.h>
 #include <mc-lib/dbs-ll.h>
+#include <mc-lib/treedbs-ll.h>
 #include <util-lib/fast_hash.h>
 #include <util-lib/util.h>
 
 static const struct timespec BO = {0, 2500};
 
-#define R_BITS 28
 #define NONE 0
 #define EMPTY 1
 #define LEFT 2
 #define RIGHT 3
-#define CLT_REM(k)      (k & ((1UL << R_BITS) - 1))
+#define CLT_REM(k)      (k & ((1ULL << R_BITS) - 1))
 #define CLT_HASH(d,k)   (k >> d->diff) //monotonic hash function
 
 typedef struct __attribute__ ((__packed__)) clt_bucket {
@@ -120,14 +120,13 @@ cas_ret_table (const clt_dbs_t* dbs, size_t pos, clt_bucket_t currval,
 static inline bool
 clt_try_lock (const clt_dbs_t* dbs, size_t pos)
 {
-	clt_bucket_t currval, newval;
-	currval = newval = read_table (dbs, pos);
-    if (currval.locked)
-        return false;
-	currval.occupied = 0;
-	currval.locked = 0;
-	newval.locked = 1;
-	return cas_table (dbs, pos, currval, newval);
+    clt_bucket_t currval, newval;
+    currval = newval = read_table (dbs, pos);
+    if (currval.locked) return false;
+    currval.occupied = 0;
+    currval.locked = 0;
+    newval.locked = 1;
+    return cas_table (dbs, pos, currval, newval);
 }
 
 static inline void
@@ -139,9 +138,9 @@ clt_unlock (const clt_dbs_t* dbs, size_t pos)
 }
 
 int
-clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
+clt_find_or_put (const clt_dbs_t* dbs, uint64_t k, bool insert)
 {
-    HREassert (k < (1UL << dbs->keysize), "Cleary table: invalid key");
+    HREassert (k < (1ULL << dbs->keysize), "Cleary table: invalid key");
     clt_bucket_t        check, oldval, newval;
     uint32_t            rem = CLT_REM (k);
     uint64_t            idx = CLT_HASH (dbs,k) + dbs->b_space; // add breathing space
@@ -157,25 +156,25 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
     	} else if (!oldval.occupied && oldval.locked) {
     		// locked, start over
             nanosleep (&BO, NULL);
-    		return clt_find_or_put (dbs, k);
+    		return clt_find_or_put (dbs, k, insert);
     	} // oldval.occupied -> normal insert
     }
     size_t          t_left = clt_find_left_from (dbs, idx);
     size_t          t_right = clt_find_right_from (dbs, idx);
 
-    if (t_right - t_left >= dbs->thresh)
-        return DB_FULL;
+    if (t_right - t_left >= dbs->thresh) return DB_FULL;
 
-	if (!clt_try_lock(dbs, t_left)) {
+    if (!clt_try_lock(dbs, t_left)) {
         nanosleep (&BO, NULL);
-		return clt_find_or_put (dbs, k);
+        return clt_find_or_put (dbs, k, insert);
     }
-	if (!clt_try_lock(dbs, t_right)) {
-		clt_unlock (dbs, t_left);
-		nanosleep (&BO, NULL);
-		return clt_find_or_put (dbs, k);
-	}
-	/* Start of CS */
+
+    if (!clt_try_lock(dbs, t_right)) {
+        clt_unlock (dbs, t_left);
+        nanosleep (&BO, NULL);
+        return clt_find_or_put (dbs, k, insert);
+    }
+    /* Startof CS */
     /* =========== */
 
     int count = 0;
@@ -207,6 +206,12 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
                 }
                 --j;
             }
+        }
+
+        if (!insert) {
+            clt_unlock (dbs, t_left);
+            clt_unlock (dbs, t_right);
+            return DB_NOT_FOUND; // NOT FOUND
         }
 
         // swap
@@ -266,6 +271,12 @@ clt_find_or_put (const clt_dbs_t* dbs, uint64_t k)
             }
         }
 
+        if (!insert) {
+            clt_unlock (dbs, t_left);
+            clt_unlock (dbs, t_right);
+            return DB_NOT_FOUND; // NOT FOUND
+        }
+
         // swap 
         q = t_left;
         while (1) {
@@ -314,7 +325,7 @@ clt_create (uint32_t ksize, uint32_t log_size)
     HREassert (ksize > log_size, "Cleary keysize to small for good distribution "
                "(logsize:2^%u, keysize: %u)", log_size, ksize);
     clt_dbs_t              *dbs = RTmalloc (sizeof(clt_dbs_t));
-    dbs->size = 1UL << log_size;
+    dbs->size = 1ULL << log_size;
     dbs->thresh = dbs->size / 64;
     dbs->thresh = min (dbs->thresh, 1ULL << 20);
     dbs->mask = dbs->size - 1;

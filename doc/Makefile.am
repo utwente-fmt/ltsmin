@@ -17,6 +17,7 @@ MANPAGES += ltsmin.7
 MANPAGES += ltsmin-ctl.5
 MANPAGES += ltsmin-ltl.5
 MANPAGES += ltsmin-pred.5
+MANPAGES += ltsmin-type-system.5
 MANPAGES += ltsmin-mu.5
 MANPAGES += ltsmin-mucalc.5
 MANPAGES += ltsmin-printtrace.1
@@ -73,6 +74,16 @@ MANPAGES += pbes2lts-seq.1
 MANPAGES += pbes2lts-dist.1
 MANPAGES += pbes2lts-mc.1
 
+MANPAGES += pnml2lts-sym.1
+MANPAGES += pnml2lts-seq.1
+MANPAGES += pnml2lts-dist.1
+MANPAGES += pnml2lts-mc.1
+
+MANPAGES += prob2lts-sym.1
+MANPAGES += prob2lts-seq.1
+MANPAGES += prob2lts-dist.1
+MANPAGES += prob2lts-mc.1
+
 MANPAGES += spgsolver.1
 
 doc_ASCIIDOC = $(addsuffix .txt, $(basename $(MANPAGES)))
@@ -82,6 +93,7 @@ extra_ASCIIDOC += inc/buddy-options.txt
 extra_ASCIIDOC += inc/compression.txt
 extra_ASCIIDOC += inc/devel-options.txt
 extra_ASCIIDOC += inc/dve.txt
+extra_ASCIIDOC += inc/env-vars.txt
 extra_ASCIIDOC += inc/file-formats.txt
 extra_ASCIIDOC += inc/general-options.txt
 extra_ASCIIDOC += inc/hre-options.txt
@@ -109,6 +121,11 @@ extra_ASCIIDOC += inc/pins2lts-sym-options.txt
 extra_ASCIIDOC += inc/pins2lts-sym.txt
 extra_ASCIIDOC += inc/pins2torx.txt
 extra_ASCIIDOC += inc/plugin-options.txt
+extra_ASCIIDOC += inc/pnml.txt
+extra_ASCIIDOC += inc/pnml-options.txt
+extra_ASCIIDOC += inc/prob.txt
+extra_ASCIIDOC += inc/prob-options.txt
+extra_ASCIIDOC += inc/procs-option.txt
 extra_ASCIIDOC += inc/prom.txt
 extra_ASCIIDOC += inc/reachability-options.txt
 extra_ASCIIDOC += inc/scoop-options.txt
@@ -116,6 +133,7 @@ extra_ASCIIDOC += inc/spg-options.txt
 extra_ASCIIDOC += inc/spg-solve-options.txt
 extra_ASCIIDOC += inc/support.txt
 extra_ASCIIDOC += inc/sylvan-options.txt
+extra_ASCIIDOC += inc/threads-option.txt
 extra_ASCIIDOC += inc/vset-options.txt
 extra_ASCIIDOC += inc/regroup-options.txt
 

@@ -46,18 +46,18 @@ typedef struct lts {
     lts_type_t ltstype; //@< contains the signature of the LTS.
     value_table_t *values; //@< value tables for all types.
     LTS_TYPE type;	
-    u_int32_t root_count; //@< number of initial states
-    u_int32_t *root_list; //@< array of initial states
-    u_int32_t transitions;
-    u_int32_t states;
+    uint32_t root_count; //@< number of initial states
+    uint32_t *root_list; //@< array of initial states
+    uint32_t transitions;
+    uint32_t states;
     treedbs_t state_db; // used if state vector length is positive.
-    u_int32_t *properties; // contains state labels
+    uint32_t *properties; // contains state labels
     treedbs_t prop_idx; // used if there is more than one state label
-    u_int32_t *begin;
-    u_int32_t *src;
-    u_int32_t *label; // contains edge labels
+    uint32_t *begin;
+    uint32_t *src;
+    uint32_t *label; // contains edge labels
     treedbs_t edge_idx; // used if there is more than one edge label
-    u_int32_t *dest;
+    uint32_t *dest;
     int32_t tau;
 } *lts_t;
 
@@ -95,7 +95,7 @@ extern void lts_set_type(lts_t lts,LTS_TYPE type);
 /**
  Change the allocated size of the given lts.
  */
-extern void lts_set_size(lts_t lts,u_int32_t roots,u_int32_t states,u_int32_t transitions);
+extern void lts_set_size(lts_t lts,uint32_t roots,uint32_t states,uint32_t transitions);
 
 /**
  Sort the transitions in the given LTS and remove duplicate transitions.
@@ -156,6 +156,13 @@ extern int stutter_step(void*context,lts_t lts,uint32_t src,uint32_t edge,uint32
 This is tau*a equialence for an edge label LTS.
  */
 extern void lts_silent_compress(lts_t lts,silent_predicate silent,void*silent_context);
+
+/**
+\brief Reduce the given lts modulo weak bisimulation.
+
+This is a port of the mCRL 1 minimization.
+ */
+extern void setbased_weak_reduce(lts_t lts);
 
 /**
  Find the set of divergent states.

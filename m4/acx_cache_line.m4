@@ -58,6 +58,9 @@ size_t cache_line_size() {
 
 #elif defined(linux)
 
+#include <math.h>
+#include <stdio.h>
+
 size_t cache_line_size() {
     FILE * p = 0;
     p = fopen("/sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size", "r");
@@ -74,9 +77,6 @@ size_t cache_line_size() {
     return 0;
 }
 #endif
-
-#include <math.h>
-#include <stdio.h>
 
 /* return log2(cache_line_size) */
 int main() {
@@ -96,25 +96,14 @@ int main() {
 /* END C-CODE */
         ]])],
         [acx_cl2="`cat conftest.data`";echo "cache_line_size() returned: 2^$acx_cl2"],
-        [acx_cl2=6;AC_MSG_WARN([Determining cache line size failed, using 2^6.])]
+        [acx_cl2=6;AC_MSG_WARN([Determining cache line size failed, using 2^6.])],
+        [acx_cl2=6;AC_MSG_WARN([Cannot determine cache line size due to x-compilation, using 2^6.])]
     )
 
-    AC_RUN_IFELSE(
-       [AC_LANG_SOURCE([[
-            int main() {
-                return sizeof(int);
-            }
-        ]])],
-        [AC_MSG_FAILURE([Cannot determine sizeof(int)!])], dnl returned 0!
-        [acx_size_int=$?]
-    )
-
-    [let "acx_cl=1<<$acx_cl2"]
-    [let "acx_cl_int=$acx_cl / $acx_size_int"]
+    acx_cl=$((1<<$acx_cl2))
 
     AC_DEFINE_UNQUOTED([CACHE_LINE], [$acx_cl2], [Log2 size of the machine's cache line])
     AC_DEFINE_UNQUOTED([CACHE_LINE_SIZE], [$acx_cl], [Size of the machine's cache line])
-    AC_DEFINE_UNQUOTED([CACHE_LINE_INT], [$acx_cl_int], [Int size of the machine's cache line])
     AC_LANG_RESTORE
 
 if test x"$acx_cl2" = x0; then

@@ -1,5 +1,4 @@
-
-
+#include <hre/config.h>
 
 #include "groups.h"
 #include <assert.h>

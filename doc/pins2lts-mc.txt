@@ -23,6 +23,8 @@ LTS output is not supported by this tool, use the distributed tools instead.
 
 == OPTIONS
 
+include::inc/procs-option.txt[]
+
 include::inc/pins2lts-mc-options.txt[]
 
 include::inc/plugin-options.txt[]

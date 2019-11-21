@@ -19,7 +19,9 @@
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins-lib/pins.h>
 #include <pins-lib/pins-impl.h>
+#include <pins-lib/pins-util.h>
 #include <pins-lib/property-semantics.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <util-lib/dynamic-array.h>
 #include <util-lib/fast_hash.h>
 #include <util-lib/treedbs.h>
@@ -71,7 +73,9 @@ struct dist_thread_context {
 static const size_t         THRESHOLD = 100000 / 100 * SPEC_REL_PERF;
 static int              trans_len;
 static int              write_lts=0;
+#ifdef HAVE_NICE
 static int              nice_value=0;
+#endif
 static int              dlk_detect=0;
 static char            *act_detect = NULL;
 static char            *inv_detect = NULL;
@@ -97,8 +101,10 @@ static  struct poptOption options[] = {
     { "filter" , 0 , POPT_ARG_STRING , &label_filter , 0 ,
       "Select the labels to be written to file from the state vector elements, "
       "state labels and edge labels." , "<patternlist>" },
+#ifdef HAVE_NICE
     { "nice", 0, POPT_ARG_INT, &nice_value, 0, "set the nice level of all workers"
       " (useful when running on other peoples workstations)", NULL},
+#endif
     { "write-state", 0, POPT_ARG_VAL, &write_state, 1, "write the full state vector", NULL },
     { "deadlock", 'd', POPT_ARG_VAL, &dlk_detect, 1, "detect deadlocks", NULL },
     { "action", 'a', POPT_ARG_STRING, &act_detect, 0, "detect error action", NULL },
@@ -119,7 +125,7 @@ static inline void
 deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 {
     if (count != 0) return;
-    if (GBstateIsValidEnd(ctx->model, state)) return;
+    if (pins_state_is_valid_end(ctx->model, state)) return;
     ctx->deadlocks++;
     if (!dlk_detect) return;
     ctx->violations++;
@@ -138,7 +144,7 @@ deadlock_detect (struct dist_thread_context *ctx, int *state, int count)
 static inline void
 invariant_detect (struct dist_thread_context *ctx, int *state)
 {
-    if ( !inv_expr || eval_predicate(ctx->model, inv_expr, NULL, state, size, ctx->env) ) return;
+    if ( !inv_expr || eval_state_predicate(ctx->model, inv_expr, state, ctx->env) ) return;
     ctx->violations++;
     if (trc_output!=NULL){
         uint32_t ofs=TreeFold(ctx->dbs,(int32_t*)(state));
@@ -569,6 +575,15 @@ empty_cost_list (void*arg,void*old_array,int old_size,struct cost_meta *new_arra
     (void) old_array; (void) arg;
 }
 
+static int
+state_find (int *state, transition_info_t *ti, void *t)
+{
+    struct dist_thread_context *ctx = (struct dist_thread_context *) t;
+    int idx;
+    return TreeFold_ret(ctx->dbs, state, &idx);
+    (void) ti;
+}
+
 int main(int argc, char*argv[]){
     char *files[2];
     HREinitBegin(argv[0]);
@@ -590,13 +605,9 @@ int main(int argc, char*argv[]){
     ctx.tcount=(int*)RTmalloc(mpi_nodes*sizeof(int));
     memset(ctx.tcount,0,mpi_nodes*sizeof(int));
 
-    model_t model=GBcreateBase();
+    model_t model = GBcreateBase();
     ctx.model = model;
-    GBsetChunkMethods(model,HREgreyboxNewmap,HREglobal(),
-                      HREgreyboxI2C,
-                      HREgreyboxC2I,
-                      HREgreyboxCAtI,
-                      HREgreyboxCount);
+    GBsetChunkMap (model, HREgreyboxTableFactory());
 
     if (ctx.mpi_me == 0)
         GBloadFileShared(model,files[0]);
@@ -650,11 +661,14 @@ int main(int argc, char*argv[]){
 
     /* Initializing according to the options just parsed.
      */
+#ifdef HAVE_NICE
     if (nice_value) {
         if (ctx.mpi_me==0) Warning(info,"setting nice to %d",nice_value);
         int rv = nice(nice_value);
         if (rv==-1) Warning(info,"failed to set nice");
     }
+#endif
+
     ctx.state_man=create_manager(65536);
     ctx.cost_man=create_manager(65536);
     /***************************************************/
@@ -713,7 +727,7 @@ int main(int argc, char*argv[]){
         for(int i=0;i<T;i++){
             int typeno=lts_type_find_type(ltstype,lts_type_get_type(trace_type,i));
             if (typeno<0) continue;
-            void *table=GBgetChunkMap(model,typeno);
+            value_table_t table = GBgetChunkMap (model, typeno);
             Debug("address of table %d/%d: %p",i,typeno,table);
             lts_file_set_table(ctx.trace,i,table);
         }
@@ -727,19 +741,20 @@ int main(int argc, char*argv[]){
             Abort("No edge label '%s...' for action detection", LTSMIN_EDGE_TYPE_ACTION_PREFIX);
         int typeno = lts_type_get_edge_label_typeno(ltstype, act_label);
         chunk c = chunk_str(act_detect);
-        act_index = GBchunkPut(model, typeno, c);
+        act_index = pins_chunk_put (model, typeno, c);
         Warning(info, "Detecting action \"%s\"", act_detect);
     }
     if (inv_detect) {
         if (PINS_POR) Abort ("Distributed tool implements no cycle provisos.");
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
-        inv_expr = parse_file_env (inv_detect, pred_parse_file, model, env);
+        inv_expr = pred_parse_file (inv_detect, env, ltstype);
         ctx.env = env;
     }
     HREbarrier(HREglobal());
     /***************************************************/
     if (size<2) Fatal(1,error,"there must be at least 2 parameters");
     ctx.dbs=TreeDBScreate(size);
+    if (PINS_POR) por_set_find_state (state_find, &ctx);
     int src[size];
     Warning(info,"there are %d state labels and %d edge labels",state_labels,edge_labels);
     int labels[state_labels];
@@ -955,8 +970,8 @@ int main(int argc, char*argv[]){
 
     if (ctx.mpi_me==0) {
         if (global_transitions==0 && global_targets>0) {
-            Warning(error,"language module fails to report the number of transitions");
-            Warning(error,"assuming number of transitions is number of targets");
+            Warning(lerror,"language module fails to report the number of transitions");
+            Warning(lerror,"assuming number of transitions is number of targets");
             global_transitions=global_targets;
         }
         if (global_targets > global_transitions) {
@@ -983,5 +998,8 @@ int main(int argc, char*argv[]){
         lts_file_close(ctx.trace);
     }
     HREbarrier(HREglobal());
+
+    GBExit(model);
+
     HREexit(LTSMIN_EXIT_SUCCESS);
 }

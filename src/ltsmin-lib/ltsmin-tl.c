@@ -1,27 +1,48 @@
 #include <hre/config.h>
 
+#include <hre/stringindex.h>
 #include <hre/user.h>
 #include <ltsmin-lib/ltsmin-grammar.h>
 #include <ltsmin-lib/ltsmin-parse-env.h> // required for ltsmin-lexer.h!
 #include <ltsmin-lib/ltsmin-lexer.h>
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-tl.h>
+#include <ltsmin-lib/ltsmin-type-system.h>
 #include <util-lib/chunk_support.h>
 #include <util-lib/dynamic-array.h>
 
 const char *
+S_NAME(ltsmin_expr_case s)
+{
+    switch (s) {
+    case S_TRUE:             return "true";
+    case S_FALSE:            return "false";
+    case S_MAYBE:            return "maybe";
+    case S_NOT:              return "!";
+    case S_LT:               return "<";
+    case S_LEQ:              return "<=";
+    case S_GT:               return ">";
+    case S_GEQ:              return ">=";
+    case S_OR:               return "||";
+    case S_AND:              return "&&";
+    case S_EQ:               return "==";
+    case S_NEQ:              return "!=";
+    case S_EQUIV:            return "<->";
+    case S_IMPLY:            return "->";
+    case S_MULT:             return "*";
+    case S_DIV:              return "/";
+    case S_REM:              return "%";
+    case S_ADD:              return "+";
+    case S_SUB:              return "-";
+    case S_EN:               return "??";
+    default:        Abort ("Not a keyword/operator, token id: %d", s);
+    }
+}
+
+const char *
 PRED_NAME(Pred pred)
 {
-    switch (pred) {
-    case PRED_TRUE:             return "true";
-    case PRED_FALSE:            return "false";
-    case PRED_NOT:              return "!";
-    case PRED_OR:               return "||";
-    case PRED_AND:              return "&&";
-    case PRED_EQ:               return "==";
-    case PRED_EQUIV:            return "<->";
-    case PRED_IMPLY:            return "->";
-    default:        Abort ("Not a keyword/operator, token id: %d", pred);
-    }
+    return S_NAME((ltsmin_expr_case) pred);
 }
 
 const char *
@@ -38,7 +59,6 @@ LTL_NAME(LTL ltl)
     default:                    return PRED_NAME((Pred)ltl);
     }
 }
-
 
 const char *
 CTL_NAME(CTL ctl)
@@ -58,9 +78,6 @@ const char *
 MU_NAME(MU mu)
 {
     switch (mu) {
-    case MU_AND:                return "&";
-    case MU_OR:                 return "|";
-
     case MU_EDGE_EXIST:         Abort ("Unimplemented: MU_EDGE_EXIST");
     case MU_EDGE_ALL:           Abort ("Unimplemented: MU_EDGE_ALL");
     case MU_EDGE_EXIST_LEFT:    return "<";
@@ -76,7 +93,7 @@ MU_NAME(MU mu)
     }
 }
 
-static stream_t
+stream_t
 read_formula (const char *file)
 {
     FILE *in=fopen( file, "r" );
@@ -84,6 +101,7 @@ read_formula (const char *file)
     if (in) {
         return stream_input(in);
     } else {
+        Warning(info, "\"%s\" is not a file, parsing as formula...", file);
         return stream_read_mem((void*)file, strlen(file), used);
     }
 }
@@ -117,61 +135,95 @@ fill_env (ltsmin_parse_env_t env, lts_type_t ltstype)
     }
 }
 
+static void
+create_pred_env(ltsmin_parse_env_t env)
+{
+    LTSminConstant      (env, PRED_FALSE,  PRED_NAME(PRED_FALSE));
+    LTSminConstant      (env, PRED_TRUE,   PRED_NAME(PRED_TRUE));
+    LTSminConstant      (env, PRED_MAYBE,  PRED_NAME(PRED_MAYBE));
+
+    LTSminBinaryOperator(env, PRED_MULT,   PRED_NAME(PRED_MULT), 1);
+    LTSminBinaryOperator(env, PRED_DIV,    PRED_NAME(PRED_DIV), 1);
+    LTSminBinaryOperator(env, PRED_REM,    PRED_NAME(PRED_REM), 1);
+    LTSminBinaryOperator(env, PRED_ADD,    PRED_NAME(PRED_ADD), 2);
+    LTSminBinaryOperator(env, PRED_SUB,    PRED_NAME(PRED_SUB), 2);
+
+    LTSminBinaryOperator(env, PRED_LT,     PRED_NAME(PRED_LT), 3);
+    LTSminBinaryOperator(env, PRED_LEQ,    PRED_NAME(PRED_LEQ), 3);
+    LTSminBinaryOperator(env, PRED_GT,     PRED_NAME(PRED_GT), 3);
+    LTSminBinaryOperator(env, PRED_GEQ,    PRED_NAME(PRED_GEQ), 3);
+
+    LTSminBinaryOperator(env, PRED_EQ,     PRED_NAME(PRED_EQ), 4);
+    LTSminBinaryOperator(env, PRED_NEQ,    PRED_NAME(PRED_NEQ), 4);
+    LTSminBinaryOperator(env, PRED_EN,     PRED_NAME(PRED_EN), 4);
+
+
+    LTSminPrefixOperator(env, PRED_NOT,    PRED_NAME(PRED_NOT), 5);
+
+    LTSminBinaryOperator(env, PRED_AND,    PRED_NAME(PRED_AND), 6);
+    LTSminBinaryOperator(env, PRED_OR,     PRED_NAME(PRED_OR), 7);
+
+    LTSminBinaryOperator(env, PRED_EQUIV,  PRED_NAME(PRED_EQUIV), 8);
+    LTSminBinaryOperator(env, PRED_IMPLY,  PRED_NAME(PRED_IMPLY), 9);
+}
+
 ltsmin_expr_t
-pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
+pred_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t lts_type)
 {
     stream_t stream = read_formula (file);
 
-    fill_env (env, ltstype);
+    fill_env (env, lts_type);
 
-    LTSminConstant      (env, PRED_FALSE,  PRED_NAME(PRED_FALSE));
-    LTSminConstant      (env, PRED_TRUE,   PRED_NAME(PRED_TRUE));
-
-    LTSminBinaryOperator(env, PRED_EQ,     PRED_NAME(PRED_EQ), 1);
-    LTSminPrefixOperator(env, PRED_NOT,    PRED_NAME(PRED_NOT),  2);
-
-    LTSminBinaryOperator(env, PRED_AND,    PRED_NAME(PRED_AND),  4);
-    LTSminBinaryOperator(env, PRED_OR,     PRED_NAME(PRED_OR),  5);
-
-    LTSminBinaryOperator(env, PRED_EQUIV,  PRED_NAME(PRED_EQUIV),6);
-    LTSminBinaryOperator(env, PRED_IMPLY,  PRED_NAME(PRED_IMPLY), 7);
+    create_pred_env(env);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
-    ltsmin_expr_t expr=env->expr;
 
-    return expr;
+    data_format_t df = check_type_format_pred(env->expr, env, lts_type);
+
+    get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
+    
+    return env->expr;
 }
 
-/******************************************************************
- * Note: some of these functions leak memory of type ltsmin_expr_t
- *****************************************************************/
+static void
+create_ltl_env(ltsmin_parse_env_t env)
+{
+    LTSminConstant      (env, LTL_FALSE,        LTL_NAME(LTL_FALSE));
+    LTSminConstant      (env, LTL_TRUE,         LTL_NAME(LTL_TRUE));
+    LTSminConstant      (env, LTL_MAYBE,        LTL_NAME(LTL_MAYBE));
 
-/* LTL:
- *     E. M. Clarke, O. Grumberg and D. A. Peled,
- *     Model Checking,
- *     MIT Press,1999
- *
- * Nonstandard connectives:
- * (Until)      p U q = F q | (p W q)
- * (Release)    p R q = q W (p & q)
- * (Release)    p R q = ! (!p U !q) (dual of until)
- * (Weak Until) p W q = q R (q | p)
- * (Weak Until) p W q = (p U q) | G p
- * (Strong Release) p M q = ! (!p W !q) (dual of weak until)
- *
- * Operator percendence
- *  HIGH
- *     ==, <=, >=, != (state label expression)
- *     !
- *     G, F, X
- *     &
- *     |
- *     ^ (XOR)
- *     <-> (EQUIV)
- *     -> (IMPLY)
- *     U, R
- *  LOW
- */
+    LTSminBinaryOperator(env, LTL_MULT,         LTL_NAME(LTL_MULT), 1);
+    LTSminBinaryOperator(env, LTL_DIV,          LTL_NAME(LTL_DIV), 1);
+    LTSminBinaryOperator(env, LTL_REM,          LTL_NAME(LTL_REM), 1);
+    LTSminBinaryOperator(env, LTL_ADD,          LTL_NAME(LTL_ADD), 2);
+    LTSminBinaryOperator(env, LTL_SUB,          LTL_NAME(LTL_SUB), 2);
+
+    LTSminBinaryOperator(env, LTL_LT,           LTL_NAME(LTL_LT), 3);
+    LTSminBinaryOperator(env, LTL_LEQ,          LTL_NAME(LTL_LEQ), 3);
+    LTSminBinaryOperator(env, LTL_GT,           LTL_NAME(LTL_GT), 3);
+    LTSminBinaryOperator(env, LTL_GEQ,          LTL_NAME(LTL_GEQ), 3);
+
+    LTSminBinaryOperator(env, LTL_EQ,           LTL_NAME(LTL_EQ), 4);
+    LTSminBinaryOperator(env, LTL_NEQ,          LTL_NAME(LTL_NEQ), 4);
+    LTSminBinaryOperator(env, LTL_EN ,          LTL_NAME(LTL_EN), 4);
+
+
+    LTSminPrefixOperator(env, LTL_NOT,          LTL_NAME(LTL_NOT), 5);
+
+    LTSminPrefixOperator(env, LTL_GLOBALLY,     LTL_NAME(LTL_GLOBALLY), 6);
+    LTSminPrefixOperator(env, LTL_FUTURE,       LTL_NAME(LTL_FUTURE), 6);
+    LTSminPrefixOperator(env, LTL_NEXT,         LTL_NAME(LTL_NEXT), 6);
+
+    LTSminBinaryOperator(env, LTL_AND,          LTL_NAME(LTL_AND), 7);
+    LTSminBinaryOperator(env, LTL_OR,           LTL_NAME(LTL_OR), 8);
+
+    LTSminBinaryOperator(env, LTL_EQUIV,        LTL_NAME(LTL_EQUIV), 9);
+    LTSminBinaryOperator(env, LTL_IMPLY,        LTL_NAME(LTL_IMPLY), 10);
+
+    LTSminBinaryOperator(env, LTL_UNTIL,        LTL_NAME(LTL_UNTIL), 11);
+    LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   LTL_NAME(LTL_WEAK_UNTIL), 11); // translated to U \/ []
+    LTSminBinaryOperator(env, LTL_RELEASE,      LTL_NAME(LTL_RELEASE), 11);
+}
 
 /* Convert weak untils to until or generally */
 static ltsmin_expr_t
@@ -210,14 +262,17 @@ ltl_tree_walker(ltsmin_expr_t in)
 
 /* Parser Priorities:
  * HIGH
- *     binary priority 1          : ==, !=, etc
- *     prefix priority 2          : !
- *     prefix priority 3          : G,F,X
- *     binary priority 4          : &
- *     binary priority 5          : |
- *     binary priority 6          : <->
- *     binary priority 7          : <->
- *     binary priority 8          : U,R
+ *     binary priority 1          : *, /, %
+ *     binary priority 2          : +, -
+ *     binary priority 3          : <, <=, >, >=
+ *     binary priority 4          : ==, !=, etc
+ *     prefix priority 5          : !
+ *     prefix priority 6          : G,F,X
+ *     binary priority 7          : &
+ *     binary priority 8          : |
+ *     binary priority 9          : <->
+ *     binary priority 10         : ->
+ *     binary priority 11         : U,R
  * LOW
  */
 ltsmin_expr_t
@@ -227,33 +282,58 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     fill_env (env, ltstype);
 
-    LTSminConstant      (env, LTL_FALSE,        LTL_NAME(LTL_FALSE));
-    LTSminConstant      (env, LTL_TRUE,         LTL_NAME(LTL_TRUE));
-
-    LTSminBinaryOperator(env, LTL_EQ,           LTL_NAME(LTL_EQ), 1);
-    LTSminPrefixOperator(env, LTL_NOT,          LTL_NAME(LTL_NOT),  2);
-
-    LTSminPrefixOperator(env, LTL_GLOBALLY,     LTL_NAME(LTL_GLOBALLY), 3);
-    LTSminPrefixOperator(env, LTL_FUTURE,       LTL_NAME(LTL_FUTURE), 3);
-    LTSminPrefixOperator(env, LTL_NEXT,         LTL_NAME(LTL_NEXT),  3);
-
-    LTSminBinaryOperator(env, LTL_AND,          LTL_NAME(LTL_AND),  4);
-    LTSminBinaryOperator(env, LTL_OR,           LTL_NAME(LTL_OR),  5);
-
-    LTSminBinaryOperator(env, LTL_EQUIV,        LTL_NAME(LTL_EQUIV),6);
-    LTSminBinaryOperator(env, LTL_IMPLY,        LTL_NAME(LTL_IMPLY), 7);
-
-    LTSminBinaryOperator(env, LTL_UNTIL,        LTL_NAME(LTL_UNTIL),  8);
-    LTSminBinaryOperator(env, LTL_WEAK_UNTIL,   LTL_NAME(LTL_WEAK_UNTIL),  8); // translated to U \/ []
-    LTSminBinaryOperator(env, LTL_RELEASE,      LTL_NAME(LTL_RELEASE),  8);
+    create_ltl_env(env);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
-    env->expr = ltl_tree_walker (env->expr);
-    ltsmin_expr_t expr = env->expr;
 
-    return expr;
+    data_format_t df = check_type_format_LTL(env->expr, env, ltstype);
+
+    get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
+
+    env->expr = ltl_tree_walker(env->expr);
+
+    return env->expr;
 }
 
+static void
+create_ctl_env(ltsmin_parse_env_t env)
+{
+    LTSminConstant      (env, CTL_FALSE,        CTL_NAME(CTL_FALSE));
+    LTSminConstant      (env, CTL_TRUE,         CTL_NAME(CTL_TRUE));
+    LTSminConstant      (env, CTL_MAYBE,        CTL_NAME(CTL_MAYBE));
+    
+    LTSminBinaryOperator(env, CTL_MULT,         CTL_NAME(CTL_MULT), 1);
+    LTSminBinaryOperator(env, CTL_DIV,          CTL_NAME(CTL_DIV), 1);
+    LTSminBinaryOperator(env, CTL_REM,          CTL_NAME(CTL_REM), 1);
+    LTSminBinaryOperator(env, CTL_ADD,          CTL_NAME(CTL_ADD), 2);
+    LTSminBinaryOperator(env, CTL_SUB,          CTL_NAME(CTL_SUB), 2);
+
+    LTSminBinaryOperator(env, CTL_LT,           CTL_NAME(CTL_LT), 3);
+    LTSminBinaryOperator(env, CTL_LEQ,          CTL_NAME(CTL_LEQ), 3);
+    LTSminBinaryOperator(env, CTL_GT,           CTL_NAME(CTL_GT), 3);
+    LTSminBinaryOperator(env, CTL_GEQ,          CTL_NAME(CTL_GEQ), 3);
+
+    LTSminBinaryOperator(env, CTL_EQ,           CTL_NAME(CTL_EQ), 4);
+    LTSminBinaryOperator(env, CTL_NEQ,          CTL_NAME(CTL_NEQ), 4);
+    LTSminBinaryOperator(env, CTL_EN,           CTL_NAME(CTL_EN), 4);
+
+    LTSminPrefixOperator(env, CTL_NOT,          CTL_NAME(CTL_NOT), 5);
+
+    LTSminPrefixOperator(env, CTL_EXIST,        CTL_NAME(CTL_EXIST), 6);
+    LTSminPrefixOperator(env, CTL_ALL,          CTL_NAME(CTL_ALL), 6);
+
+    LTSminPrefixOperator(env, CTL_GLOBALLY,     CTL_NAME(CTL_GLOBALLY), 6);
+    LTSminPrefixOperator(env, CTL_FUTURE,       CTL_NAME(CTL_FUTURE), 6);
+    LTSminPrefixOperator(env, CTL_NEXT,         CTL_NAME(CTL_NEXT), 6);
+
+    LTSminBinaryOperator(env, CTL_AND,          CTL_NAME(CTL_AND), 7);
+    LTSminBinaryOperator(env, CTL_OR,           CTL_NAME(CTL_OR), 8);
+
+    LTSminBinaryOperator(env, CTL_EQUIV,        CTL_NAME(CTL_EQUIV), 9);
+    LTSminBinaryOperator(env, CTL_IMPLY,        CTL_NAME(CTL_IMPLY), 10);
+
+    LTSminBinaryOperator(env, CTL_UNTIL,        CTL_NAME(CTL_UNTIL), 11);
+}
 
 /* CTL:
  *     E. M. Clarke, E. A. Emerson and A. P. Sistla,
@@ -281,34 +361,56 @@ ctl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     fill_env (env, ltstype);
 
-    LTSminConstant      (env, CTL_FALSE,        CTL_NAME(CTL_FALSE));
-    LTSminConstant      (env, CTL_TRUE,         CTL_NAME(CTL_TRUE));
-
-    LTSminBinaryOperator(env, CTL_EQ,           CTL_NAME(CTL_EQ), 1);
-    LTSminPrefixOperator(env, CTL_NOT,          CTL_NAME(CTL_NOT),  2);
-
-    LTSminPrefixOperator(env, CTL_EXIST,        CTL_NAME(CTL_EXIST),  3);
-    LTSminPrefixOperator(env, CTL_ALL,          CTL_NAME(CTL_ALL),  3);
-
-    LTSminPrefixOperator(env, CTL_GLOBALLY,     CTL_NAME(CTL_GLOBALLY), 3);
-    LTSminPrefixOperator(env, CTL_FUTURE,       CTL_NAME(CTL_FUTURE), 3);
-    LTSminPrefixOperator(env, CTL_NEXT,         CTL_NAME(CTL_NEXT),  3);
-
-    LTSminBinaryOperator(env, CTL_AND,          CTL_NAME(CTL_AND),  4);
-    LTSminBinaryOperator(env, CTL_OR,           CTL_NAME(CTL_OR),  5);
-
-    LTSminBinaryOperator(env, CTL_EQUIV,        CTL_NAME(CTL_EQUIV),6);
-    LTSminBinaryOperator(env, CTL_IMPLY,        CTL_NAME(CTL_IMPLY), 7);
-
-    LTSminBinaryOperator(env, CTL_UNTIL,        CTL_NAME(CTL_UNTIL),  8);
+    create_ctl_env(env);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
-    ltsmin_expr_t expr=env->expr;
 
-    return expr;
+    data_format_t df = check_type_format_CTL(env->expr, env, ltstype);
+
+    get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
+
+    return env->expr;
 }
 
+static void
+create_mu_env(ltsmin_parse_env_t env)
+{
+    LTSminConstant(env, MU_FALSE, MU_NAME(MU_FALSE));
+    LTSminConstant(env, MU_TRUE, MU_NAME(MU_TRUE));
+    LTSminConstant(env, MU_MAYBE, MU_NAME(MU_MAYBE));
 
+    LTSminKeyword(env, MU_MU, MU_NAME(MU_MU));
+    LTSminKeyword(env, MU_NU, MU_NAME(MU_NU));
+    LTSminKeyword(env, MU_EDGE_EXIST_LEFT, MU_NAME(MU_EDGE_EXIST_LEFT));
+    LTSminKeyword(env, MU_EDGE_EXIST_RIGHT, MU_NAME(MU_EDGE_EXIST_RIGHT));
+    LTSminKeyword(env, MU_EDGE_ALL_LEFT, MU_NAME(MU_EDGE_ALL_LEFT));
+    LTSminKeyword(env, MU_EDGE_ALL_RIGHT, MU_NAME(MU_EDGE_ALL_RIGHT));
+
+    LTSminBinaryOperator(env, MU_MULT, MU_NAME(MU_MULT), 1);
+    LTSminBinaryOperator(env, MU_DIV, MU_NAME(MU_DIV), 1);
+    LTSminBinaryOperator(env, MU_REM, MU_NAME(MU_REM), 1);
+    LTSminBinaryOperator(env, MU_ADD, MU_NAME(MU_ADD), 2);
+    LTSminBinaryOperator(env, MU_SUB, MU_NAME(MU_SUB), 2);
+
+    LTSminBinaryOperator(env, MU_LT,  MU_NAME(MU_LT), 3);
+    LTSminBinaryOperator(env, MU_LEQ, MU_NAME(MU_LEQ), 3);
+    LTSminBinaryOperator(env, MU_GT,  MU_NAME(MU_GT), 3);
+    LTSminBinaryOperator(env, MU_GEQ, MU_NAME(MU_GEQ), 3);
+
+    LTSminBinaryOperator(env, MU_EQ,  MU_NAME(MU_EQ), 4);
+    LTSminBinaryOperator(env, MU_NEQ, MU_NAME(MU_NEQ), 4);
+    LTSminBinaryOperator(env, MU_EN,  MU_NAME(MU_EN), 4);
+
+    LTSminPrefixOperator(env, MU_NOT, MU_NAME(MU_NOT), 5);
+
+    LTSminBinaryOperator(env, MU_AND, MU_NAME(MU_AND), 6);
+    LTSminBinaryOperator(env, MU_OR, MU_NAME(MU_OR), 7);
+
+    LTSminPrefixOperator(env, MU_NEXT, MU_NAME(MU_NEXT), 8);
+    LTSminPrefixOperator(env, MU_EXIST, MU_NAME(MU_EXIST), 8);
+    LTSminPrefixOperator(env, MU_ALL, MU_NAME(MU_ALL), 8);
+}
+    
 /*
  * From: Modal mu-calculi, Julian Bradfield and Colin Stirling
  * For the concrete syntax, we shall assume that modal operators have higher
@@ -325,32 +427,15 @@ mu_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 
     fill_env (env, ltstype);
 
-    LTSminConstant      (env, MU_FALSE,        "false");
-    LTSminConstant      (env, MU_TRUE,         "true");
-
-    LTSminKeyword(env, MU_MU, "mu");
-    LTSminKeyword(env, MU_NU, "nu");
-    LTSminKeyword(env, MU_EDGE_EXIST_LEFT,  "<");
-    LTSminKeyword(env, MU_EDGE_EXIST_RIGHT, ">");
-    LTSminKeyword(env, MU_EDGE_ALL_LEFT,  "[");
-    LTSminKeyword(env, MU_EDGE_ALL_RIGHT, "]");
-
-    LTSminBinaryOperator(env, MU_AND, "&",2);
-    LTSminBinaryOperator(env, MU_AND, "/\\",2);
-    LTSminBinaryOperator(env, MU_OR, "\\/",3);
-    LTSminBinaryOperator(env, MU_OR, "|",3);
-    LTSminBinaryOperator(env, MU_EQ, "==",1);
-    LTSminPrefixOperator(env, MU_NOT, "!",1);
-
-    LTSminPrefixOperator(env, MU_NEXT, "X",4);
-    LTSminPrefixOperator(env, MU_EXIST, "E",4);
-    LTSminPrefixOperator(env, MU_ALL, "A",4);
+    create_mu_env(env);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
-    ltsmin_expr_t expr=env->expr;
 
-    env->expr=NULL;
-    return expr;
+    data_format_t df = check_type_format_MU(env->expr, env, ltstype);
+
+    get_data_format_unary(UNARY_BOOL_OPS, env->expr, env, df);
+
+    return env->expr;
 }
 
 
@@ -365,18 +450,30 @@ ltsmin_expr_t ltl_to_ctl_star_1(ltsmin_expr_t in)
         case LTL_NUM:       res->token = CTL_NUM;       break;
         case LTL_CHUNK:     res->token = CTL_CHUNK;     break;
         case LTL_VAR:       res->token = CTL_VAR;       break;
+        case LTL_LT:        res->token = CTL_LT;        break;
+        case LTL_LEQ:       res->token = CTL_LEQ;       break;
+        case LTL_GT:        res->token = CTL_GT;        break;
+        case LTL_GEQ:       res->token = CTL_GEQ;       break;
         case LTL_EQ:        res->token = CTL_EQ;        break;
+        case LTL_NEQ:       res->token = CTL_NEQ;       break;
         case LTL_TRUE:      res->token = CTL_TRUE;      break;
         case LTL_FALSE:     res->token = CTL_FALSE;     break;
+        case LTL_MAYBE:     res->token = CTL_MAYBE;     break;
         case LTL_OR:        res->token = CTL_OR;        break;
         case LTL_AND:       res->token = CTL_AND;       break;
         case LTL_NOT:       res->token = CTL_NOT;       break;
+        case LTL_MULT:      res->token = CTL_MULT;      break;
+        case LTL_DIV:       res->token = CTL_DIV;       break;
+        case LTL_REM:       res->token = CTL_REM;       break;
+        case LTL_ADD:       res->token = CTL_ADD;       break;
+        case LTL_SUB:       res->token = CTL_SUB;       break;
         case LTL_NEXT:      res->token = CTL_NEXT;      break;
         case LTL_UNTIL:     res->token = CTL_UNTIL;     break;
         case LTL_IMPLY:     res->token = CTL_IMPLY;     break;
         case LTL_EQUIV:     res->token = CTL_EQUIV;     break;
         case LTL_FUTURE:    res->token = CTL_FUTURE;    break;
         case LTL_GLOBALLY:  res->token = CTL_GLOBALLY;  break;
+        case LTL_EN:        res->token = CTL_EN;        break;
         //case LTL_RELEASE:   // convert..
         //case LTL_WEAK_UNTIL // convert..
         default:
@@ -444,19 +541,384 @@ ltsmin_expr_t ctl_normalize(ltsmin_expr_t in)
     return in;
 }
 
-ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in)
+MU ctl2mu_token(CTL token) { // precondition: token is not a path operator (A,E) or temporal operator (F,G,X,U,...)
+      switch (token) {
+        case CTL_SVAR:      return MU_SVAR;
+        case CTL_EVAR:      return MU_EVAR;
+        case CTL_NUM:       return MU_NUM;
+        case CTL_CHUNK:     return MU_CHUNK;
+        case CTL_VAR:       return MU_VAR;
+        case CTL_TRUE:      return MU_TRUE;
+        case CTL_FALSE:     return MU_FALSE;
+        case CTL_MAYBE:     return MU_MAYBE;
+        case CTL_OR:        return MU_OR;
+        case CTL_AND:       return MU_AND;
+        case CTL_NOT:       return MU_NOT;
+        case CTL_NEXT:      return MU_NEXT;
+        case CTL_ALL:       return MU_ALL;
+        case CTL_EXIST:     return MU_EXIST;
+        case CTL_LT:        return MU_LT;
+        case CTL_LEQ:       return MU_LEQ;
+        case CTL_GT:        return MU_GT;
+        case CTL_GEQ:       return MU_GEQ;
+        case CTL_EQ:        return MU_EQ;
+        case CTL_NEQ:       return MU_NEQ;
+        case CTL_MULT:      return MU_MULT;
+        case CTL_DIV:       return MU_DIV;
+        case CTL_REM:       return MU_REM;
+        case CTL_ADD:       return MU_ADD;
+        case CTL_SUB:       return MU_SUB;
+        case CTL_EN:        return MU_EN;
+        default:
+	  Abort("ctl_to_mu cannot handle path or temporal operator: %s",CTL_NAME(token));
+    }
+}
+
+static void
+create_mu_var(int num, ltsmin_parse_env_t env)
 {
-    /* Source: formalising the translation of CTL into L_mu
+    if (!SIget(env->idents,num)) {
+	const char f[] = "Z%d";
+	char b[snprintf(NULL, 0, f, num) + 1];
+	sprintf(b, f, num);
+	SIputAt(env->idents, b, num);
+    }
+}
+
+
+ltsmin_expr_t ctlmu(ltsmin_expr_t in, ltsmin_parse_env_t env, int free)
+{   // free is the next free variable to use in mu/nu expressions
+    /* Source: formalising the translation of CTL into L_mu (Hasan Amjad)
      * T is the translation from CTL to mu
      * T(p \in AP) = p
      * T(!f) = !T(f)
-     * T(f & g) = T(g) & T(g)
+     * T(f & g) = T(f) & T(g)
      * T(EX f) = <.> T(f)
-     * T(EG f) = nu Q. f & <.> Q
-     * T(E[f U g]) = mu Q. g | (f & <.> Q)
+     * T(EG f) = nu Q. T(f) & <.> Q
+     * T(E[f U g]) = mu Q. T(g) | (T(f) & <.> Q)
      */
-     return in;
+
+    const int mu_token = ctl2mu_token(in->token);
+
+    ltsmin_expr_t res = LTSminExpr(in->node_type, mu_token, in->idx, NULL, NULL);
+
+    switch (in->node_type) {
+        case BINARY_OP: {
+            res->idx = LTSminBinaryIdx(env, MU_NAME(mu_token));
+            switch (in->token) {
+                case CTL_UNTIL: {
+                    Abort("CTL (sub)formula should not start with U");
+                }
+                default: { // traverse children
+                    res->arg1 = ctlmu(in->arg1, env, free);
+                    res->arg1->parent = res;
+                    res->arg2 = ctlmu(in->arg2, env, free);
+                    res->arg2->parent = res;
+                    LTSminExprRehash(res);
+                    return res;
+                }
+            }
+        }
+	
+        case UNARY_OP: {
+            res->idx = LTSminUnaryIdx(env, MU_NAME(mu_token));
+            switch (in->token) {
+                case CTL_NOT: { // traverse child
+                    res->arg1 = ctlmu(in->arg1, env, free);
+                    res->arg1->parent = res;
+                    LTSminExprRehash(res);
+                    return res;
+                }
+                case CTL_EXIST: case CTL_ALL: {
+                    switch (in->arg1->token) {
+                    case CTL_UNTIL: {
+			// translate E p U q  into  MU Z. q \/ (p /\ E X Z)
+			// translate A p U q  into  MU Z. q \/ (p /\ (A X Z /\ EX true))
+                        create_mu_var(free, env);
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
+                        res->arg1 = X;
+                        res->arg1->parent = res;
+                        LTSminExprRehash(res);
+			if (in->token == CTL_ALL) {
+			    ltsmin_expr_t True = LTSminExpr(CONSTANT, MU_TRUE, LTSminConstantIdx(env, MU_NAME(MU_TRUE)), NULL, NULL);
+			    ltsmin_expr_t XTrue = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), True, 0);
+			    ltsmin_expr_t NoDeadlock = LTSminExpr(UNARY_OP, MU_EXIST, LTSminUnaryIdx(env, MU_NAME(MU_EXIST)), XTrue, 0);
+			    res = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), res, NoDeadlock);
+			}
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
+                        ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), P, res);
+                        ltsmin_expr_t Q = ctlmu(in->arg1->arg2, env, free + 1);
+                        ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, LTSminBinaryIdx(env, MU_NAME(MU_OR)), Q, A);
+                        ltsmin_expr_t result = LTSminExpr(MU_FIX, MU_MU, free, O, 0);
+                        return result;
+                    }
+                    case CTL_FUTURE: {
+			// translate E F p into MU Z. p \/ E X Z
+			// translate A F p into MU Z. p \/ (A X Z /\ E X true)
+                        create_mu_var(free, env);
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
+                        res->arg1 = X;
+                        res->arg1->parent = res;
+                        LTSminExprRehash(res);
+			if (in->token == CTL_ALL) {
+			    ltsmin_expr_t True = LTSminExpr(CONSTANT, MU_TRUE, LTSminConstantIdx(env, MU_NAME(MU_TRUE)), NULL, NULL);
+			    ltsmin_expr_t XTrue = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), True, 0);
+			    ltsmin_expr_t NoDeadlock = LTSminExpr(UNARY_OP, MU_EXIST, LTSminUnaryIdx(env, MU_NAME(MU_EXIST)), XTrue, 0);
+			    res = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), res, NoDeadlock);
+			}
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
+                        ltsmin_expr_t O = LTSminExpr(BINARY_OP, MU_OR, LTSminBinaryIdx(env, MU_NAME(MU_OR)), P, res);
+                        ltsmin_expr_t result = LTSminExpr(MU_FIX, MU_MU, free, O, 0);
+                        return result;
+                    }
+                    case CTL_GLOBALLY: {
+			// translate A G p into NU Z. p /\ A X Z
+			// translate E G p into NU Z. p /\ (E X Z \/ AX false)
+                        create_mu_var(free, env);
+                        ltsmin_expr_t Z = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, free, 0, 0);
+                        ltsmin_expr_t X = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), Z, 0);
+                        res->arg1 = X;
+                        res->arg1->parent = res;
+                        LTSminExprRehash(res);
+			if (in->token == CTL_EXIST) {
+			    ltsmin_expr_t False = LTSminExpr(CONSTANT, MU_FALSE, LTSminConstantIdx(env, MU_NAME(MU_FALSE)), NULL, NULL);
+			    ltsmin_expr_t XFalse = LTSminExpr(UNARY_OP, MU_NEXT, LTSminUnaryIdx(env, MU_NAME(MU_NEXT)), False, 0);
+			    ltsmin_expr_t Deadlock = LTSminExpr(UNARY_OP, MU_ALL, LTSminUnaryIdx(env, MU_NAME(MU_ALL)), XFalse, 0);
+			    res = LTSminExpr(BINARY_OP, MU_OR, LTSminBinaryIdx(env, MU_NAME(MU_OR)), res, Deadlock);
+			}
+
+                        ltsmin_expr_t P = ctlmu(in->arg1->arg1, env, free + 1);
+                        ltsmin_expr_t A = LTSminExpr(BINARY_OP, MU_AND, LTSminBinaryIdx(env, MU_NAME(MU_AND)), P, res);
+                        ltsmin_expr_t result = LTSminExpr(NU_FIX, MU_NU, free, A, 0);
+                        return result;
+                    }
+                    case CTL_NEXT: { // translate A/E X to A/E X
+                        ltsmin_expr_t resX = LTSminExpr(
+                                UNARY_OP,
+                                MU_NEXT,
+                                LTSminUnaryIdx(env, MU_NAME(MU_NEXT)),
+                                ctlmu(in->arg1->arg1, env, free),
+                                NULL);
+                        res->arg1 = resX;
+                        res->arg1->parent = res;
+                        LTSminExprRehash(res);
+                        return res;
+                    }
+                    default:
+                        Abort("ctl_to_mu: subformula of A/E should start with U,F,G, or X");
+                    }
+                }
+                case CTL_FUTURE: case CTL_GLOBALLY: case CTL_NEXT: {
+                    Abort("ctl_to_mu: (sub)formula should not start with F, G, X");
+                }
+                default: {
+                    res->arg1 = ctlmu(in->arg1, env, free);
+                    res->arg1->parent = res;
+                    LTSminExprRehash(res);
+                    return res;
+                }
+            }
+        }
+        case CONSTANT: {
+            res->idx = LTSminConstantIdx(env, MU_NAME(mu_token));
+            LTSminExprRehash(res);
+            return res;
+        }
+        default: {
+            return res;
+        }
+    }
 }
+
+ltsmin_expr_t ctl_to_mu(ltsmin_expr_t in, ltsmin_parse_env_t env, lts_type_t lts_type)
+{
+    HREassert(SIgetCount(env->idents) == 0); // TODO: why is this necessary? >1 formula?
+    LTSminParseEnvReset(env);
+    fill_env(env, lts_type);
+    create_mu_env(env);
+    int free = SIgetCount(env->idents); // a non-used identifier
+    ltsmin_expr_t n = ctlmu(in, env, free);
+    LTSminExprDestroy(in, 1);
+    return n;
+}
+
+ltsmin_expr_t ltl_to_mu(ltsmin_expr_t in)
+{ // TODO use BA or TGBA from SPOT
+    return ctl_star_to_mu(ltl_to_ctl_star(in));
+}
+
+MU mu_dual(MU token) {
+    switch(token) {
+        case MU_ALL: return MU_EXIST;
+        case MU_EXIST: return MU_ALL;
+        case MU_MU: return MU_NU;
+        case MU_NU: return MU_MU;
+        case MU_AND: return MU_OR;
+        case MU_OR: return MU_AND;
+        case MU_NEXT: return MU_NEXT;
+        case MU_TRUE: return MU_FALSE;
+        case MU_FALSE: return MU_TRUE;
+        case MU_EQ: return MU_NEQ;
+        case MU_LEQ: return MU_GT;
+        case MU_GT: return MU_LEQ;
+        case MU_GEQ: return MU_LT;
+        case MU_LT: return MU_GEQ;
+    default:
+	Abort("invalid token for mu_dual");
+    }
+}
+
+
+ltsmin_expr_t mu_optimize_rec(ltsmin_expr_t in, ltsmin_parse_env_t env, char negated, int* free, array_manager_t man, int rename[])
+{
+    // push negations inside (at least no mu/nu under a negation)
+    // ensure that all variables are different
+    // ensure mu/nu variable binders occur in increasing order. That is: if mu Zi ( ... nu Zj ...) then i<j
+    switch(in->token) {
+        case MU_TRUE:
+        case MU_FALSE:  {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            return LTSminExpr(CONSTANT,token,LTSminConstantIdx(env,MU_NAME(token)),0,0);
+        }
+        case MU_EQ:
+        case MU_NEQ:
+        case MU_LT:
+        case MU_LEQ:
+        case MU_GT:
+        case MU_GEQ: {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),in->arg1,in->arg2);
+        }
+        case MU_EN: {
+            if (negated) return LTSminExpr(UNARY_OP, MU_NOT, LTSminUnaryIdx(env, MU_NAME(MU_NOT)), in, 0);
+            else return in;
+        }
+        case MU_SVAR: {
+            if (negated) { return LTSminExpr(UNARY_OP, MU_NOT, LTSminUnaryIdx(env, MU_NAME(MU_NOT)), in, 0); }
+            else { return in; }
+        }
+        case MU_VAR: {
+            // assuming that the formula is monotonic we can ignore the sign
+            return LTSminExpr((ltsmin_expr_case)MU_VAR,MU_VAR,rename[in->idx],0,0);
+        }
+        case MU_OR:
+        case MU_AND: {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            ltsmin_expr_t result1 = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+            ltsmin_expr_t result2 = mu_optimize_rec(in->arg2, env, negated, free, man, rename);
+            return LTSminExpr(BINARY_OP,token,LTSminBinaryIdx(env,MU_NAME(token)),result1,result2);
+        }
+        case MU_NOT: {
+            return mu_optimize_rec(in->arg1, env, !negated, free, man, rename); // do we care about a memory leak?
+        }
+        case MU_NEXT:
+        case MU_EXIST:
+        case MU_ALL: {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            ltsmin_expr_t result = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+            result = LTSminExpr(UNARY_OP,token,LTSminUnaryIdx(env, MU_NAME(token)),result,0);
+            return result;
+        }
+        case MU_MU:
+        case MU_NU: {
+            int token = (negated ? (int) mu_dual(in->token) : in->token);
+            int operator = (token==MU_MU ? MU_FIX : NU_FIX);
+            int index = (*free)++;
+            ensure_access(man,in->idx);
+            rename[in->idx]=index;
+            create_mu_var(index,env);
+            ltsmin_expr_t result = mu_optimize_rec(in->arg1, env, negated, free, man, rename);
+            return LTSminExpr(operator,token,index,result,0);
+        }
+        default:
+            Abort("encountered unhandled mu operator");
+    }
+}
+
+int mu_optimize(ltsmin_expr_t *inout, ltsmin_parse_env_t env)
+{
+    int free=0;
+    array_manager_t man = create_manager(512);
+    int* rename = NULL;
+    ADD_ARRAY(man, rename, int);
+    *inout = mu_optimize_rec(*inout,env,false,&free,man,rename);
+    destroy_manager(man); // TODO: check if this is correct; seems to go wrong
+    return free;
+}
+
+void mu_object_rec(ltsmin_expr_t in, mu_object_t this)
+{
+    // store the sign of mu/nu variables, and compute the direct dependencies
+    switch(in->token) {
+        case MU_VAR: {
+            for (int i=this->top-1; this->stack[i] != in->idx; i--) {
+                // iterate all bindings on the stack until (not including) this variable
+                Warning(debug, "Dependency %d -> %d", in->idx, this->stack[i]);
+                this->deps[in->idx][this->stack[i]] = true;
+            }
+            break;
+        }
+        case MU_OR: case MU_AND: {
+            mu_object_rec(in->arg1,this);
+            mu_object_rec(in->arg2,this);
+            break;
+        }
+        case MU_NOT: case MU_NEXT: case MU_EXIST: case MU_ALL: {
+            mu_object_rec(in->arg1,this);
+            break;
+        }
+        case MU_MU: case MU_NU: {
+            int var = in->idx;
+            this->sign[var]= in->token;
+            this->stack[this->top++] = var;
+            mu_object_rec(in->arg1,this);
+            this->top--;
+            break;
+        }
+        default: ;
+    }
+}
+
+mu_object_t mu_object(ltsmin_expr_t in, int nvars)
+{ 
+    // this function critically assumes that all mu/nu variables
+    // are distinct and occur in increasing order
+    mu_object_t result = RT_NEW(struct mu_object_s);
+    result->nvars = nvars;
+    result->sign = (int*) RTmallocZero( sizeof(int) * nvars );
+    result->deps = (int**) RTmalloc( sizeof(int*) * nvars);
+    for (int i=0; i<nvars; i++) {
+        result->deps[i]=RTmallocZero(sizeof(int) * nvars);
+    }
+    result->stack = (int*) RTmallocZero(sizeof(char) * nvars); // could use bitset
+    result->top = 0;
+
+    mu_object_rec(in,result);
+
+    // compute transitive closure of deps
+    int** deps=result->deps;
+    char change;
+    do {
+        change=0;
+        for (int i=0;i<nvars;i++) {
+            for (int j=0;j<nvars;j++)
+            for (int k=0;k<nvars;k++) {
+                if (deps[i][j] && deps[j][k] && !deps[i][k]) {
+                    change=1;
+                    deps[i][k] = 1;
+                    fprintf(stderr,"Dependency %d ->> %d\n",i,k);
+                }
+            }
+        }
+    } while (change==1);
+
+    return result;
+}
+
+
+/********** TABLEAUX FOR THE TRANSLATION FROM CTL-STAR TO MU_CALCULUS ********/
 
 int tableaux_node_eq(tableaux_node_t *n1, tableaux_node_t *n2)
 {
@@ -570,62 +1032,6 @@ void* tableaux_table_lookup(tableaux_table_t *t, uint32_t hash, void* data)
     }
 }
 
-/* for debuggin only */
-char *ltsmin_expr_print_ltl(ltsmin_expr_t ltl,char* buf)
-{
-    // no equation
-    HREassert (ltl, "Empty LTL expression");
-
-    // left eq
-    switch(ltl->node_type) {
-        case BINARY_OP:
-            *buf++='(';
-            buf = ltsmin_expr_print_ltl(ltl->arg1, buf);
-        default:;
-    }
-    // middle
-    switch(ltl->token) {
-        case LTL_SVAR: sprintf(buf, "@S%d", ltl->idx); break;
-        case LTL_EVAR: sprintf(buf, "@E%d", ltl->idx); break;
-        case LTL_NUM: sprintf(buf, "%d", ltl->idx); break;
-        case LTL_VAR:
-            if (-1 == ltl->num)
-                sprintf(buf, "@V%d", ltl->idx);
-            else
-                sprintf(buf, "@C%d", ltl->num);
-            break;
-        case LTL_CHUNK: sprintf(buf, "@H%d", ltl->idx); break;
-        case LTL_EQ: sprintf(buf, " == "); break;
-        case LTL_TRUE: sprintf(buf, "true"); break;
-        case LTL_OR: sprintf(buf, " or "); break;
-        case LTL_NOT: sprintf(buf, "!"); break;
-        case LTL_NEXT: sprintf(buf, "X "); break;
-        case LTL_UNTIL: sprintf(buf, " U "); break;
-        case LTL_FALSE: sprintf(buf, "false"); break;
-        case LTL_AND: sprintf(buf, " and "); break;
-        case LTL_EQUIV: sprintf(buf, " <-> "); break;
-        case LTL_IMPLY: sprintf(buf, " -> "); break;
-        case LTL_FUTURE: sprintf(buf, "F "); break;
-        case LTL_GLOBALLY: sprintf(buf, "G "); break;
-        default:
-            Abort("unknown LTL token");
-    }
-    buf += strlen(buf);
-    // right eq
-    switch(ltl->node_type) {
-        case UNARY_OP:
-            buf = ltsmin_expr_print_ltl(ltl->arg1, buf);
-            break;
-        case BINARY_OP:
-            buf = ltsmin_expr_print_ltl(ltl->arg2, buf);
-            *buf++=')';
-            break;
-        default:;
-    }
-    *buf='\0';
-    return buf;
-}
-
 /* print ctl/ctl* expression in a buffer
  * returns the buffer + size taken for the expression
  * assumes buffer is large enough */
@@ -646,20 +1052,20 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
         case CTL_SVAR: sprintf(buf, "@S%d", ctl->idx); break;
         case CTL_EVAR: sprintf(buf, "@E%d", ctl->idx); break;
         case CTL_NUM: sprintf(buf, "%d", ctl->idx); break;
-        case CTL_VAR:
-            if (-1 == ctl->num)
-                sprintf(buf, "@V%d", ctl->idx);
-            else
-                sprintf(buf, "@C%d", ctl->num);
-            break;
         case CTL_CHUNK: sprintf(buf, "@H%d", ctl->idx); break;
+        case CTL_LT: sprintf(buf, " < "); break;
+        case CTL_LEQ: sprintf(buf, " <= "); break;
+        case CTL_GT: sprintf(buf, " > "); break;
+        case CTL_GEQ: sprintf(buf, " >= "); break;
         case CTL_EQ: sprintf(buf, " == "); break;
+        case CTL_NEQ: sprintf(buf, " != "); break;
         case CTL_TRUE: sprintf(buf, "true"); break;
         case CTL_OR: sprintf(buf, " or "); break;
         case CTL_NOT: sprintf(buf, "!"); break;
         case CTL_NEXT: sprintf(buf, "X "); break;
         case CTL_UNTIL: sprintf(buf, " U "); break;
         case CTL_FALSE: sprintf(buf, "false"); break;
+        case CTL_MAYBE: sprintf(buf, "maybe"); break;
         case CTL_AND: sprintf(buf, " and "); break;
         case CTL_EQUIV: sprintf(buf, " <-> "); break;
         case CTL_IMPLY: sprintf(buf, " -> "); break;
@@ -667,6 +1073,12 @@ char* ltsmin_expr_print_ctl(ltsmin_expr_t ctl, char* buf)
         case CTL_GLOBALLY: sprintf(buf, "G "); break;
         case CTL_EXIST: sprintf(buf, "E "); break;
         case CTL_ALL: sprintf(buf, "A "); break;
+        case CTL_MULT: sprintf(buf, " * "); break;
+        case CTL_DIV: sprintf(buf, " / "); break;
+        case CTL_REM: sprintf(buf, " %% "); break;
+        case CTL_ADD: sprintf(buf, " + "); break;
+        case CTL_SUB: sprintf(buf, " - "); break;
+        case CTL_EN:  sprintf(buf, " ?? "); break;
         default:
             Abort("unknown CTL token");
     }
@@ -880,7 +1292,7 @@ ltsmin_expr_t tableaux_expr(tableaux_t *t, ltsmin_expr_t e)
         result = e;
         tableaux_table_add(&t->expressions, e->hash, e);
     } else {
-        LTSminExprDestroy(e);
+        LTSminExprDestroy(e, 1);
     }
     return result;
 }
@@ -1296,7 +1708,7 @@ void tableaux_print(tableaux_t *t)
     int stop = start;
     tableaux_print_compressed(&t->root, 0, &start, &stop);
     for(int i=0; i <= max_level; i++) {
-        Warning(info, "%s", tableaux_lines[i]);
+        Warning(infoLong, "%s", tableaux_lines[i]);
     }
     destroy_manager(line_man);
 }
@@ -1440,7 +1852,7 @@ tableaux_node_t* build_initial_node(tableaux_t *t, ltsmin_expr_t e)
 {
     ltsmin_expr_t e_pnf = ctl_star_to_pnf(e);
 
-    tableaux_node_quantifier_t q = NODE_NONE;
+    tableaux_node_quantifier_t q = NODE_ALL;
 
     if (e_pnf->token == CTL_ALL || e_pnf->token == CTL_EXIST) {
         // get tail
@@ -1455,7 +1867,7 @@ tableaux_node_t* build_initial_node(tableaux_t *t, ltsmin_expr_t e)
     // add node
     tableaux_table_add(&t->nodes, n->hash, n);
     // free pnf expression
-    LTSminExprDestroy(e_pnf);
+    LTSminExprDestroy(e_pnf, 1);
     // return node
     return n;
 }
@@ -1477,13 +1889,8 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
     switch(mu->token) {
         case MU_SVAR: sprintf(buf, "@S%d", mu->idx); break;
         case MU_EVAR: sprintf(buf, "@E%d", mu->idx); break;
+        case VAR: sprintf(buf, "@V%d", mu->idx); break;
         case MU_NUM: sprintf(buf, "%d", mu->idx); break;
-        case MU_VAR:
-            if (-1 == mu->num)
-                sprintf(buf, "@V%d", mu->idx);
-            else
-                sprintf(buf, "@C%d", mu->num);
-            break;
         case MU_CHUNK: sprintf(buf, "@H%d", mu->idx); break;
         case MU_EQ: sprintf(buf, " == "); break;
         case MU_TRUE: sprintf(buf, "true"); break;
@@ -1491,7 +1898,9 @@ char* ltsmin_expr_print_mu(ltsmin_expr_t mu, char* buf)
         case MU_NOT: sprintf(buf, "!"); break;
         case MU_NEXT: sprintf(buf, "X "); break;
         case MU_FALSE: sprintf(buf, "false"); break;
+        case MU_MAYBE: sprintf(buf, "maybe"); break;
         case MU_AND: sprintf(buf, " /\\ "); break;
+        case MU_EN: sprintf(buf, " ?? "); break;
         //case MU_EQUIV: sprintf(buf, " <-> "); break;
         //case MU_IMPLY: sprintf(buf, " -> "); break;
         case MU_EXIST: sprintf(buf, "E "); break;
@@ -1538,25 +1947,7 @@ ltsmin_expr_t ctl_star_to_mu_1(ltsmin_expr_t in)
 {
     ltsmin_expr_t res = RT_NEW(struct ltsmin_expr_s);
     memcpy(res, in, sizeof(struct ltsmin_expr_s));
-    switch (in->token) {
-        case CTL_SVAR:      res->token = MU_SVAR;      break;
-        case CTL_EVAR:      res->token = MU_EVAR;      break;
-        case CTL_NUM:       res->token = MU_NUM;       break;
-        case CTL_CHUNK:     res->token = MU_CHUNK;     break;
-        case CTL_VAR:       res->token = MU_VAR;       break;
-        case CTL_EQ:        res->token = MU_EQ;        break;
-        case CTL_TRUE:      res->token = MU_TRUE;      break;
-        case CTL_FALSE:     res->token = MU_FALSE;     break;
-        case CTL_OR:        res->token = MU_OR;        break;
-        case CTL_AND:       res->token = MU_AND;       break;
-        case CTL_NOT:       res->token = MU_NOT;       break;
-        case CTL_NEXT:      res->token = MU_NEXT;      break;
-        case CTL_ALL:       res->token = MU_ALL;       break;
-        case CTL_EXIST:     res->token = MU_EXIST;     break;
-        default:
-            // unhandled?
-            Abort("unhandled case in ctl_star_to_mu_1");
-    }
+    res->token = ctl2mu_token(in->token);
     // handle sub-expressions
     switch (in->node_type) {
         case UNARY_OP:
@@ -1759,14 +2150,14 @@ ltsmin_expr_t tableaux_translate_syntax_tree(tableaux_t* t, syntax_tree_t *s)
                     char buf1[4096];
                     tableaux_node_print(s->node, buf);
                     tableaux_node_print(s->companion->node, buf1);
-                    Warning(info, "encountered preterminal %s with companion %s", buf, buf1);
+                    Warning(infoLong, "encountered preterminal %s with companion %s", buf, buf1);
                     ltsmin_expr_print_ctl(s->companion->S_phi->expr, buf);
                     if (s->node->quantifier == NODE_ALL) {
                         path_var_idx = find_path(NU_PATH, s, s->companion);
-                        Warning(info, " nu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
+                        Warning(infoLong, " nu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
                     } else {
                         path_var_idx = find_path(MU_PATH, s, s->companion);
-                        Warning(info, " mu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
+                        Warning(infoLong, " mu-path exist from %s to %s? %s", buf, buf, path_var_idx ? "yes" : "no");
                     }
 
                     res = LTSminExpr((ltsmin_expr_case)MU_VAR, MU_VAR, s->companion->path_var[path_var_idx], mu_left, mu_right);
@@ -1800,7 +2191,7 @@ ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t in)
     tableaux_t *t = tableaux_create();
 
     // step 1: convert ctl_star formula to tableaux start node
-    Warning(info, "-- conversion --");
+    Warning(infoLong, "-- conversion --");
     //tableaux_node_t *n = build_test_node(t);
     tableaux_node_t *n = build_initial_node(t,in);
     t->root.node = n;
@@ -1809,15 +2200,15 @@ ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t in)
     tableaux_build_syntax_tree(t, &t->root);
 
     // debug print this
-    tableaux_print(t);
+    if (log_active(infoLong)) tableaux_print(t);
 
     // step 3: translate the tableaux
     ltsmin_expr_t mu = tableaux_translate_syntax_tree(t, &t->root);
-    ltsmin_expr_print_mu(mu, buf);
-    Warning(info, "** %s **", buf);
+    if (log_active(infoLong)) ltsmin_expr_print_mu(mu, buf);
+    Warning(infoLong, "** %s **", buf);
 
     tableaux_destroy(t);
-    Warning(info, "-- end conversion --");
+    Warning(infoLong, "-- end conversion --");
 
     return mu;
 }

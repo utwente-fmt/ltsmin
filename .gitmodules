@@ -1,15 +1,9 @@
-[submodule "buddy"]
-	path = buddy
-	url = https://github.com/utwente-fmt/buddy.git
 [submodule "spins"]
 	path = spins
 	url = https://github.com/utwente-fmt/spins.git
 [submodule "ltl2ba"]
 	path = ltl2ba
-	url = http://fmt.cs.utwente.nl/tools/scm/ltl2ba.git
-[submodule "sylvan"]
-	path = sylvan
-	url = https://github.com/utwente-fmt/sylvan.git
+	url = https://github.com/utwente-fmt/ltl2ba.git
 [submodule "scoop"]
 	path = scoop
 	url = https://github.com/utwente-fmt/scoop.git

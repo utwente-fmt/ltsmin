@@ -2,11 +2,17 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
+#ifdef __APPLE__
+#include <alloca.h>
+#endif
 
 #include <hre/user.h>
 #include <vset-lib/vdom_object.h>
+#include <vset-lib/vector_set.h>
 #include <hre-io/user.h>
 #include <util-lib/simplemap.h>
 
@@ -58,6 +64,8 @@ struct op_rec {
             uint32_t arg2;
             uint32_t res;
         } other;
+        uint64_t count_part;
+        void* any;
     } res;
 };
 static struct op_rec *op_cache=NULL;
@@ -73,6 +81,12 @@ static struct op_rec *op_cache=NULL;
 #define OP_SAT 9
 #define OP_RELPROD 10
 #define OP_UNIVERSE 11
+#define OP_CCOUNT1 12
+#define OP_CCOUNT2 13
+#define OP_VISIT 14
+#define MAX_OP 14
+
+static int next_cache_op = MAX_OP;
 
 struct vector_domain {
     struct vector_domain_shared shared;
@@ -134,7 +148,7 @@ mdd_create_stack()
 {
     stack_size = fib(stack_fib);
     mdd_stack = RTmalloc(sizeof(uint32_t[stack_size]));
-    Warning(info, "initial stack size %u", stack_size);
+    Warning(info, "initial stack size %" PRIu32, stack_size);
 }
 
 static void
@@ -148,7 +162,7 @@ mdd_push(uint32_t mdd)
 
         mdd_stack = RTrealloc(mdd_stack, sizeof(uint32_t[stack_size_new]));
         stack_size = stack_size_new;
-        Warning(debug, "new stack size %u", stack_size);
+        Warning(debug, "new stack size %" PRIu32, stack_size);
     }
     mdd_stack[mdd_top]=mdd;
     mdd_top++;
@@ -235,7 +249,7 @@ static void mdd_collect(uint32_t a,uint32_t b){
        but the memory use went up considerably.
        Still it may be useful for saturation.
     */
-    Warning(debug, "ListDD garbage collection: %u of %u nodes used",
+    Warning(debug, "ListDD garbage collection: %" PRIu32" of %" PRIu32" nodes used",
             mdd_used, mdd_nodes);
     int resize=0;
     // The two assignments below are not needed, but silence compiler warnings
@@ -257,14 +271,18 @@ static void mdd_collect(uint32_t a,uint32_t b){
             Warning(debug, "op cache reached maximum size");
             new_cache_size = UINT32_MAX;
         }
-        Warning(debug, "new op cache has %u entries", new_cache_size);
+        Warning(debug, "new op cache has %" PRIu32 " entries", new_cache_size);
     }
     for(uint32_t i=0;i<cache_size;i++){
         uint32_t slot,op,arg1,arg2,res;
-        op=op_cache[i].op&0xffff;
+        op=op_cache[i].op&0x00ff;
         switch(op){
             case OP_UNUSED: continue;
-            case OP_COUNT: {
+            case OP_COUNT:
+            case OP_CCOUNT1:
+            case OP_CCOUNT2:
+            case OP_VISIT:
+            {
                 arg1=op_cache[i].arg1;
                 arg2=0;
                 if (!(node_table[arg1].next&0x80000000)){
@@ -329,8 +347,8 @@ static void mdd_collect(uint32_t a,uint32_t b){
             unique_table[i]=mdd_sweep_bucket(unique_table[i]);
         }
     } else {
-        Warning(debug,"copied %u op cache nodes",copy_count);
-        RTfree(op_cache);
+        Warning(debug,"copied %" PRIu32" op cache nodes",copy_count);
+        RTalignedFree(op_cache);
         op_cache=new_cache;
         cache_size=new_cache_size;
         uint32_t old_size=mdd_nodes;
@@ -891,29 +909,17 @@ static int set_member_mdd(vset_t set, const int* e)
 }
 
 static void
-set_count_mdd(vset_t set, long *nodes, bn_int_t *elements)
+set_count_mdd(vset_t set, long *nodes, double *elements)
 {
-    if (nodes != NULL) {
-        long n_count = mdd_node_count(set->mdd);
-        *nodes = n_count;
-    }
-    if (elements != NULL) {
-        double e_count   = mdd_count(set->mdd);
-        bn_double2int(e_count, elements);
-    }
+    if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
+    if (elements != NULL) *elements = mdd_count(set->mdd);
 }
 
 static void
-rel_count_mdd(vrel_t rel, long *nodes, bn_int_t *elements)
+rel_count_mdd(vrel_t rel, long *nodes, double *elements)
 {
-    if (nodes != NULL) {
-        long n_count = mdd_node_count(rel->mdd);
-        *nodes = n_count;
-    }
-    if (elements != NULL) {
-        double e_count   = mdd_count(rel->mdd);
-        bn_double2int(e_count, elements);
-    }
+    if (nodes != NULL) *nodes = mdd_node_count(rel->mdd);
+    if (elements != NULL) *elements = mdd_count(rel->mdd);
 }
 
 static void
@@ -1113,8 +1119,7 @@ mdd_next(uint32_t p_id, uint32_t set, uint32_t rel, int idx, int *proj, int len)
 static void
 set_project_mdd(vset_t dst, vset_t src)
 {
-    assert(src->p_len == -1);
-    if (dst->p_len == -1) {
+    if (src->p_len != -1 || dst->p_len == -1) {
         dst->mdd = src->mdd;
     } else {
         dst->mdd = 0;
@@ -1628,6 +1633,166 @@ static void rel_dot_mdd(FILE* fp, vrel_t src) {
   fprintf(fp,"}\n");
 }
 
+static long double mdd_ccount(uint32_t mdd){
+    if (mdd<=1) return mdd;
+    uint32_t slot1=hash(OP_CCOUNT1,mdd,0)%cache_size;
+    uint32_t slot2=hash(OP_CCOUNT2,mdd,0)%cache_size;
+
+    union {
+        long double count;
+        struct {
+            uint64_t p1;
+            uint64_t p2;
+        } s;
+    } res;
+
+    res.count=0.0;
+    if (op_cache[slot1].op==OP_CCOUNT1 && op_cache[slot1].arg1==mdd
+            && op_cache[slot2].op==OP_CCOUNT2 && op_cache[slot2].arg1==mdd){
+        res.s.p1=op_cache[slot1].res.count_part;
+        res.s.p2=op_cache[slot2].res.count_part;
+        return res.count;
+    }
+    res.count=mdd_ccount(node_table[mdd].down);
+    res.count+=mdd_ccount(node_table[mdd].right);
+    op_cache[slot1].op=OP_CCOUNT1;
+    op_cache[slot1].arg1=mdd;
+    op_cache[slot1].res.count_part=res.s.p1;
+    op_cache[slot2].op=OP_CCOUNT2;
+    op_cache[slot2].arg1=mdd;
+    op_cache[slot2].res.count_part=res.s.p2;
+    return res.count;
+}
+
+static void
+set_ccount_mdd(vset_t set, long *nodes, long double *elements)
+{
+    if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
+    if (elements != NULL) *elements = mdd_ccount(set->mdd);
+}
+
+static void
+dom_clear_cache(vdom_t dom, const int cache_op)
+{
+    (void) dom;
+    const uint32_t op = (uint32_t) OP_VISIT | (cache_op << 8);
+
+    for (uint32_t i = 0 ; i < cache_size; i++) {
+        if ((op_cache[i].op & 0xffff) == op) op_cache[i].op=OP_UNUSED;
+    }
+
+    next_cache_op = MAX_OP;
+}
+
+static void
+mdd_visit_proj(uint32_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, uint32_t cache_op, uint32_t p_id)
+{
+    if (set <= 1) {
+        if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(1, set, 0, NULL, context);
+        return;
+    }
+
+    uint32_t op = cache_op | (p_id << 16);
+    uint32_t slot = hash(op, set, 0) % cache_size;
+
+    void* result;
+    if (op_cache[slot].op == op && op_cache[slot].arg1 == set){
+        result = op_cache[slot].res.any;
+        if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(0, node_table[set].val, 1, result, context);
+        return;
+    }
+
+    if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(0, node_table[set].val, 0, NULL, context);
+
+    void* context_down = alloca(ctx_size);
+    void* context_right = alloca(ctx_size);
+    if (cbs->vset_visit_init_context != NULL) {
+        cbs->vset_visit_init_context(context_down, context, 1);
+        cbs->vset_visit_init_context(context_right, context, 0);
+    }
+
+    mdd_visit_proj(node_table[set].down, cbs, ctx_size, context_down, cache_op, node_table[p_id].down);
+    mdd_visit_proj(node_table[set].right, cbs, ctx_size, context_right, cache_op, p_id);
+
+    if (cbs->vset_visit_post != NULL) {
+        int cache = 0;
+        cbs->vset_visit_post(node_table[set].val, context, &cache, &result);
+
+        if (cache) {
+            op_cache[slot].op = op;
+            op_cache[slot].arg1 = set;
+            op_cache[slot].res.any = result;
+            if(cbs->vset_visit_cache_success != NULL) cbs->vset_visit_cache_success(context, result);
+        }
+    }
+}
+
+static void
+mdd_visit(uint32_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, uint32_t cache_op)
+{
+    if (set <= 1) {
+        if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(1, set, 0, NULL, context);
+        return;
+    }
+
+    uint32_t slot = hash(cache_op, set, 0) % cache_size;
+
+    void* result;
+    if (op_cache[slot].op == cache_op && op_cache[slot].arg1 == set){
+        result = op_cache[slot].res.any;
+        if (cbs->vset_visit_pre != NULL) cbs->vset_visit_pre(0, node_table[set].val, 1, result, context);
+        return;
+    }
+
+    cbs->vset_visit_pre(0, node_table[set].val, 0, NULL, context);
+
+    void* context_down = alloca(ctx_size);
+    void* context_right = alloca(ctx_size);
+    if (cbs->vset_visit_init_context != NULL) {
+        cbs->vset_visit_init_context(context_down, context, 1);
+        cbs->vset_visit_init_context(context_right, context, 0);
+    }
+
+    mdd_visit(node_table[set].down, cbs, ctx_size, context_down, cache_op);
+    mdd_visit(node_table[set].right, cbs, ctx_size, context_right, cache_op);
+
+    if (cbs->vset_visit_post != NULL) {
+        int cache = 0;
+        cbs->vset_visit_post(node_table[set].val, context, &cache, &result);
+
+        if (cache) {
+            op_cache[slot].op = cache_op;
+            op_cache[slot].arg1 = set;
+            op_cache[slot].res.any = result;
+            if(cbs->vset_visit_cache_success != NULL) cbs->vset_visit_cache_success(context, result);
+        }
+    }
+}
+
+static void
+set_visit_mdd(vset_t set, vset_visit_callbacks_t* cbs, size_t ctx_size, void* context, int cache_op)
+{
+    if (cache_op > 0xff) Abort("cache op too large");
+
+    const uint32_t op = (uint32_t) OP_VISIT | (cache_op << 8);
+
+    if (set->p_len != -1) mdd_visit_proj(set->mdd, cbs, ctx_size, context, op, set->p_id);
+    else mdd_visit(set->mdd, cbs, ctx_size, context, op);
+}
+
+static int
+dom_next_cache_op(vdom_t dom)
+{
+    (void) dom;
+    
+    next_cache_op++;
+
+    if (next_cache_op > (int) 0xff) {
+        Abort("No more free user cache operations");
+    }
+
+    return next_cache_op;
+}
 
 vdom_t vdom_create_list_native(int n){
     Warning(info,"Creating a native ListDD domain.");
@@ -1635,11 +1800,11 @@ vdom_t vdom_create_list_native(int n){
     vdom_init_shared(dom,n);
     if (unique_table==NULL) {
         mdd_nodes=(nodes_fib <= FIB_MAX)?fib(nodes_fib):UINT32_MAX;
-        Warning(info,"initial node table has %u entries",mdd_nodes);
+        Warning(info,"initial node table has %" PRIu32 " entries",mdd_nodes);
         uniq_size=(nodes_fib + 1 <= FIB_MAX)?fib(nodes_fib+1):UINT32_MAX;
-        Warning(info,"initial uniq table has %u entries",uniq_size);
+        Warning(info,"initial uniq table has %" PRIu32 " entries",uniq_size);
         cache_size=(nodes_fib+cache_fib <= FIB_MAX)?fib(nodes_fib+cache_fib):UINT32_MAX;
-        Warning(info,"initial op cache has %u entries",cache_size);
+        Warning(info,"initial op cache has %" PRIu32" entries",cache_size);
 
         unique_table=RTmalloc(uniq_size*sizeof(uint32_t));
         node_table=RTmalloc(mdd_nodes*sizeof(struct mdd_node));
@@ -1673,6 +1838,7 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_copy=set_copy_mdd;
     dom->shared.set_enum=set_enum_mdd;
     dom->shared.set_count=set_count_mdd;
+    dom->shared.set_ccount=set_ccount_mdd;
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
     dom->shared.rel_create=rel_create_mdd;
@@ -1698,5 +1864,8 @@ vdom_t vdom_create_list_native(int n){
     dom->shared.set_least_fixpoint=set_least_fixpoint_mdd;
     dom->shared.set_dot=set_dot_mdd;
     dom->shared.rel_dot=rel_dot_mdd;
+    dom->shared.set_visit_seq=set_visit_mdd;
+    dom->shared.dom_clear_cache=dom_clear_cache;
+    dom->shared.dom_next_cache_op=dom_next_cache_op;
     return dom;
 }

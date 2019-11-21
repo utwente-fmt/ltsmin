@@ -69,7 +69,7 @@ dfs_stack_size (dfs_stack_t stack)
 static void
 clean_frame(dfs_stack_t stack)
 {
-    if(stack->frame_bottom){
+    if (stack->frame_bottom){
         isba_discard_int(stack->states, stack->frame_bottom);
         stack->frame_bottom = 0;
         stack->frame_size = 0;
@@ -176,6 +176,16 @@ dfs_stack_discard (dfs_stack_t stack, size_t num)
     }
     isba_discard_int(stack->states, num);
     stack->frame_size -= num;
+}
+
+void
+dfs_stack_clear (dfs_stack_t stack)
+{
+    isba_discard_int (stack->states, isba_size_int(stack->states));
+    isba_discard_int (stack->frames, isba_size_int(stack->frames));
+    stack->nframes = 0;
+    stack->frame_size = 0;
+    stack->frame_bottom = 0;
 }
 
 int *

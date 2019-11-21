@@ -5,8 +5,10 @@
 #ifndef LTL_H
 #define LTL_H
 
+#include <ltsmin-lib/ltsmin-standard.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/parallel/color.h>
+#include <pins-lib/pins2pins-ltl.h>
 #include <util-lib/fast_set.h>
 
 extern struct poptOption ndfs_options[];
@@ -24,16 +26,31 @@ typedef union trace_info_u {
     char                data[16];
 } trace_info_t;
 
-extern void find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack);
+extern void find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack,
+                                            bool is_lasso);
 
-extern void ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
+static inline void
+check_counter_example (wctx_t *ctx, dfs_stack_t stack, bool is_lasso)
+{
+    if (EXPECT_FALSE(ctx->counter_example)) {
+        /* Write last state to stack to close cycle */
+        state_data_t data = dfs_stack_push (stack, NULL);
+        state_info_serialize (ctx->ce_state, data);
+
+        find_and_write_dfs_stack_trace (ctx->model, stack, is_lasso);
+    }
+}
+
+extern void ndfs_report_cycle (wctx_t *ctx, model_t model, dfs_stack_t stack,
                                state_info_t *cycle_closing_state);
 
 static inline bool
 ecd_has_state (fset_t *table, state_info_t *s)
 {
     hash32_t            hash = ref_hash (s->ref);
-    return fset_find (table, &hash, &s->ref, NULL, false);
+    int seen = fset_find (table, &hash, &s->ref, NULL, false);
+    HREassert (seen != FSET_FULL);
+    return seen;
 }
 
 static inline uint32_t

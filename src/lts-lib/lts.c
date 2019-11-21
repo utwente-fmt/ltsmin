@@ -26,12 +26,12 @@ void lts_free(lts_t lts){
     RTfree(lts);
 }
 
-static void build_block(uint32_t states,uint32_t transitions,u_int32_t *begin,u_int32_t *block,u_int32_t *label,u_int32_t *other){
+static void build_block(uint32_t states,uint32_t transitions,uint32_t *begin,uint32_t *block,uint32_t *label,uint32_t *other){
     int has_label=(label!=NULL);
     uint32_t i;
     uint32_t loc1,loc2;
-    u_int32_t tmp_label1=0,tmp_label2=0;
-    u_int32_t tmp_other1,tmp_other2;
+    uint32_t tmp_label1=0,tmp_label2=0;
+    uint32_t tmp_other1,tmp_other2;
 
     for(i=0;i<states;i++) begin[i]=0;
     for(i=0;i<transitions;i++) begin[block[i]]++;
@@ -84,10 +84,10 @@ void lts_set_type(lts_t lts,LTS_TYPE type){
     Debug("first change to LTS_LIST");
     switch(lts->type){
         case LTS_LIST:
-            lts->begin=(u_int32_t*)RTmalloc(sizeof(u_int32_t)*(lts->states+1));
+            lts->begin=(uint32_t*)RTmalloc(sizeof(uint32_t)*(lts->states+1));
             break;
         case LTS_BLOCK:
-            lts->src=(u_int32_t*)RTmalloc(sizeof(u_int32_t)*(lts->transitions));
+            lts->src=(uint32_t*)RTmalloc(sizeof(uint32_t)*(lts->transitions));
             for(i=0;i<lts->states;i++){
                 for(j=lts->begin[i];j<lts->begin[i+1];j++){
                     lts->src[j]=i;
@@ -95,7 +95,7 @@ void lts_set_type(lts_t lts,LTS_TYPE type){
             }
             break;
         case LTS_BLOCK_INV:
-            lts->dest=(u_int32_t*)RTmalloc(sizeof(u_int32_t)*(lts->transitions));
+            lts->dest=(uint32_t*)RTmalloc(sizeof(uint32_t)*(lts->transitions));
             for(i=0;i<lts->states;i++){
                 for(j=lts->begin[i];j<lts->begin[i+1];j++){
                     lts->dest[j]=i;
@@ -134,12 +134,12 @@ static void lts_realloc(lts_t lts){
     }
     uint32_t size;
     // realloc root_list
-    size=sizeof(u_int32_t)*lts->root_count;
+    size=sizeof(uint32_t)*lts->root_count;
     lts->root_list=(uint32_t*)RTrealloc(lts->root_list,size);
     if (size && lts->root_list==NULL) Abort("out of memory");
     // realloc properties
     if (N>0) {
-        size=sizeof(u_int32_t)*lts->states;
+        size=sizeof(uint32_t)*lts->states;
         lts->properties=(uint32_t*)RTrealloc(lts->properties,size);
         if (size && lts->properties==NULL) Abort("out of memory");
     } else {
@@ -159,13 +159,13 @@ static void lts_realloc(lts_t lts){
     switch(lts->type){
         case LTS_BLOCK:
         case LTS_BLOCK_INV:
-            size=sizeof(u_int32_t)*(lts->states+1);
+            size=sizeof(uint32_t)*(lts->states+1);
             break;
         case LTS_LIST:
             size=0;
             break;
     }
-    lts->begin=(u_int32_t*)RTrealloc(lts->begin,size);
+    lts->begin=(uint32_t*)RTrealloc(lts->begin,size);
     if (size && lts->begin==NULL) Abort("out of memory");
     // realloc src
     switch(lts->type){
@@ -174,10 +174,10 @@ static void lts_realloc(lts_t lts){
             break;
         case LTS_BLOCK_INV:
         case LTS_LIST:
-            size=sizeof(u_int32_t)*(lts->transitions);
+            size=sizeof(uint32_t)*(lts->transitions);
             break;
     }
-    lts->src=(u_int32_t*)RTrealloc(lts->src,size);
+    lts->src=(uint32_t*)RTrealloc(lts->src,size);
     if (size && lts->src==NULL) Abort("out of memory");
     // realloc dest
     switch(lts->type){
@@ -186,14 +186,14 @@ static void lts_realloc(lts_t lts){
             break;
         case LTS_BLOCK:
         case LTS_LIST:
-            size=sizeof(u_int32_t)*(lts->transitions);
+            size=sizeof(uint32_t)*(lts->transitions);
             break;
     }
-    lts->dest=(u_int32_t*)RTrealloc(lts->dest,size);
+    lts->dest=(uint32_t*)RTrealloc(lts->dest,size);
     if (size && lts->dest==NULL) Abort("out of memory");
     // realloc label
-    size=(K>0)?(sizeof(u_int32_t)*(lts->transitions)):0;
-    lts->label=(u_int32_t*)RTrealloc(lts->label,size);
+    size=(K>0)?(sizeof(uint32_t)*(lts->transitions)):0;
+    lts->label=(uint32_t*)RTrealloc(lts->label,size);
     if (size && lts->label==NULL) Abort("out of memory");
 }
 
@@ -229,18 +229,21 @@ void lts_set_sig(lts_t lts,lts_type_t type){
         switch(lts_type_get_format(type,i)){
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeBool:
+        case LTStypeTrilean:
+        case LTStypeSInt32:
             values[i]=NULL;
             break;
         case LTStypeChunk:
         case LTStypeEnum:
-            values[i]=chunk_table_create(NULL,sort);
+            values[i] = simple_chunk_table_create(NULL,sort);
             break;
         }
     }
     lts_set_sig_given(lts,type,values);
 }
 
-void lts_set_size(lts_t lts,u_int32_t roots,u_int32_t states,u_int32_t transitions){
+void lts_set_size(lts_t lts,uint32_t roots,uint32_t states,uint32_t transitions){
     lts->root_count=roots;
     lts->states=states;
     lts->transitions=transitions;
@@ -306,7 +309,7 @@ struct cycle_elim_context {
 
 void lts_silent_cycle_elim(lts_t lts,silent_predicate silent,void*silent_ctx,bitset_t diverging){
     if (lts->state_db!=NULL){
-        Warning(error,"illegally wiping out state vectors");
+        Warning(lerror,"illegally wiping out state vectors");
         lts->state_db=NULL;
     }
     int has_props=lts->properties!=NULL;
@@ -480,11 +483,12 @@ void lts_merge(lts_t lts1,lts_t lts2){
         int T1=lts_type_get_edge_label_typeno(lts1->ltstype,0);
         int T2=lts_type_get_edge_label_typeno(lts2->ltstype,0);
         if (lts2->values[T2]!=NULL){
-            int N=VTgetCount(lts2->values[T2]);
-            int map[N];
-            for(int i=0;i<N;i++){
-                chunk c=VTgetChunk(lts2->values[T2],i);
-                map[i]=VTputChunk(lts1->values[T1],c);
+            int C = VTgetCount (lts2->values[T2]);
+            int map[C];
+            table_iterator_t it = VTiterator (lts2->values[T2]);
+            for (int i = 0; IThasNext(it); i++) {
+                chunk c = ITnext (it);
+                map[i] = VTputChunk (lts1->values[T1], c);
             }
             for(uint32_t i=0;i<lts2->transitions;i++){
                 lts1->label[trans_count+i]=map[lts2->label[i]];
@@ -502,19 +506,20 @@ void lts_merge(lts_t lts1,lts_t lts2){
             int T2=lts_type_get_state_label_typeno(lts2->ltstype,0);
             if (lts2->values[T2]!=NULL){
                 Print(info,"copying chunks");
-                int N=VTgetCount(lts2->values[T2]);
-                int map[N];
-                for(int i=0;i<N;i++){
-                    chunk c=VTgetChunk(lts2->values[T2],i);
-                    map[i]=VTputChunk(lts1->values[T1],c);
+                int C = VTgetCount (lts2->values[T2]);
+                int map[C];
+                table_iterator_t it = VTiterator (lts2->values[T2]);
+                for (int i = 0; IThasNext(it); i++) {
+                    chunk c = ITnext (it);
+                    map[i] = VTputChunk (lts1->values[T1], c);
                 }
                 Print(info,"copying labels");
-                for(uint32_t i=0;i<lts2->states;i++){
-                    lts1->properties[state_count+i]=map[lts2->properties[i]];
+                for (uint32_t i=0;i<lts2->states;i++){
+                    lts1->properties[state_count+i] = map[lts2->properties[i]];
                 }
             } else {
-                for(uint32_t i=0;i<lts2->states;i++){
-                    lts1->properties[state_count+i]=lts2->properties[i];
+                for (uint32_t i=0;i<lts2->states;i++){
+                    lts1->properties[state_count+i] = lts2->properties[i];
                 }
             }
         } else {
@@ -576,17 +581,42 @@ lts_t lts_encode_edge(lts_t lts){
             TreeUnfold(lts->state_db,i,vector);
             for(int j=0;j<V;j++){
                 switch(format[j]){
-                case LTStypeDirect:
-                case LTStypeRange:
-                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
-                    break;
-                case LTStypeChunk:
-                case LTStypeEnum:
-                    {
-                    chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
-                    char label_s[label_c.len*2+6];
-                    chunk2string(label_c,sizeof label_s,label_s);
-                    current+=snprintf(current,BUFLEN,"|%s",label_s);
+                    case LTStypeDirect:
+                    case LTStypeRange:
+                    case LTStypeSInt32:
+                        current+=snprintf(current,BUFLEN,"|%d",vector[j]);
+                        break;
+                    case LTStypeChunk:
+                    case LTStypeEnum:
+                        {
+                        chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
+                        char label_s[label_c.len*2+6];
+                        chunk2string(label_c,sizeof label_s,label_s);
+                        current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        break;
+                        }
+                    case LTStypeBool: // fall through
+                    case LTStypeTrilean: {
+                        char* value = NULL;
+                        switch (vector[j]) {
+                            case 0: {
+                                value = "false";
+                                break;
+                            }
+                            case 1: {
+                                value = "true";
+                                break;
+                            }
+                            case 2: {
+                                value = "maybe";
+                                break;
+                            }
+                            default: {
+                                Abort("Invalid value: %d", vector[j]);
+                            }
+                        }
+                        current+=snprintf(current,BUFLEN,"|%s",value);
+                        break;
                     }
                 }
             }
@@ -615,23 +645,48 @@ lts_t lts_encode_edge(lts_t lts){
             }
             for(int j=0;j<N;j++){
                 switch(format[j]){
-                case LTStypeDirect:
-                case LTStypeRange:
-                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
-                    break;
-                case LTStypeChunk:
-                case LTStypeEnum:
-                    {
-                    chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
-                    char label_s[label_c.len*2+6];
-                    chunk2string(label_c,sizeof label_s,label_s);
-                    current+=snprintf(current,BUFLEN,"|%s",label_s);
+                    case LTStypeDirect:
+                    case LTStypeRange:
+                    case LTStypeSInt32:
+                        current+=snprintf(current,BUFLEN,"|%d",vector[j]);
+                        break;
+                    case LTStypeChunk:
+                    case LTStypeEnum:
+                        {
+                        chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
+                        char label_s[label_c.len*2+6];
+                        chunk2string(label_c,sizeof label_s,label_s);
+                        current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        break;
+                        }
+                    case LTStypeBool:
+                    case LTStypeTrilean: {
+                        char* value = NULL;
+                        switch (vector[j]) {
+                            case 0: {
+                                value = "false";
+                                break;
+                            }
+                            case 1: {
+                                value = "true";
+                                break;
+                            }
+                            case 2: {
+                                value = "maybe";
+                                break;
+                            }
+                            default: {
+                                Abort("Invalid value: %d", vector[j]);
+                            }
+                        }
+                        current+=snprintf(current,BUFLEN,"|%s",value);
+                        break;
                     }
                 }
             }
             res->src[edge]=i+1;
             res->dest[edge]=i+1;
-            res->label[edge]=VTputChunk(res->values[0],chunk_str(label));;
+            res->label[edge]=VTputChunk(res->values[0],chunk_str(label));
             edge++;
         }
     }
@@ -654,23 +709,48 @@ lts_t lts_encode_edge(lts_t lts){
             }
             for(int j=0;j<K;j++){
                 switch(format[j]){
-                case LTStypeDirect:
-                case LTStypeRange:
-                    current+=snprintf(current,BUFLEN,"|%d",vector[j]);
-                    break;
-                case LTStypeChunk:
-                case LTStypeEnum:
-                    {
-                    chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
-                    char label_s[label_c.len*2+6];
-                    chunk2string(label_c,sizeof label_s,label_s);
-                    current+=snprintf(current,BUFLEN,"|%s",label_s);
+                    case LTStypeDirect:
+                    case LTStypeRange:
+                    case LTStypeSInt32:
+                        current+=snprintf(current,BUFLEN,"|%d",vector[j]);
+                        break;
+                    case LTStypeChunk:
+                    case LTStypeEnum:
+                        {
+                        chunk label_c=VTgetChunk(lts->values[typeno[j]],vector[j]);
+                        char label_s[label_c.len*2+6];
+                        chunk2string(label_c,sizeof label_s,label_s);
+                        current+=snprintf(current,BUFLEN,"|%s",label_s);
+                        break;
+                        }
+                    case LTStypeBool:
+                    case LTStypeTrilean: {
+                        char* value = NULL;
+                        switch (vector[j]) {
+                            case 0: {
+                                value = "false";
+                                break;
+                            }
+                            case 1: {
+                                value = "true";
+                                break;
+                            }
+                            case 2: {
+                                value = "maybe";
+                                break;
+                            }
+                            default: {
+                                Abort("Invalid value: %d", vector[j]);
+                            }
+                        }
+                        current+=snprintf(current,BUFLEN,"|%s",value);
+                        break;
                     }
                 }
             }
             res->src[edge]=lts->src[i]+1;
             res->dest[edge]=lts->dest[i]+1;
-            res->label[edge]=VTputChunk(res->values[0],chunk_str(label));;
+            res->label[edge]=VTputChunk(res->values[0],chunk_str(label));
             edge++;
         }
     }

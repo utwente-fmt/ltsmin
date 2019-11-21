@@ -21,7 +21,8 @@ num_global_bits (strategy_t s)
     return (Strat_ENDFS  & s ? 3 :
            ((Strat_CNDFS | Strat_DFSFIFO) & s ? 2 :
            ((Strat_LNDFS | Strat_OWCTY | Strat_TA) & s ? 1 :
-           ((Strat_DFS & s) && proviso == Proviso_Stack ? 1 : 0) )));
+           ( Strat_TARJAN & s ? 1 :
+           ((Strat_DFS & s) && proviso == Proviso_Stack ? 1 : 0) ))));
 }
 
 /*************************************************************************/
@@ -35,10 +36,10 @@ get_strategy (alg_t *alg)
 }
 
 int
-alg_state_new_default (void *ctx, ref_t ref, int seen)
+alg_state_new_default (void *ctx, transition_info_t *ti, ref_t ref, int seen)
 {
     return seen;
-    (void) ref; (void) ctx;
+    (void) ref; (void) ctx; (void) ti;
 }
 
 void
@@ -141,6 +142,15 @@ alg_shared_init_strategy      (run_t *run, strategy_t strat)
     case Strat_DFSFIFO:
         dfs_fifo_shared_init (run);
         break;
+    case Strat_TARJAN:
+        tarjan_shared_init (run);
+        break;
+    case Strat_UFSCC:
+        ufscc_shared_init (run);
+        break;
+    case Strat_RENAULT:
+        renault_shared_init (run);
+        break;
     default: Abort ("Strategy (%s) is unknown or incompatible with the current "
                     "language module.", key_search(strategies, strategy[0]));
     }
@@ -194,6 +204,14 @@ set_alg_run                 (alg_t *alg, alg_run_f alg_run)
     alg->procs.alg_run = alg_run;
 }
 
+/**
+ * Fresh successor heuristic implementation.
+ * Used by permutor.
+ *
+ * Return a positive integer when a state has been visited locally
+ * Return a negative integer when a state has only been visited by another worker
+ * Or zero when unknown.
+ */
 alg_state_seen_f
 get_alg_state_seen          (alg_t *alg)
 {

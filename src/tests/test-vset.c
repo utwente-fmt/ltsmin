@@ -3,6 +3,20 @@
 #include <hre/user.h>
 #include <vset-lib/vector_set.h>
 
+#ifdef HAVE_SYLVAN
+#include <sylvan.h>
+#else
+#define LACE_ME
+#define lace_suspend()
+#define lace_resume()
+#endif
+
+struct args_t
+{
+    int argc;
+    char **argv;
+};
+
 static void
 test_vset_popt(poptContext con, enum poptCallbackReason reason,
                const struct poptOption * opt, const char * arg, void * data)
@@ -19,6 +33,19 @@ test_vset_popt(poptContext con, enum poptCallbackReason reason,
         Abort("unexpected call to test_vset_popt");
     }
 }
+
+#ifdef HAVE_SYLVAN
+static size_t lace_n_workers = 0;
+static size_t lace_dqsize = 40960000; // can be very big, no problemo
+static size_t lace_stacksize = 0; // use default
+
+static struct poptOption lace_options[] = {
+    { "lace-workers", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_n_workers , 0 , "set number of Lace workers (threads for parallelization)","<workers>"},
+    { "lace-dqsize",0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_dqsize , 0 , "set length of Lace task queue","<dqsize>"},
+    { "lace-stacksize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &lace_stacksize, 0, "set size of program stack in kilo bytes (0=default stack size)", "<stacksize>"},
+POPT_TABLEEND
+};
+#endif
 
 static struct poptOption options[] = {
     { NULL, 0, POPT_ARG_CALLBACK|POPT_CBFLAG_POST|POPT_CBFLAG_SKIPOPTION, (void*)test_vset_popt, 0, NULL, NULL},
@@ -210,19 +237,14 @@ empty_projection_set_test()
     vset_clear(empty);
     Warning(info, "Zip correct");
 
-    bn_int_t elements;
+    double elements;
     long nodes;
-    char str[1024];
 
     vset_count(singleton, &nodes, &elements);
-    bn_int2string(str, sizeof(str), &elements);
-    bn_clear(&elements);
-    Warning(info, "Singeton has %ld nodes and %s elements", nodes, str);
+    Warning(info, "Singeton has %ld nodes and %f elements", nodes, elements);
 
     vset_count(empty, &nodes, &elements);
-    bn_int2string(str, sizeof(str), &elements);
-    bn_clear(&elements);
-    Warning(info, "Empty has %ld nodes and %s elements", nodes, str);
+    Warning(info, "Empty has %ld nodes and %f elements", nodes, elements);
 
     int element_2[2] = {0, 0};
     vset_t singleton_2 = vset_create(domain, -1, NULL);
@@ -302,19 +324,14 @@ empty_projection_rel_test()
 
     vrel_add(singleton, element_local, element_global);
 
-    bn_int_t elements;
+    double elements;
     long nodes;
-    char str[1024];
 
     vrel_count(singleton, &nodes, &elements);
-    bn_int2string(str, sizeof(str), &elements);
-    bn_clear(&elements);
-    Warning(info, "Singeton rel has %ld nodes and %s elements", nodes, str);
+    Warning(info, "Singeton rel has %ld nodes and %f elements", nodes, elements);
 
     vrel_count(empty, &nodes, &elements);
-    bn_int2string(str, sizeof(str), &elements);
-    bn_clear(&elements);
-    Warning(info, "Empty rel has %ld nodes and %s elements", nodes, str);
+    Warning(info, "Empty rel has %ld nodes and %f elements", nodes, elements);
 
     vset_t singleton_set = vset_create(domain, -1, NULL);
     vset_t empty_set = vset_create(domain, -1, NULL);
@@ -367,6 +384,17 @@ empty_projection_rel_test()
 int
 main(int argc, char *argv[])
 {
+#ifdef HAVE_SYLVAN
+    struct args_t args = (struct args_t){argc, argv};
+    poptContext optCon = poptGetContext(NULL, argc, (const char**)argv, lace_options, 0);
+    while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
+    poptFreeContext(optCon);
+
+
+    lace_init(lace_n_workers, lace_dqsize);
+    lace_startup(lace_stacksize, NULL, (void*)&args);
+#endif
+
     HREinitBegin(argv[0]); // the organizer thread is called after the binary
     HREaddOptions(options,"Vector set test\n\nOptions");
     HREinitStart(&argc,&argv,0,0,NULL,NULL);

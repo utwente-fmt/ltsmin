@@ -3,11 +3,10 @@
 
 /* Definitions for a simple predicate language & temporal logics */
 
+#include <dm/bitvector.h>
 #include <ltsmin-lib/lts-type.h>
 #include <ltsmin-lib/ltsmin-grammar.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
-
-typedef ltsmin_expr_t (*parse_f)(const char *,ltsmin_parse_env_t,lts_type_t);
 
 /* Predicate language */
 typedef enum {
@@ -16,14 +15,26 @@ typedef enum {
     PRED_NUM   = INT,
     PRED_CHUNK = CHUNK,
     PRED_VAR   = VAR,
+    PRED_LT    = S_LT,
+    PRED_LEQ   = S_LEQ,
+    PRED_GT    = S_GT,
+    PRED_GEQ   = S_GEQ,
     PRED_EQ    = S_EQ,
+    PRED_NEQ   = S_NEQ,
     PRED_TRUE  = S_TRUE,
     PRED_FALSE = S_FALSE,
+    PRED_MAYBE = S_MAYBE,
     PRED_NOT   = S_NOT,
     PRED_OR    = S_OR,
     PRED_AND   = S_AND,
     PRED_EQUIV = S_EQUIV,
-    PRED_IMPLY = S_IMPLY
+    PRED_IMPLY = S_IMPLY,
+    PRED_MULT  = S_MULT,
+    PRED_DIV   = S_DIV,
+    PRED_REM   = S_REM,
+    PRED_ADD   = S_ADD,
+    PRED_SUB   = S_SUB,
+    PRED_EN    = S_EN,
 } Pred;
 
 extern ltsmin_expr_t pred_parse_file(const char *,ltsmin_parse_env_t,lts_type_t);
@@ -37,12 +48,24 @@ typedef enum {
     LTL_VAR   = VAR,
     LTL_TRUE  = PRED_TRUE,
     LTL_FALSE = PRED_FALSE,
+    LTL_MAYBE = PRED_MAYBE,
+    LTL_LT    = PRED_LT,
+    LTL_LEQ   = PRED_LEQ,
+    LTL_GT    = PRED_GT,
+    LTL_GEQ   = PRED_GEQ,
     LTL_NOT   = PRED_NOT,
     LTL_EQ    = PRED_EQ,
+    LTL_NEQ   = PRED_NEQ,
     LTL_OR    = PRED_OR,
     LTL_AND   = PRED_AND,
     LTL_EQUIV = PRED_EQUIV,
     LTL_IMPLY = PRED_IMPLY,
+    LTL_MULT  = PRED_MULT,
+    LTL_DIV   = PRED_DIV,
+    LTL_REM   = PRED_REM,
+    LTL_ADD   = PRED_ADD,
+    LTL_SUB   = PRED_SUB,
+    LTL_EN    = PRED_EN,
 
     LTL_FUTURE= TOKEN_USER,
     LTL_GLOBALLY,
@@ -65,12 +88,24 @@ typedef enum {
     CTL_VAR   = VAR,
     CTL_TRUE  = PRED_TRUE,
     CTL_FALSE = PRED_FALSE,
+    CTL_MAYBE = PRED_MAYBE,
+    CTL_LT    = PRED_LT,
+    CTL_LEQ   = PRED_LEQ,
+    CTL_GT    = PRED_GT,
+    CTL_GEQ   = PRED_GEQ,
     CTL_NOT   = PRED_NOT,
     CTL_EQ    = PRED_EQ,
+    CTL_NEQ   = PRED_NEQ,
     CTL_OR    = PRED_OR,
     CTL_AND   = PRED_AND,
     CTL_EQUIV = PRED_EQUIV,
     CTL_IMPLY = PRED_IMPLY,
+    CTL_MULT  = PRED_MULT,
+    CTL_DIV   = PRED_DIV,
+    CTL_REM   = PRED_REM,
+    CTL_ADD   = PRED_ADD,
+    CTL_SUB   = PRED_SUB,
+    CTL_EN    = PRED_EN,
 
     CTL_NEXT  = TOKEN_USER,
     CTL_UNTIL,
@@ -90,12 +125,24 @@ typedef enum {
     MU_NUM                  = INT,
     MU_CHUNK                = CHUNK,
     MU_VAR                  = VAR,
+    MU_LT                   = PRED_LT,
+    MU_LEQ                  = PRED_LEQ,
+    MU_GT                   = PRED_GT,
+    MU_GEQ                  = PRED_GEQ,
     MU_AND                  = PRED_AND,
     MU_OR                   = PRED_OR,
     MU_EQ                   = PRED_EQ,
+    MU_NEQ                  = PRED_NEQ,
     MU_TRUE                 = PRED_TRUE,
     MU_FALSE                = PRED_FALSE,
+    MU_MAYBE                = PRED_MAYBE,
     MU_NOT                  = PRED_NOT,
+    MU_MULT                 = PRED_MULT,
+    MU_DIV                  = PRED_DIV,
+    MU_REM                  = PRED_REM,
+    MU_ADD                  = PRED_ADD,
+    MU_SUB                  = PRED_SUB,
+    MU_EN                   = PRED_EN,
 
     MU_EDGE_EXIST           = EDGE_EXIST,
     MU_EDGE_ALL             = EDGE_ALL,
@@ -115,6 +162,8 @@ extern const char  *LTL_NAME(LTL ltl);
 extern const char  *CTL_NAME(CTL ctl);
 extern const char  *MU_NAME(MU mu);
 
+extern stream_t read_formula(const char *file);
+
 extern ltsmin_expr_t mu_parse_file(const char *,ltsmin_parse_env_t,lts_type_t);
 
 /* Conversion */
@@ -124,9 +173,27 @@ extern ltsmin_expr_t ctl_to_ctl_star(ltsmin_expr_t);
 extern ltsmin_expr_t ctl_normalize(ltsmin_expr_t);
 extern ltsmin_expr_t ctl_star_to_pnf(ltsmin_expr_t);
 extern ltsmin_expr_t ctl_star_to_mu(ltsmin_expr_t);
-extern char* ltsmin_expr_print_ltl(ltsmin_expr_t, char*);
+extern ltsmin_expr_t ctl_to_mu(ltsmin_expr_t, ltsmin_parse_env_t, lts_type_t);
+extern ltsmin_expr_t ltl_to_mu(ltsmin_expr_t);
 extern char* ltsmin_expr_print_ctl(ltsmin_expr_t, char*);
 extern char* ltsmin_expr_print_mu(ltsmin_expr_t, char*);
+
+// optimizes expression: negations inside, rename variables apart
+// return the number of (different) variables
+extern int mu_optimize(ltsmin_expr_t*, const ltsmin_parse_env_t);
+
+typedef struct mu_object_s *mu_object_t;
+struct mu_object_s {
+    int nvars;     // nr. of mu-calculus variables
+    int *sign;     // sign of variable n (MU_MU or MU_NU)
+    int **deps;    // deps[i][j] is true if mu/nu Zi (... mu/nu Zj ( ... Zi ...) ...)
+    int *stack;   // used to store local context in recursion
+    int top;       // top of the stack
+};
+
+extern mu_object_t mu_object(ltsmin_expr_t in, int nvars);
+
+/********** TABLEAUX FOR THE TRANSLATION FROM CTL-STAR TO MU_CALCULUS ********/
 
 /* ctl* to mu conversion
  *

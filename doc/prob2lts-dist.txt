@@ -1,0 +1,34 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+prob2lts-dist(1)
+=================
+:Author:  Jeroen Meijer
+:Email:   <j.j.g.meijer@utwente.nl>
+:Date:    2016-01-11
+
+== NAME
+
+prob2lts-dist - Distributed state space generator for B, through ProB.
+
+== SYNOPSIS
+
+*{manname}* [OPTIONS]... '/path/to/socket.probz|/path/to/machine.[mch|eventb|tlc]' ['output.fmt']
+
+== DESCRIPTION
+
+{manname} performs distributed reachability analysis on a specification provided
+through '/path/to/machine.[mch|eventb|tlc]', or through a specification
+provided through '/path/to/socket.probz'
+'output.fmt' specifies the name of the output archive.  The desired 
+format is deduced from the filename extension. Available formats are described below.
+
+include::inc/prob.txt[]
+
+include::inc/mpi-example.txt[]
+
+== OPTIONS
+
+include::inc/pins2lts-dist-options.txt[]
+
+include::inc/prob-options.txt[]
+
+include::inc/pins2lts-dist.txt[]

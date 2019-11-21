@@ -1,0 +1,41 @@
+# include the general include file which contains the functions
+source $srcdir/lib/include.tcl
+# use the nclude file containing several procedures
+source $srcdir/lib/backends.tcl
+
+#cd into the test dir such that output files are placed here.
+if { [file exists $binpaths(out) ] != 1 } {
+    file mkdir $binpaths(out)
+}
+cd $binpaths(out)
+
+puts "\n-----------------------------"
+puts   "TESTING: Algorithmic backends for Promela"
+puts   "-----------------------------\n"
+
+global test_promela
+if { "$test_promela" == "yes" } {
+    set langs [dict create]
+
+    # Language frontends:
+    # -------------------
+
+    set prom_model "p117.pml"
+    compile_promela $prom_model
+
+    # prom:
+    dict set langs prom model [subst "$prom_model.spins"]
+    dict set langs prom exp_output "354 states 828 transitions"
+    set alg_be [ find_alg_backends "{dist,mc,seq}" ]
+    run_test_for_alg_backends $alg_be $langs $backends
+
+    # different output for symbolic tool:
+    dict set langs prom exp_output "state space has 354"
+    # BuDDy is too slow for this test 
+    set alg_be [ find_alg_backends "{sym}" ]
+    run_test_for_alg_backends $alg_be $langs $backends
+} {
+    puts "Skipping DVE tests due to configuration\n"
+}
+
+cd ".."

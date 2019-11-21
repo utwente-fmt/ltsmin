@@ -20,6 +20,12 @@ substantial speedups.
 *--pins-guards*::
     Use guards in combination with the long next-state function to speed up the next-state function.
 
+*--allow-undefined-edges*::
+    Allow values for edge variables in atomic predicates to be unreachable.
+
+*--allow-undefined-values*::
+    Allow undefined values in atomic predicates for enums.
+
 *-r*, *--regroup*='SPEC'::
     Enable regrouping optimizations on the dependency matrix.
 +
@@ -29,6 +35,44 @@ dependency matrix.  The following transformations _T_ are available:
 
 include::regroup-options.txt[]
 
+*--row-perm*='PERM'::
+    Apply row permutation 'PERM', where 'PERM' is a sequence of row numbers, separated by a comma.
+    E.g. the vector 2,1,0 will swap row 2 with row 0.
+    
+*--col-perm*='PERM'::
+    Apply column permutation 'PERM', where 'PERM' is a sequence of column numbers, separated by a comma.
+    E.g. the vector 2,1,0 will swap column 2 with column 0.
+    
+*--col-ins*='PAIRS'::
+    Insert columns before other columns in the dependency matrix.
++
+'PAIRS' is a comma-separated sequence of pairs '<(C.C',)+>'.
+E.g. *--col-ins=1.0* will insert column *1* before column *0*.
+Each pair contains a source column *C* and a target column *C'*. During the application of the whole
+sequence, *C* will always be the column number that corresponds with the column before the application of the whole sequence.
+The column number *C'* will always be the column during the application of the whole sequence. This means that
+in for example *--col-ins=2.0,1.0*, first column *2* is inserted at position *0*, then column *1* is inserted at position *0*.
+The result will be that the original column *2* will be at position *1*.
+Another important detail is that when *--col-ins* is used, all source columns will temporarily be "removed"
+during reordering from the dependency matrix, i.e. when the *-r*,*--regroup* option is given. After reordering
+is done, the columns will be inserted at the desired target position. In other words, reordering algorithms
+given by the option *-r*,*--regroup*, will only be applied on the dependency matrix with source columns removed.
++
+
+*--sloan-w1*='WEIGHT1'::
+    Use 'WEIGHT1' as the first weight for the Sloan algorithm, see https://www.boost.org/doc/libs/1_66_0/libs/graph/doc/sloan_ordering.htm.
+
+*--sloan-w2*='WEIGHT2'::
+    Use 'WEIGHT2' as the second weight for the Sloan algorithm, see https://www.boost.org/doc/libs/1_66_0/libs/graph/doc/sloan_ordering.htm.
+
+*--graph-metrics*::
+    Print Boost's and ViennaCL's graph metrics (only available when LTSmin is compiled with Boost or ViennaCL).
+    
+*--regroup-exit*::
+    Exit with 0 when regrouping is done.
+
+*--regroup-time*::
+    Print timing information of each transformation, given in sequence *--regroup* (*-r*).
 
 *--mucalc*='FILE'|'FORMULA'::
     Compute a parity game for the mu-calculus formula.
@@ -51,14 +95,18 @@ encode accepting states.
 *--ltl-semantics*='spin|textbook|ltsmin'::
     Change the semantics of the crossproduct generated using '--ltl'
 +
-Three options are available, the default is 'spin'.
+Three options are available, the default is automatically chosen based on the
+atomic predicates in the formula.
 
 spin;;
     Use semantics equal to the spin model checker. From the 'source'
     state all transitions are generated. Then, state predicates
     are evaluated on the 'source' state. The Buchi automaton now
     moves according to these predicates.
-    Deadlocks in the LTS cause the Buchi to progress independently. 
+    Deadlocks in the LTS cause the Buchi to progress independently.
+    This option is incompatible with edge-based atomic predicates.
+    This option is the default if no edge-based atomic predicates are found
+    in the LTL formula.
 
 textbook;;
     Use textbook semantics. A new initial state is generated with an
@@ -66,14 +114,38 @@ textbook;;
     are evaluated on the 'target' state and the Buchi automaton
     moves according to these predicates.
     Deadlocks in the LTS do NOT cause the Buchi to progress independently.
+    This option is incompatible with edge-based atomic predicates.
 
 ltsmin;;
     Same as spin semantics, but now deadlocks in the LTS do NOT cause the Buchi
     to progress independently.
+    This option is the default if edge-based atomic predicates are found
+    in the LTL formula.
 endif::ltl[]
 
-*--por*::
-    Activate partial order reduction
+*--por*='heur|del'::
+    Activate partial-order reduction
 +
-Partial Order Reduction can reduce the state space when searching
+Partial-Order Reduction (POR) can reduce the state space when searching
 for deadlocks (+-d+) or accepting cycles (+--ltl+).
+Two POR algorithms are available:
+
+heur;;
+    Uses a cost-based heuristic beam-search to find the smallest stubborn set
+
+del;;
+    Uses Valmari's deletion algorithm to find the smallest stubborn set by
+    iteratively removing transitions while maintaining the constraints. 
+
+
+*--weak*::
+    Use weak commutativity in partial-order reduction. Possibly yielding better
+    reductions.
+    
+ 
+*--leap*::
+    Use leaping partial-order reduction, by combining several disjoint
+    stubborn sets sequentially.
+
+include::env-vars.txt[]
+

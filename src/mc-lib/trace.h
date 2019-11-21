@@ -15,6 +15,9 @@ extern trc_env_t *trc_create (model_t model, trc_get_state_f get,
 extern void trc_write_trace (trc_env_t *env, char *trc_output, ref_t *trace,
                              int level);
 
+extern ref_t *trc_find_trace (ref_t dst_idx, int level, ref_t *parent_ofs, ref_t start_idx,
+                              size_t *length);
+
 extern void trc_find_and_write (trc_env_t *env, char *trc_output, ref_t dst_idx,
                                 int level, ref_t *parent_ofs, ref_t start_idx);
 

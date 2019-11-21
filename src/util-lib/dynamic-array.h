@@ -2,6 +2,8 @@
 #ifndef DYNAMIC_ARRAY_H
 #define DYNAMIC_ARRAY_H
 
+#include<stdlib.h>
+
 /**
 \file dynamic-array.h
 
@@ -16,7 +18,7 @@ typedef struct array_manager *array_manager_t;
 /**
 \brief Create an array manager.
 */
-extern array_manager_t create_manager(int block_size);
+extern array_manager_t create_manager(size_t block_size);
 
 /**
 \brief Destroy an array manager.
@@ -26,7 +28,7 @@ extern void destroy_manager(array_manager_t);
 /**
 \brief type of the resize callback.
  */
-typedef void(*array_resize_cb)(void*arg,void*old_array,int old_size,void*new_array,int new_size);
+typedef void(*array_resize_cb)(void*arg,void*old_array,size_t old_size,void*new_array,size_t new_size);
 
 /**
 \brief Add an array to be managed.
@@ -55,12 +57,12 @@ This macro wraps a call to add_array in such a way that no warnings are produced
 /**
 \brief Ensure that all managed array are big enough for the given index to be valid.
 */
-extern void ensure_access(array_manager_t man,int index);
+extern void ensure_access(array_manager_t man,size_t index);
 
 /**
 \brief Return the current size of the managed arrays.
 */
-extern int array_size(array_manager_t man);
+extern size_t array_size(array_manager_t man);
 
 #endif
 

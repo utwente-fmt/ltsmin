@@ -1,0 +1,94 @@
+#!/bin/bash
+# Simple bash shell script to launch SpinS using the LTSmin backend
+
+# get the directory where this file is located
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# first check if the spins.jar is in the install directory,
+# otherwise use the spins.jar from the source tree.
+spins_dir="$DIR/../share/ltsmin" # installed version
+spins_dir2="$DIR/../../spins" # source tree version
+
+CP="$spins_dir/spins.jar"
+if [ ! -e $CP ]; then
+    spins_dir=$spins_dir2
+fi
+CP="$spins_dir/spins.jar"
+
+CYGPATH=`which cygpath 2> /dev/null`
+if [ ! -z "$CYGPATH" ]; then
+    CP=`cygpath -wp "$CP"`
+fi
+
+promela_file=
+no_compile=0
+overcommit=1
+
+for option in ${1+"$@"}; do
+    if [ "${option:0:2}" == "-I" ]; then
+        no_compile=1
+    elif [ "${option:0:1}" != "-" ]; then
+        promela_file="$option"
+    elif [ "${option:0:2}" == "-o" ]; then
+        overcommit=0
+    fi
+done
+
+#if [ -z "$promela_file" ]; then
+#    echo "usage: spins [options] promela_file" ;
+#    echo "options will be passed to GCC"
+#    exit 1
+#fi
+
+promela_name=`basename $promela_file`
+output_file="${promela_name}.spins.c"
+
+if [ -f "$output_file" ]; then
+    rm -f "$output_file";
+fi
+
+if [ $overcommit -eq 1 ]; then
+    # Total memory in KB
+    if [ -e /proc/meminfo ]; then 
+        totalMemKB=`awk '/MemTotal:/ { print $2 }' /proc/meminfo`
+        totalMemMB=$(( $totalMemKB/1024 ))
+    else
+        totalMem=`top -l 1 | grep PhysMem:`
+        totalMemMB=`echo "$totalMem" | sed "s/PhysMem:[ ]*\([0-9]*\)M.*/\1/g"`
+        if [ "$totalMem" = "$totalMemMB" ]; then
+            totalMemGB=`echo "$totalMem" | sed "s/PhysMem:[ ]*\([0-9]*\)G.*/\1/g"`
+            totalMemMB=$(( $totalMemGB*1024 ))
+        fi
+    fi
+    heapMB=$(( $totalMemMB*75/100 ))
+    commitedMB=$(( $heapMB/2 ))
+
+    java -Xms${commitedMB}m -Xmx${heapMB}m -Xss64m -cp $CP spins.Compile ${1+"$@"}
+else
+    java -cp $CP spins.Compile ${1+"$@"}
+fi
+
+ERROR=$?
+if [ $ERROR -ne 0 ]; then
+    echo "Compilation of $promela_file failed"
+    exit $ERROR;
+fi
+
+if [ $no_compile == 1 ]; then
+    echo
+    exit 0
+fi
+
+gcc -fPIC -shared -O2 -ggdb $CFLAGS -pthread $output_file -o $promela_name.spins \
+    -Wno-parentheses-equality \
+    -Wno-initializer-overrides \
+    -Wno-unused-but-set-variable \
+    -Wno-unknown-warning-option
+ERROR=$?
+if [ ! $ERROR -eq 0 ]; then
+    echo "Compilation of $output_file failed"
+    exit $ERROR
+else
+    echo "Compiled C model to $promela_name.spins"
+    exit 0
+fi

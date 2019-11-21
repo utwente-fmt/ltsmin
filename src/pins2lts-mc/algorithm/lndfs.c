@@ -74,8 +74,14 @@ lndfs_blue (run_t *run, wctx_t *ctx)
                 dfs_stack_pop (loc->stack);
             }
         } else { //backtrack
-            if (0 == dfs_stack_nframes (loc->stack))
+            if (0 == dfs_stack_nframes (loc->stack)) {
+                if (global->exit_status == LTSMIN_EXIT_SUCCESS && ctx->id == 0) {
+                    Warning(info," ");
+                    Warning(info,"Empty product with LTL!");
+                    Warning(info," ");
+                }
                 return;
+            }
             dfs_stack_leave (loc->stack);
             ctx->counters->level_cur--;
             state_data = dfs_stack_top (loc->stack);
@@ -84,7 +90,7 @@ lndfs_blue (run_t *run, wctx_t *ctx)
                 /* all successors are red */
                 wait_seed (ctx, loc->seed->ref);
                 set_all_red (ctx, loc->seed);
-            } else if ( GBbuchiIsAccepting(ctx->model, state_info_state(loc->seed)) ) {
+            } else if ( pins_state_is_accepting(ctx->model, state_info_state(loc->seed)) ) {
                 /* call red DFS for accepting states */
                 lndfs_red (ctx, loc->seed->ref);
             } else if (all_red && ctx->counters->level_cur > 0 &&

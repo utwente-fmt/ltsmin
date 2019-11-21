@@ -1,4 +1,6 @@
 #include <hre/config.h>
+#include <hre/user.h>
+#include <hre/feedback.h>
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
@@ -7,8 +9,7 @@
 void
 bn_init (long long *a)
 {
-    (void)a;
-    return;
+    *a = 0;
 }
 
 void
@@ -20,8 +21,7 @@ bn_init_copy (long long *a, long long *b)
 void
 bn_clear (long long *a)
 {
-    (void)a;
-    return;
+    *a = 0;
 }
 
 void
@@ -31,10 +31,10 @@ bn_double2int (double a, long long *b)
     *b = llround (a);
 }
 
-int
+void
 bn_int2string (char *string, size_t size, long long *a)
 {
-    return snprintf (string, size, "%lld", *a);
+    snprintf (string, size, "%lld", *a);
 }
 
 double
@@ -47,10 +47,17 @@ void
 bn_add (long long *a, long long *b, long long *c)
 {
     *c = *a + *b;
+    if (*c < *a || *c < *b) Abort("long long overflow");
 }
 
 void
-bn_set_digit (long long *a, unsigned int digit)
+bn_set_digit (long long *a, int digit)
 {
     *a = digit;
+}
+
+size_t
+bn_strlen (long long *a)
+{
+    return snprintf(NULL, 0, "%lld", *a) + 1;
 }

@@ -1,0 +1,12 @@
+=== PNML Options
+
+*--noack*='1|2'::
+        Set the Noack order to apply.
+
+*--edge-label*='id|name'::
+        Set what to use as edge label. This only affects Petri nets written in
+        PNML, not those written in e.g. ANDL. When value 'id' is given, the 
+        transition identifier will be used as edge label. When value 'name' is
+        given the transition's name will be used as edge label. This mostly
+        affects how atomic propositions are interpreted.
+

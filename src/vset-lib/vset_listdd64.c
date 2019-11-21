@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -92,6 +93,8 @@ static struct op_rec *op_cache=NULL;
 #define OP_RELPROD 10
 #define OP_UNIVERSE 11
 #define OP_JOIN 12
+#define OP_CCOUNT1 13
+#define OP_CCOUNT2 14
 
 static void cache_put(uint64_t slot_hash,
                       uint32_t op,
@@ -313,7 +316,10 @@ static void mdd_collect(uint64_t a,uint64_t b){
         uint64_t slot;
         switch(op_cache[i].op){
             case OP_UNUSED: continue;
-            case OP_COUNT: {
+            case OP_COUNT:
+            case OP_CCOUNT1:
+            case OP_CCOUNT2:
+            {
                 if (!node_table[op_cache[i].arg1].reachable){
                     op_cache[i].op=OP_UNUSED;
                     continue;
@@ -441,7 +447,7 @@ static void mdd_collect(uint64_t a,uint64_t b){
         }
     } else {
         Warning(debug,"copied %"PRIu64" op cache nodes",copy_count);
-        RTfree(op_cache);
+        RTalignedFree(op_cache);
         op_cache=new_cache;
         cache_size=new_cache_size;
         uint64_t old_size=mdd_nodes;
@@ -1013,29 +1019,17 @@ static int set_member_mdd(vset_t set, const int* e)
 }
 
 static void
-set_count_mdd(vset_t set, long *nodes, bn_int_t *elements)
+set_count_mdd(vset_t set, long *nodes, double *elements)
 {
-    if (nodes != NULL) {
-        uint64_t n_count = mdd_node_count(set->mdd);
-        *nodes = n_count;
-    }
-    if (elements != NULL) {
-        double e_count   = mdd_count(set->mdd);
-        bn_double2int(e_count, elements);
-    }
+    if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
+    if (elements != NULL) *elements = mdd_count(set->mdd);
 }
 
 static void
-rel_count_mdd(vrel_t rel, long *nodes, bn_int_t *elements)
+rel_count_mdd(vrel_t rel, long *nodes, double *elements)
 {
-    if (nodes != NULL) {
-        uint64_t n_count = mdd_node_count(rel->mdd);
-        *nodes = n_count;
-    }
-    if (elements != NULL) {
-        double e_count   = mdd_count(rel->mdd);
-        bn_double2int(e_count, elements);
-    }
+    if (nodes != NULL) *nodes = mdd_node_count(rel->mdd);
+    if (elements != NULL) *elements = mdd_count(rel->mdd);
 }
 
 static void
@@ -1344,8 +1338,7 @@ mdd_next(uint64_t p_id, uint64_t set, uint64_t rel, int idx, int *r_proj, int r_
 static void
 set_project_mdd(vset_t dst, vset_t src)
 {
-    assert(src->p_len == src->dom->shared.size);
-    if (dst->p_len == -1) {
+    if (src->p_len != src->dom->shared.size || dst->p_len == dst->dom->shared.size) {
         dst->mdd = src->mdd;
     } else {
         dst->mdd = 0;
@@ -2207,7 +2200,6 @@ mdd_join(uint64_t a_pid, uint64_t b_pid, uint64_t a, uint64_t b, int a_p_len, in
 {
     if (a_p_len < 0 || b_p_len < 0) Abort("missing projection information");
     if (a == 0 || b == 0)  return 0;
-    if (a == b) return a;
     if (a_p_len == 0) return b;
     if (b_p_len == 0) return a;
 
@@ -2216,6 +2208,8 @@ mdd_join(uint64_t a_pid, uint64_t b_pid, uint64_t a, uint64_t b, int a_p_len, in
     uint64_t slot;
 
     if (a_proj[0] == b_proj[0]) {
+
+        if (a_pid == b_pid) return mdd_intersect(a, b);
 
         uint64_t old_a=a;
         uint64_t old_b=b;
@@ -2291,7 +2285,44 @@ set_join_mdd(vset_t dst, vset_t left, vset_t right)
 }
 
 static int separates_rw() { return 1; }
-static int supports_cpy() { return 1; }
+
+static long double mdd_ccount(uint32_t mdd){
+    if (mdd<=1) return mdd;
+    uint32_t slot1=hash3(OP_CCOUNT1,mdd,0)%cache_size;
+    uint32_t slot2=hash3(OP_CCOUNT2,mdd,0)%cache_size;
+
+    union {
+        long double count;
+        struct {
+            uint64_t p1;
+            uint64_t p2;
+        } s;
+    } res;
+
+    res.count=0.0;
+    if (op_cache[slot1].op==OP_CCOUNT1 && op_cache[slot1].arg1==mdd
+            && op_cache[slot2].op==OP_CCOUNT2 && op_cache[slot2].arg1==mdd){
+        res.s.p1=op_cache[slot1].res.other.arg2;
+        res.s.p2=op_cache[slot2].res.other.arg3;
+        return res.count;
+    }
+    res.count=mdd_ccount(node_table[mdd].down);
+    res.count+=mdd_ccount(node_table[mdd].right);
+    op_cache[slot1].op=OP_CCOUNT1;
+    op_cache[slot1].arg1=mdd;
+    op_cache[slot1].res.other.arg2=res.s.p1;
+    op_cache[slot2].op=OP_CCOUNT2;
+    op_cache[slot2].arg1=mdd;
+    op_cache[slot2].res.other.arg3=res.s.p2;
+    return res.count;
+}
+
+static void
+set_ccount_mdd(vset_t set, long *nodes, long double *elements)
+{
+    if (nodes != NULL) *nodes = mdd_node_count(set->mdd);
+    if (elements != NULL) *elements = mdd_ccount(set->mdd);
+}
 
 vdom_t vdom_create_list64_native(int n){
     Warning(info,"Creating a native ListDD 64-bit domain.");
@@ -2343,6 +2374,7 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.set_copy=set_copy_mdd;
     dom->shared.set_enum=set_enum_mdd;
     dom->shared.set_count=set_count_mdd;
+    dom->shared.set_ccount=set_ccount_mdd;
     dom->shared.set_union=set_union_mdd;
     dom->shared.set_minus=set_minus_mdd;
     dom->shared.rel_create=rel_create_mdd;
@@ -2373,6 +2405,5 @@ vdom_t vdom_create_list64_native(int n){
     dom->shared.rel_dot=rel_dot_mdd;
     dom->shared.set_join=set_join_mdd;
     dom->shared.separates_rw=separates_rw;
-    dom->shared.supports_cpy=supports_cpy;
     return dom;
 }

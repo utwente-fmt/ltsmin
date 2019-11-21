@@ -12,6 +12,8 @@
 #include <time.h>
 
 #include <hre/unix.h>
+#include <pins-lib/pins2pins-ltl.h>
+#include <pins-lib/por/pins2pins-por.h>
 #include <pins2lts-mc/algorithm/algorithm.h>
 #include <pins2lts-mc/algorithm/reach.h>
 #include <pins2lts-mc/parallel/global.h>
@@ -99,6 +101,11 @@ struct permute_s {
     size_t              labels;     /* number of transition labels */
     alg_state_seen_f    state_seen;
     int                 por_proviso;
+
+    ci_list           **inhibited_by;
+    matrix_t           *inhibit_matrix;
+    matrix_t           *class_matrix;
+    int                 class_label;
 };
 
 static int
@@ -119,8 +126,8 @@ rr_cmp (const void *a, const void *b, void *arg)
     int                *rand = *perm->rand;
     ref_t               A = perm->todos[*((int*)a)].ref;
     ref_t               B = perm->todos[*((int*)b)].ref;
-    return ((((1UL<<dbs_size)-1)&rand[A & ((1<<RR_ARRAY_SIZE)-1)])^A) -
-           ((((1UL<<dbs_size)-1)&rand[B & ((1<<RR_ARRAY_SIZE)-1)])^B);
+    return ((((1ULL<<dbs_size)-1)&rand[A & ((1<<RR_ARRAY_SIZE)-1)])^A) -
+           ((((1ULL<<dbs_size)-1)&rand[B & ((1<<RR_ARRAY_SIZE)-1)])^B);
 }
 
 static int
@@ -138,18 +145,12 @@ dyn_cmp (const void *a, const void *b, void *arg)
 {
     permute_t          *perm = (permute_t *) arg;
     int                *rand = *perm->rand;
-    const permute_todo_t     *A = &perm->todos[*((int*)a)];
-    const permute_todo_t     *B = &perm->todos[*((int*)b)];
+    permute_todo_t     *A = &perm->todos[*((int*)a)];
+    permute_todo_t     *B = &perm->todos[*((int*)b)];
 
-    int Aval = A->seen;
-    int Bval = B->seen;
-    if (A->seen == B->seen) {
-        Aval = perm->state_seen (perm->call_ctx, A->ref, A->seen);
-        Bval = perm->state_seen (perm->call_ctx, B->ref, B->seen);
-    }
-    if (Aval == Bval) // if dynamically no difference, then randomize:
+    if (A->seen == B->seen) // if dynamically no difference, then randomize:
         return rand[A->ti.group] - rand[B->ti.group];
-    return Bval - Aval;
+    return A->seen - B->seen;
 }
 
 static inline void
@@ -158,12 +159,13 @@ perm_todo (permute_t *perm, transition_info_t *ti, int seen)
     HREassert (perm->nstored < K+TODO_MAX);
     permute_todo_t     *todo = perm->todos + perm->nstored;
     perm->tosort[perm->nstored] = perm->nstored;
-    todo->seen = seen;
     todo->ref = perm->next->ref;
+    todo->seen = seen;
+    todo->seen = perm->state_seen (perm->call_ctx, ti, todo->ref, seen);
     todo->lattice = perm->next->lattice;
     todo->ti.group = ti->group;
     todo->ti.por_proviso = ti->por_proviso;
-    if (EXPECT_FALSE(act_detect || files[1]))
+    if (EXPECT_FALSE(act_detect || files[1] || (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)))
         memcpy (todo->ti.labels, ti->labels, sizeof(int*[perm->labels]));
     perm->nstored++;
     ti->por_proviso = perm->por_proviso;
@@ -195,6 +197,7 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
     int                 seen;
     seen = state_info_new_state (perm->next, dst, ti, perm->state);
     if (EXPECT_FALSE(seen < 0)) {
+        global->exit_status = LTSMIN_EXIT_FAILURE;
         if (run_stop(perm->run_ctx)) {
             Warning (info, "Error: %s full! Change -s/--ratio.",
                            state_store_full_msg(seen));
@@ -206,13 +209,15 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
         if (ti->group < perm->start_group) {
             perm_todo (perm, ti, seen);
             break;
-        }
+        } else // fall through
     case Perm_None:
         perm->real_cb (perm->call_ctx, perm->next, ti, seen);
+        ti->por_proviso &= perm->por_proviso;
         break;
     case Perm_Shift_All:
         if (0 == perm->start_group_index && ti->group >= perm->start_group)
             perm->start_group_index = perm->nstored;
+        // fall through
     case Perm_Dynamic:
     case Perm_Random:
     case Perm_SR:
@@ -227,15 +232,59 @@ permute_one (void *arg, transition_info_t *ti, state_data_t dst, int *cpy)
 }
 
 int
+permute_next (permute_t *perm, state_info_t *state, int group, perm_cb_f cb, void *ctx)
+{
+    perm->permutation   = Perm_None;
+    perm->call_ctx      = ctx;
+    perm->real_cb       = cb;
+    perm->state         = state;
+    perm->nstored       = perm->start_group_index = 0;
+    int                 count;
+    state_data_t        data = state_info_pins_state (state);
+    count = GBgetTransitionsLong (((wctx_t *)ctx)->model, group, data, permute_one, perm);
+    return count;
+}
+
+static inline bool
+is_inhibited (permute_t* perm, int *class_count, int i)
+{
+    for (int c = 0; c < perm->inhibited_by[i]->count; c++) {
+        int j = perm->inhibited_by[i]->data[c];
+        if (j >= i) return false;
+        if (class_count[j] > 0) return true;
+    }
+    return false;
+}
+
+int
 permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
 {
     perm->call_ctx = ctx;
     perm->real_cb = cb;
     perm->state = state;
     perm->nstored = perm->start_group_index = 0;
-    int                 count;
+    int                 count = 0;
     state_data_t        data = state_info_pins_state (state);
-    count = GBgetTransitionsAll (perm->model, data, permute_one, perm);
+
+    if (inhibit) {
+        int N = dm_nrows (perm->inhibit_matrix);
+        int class_count[N];
+        for (int i = 0; i < N; i++) {
+            class_count[i] = 0;
+            if (is_inhibited(perm, class_count, i)) continue;
+            if (perm->class_label >= 0) {
+                class_count[i] = GBgetTransitionsMatching (perm->model, perm->class_label, i, data, permute_one, perm);
+            } else if (perm->class_matrix != NULL) {
+                class_count[i] = GBgetTransitionsMarked (perm->model, perm->class_matrix, i, data, permute_one, perm);
+            } else {
+                Abort ("inhibit set, but no known classification found.");
+            }
+            count += class_count[i];
+        }
+    } else {
+        count = GBgetTransitionsAll (perm->model, data, permute_one, perm);
+    }
+
     switch (perm->permutation) {
     case Perm_Otf:
         randperm (perm->pad, perm->nstored, state->ref + perm->shiftorder);
@@ -247,19 +296,19 @@ permute_trans (permute_t *perm, state_info_t *state, perm_cb_f cb, void *ctx)
             perm_do (perm, perm->rand[perm->nstored][i]);
         break;
     case Perm_Dynamic:
-        qsortr (perm->tosort, perm->nstored, sizeof(int), dyn_cmp, perm);
+        qsort_r (perm->tosort, perm->nstored, sizeof(int), dyn_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_RR:
-        qsortr (perm->tosort, perm->nstored, sizeof(int), rr_cmp, perm);
+        qsort_r (perm->tosort, perm->nstored, sizeof(int), rr_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_SR:
-        qsortr (perm->tosort, perm->nstored, sizeof(int), rand_cmp, perm);
+        qsort_r (perm->tosort, perm->nstored, sizeof(int), rand_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_Sort:
-        qsortr (perm->tosort, perm->nstored, sizeof(int), sort_cmp, perm);
+        qsort_r (perm->tosort, perm->nstored, sizeof(int), sort_cmp, perm);
         perm_do_all (perm);
         break;
     case Perm_Shift:
@@ -292,6 +341,13 @@ permute_set_por (permute_t *perm, int por)
     perm->por_proviso = por;
 }
 
+static int
+state_find (state_data_t state, transition_info_t *ti, void *t)
+{
+    permute_t          *perm = t;
+    return state_info_find_state (perm->next, state, ti, perm->state) != DB_NOT_FOUND;
+}
+
 permute_t *
 permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f ssf,
                 int worker_index, void *run_ctx)
@@ -300,7 +356,7 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
     perm->todos = RTalign (CACHE_LINE_SIZE, sizeof(permute_todo_t[K+TODO_MAX]));
     perm->tosort = RTalign (CACHE_LINE_SIZE, sizeof(int[K+TODO_MAX]));
     perm->shift = ((double)K)/W;
-    perm->shiftorder = (1UL<<dbs_size) / W * worker_index;
+    perm->shiftorder = (1ULL<<dbs_size) / W * worker_index;
     perm->start_group = perm->shift * worker_index;
     perm->model = model;
     perm->state_seen = ssf;
@@ -320,9 +376,9 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
     if (Perm_RR == perm->permutation) {
         perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*));
         perm->rand[0] = RTalign (CACHE_LINE_SIZE, sizeof(int[1<<RR_ARRAY_SIZE]));
-        srandom (time(NULL) + 9876432*worker_index);
+        srand (time(NULL) + 9876432*worker_index);
         for (int i =0; i < (1<<RR_ARRAY_SIZE); i++)
-            perm->rand[0][i] = random();
+            perm->rand[0][i] = rand();
     }
     if (Perm_SR == perm->permutation || Perm_Dynamic == perm->permutation) {
         perm->rand = RTalignZero (CACHE_LINE_SIZE, sizeof(int*));
@@ -331,12 +387,41 @@ permute_create (permutation_perm_t permutation, model_t model, alg_state_seen_f 
     }
     perm->labels = lts_type_get_edge_label_count (GBgetLTStype(model));
     for (size_t i = 0; i < K+TODO_MAX; i++) {
-        if (act_detect || files[1]) {
+        if (act_detect || files[1] || (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)) {
             perm->todos[i].ti.labels = RTmalloc (sizeof(int*[perm->labels]));
         } else {
             perm->todos[i].ti.labels = NULL;
         }
     }
+
+    perm->class_label = lts_type_find_edge_label (GBgetLTStype(model),LTSMIN_EDGE_TYPE_ACTION_CLASS);
+    if (inhibit){
+        int id=GBgetMatrixID(model,"inhibit");
+        if (id>=0){
+            perm->inhibit_matrix = GBgetMatrix (model, id);
+            Warning(infoLong,"inhibit matrix is:");
+            if (log_active(infoLong)) dm_print (stderr, perm->inhibit_matrix);
+            perm->inhibited_by = (ci_list **)dm_cols_to_idx_table (perm->inhibit_matrix);
+        } else {
+            Warning(infoLong,"no inhibit matrix");
+        }
+        id = GBgetMatrixID(model,LTSMIN_EDGE_TYPE_ACTION_CLASS);
+        if (id>=0){
+            perm->class_matrix=GBgetMatrix(model,id);
+            Warning(infoLong,"inhibit class matrix is:");
+            if (log_active(infoLong)) dm_print(stderr,perm->class_matrix);
+        } else {
+            Warning(infoLong,"no inhibit class matrix");
+        }
+        if (perm->class_label>=0) {
+            Warning(infoLong,"inhibit class label is %d",perm->class_label);
+        } else {
+            Warning(infoLong,"no inhibit class label");
+        }
+    }
+
+    if (PINS_POR) por_set_find_state (state_find, perm);
+
     return perm;
 }
 
@@ -349,24 +434,24 @@ permute_state_info (permute_t *perm)
 void
 permute_free (permute_t *perm)
 {
-    RTfree (perm->todos);
-    RTfree (perm->tosort);
+    RTalignedFree (perm->tosort);
     if (Perm_Otf == perm->permutation)
-        RTfree (perm->pad);
+        RTalignedFree (perm->pad);
     if (Perm_Random == perm->permutation) {
         for (size_t i = 0; i < K+TODO_MAX; i++)
-            RTfree (perm->rand[i]);
+            RTalignedFree (perm->rand[i]);
         RTfree (perm->rand);
     }
     if ( Perm_RR == perm->permutation || Perm_SR == perm->permutation ||
          Perm_Dynamic == perm->permutation ) {
-        RTfree (perm->rand[0]);
-        RTfree (perm->rand);
+        RTalignedFree (perm->rand[0]);
+        RTalignedFree (perm->rand);
     }
-    if (act_detect || files[1]) {
+    if (act_detect || files[1] || (PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA)) {
         for (size_t i = 0; i < K+TODO_MAX; i++) {
             RTfree (perm->todos[i].ti.labels);
         }
     }
-    RTfree (perm);
+    RTalignedFree (perm->todos);
+    RTalignedFree (perm);
 }

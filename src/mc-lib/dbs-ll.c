@@ -16,7 +16,7 @@ static const int        TABLE_SIZE = 24;
 static const mem_hash_t EMPTY = 0;
 static mem_hash_t       WRITE_BIT = 1;
 static mem_hash_t       WRITE_BIT_R = ~((mem_hash_t)1);
-static const uint64_t   CL_MASK = -(1UL << CACHE_LINE);
+static const uint64_t   CL_MASK = -(1ULL << CACHE_LINE);
 
 struct dbs_ll_s {
     size_t              length;
@@ -57,19 +57,23 @@ DBSLLget_sat_bits (const dbs_ll_t dbs, const dbs_ref_t ref)
 
 int
 DBSLLtry_set_sat_bits (const dbs_ll_t dbs, const ref_t ref,
-                           size_t bits, uint64_t exp, uint64_t new_val)
+                       size_t bits, size_t offs,
+                       uint64_t exp, uint64_t new_val)
 {
     mem_hash_t         old_val, new_v;
-    mem_hash_t         mask = (1UL << bits) - 1;
-    HREassert (new_val < (1UL << dbs->sat_bits), "new_val too high");
+    mem_hash_t         mask = (1ULL << bits) - 1;
+    HREassert (new_val < (1ULL << dbs->sat_bits), "new_val too high");
     HREassert ((new_val & mask) == new_val, "new_val too high wrt bits");
 
+    mask <<= offs;
+    new_val <<= offs;
+    exp <<= offs;
     mem_hash_t      hash_and_sat = atomic_read (dbs->table+ref);
     old_val = hash_and_sat & dbs->sat_mask;
     if ((old_val & mask) != exp) return false;
 
     new_v = (hash_and_sat & ~mask) | new_val;
-    return cas(dbs->table + ref, old_val, new_v);
+    return cas(dbs->table + ref, hash_and_sat, new_v);
 }
 
 int
@@ -156,7 +160,7 @@ DBSLLmemoized_hash (const dbs_ll_t dbs, const dbs_ref_t ref)
 }
 
 int
-DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *hash)
+DBSLLfop_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *hash, bool insert)
 {
     local_t            *loc = get_local (dbs);
     stats_t            *stat = &loc->stat;
@@ -169,7 +173,7 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *ha
         hash_memo = ((hash_rehash >> 48) ^ hash_memo);
     mem_hash_t          lost = hash_memo & (WRITE_BIT | dbs->sat_mask);
     hash_memo = (hash_memo + (lost << (dbs->sat_bits+1))) & ~dbs->sat_mask;
-    uint32_t            prime = primes[hash_rehash & PRIME_MASK];
+    uint32_t            prime = odd_primes[hash_rehash & PRIME_MASK];
     //avoid collision of memoized hash with reserved values EMPTY and WRITE_BIT
     while (EMPTY == hash_memo || WRITE_BIT == hash_memo)
         hash_memo = (hash_memo + (prime << (dbs->sat_bits+1))) & ~dbs->sat_mask;
@@ -181,6 +185,7 @@ DBSLLlookup_hash (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret, hash64_t *ha
         for (size_t i = 0; i < CACHE_LINE_SIZE; i++) {
             mem_hash_t         *bucket = &dbs->table[ref];
             if (EMPTY == *bucket) {
+                if (!insert) return DB_NOT_FOUND;
                 if (cas (bucket, EMPTY, WAIT)) {
                     memcpy (&dbs->data[ref * l], v, b);
                     atomic_write (bucket, DONE);
@@ -215,20 +220,6 @@ DBSLLget (const dbs_ll_t dbs, const dbs_ref_t ref, int *dst)
     (void) dst;
 }
 
-int
-DBSLLlookup_ret (const dbs_ll_t dbs, const int *v, dbs_ref_t *ret)
-{
-    return DBSLLlookup_hash (dbs, v, ret, NULL);
-}
-
-dbs_ref_t
-DBSLLlookup (const dbs_ll_t dbs, const int *vector)
-{
-    dbs_ref_t             ret;
-    DBSLLlookup_hash (dbs, vector, &ret, NULL);
-    return ret;
-}
-
 dbs_ll_t
 DBSLLcreate (int length)
 {
@@ -244,26 +235,26 @@ DBSLLcreate_sized (int length, int size, hash64_f hash64, int satellite_bits)
     dbs->full = 0;
     HREassert (satellite_bits < 8, "To many satellite bits for good DBS performance");
     dbs->sat_bits = satellite_bits;
-    dbs->sat_mask = satellite_bits ? (1UL<<satellite_bits) - 1 : 0;
+    dbs->sat_mask = satellite_bits ? (1ULL<<satellite_bits) - 1 : 0;
     WRITE_BIT <<= satellite_bits;
     WRITE_BIT_R <<= satellite_bits;
     dbs->bytes = length * sizeof (int);
-    dbs->size = 1UL << size;
+    dbs->size = 1ULL << size;
     dbs->threshold = dbs->size / 100;
     dbs->threshold = min (dbs->threshold, 1ULL << 16);
     dbs->mask = ((uint64_t)dbs->size) - 1;
     dbs->table = RTalignZero (CACHE_LINE_SIZE, sizeof (mem_hash_t[dbs->size]));
     dbs->data = RTalign (CACHE_LINE_SIZE, dbs->size * dbs->bytes);
-    HREcreateLocal (&dbs->local_key, RTfree);
+    HREcreateLocal (&dbs->local_key, RTalignedFree);
     return dbs;
 }
 
 void
 DBSLLfree (dbs_ll_t dbs)
 {
-    RTfree (dbs->data);
-    RTfree (dbs->table);
-    RTfree (dbs);
+    RTalignedFree (dbs->data);
+    RTalignedFree (dbs->table);
+    RTalignedFree (dbs);
 }
 
 stats_t *

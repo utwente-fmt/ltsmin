@@ -17,6 +17,8 @@ static char* label_filter=NULL;
 static int encode=0;
 static int bfs_reorder=0;
 
+static int root=-1;
+
 static  struct poptOption options[] = {
     { "copy" , 0 , POPT_ARG_VAL , &task , LTScopy ,
     "perform a streaming copy from <input> to <output>" , NULL},
@@ -33,6 +35,8 @@ static  struct poptOption options[] = {
       "encode any LTS as a single edge label LTS during a load/store copy" , NULL },
     { "bfs" , 0 , POPT_ARG_VAL , &bfs_reorder , 1 ,
       "renumber the states to conform to BFS order during a load/store copy" , NULL },
+    { "set-root" , 0 , POPT_ARG_INT , &root , 0 ,
+      "set the initial state during a load/store copy operation" , "<new root>" },
     POPT_TABLEEND
 };
 
@@ -75,12 +79,15 @@ int main(int argc, char *argv[]){
                 switch(lts_type_get_format(ltstype,i)){
                 case LTStypeDirect:
                 case LTStypeRange:
+                case LTStypeBool:
+                case LTStypeTrilean:
+                case LTStypeSInt32:
                     Debug("integer type %s does not use tables",name);
                     break;
                 case LTStypeChunk:
                 case LTStypeEnum:
                     Debug("creating table for type %s",name);
-                    value_table_t tmp=chunk_table_create(NULL,name);
+                    value_table_t tmp = simple_chunk_table_create(NULL,name);
                     Debug("set in %s",name);
                     lts_file_set_table(in,i,tmp);
                     Debug("set out %s",name);
@@ -97,6 +104,13 @@ int main(int argc, char *argv[]){
             Print(infoShort,"loading from %s",files[0]);
             lts_t lts=lts_create();
             lts_read(files[0],lts);
+            if (root>=0){
+                if (lts->root_count!=1){
+                    Abort("original does not have precisely one initial state");
+                }
+                Print(infoShort,"changing root from %d to %d",lts->root_list[0],root);
+                lts->root_list[0]=root;
+            }
             if (encode) {
                 Print(infoShort,"single edge label encoding");
                 lts=lts_encode_edge(lts);
@@ -128,12 +142,15 @@ int main(int argc, char *argv[]){
                 switch(lts_type_get_format(ltstype,i)){
                 case LTStypeDirect:
                 case LTStypeRange:
+                case LTStypeBool:
+                case LTStypeTrilean:
+                case LTStypeSInt32:
                     Debug("integer type %s does not use tables",name);
                     break;
                 case LTStypeChunk:
                 case LTStypeEnum:
                     Debug("creating table for type %s",name);
-                    value_table_t tmp=chunk_table_create(NULL,name);
+                    value_table_t tmp = simple_chunk_table_create(NULL,name);
                     Debug("set in %s",name);
                     lts_file_set_table(in,i,tmp);
                     Debug("set out %s",name);

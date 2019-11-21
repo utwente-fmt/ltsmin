@@ -60,5 +60,63 @@ w2+;;
 W2+;;
   Over-approximate may-write to read+write. Allows must-write dependencies to also subsume read dependencies.
 
+-2r;;
+  Over-approximate copy to read. May be useful for testing whether the dependency matrix is correct.
+
 rb4w;;
   Use special heuristics to move read dependencies before write dependences. Often a win in symbolic state space generation.
+
+mm;;
+  Writes metrics of the selected (*sr*, *sw*, *sc*) matrix to stdout. The following metrics are printed:
+  . Event span: the total distance between the minimum and maximum column of rows.
+  . Normalized event span: the event span divided by the size of the matrix (rows x columns).
+  . Weighted event span: the weighted event span, the event span, including a moment signifying the location of the span. See, Siminiceanu et al., we use moment 1.
+  . Normalized weighted event span: the weighted event span divided by the size of the matrix (rows x column).
+  
+sr;;
+ Select the read matrix for *cs*, *csa*, *cw*, *ca*, *rs*, *bcm*, *bs*, *bk*, *vcm*, *vacm*, *vgps* and *mm*.
+ 
+sw;;
+ Select the write matrix (default) for *cs*, *csa*, *cw*, *ca*, *rs*, *bcm*, *bs*, *bk*, *vcm*, *vacm*, *vgps* and *mm*.
+ The write matrix is the default selection, because only write dependencies can create new nodes in decision diagrams.
+ A bad variable order in the write matrix thus leads to a large number of peak nodes during reachability analysis.
+ A bad variable order in the read matrix can also lead to a slow reachability analysis, but typically
+ not as severe as a bad variable order in the write matrix. Slow reachability analysis due to a bad variable order
+ in the read matrix causes many recursive calls to the relational product operation. Typically it is best that read 
+ dependencies are moved to the top DD level, thus left most in the read matrix.
+  
+sc;;
+ Select the combined matrix for *cs*, *csa*, *cw*, *ca*, *rs*, *bcm*, *bs*, *bk*, *vcm*, *vacm*, *vgps* and *mm*.
+ The combined matrix is the logical or of the read and write matrix.
+    
+bg;;
+  Use a bipartite graph (default) for *bcm*, *bk*, *bs*, *vcm*, *vacm* and *vgps*.
+
+tg;;
+  Create a total graph of the bipartite graph for *bcm*, *bk*, *bs*, *vcm*, *vacm* and *vgps*.
+  This adds more vertices and edges thus increasing computation time, but sometimes provides a better ordering.
+
++  
+Below, the sparse matrix algorithms prefixed with *b* are only available when LTSmin is compiled with Boost.
+Algorithms prefixed with *v* are only available when LTSmin is compiled with ViennaCL.
++ 
+bcm;;
+  Apply Boost's Cuthill-McKee ordering.
+  
+bk;;
+  Apply Boost's King ordering.
+
+bs;;
+  Apply Boost's Sloan ordering.
+  
+vcm;;
+  Apply ViennaCL's Cuthill-McKee ordering.
+  
+vacm;;
+  Apply ViennaCL's advanced Cuthill-McKee ordering.
+  
+vgps;;
+  Apply ViennaCl's Gibbs-Poole-Stockmeyer ordering.
+  
+f;;
+  Apply FORCE ordering.

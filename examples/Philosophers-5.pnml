@@ -1,0 +1,623 @@
+<?xml version="1.0"?>
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net id="Philosophers-PT-000005" type="http://www.pnml.org/version-2009/grammar/ptnet">
+    <page id="page0">
+      <name>
+        <text>DefaultPage</text>
+      </name>
+      <place id="Think_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Think_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Think_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Think_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Think_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Think_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Think_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Think_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Think_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Think_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Fork_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Fork_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Fork_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Fork_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Fork_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Fork_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Fork_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Fork_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Fork_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Fork_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+        <initialMarking>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>1</text>
+        </initialMarking>
+      </place>
+      <place id="Catch1_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch1_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch1_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch1_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch1_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch1_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch1_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch1_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch1_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch1_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch2_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch2_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch2_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch2_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch2_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch2_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch2_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch2_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Eat_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Eat_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Catch2_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Catch2_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Eat_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Eat_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Eat_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Eat_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Eat_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Eat_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <place id="Eat_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>Eat_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </place>
+      <transition id="FF1a_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1a_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1a_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1a_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1a_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1a_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1a_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1a_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1b_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1b_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1b_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1b_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1a_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1a_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1b_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1b_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2a_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2a_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2a_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2a_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1b_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1b_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF1b_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF1b_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2a_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2a_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2b_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2b_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2a_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2a_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2a_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2a_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2b_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2b_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2b_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2b_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2b_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2b_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="FF2b_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>FF2b_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="End_4">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>End_4</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="End_3">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>End_3</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="End_2">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>End_2</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="End_1">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>End_1</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <transition id="End_5">
+        <name>
+          <graphics>
+            <offset x="0" y="0"/>
+          </graphics>
+          <text>End_5</text>
+        </name>
+        <graphics>
+          <position x="100" y="100"/>
+        </graphics>
+      </transition>
+      <arc id="cId150692057982413369655" source="End_1" target="Fork_1"/>      <arc id="cId155319013566109305754" source="End_1" target="Think_1"/>      <arc id="cId155319013566109305753" source="Eat_1" target="End_1"/>      <arc id="cId155319013566109305759" source="End_2" target="Fork_2"/>      <arc id="cId155319013566109305758" source="End_2" target="Think_2"/>      <arc id="cId155319013566109305757" source="Eat_2" target="End_2"/>      <arc id="cId155319013566109305756" source="End_1" target="Fork_5"/>      <arc id="cId155319013566109305763" source="End_3" target="Fork_3"/>      <arc id="cId155153765244440892962" source="End_3" target="Think_3"/>      <arc id="cId155153765244440892961" source="Eat_3" target="End_3"/>      <arc id="cId155153765244440892960" source="End_2" target="Fork_1"/>      <arc id="cId155153765244440892968" source="End_4" target="Fork_3"/>      <arc id="cId155153765244440892969" source="Eat_5" target="End_5"/>      <arc id="cId155153765244440892970" source="End_5" target="Think_5"/>      <arc id="cId155153765244440892971" source="End_5" target="Fork_5"/>      <arc id="cId155153765244440892964" source="End_3" target="Fork_2"/>      <arc id="cId155153765244440892965" source="Eat_4" target="End_4"/>      <arc id="cId155153765244440892966" source="End_4" target="Think_4"/>      <arc id="cId155153765244440892967" source="End_4" target="Fork_4"/>      <arc id="cId155153765244440892976" source="Fork_1" target="FF2b_2"/>      <arc id="cId155153765244440892977" source="Catch2_2" target="FF2b_2"/>      <arc id="cId155153765244440892978" source="FF2b_2" target="Eat_2"/>      <arc id="cId155153765244440892979" source="Fork_2" target="FF2b_3"/>      <arc id="cId155153765244440892972" source="End_5" target="Fork_4"/>      <arc id="cId155153765244440892973" source="Fork_5" target="FF2b_1"/>      <arc id="cId155153765244440892974" source="Catch2_1" target="FF2b_1"/>      <arc id="cId155153765244440892975" source="FF2b_1" target="Eat_1"/>      <arc id="cId155153765244440892985" source="Fork_4" target="FF2b_5"/>      <arc id="cId155153765244440892984" source="FF2b_4" target="Eat_4"/>      <arc id="cId155153765244440892987" source="FF2b_5" target="Eat_5"/>      <arc id="cId155153765244440892986" source="Catch2_5" target="FF2b_5"/>      <arc id="cId155153765244440892981" source="FF2b_3" target="Eat_3"/>      <arc id="cId155649510209446131380" source="Catch2_3" target="FF2b_3"/>      <arc id="cId155649510209446131383" source="Catch2_4" target="FF2b_4"/>      <arc id="cId155649510209446131382" source="Fork_3" target="FF2b_4"/>      <arc id="cId155649510209446131393" source="FF2a_2" target="Eat_2"/>      <arc id="cId155649510209446131392" source="Catch1_2" target="FF2a_2"/>      <arc id="cId155649510209446131395" source="Catch1_3" target="FF2a_3"/>      <arc id="cId155649510209446131394" source="Fork_3" target="FF2a_3"/>      <arc id="cId155649510209446131389" source="Catch1_1" target="FF2a_1"/>      <arc id="cId155649510209446131388" source="Fork_1" target="FF2a_1"/>      <arc id="cId155649510209446131391" source="Fork_2" target="FF2a_2"/>      <arc id="cId155649510209446131390" source="FF2a_1" target="Eat_1"/>      <arc id="cId1556495102094461313102" source="FF2a_5" target="Eat_5"/>      <arc id="cId1556495102094461313103" source="Think_1" target="FF1b_1"/>      <arc id="cId1556495102094461313100" source="Fork_5" target="FF2a_5"/>      <arc id="cId1556495102094461313101" source="Catch1_5" target="FF2a_5"/>      <arc id="cId155649510209446131398" source="Catch1_4" target="FF2a_4"/>      <arc id="cId155649510209446131399" source="FF2a_4" target="Eat_4"/>      <arc id="cId155649510209446131396" source="FF2a_3" target="Eat_3"/>      <arc id="cId155649510209446131397" source="Fork_4" target="FF2a_4"/>      <arc id="cId1556495102094461313110" source="Fork_3" target="FF1b_3"/>      <arc id="cId1556495102094461313111" source="FF1b_3" target="Catch2_3"/>      <arc id="cId1556495102094461313108" source="FF1b_2" target="Catch2_2"/>      <arc id="cId1556495102094461313109" source="Think_3" target="FF1b_3"/>      <arc id="cId1554842614582809889106" source="Think_2" target="FF1b_2"/>      <arc id="cId1554842614582809889107" source="Fork_2" target="FF1b_2"/>      <arc id="cId1554842614582809889104" source="Fork_1" target="FF1b_1"/>      <arc id="cId1554842614582809889105" source="FF1b_1" target="Catch2_1"/>      <arc id="cId1554842614582809889119" source="Fork_5" target="FF1a_1"/>      <arc id="cId1554842614582809889118" source="Think_1" target="FF1a_1"/>      <arc id="cId1554842614582809889117" source="FF1b_5" target="Catch2_5"/>      <arc id="cId1554842614582809889116" source="Fork_5" target="FF1b_5"/>      <arc id="cId1554842614582809889115" source="Think_5" target="FF1b_5"/>      <arc id="cId1554842614582809889114" source="FF1b_4" target="Catch2_4"/>      <arc id="cId1554842614582809889113" source="Fork_4" target="FF1b_4"/>      <arc id="cId1554842614582809889112" source="Think_4" target="FF1b_4"/>      <arc id="cId1554842614582809889127" source="Think_4" target="FF1a_4"/>      <arc id="cId1554842614582809889126" source="FF1a_3" target="Catch1_3"/>      <arc id="cId1554842614582809889125" source="Fork_2" target="FF1a_3"/>      <arc id="cId1554842614582809889124" source="Think_3" target="FF1a_3"/>      <arc id="cId1554842614582809889123" source="FF1a_2" target="Catch1_2"/>      <arc id="cId1554842614582809889122" source="Fork_1" target="FF1a_2"/>      <arc id="cId1554842614582809889121" source="Think_2" target="FF1a_2"/>      <arc id="cId1554842614582809889120" source="FF1a_1" target="Catch1_1"/>      <arc id="cId1554842614582809889129" source="FF1a_4" target="Catch1_4"/>      <arc id="cId1554842614582809889128" source="Fork_3" target="FF1a_4"/>      <arc id="cId1554842614582809889131" source="Fork_4" target="FF1a_5"/>      <arc id="cId1554842614582809889130" source="Think_5" target="FF1a_5"/>      <arc id="cId1546580198499389249132" source="FF1a_5" target="Catch1_5"/>    </page>
+    <name>
+      <text>Philosophers-PT-000005</text>
+    </name>
+  </net>
+</pnml>

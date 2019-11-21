@@ -1,47 +1,37 @@
 Release Checklist
 =================
 
-* finalize 'next' branch (include all feature branches and fixes from
-  'maint' branch
+* If first release of the year, update the copyright data in COPYING, and
+  README.md
 
-* If first release of the year, update the copyright data in COPYING
+* Update NEWS with release notes, note that
+  NEWS is a sym link to changelog.md.
+  Having this sym link means we remain compatible with
+  autoconf.
 
-* Update NEWS with release notes
-
-* Bump version in configure.ac and commit to master
+* Verify the version (<MAJOR>.<MINOR>.<PATCH>) in configure.ac.
 
 * Tag release
-  git tag ltsmin-<version>
+  git tag v<MAJOR>.<MINOR>.<PATCH>. Here the v prefix is important, because 1)
+  it is suggested by Github releases, under "Tagging suggestions", and 2)
+  it allows you to publish LTSmin's website too. Travis is configured (through
+  .travis.yml) to publish a new website only if the tag matches
+  v<MAJOR>.<MINOR>.<PATCH>. The reason is that if you want to publish a paper,
+  based on an LTSmin version that is older than what the current website refers
+  to, you will not "overwrite" the website. So it is perfectly fine to push
+  a tag with a name, say "NFM2016" to Github, it will even perform a binary
+  release, but it will not update the website. This is because NFM2016 is not
+  prefixed with v. Even if you change the LTSmin version in configure.ac to
+  NFM2016, you will still not update the website. Prefixing a tag
+  with v may only be done when performing an LTSmin release, based on
+  semantic versioning, e.g. it is recommended to push tags like v3.0.0, but not
+  vNFM2016 (if NFM2016 is the version in configure.ac).
 
 * make distcheck (creates tarball and checks whether it builds)
   To test specific configurations:
     make distcheck DISTCHECK_CONFIGURE_FLAGS='...'
 
-* Create a copy of the website in a staging area (outside of tools/ltsmin/)
+* Push the tag to origin, Travis will perform the release for you :)
 
-* Generate and copy documentation to website (staging area);
-  possibly add renamed files to .htaccess
+* Bump the version in configure.ac, and commit to master.
 
-* Copy tarball and symlink to unversioned tar.gz to website (staging area);
-  Update link to tarball on website; Regenerate website (staging area)
-
-* merge 'master' branch into 'next'
-  git checkout next && git pull . master
-
-* merge 'master' branch into 'maint'
-  git checkout maint && git pull . master
-
-* Push 'master', 'maint', 'next' and 'ltsmin-<version>' branches to public
-  repository
-
-* Update the website from the staging area (create a backup beforehand):
-  cd staging-area &&
-    rsync --delete -avuz . ewi1057:~fmt/public_html/tools/ltsmin/
-
-* Close all bugs marked as "resolved" in Redmine:
-  Create filter on "Target version" and "Status", select all, and right click.
-  (ensure that Redmine's view on the FMT repository is current, e.g.,
-  by visiting to "Repository" view.)
-
-* Announce new release in Redmine's News section for the LTSmin project,
-  upload tarball to Files section

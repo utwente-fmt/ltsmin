@@ -1,0 +1,31 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+prob2lts-sym(1)
+===============
+:Author:  Jeroen Meijer
+:Email:   <j.j.g.meijer@utwente.nl>
+:Date:    2016-01-11
+
+== NAME
+
+prob2lts-sym - Symbolic reachability analysis for B, through ProB.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... '/path/to/socket.probz|/path/to/machine.[mch|eventb|tlc]' ['output.etf']
+
+== DESCRIPTION
+
+{manname} performs symbolic reachability analysis on a specification provided
+through '/path/to/machine.[mch|eventb|tlc]', or through a specification
+provided through '/path/to/socket.probz'. 'output.etf' specifies the name of the output
+archive, written in manpage:etf[5] format.
+
+include::inc/prob.txt[]
+
+== OPTIONS
+
+include::inc/pins2lts-sym-options.txt[]
+
+include::inc/prob-options.txt[]
+
+include::inc/pins2lts-sym.txt[]

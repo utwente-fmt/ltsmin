@@ -43,7 +43,7 @@ output_popt (poptContext con, enum poptCallbackReason reason,
     case POPT_CALLBACK_REASON_POST: {
             int ov = linear_search (output_values, arg_value);
             if (ov < 0) {
-                Warning (error, "unknown output value %s", arg_value);
+                Warning (lerror, "unknown output value %s", arg_value);
                 HREprintUsage();
                 HREabort(LTSMIN_EXIT_FAILURE);
             }
@@ -81,6 +81,7 @@ trace_get_type_str(lts_t trace, int typeno, int type_idx, size_t dst_size, char*
     switch(lts_type_get_format(trace->ltstype,typeno)){
         case LTStypeDirect:
         case LTStypeRange:
+        case LTStypeSInt32:
             snprintf(dst, dst_size, "%d", type_idx);
             break;
         case LTStypeChunk:
@@ -90,6 +91,29 @@ trace_get_type_str(lts_t trace, int typeno, int type_idx, size_t dst_size, char*
             chunk2string(c,dst_size,dst);
             }
             break;
+        case LTStypeBool:
+        case LTStypeTrilean: {
+            char* value = NULL;
+            switch (type_idx) {
+                case 0: {
+                    value = "false";
+                    break;
+                }
+                case 1: {
+                    value = "true";
+                    break;
+                }
+                case 2: {
+                    value = "maybe";
+                    break;
+                }
+                default: {
+                    Abort("Invalid value: %d", type_idx);
+                }
+            }
+            snprintf(dst, dst_size, "%s", value);
+            break;
+        }
     }
 }
 
@@ -135,7 +159,7 @@ output_text(lts_t trace, FILE* output_file) {
         int state_lbls[sLbls];
         int edge_lbls[eLbls];
 
-        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
+        uint32_t i = (x != 0 && x == trace->transitions ? trace->dest[x-1] : x);
         fprintf(output_file, "state %d/%d\n",i,trace->transitions);
         if (i != 0) {
             // previous state
@@ -316,7 +340,7 @@ output_text_table(lts_t trace, FILE* output_file) {
         int prev_edge_lbls[eLbls];
         int edge_lbls[eLbls];
 
-        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
+        uint32_t i = (x != 0 && x == trace->transitions ? trace->dest[x-1] : x);
         for(int j=0; j<N; ++j) prev_state[j] = state[j];
         if (N) TreeUnfold(trace->state_db, i, state);
         fprintf(output_file, "%.3d: [",i);
@@ -410,7 +434,7 @@ output_csv(lts_t trace, FILE* output_file) {
         int state[N];
         char tmp[BUFLEN];
 
-        uint32_t i = (x != trace->transitions ? x : trace->dest[x-1]);
+        uint32_t i = (x != 0 && x == trace->transitions ? trace->dest[x-1] : x);
         if (N) TreeUnfold(trace->state_db, i, state);
         for(int j=0; j<N; ++j) {
             int typeno = lts_type_get_state_typeno(trace->ltstype, j);

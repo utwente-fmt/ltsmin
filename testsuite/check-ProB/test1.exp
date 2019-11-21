@@ -1,0 +1,49 @@
+# include the general include file which contains the functions
+source $srcdir/lib/include.tcl
+
+# use the local uncluding file containing several procedures
+source $srcdir/lib/backends.tcl
+
+#cd into the test dir such that output files are placed here.
+if { [file exists $binpaths(out) ] != 1 } {
+    file mkdir $binpaths(out)
+}
+cd $binpaths(out)
+
+puts "\n----------------------------------------------"
+puts   "TESTING: Algorithmic backends for ProB front-end"
+puts   "----------------------------------------------\n"
+
+
+# the number of threads to use in multithreaded backends
+set num_threads 1
+
+# Language ProB-frontends:
+# -------------------
+
+set prob_model "MutexSimple.mch"
+set PID [ start_ProB $prob_model ]
+
+set langs [dict create]
+# a model per language
+dict set langs prob model "/tmp/ltsmin.probz" 
+dict set langs prob options mc "--threads=$num_threads --no-close"
+
+dict set backends seq options "--no-close"
+dict set backends dist options "--no-close"
+
+dict set langs prob exp_output "10 states 23 transitions"
+set alg_be [ find_alg_backends "{seq,dist,mc}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
+# different output for symbolic tool:
+dict set langs prob exp_output "state space has 10"
+dict set backends sym options "--no-close"
+
+set alg_be [ find_alg_backends "{sym}" ]
+run_test_for_alg_backends $alg_be $langs $backends
+
+exec kill -9 $PID
+exec rm /tmp/ltsmin.probz
+
+cd ".."

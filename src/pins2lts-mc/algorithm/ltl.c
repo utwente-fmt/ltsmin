@@ -8,6 +8,7 @@
 
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <pins2lts-mc/algorithm/ltl.h>
+#include <pins2lts-mc/parallel/global.h>
 
 int              ecd = 1;
 
@@ -41,7 +42,7 @@ new_state (trace_info_t     *out, state_info_t *si)
 }
 
 void
-find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack)
+find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack, bool is_lasso)
 {
     size_t              level = dfs_stack_nframes (stack) + 1;
     trace_ctx_t         ctx;
@@ -53,9 +54,13 @@ find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack)
         state_data_t        data = dfs_stack_peek_top (stack, i);
         state_info_deserialize (ctx.state, data);
         new_state (&state, ctx.state);
-        Warning (info, "%zu\t(%zu),", ctx.state->ref, level - i);
+        Warning (infoLong, "%zu\t(%zu),", ctx.state->ref, level - i);
         int val = SIputC (ctx.si, state.data, sizeof(struct val_s));
         trace[level - i - 1] = (ref_t) val;
+    }
+    if (is_lasso && trace[level-1] >= level - 1) {
+        Warning (lerror, "Trace has no cycle. Writing erroneous trace for debugging purposes.");
+        global->exit_status = LTSMIN_EXIT_FAILURE;
     }
     trc_env_t          *trace_env = trc_create (model, get_stack_state, &ctx);
     Warning (info, "Writing trace to %s", trc_output);
@@ -65,24 +70,22 @@ find_and_write_dfs_stack_trace (model_t model, dfs_stack_t stack)
 }
 
 void
-ndfs_report_cycle (run_t *run, model_t model, dfs_stack_t stack,
+ndfs_report_cycle (wctx_t *ctx, model_t model, dfs_stack_t stack,
                    state_info_t *cycle_closing_state)
 {
+    (void)model;
+    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
     /* Stop other workers, exit if some other worker was first here */
-    if ( !run_stop(run) )
+    if ( no_exit || !run_stop(ctx->run) )
         return;
     size_t              level = dfs_stack_nframes (stack) + 1;
     Warning (info, " ");
     Warning (info, "Accepting cycle FOUND at depth %zu!", level);
     Warning (info, " ");
-    if (trc_output) {
-        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
-        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
-        /* Write last state to stack to close cycle */
-        state_data_t data = dfs_stack_push (stack, NULL);
-        state_info_serialize (cycle_closing_state, data);
-        find_and_write_dfs_stack_trace (model, stack);
+    if (trc_output && ctx->counter_example == 0) {
+        state_info_set (ctx->ce_state, cycle_closing_state->ref, cycle_closing_state->lattice);
+        ctx->counter_example = 1; // delay, to avoid re-entrancy of GBgetTrans
+        //find_and_write_dfs_stack_trace (model, stack, true);
     }
-    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
 }
 

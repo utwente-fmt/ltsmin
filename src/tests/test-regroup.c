@@ -65,48 +65,24 @@ read_matrix ()
 }
 
 int
-max_row_first (matrix_t *r, matrix_t *w, int rowa, int rowb)
+max_row_first (matrix_t *m, int rowa, int rowb)
 {
     int                 i,
                         ra,
-                        wa,
-                        rb,
-                        wb;
+                        rb;
 
-    for (i = 0; i < dm_ncols (r); i++) {
-        ra = dm_is_set (r, rowa, i);
-        wa = dm_is_set (w, rowa, i);
-        rb = dm_is_set (r, rowb, i);
-        wb = dm_is_set (w, rowb, i);
+    for (i = 0; i < dm_ncols (m); i++) {
+        ra = dm_is_set (m, rowa, i);
+        rb = dm_is_set (m, rowb, i);
 
-        if ((ra && wa && rb && wb) || (!ra && !wa && !rb && !wb))
+        if ((ra && rb) || (!ra && !rb))
             continue;
-        return (rb + wb - ra - wa);
+        return (rb - ra);
     }
 
     return 0;
 }
 
-int
-eq_rows(matrix_t *r, matrix_t *mayw, matrix_t *mustw, int rowa, int rowb, void *context) {
-    if (    dm_ones_in_row (r, rowa) != dm_ones_in_row (r, rowb) ||
-            dm_ones_in_row (mayw, rowa) != dm_ones_in_row (mayw, rowb) ||
-            dm_ones_in_row (mustw, rowa) != dm_ones_in_row (mustw, rowb))
-        return 0;
-    int                 i;
-    for (i = 0; i < dm_ncols (r); i++) {
-        int                 ar = dm_is_set (r, rowa, i);
-        int                 br = dm_is_set (r, rowb, i);
-        int                 amayw = dm_is_set (mayw, rowa, i);
-        int                 bmayw = dm_is_set (mayw, rowb, i);
-        int                 amustw = dm_is_set (mustw, rowa, i);
-        int                 bmustw = dm_is_set (mustw, rowb, i);
-        if (ar != br || amayw != bmayw || amustw != bmustw)
-            return 0;                  // unequal
-    }
-    return 1;                          // equal
-    (void)context;
-}
 
 int
 state_mapping (matrix_t *m)
@@ -188,33 +164,35 @@ dependencies (matrix_t *m)
     return 1;
 }
 
+static int
+eq_rows(matrix_t *m, int rowa, int rowb, void *context)
+{
+    (void) *m; (void) rowa; (void) rowb; (void) context;
+    return 1;
+}
 
 int
 main (void)
 {
-    matrix_t            r = read_matrix ();
-    matrix_t            mayw;
-    matrix_t            mustw;
-    dm_copy(&r, &mayw);
-    dm_copy(&r, &mustw);
+    matrix_t            m = read_matrix ();
     printf ("matrix:\n");
-    dm_print (stdout, &r);
+    dm_print (stdout, &m);
     // nub
-    dm_sort_rows (&r, &mayw, &mustw, &max_row_first);
-    dm_nub_rows (&r, &mayw, &mustw, &eq_rows, NULL);
+    dm_sort_rows (&m, &max_row_first);
+    dm_nub_rows (&m, &eq_rows, NULL);
     // optimize
-    dm_optimize (&r, &mayw, &mustw);
+    dm_optimize (&m);
     // sort again
-    dm_sort_rows (&r, &mayw, &mustw, &max_row_first);
+    dm_sort_rows (&m, &max_row_first);
 
     printf ("matrix:\n");
-    dm_print (stdout, &r);
+    dm_print (stdout, &m);
     printf ("state mapping:\n");
-    state_mapping (&r);
+    state_mapping (&m);
     printf ("transition mapping:\n");
-    transition_mapping (&r);
+    transition_mapping (&m);
     printf ("dependencies:\n");
-    dependencies (&r);
+    dependencies (&m);
 
     return 0;
 }

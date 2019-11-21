@@ -247,6 +247,13 @@ state_info_new_state (state_info_t *si, state_data_t data,
     return store_new_state (si->in->store, data, ti, src->in->store);
 }
 
+int
+state_info_find_state (state_info_t *si, state_data_t data,
+                      transition_info_t *ti, state_info_t *src)
+{
+    return store_find (si->in->store, data, ti, src->in->store);
+}
+
 void
 state_info_serialize (state_info_t *si, raw_data_t data)
 {

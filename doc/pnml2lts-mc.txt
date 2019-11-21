@@ -1,0 +1,33 @@
+//                           -*- mode: doc; outline-regexp: "==\(=*\) ." -*-
+pnml2lts-mc(1)
+================
+:Author:  Jeroen Meijer
+:Email:   <j.j.g.meijer@utwente.nl>
+:Date:    2015-12-02
+
+== NAME
+
+pnml2lts-mc - Concurrent state space generator for PNML models.
+
+== SYNOPSIS
+
+*{manname}* [OPTION]... 'Petri-net.pnml'
+
+== DESCRIPTION
+
+{manname} performs multi-core reachability and LTL model checking on the
+labelled transition system from a specification provided in
+'Petri-net.pnml'.
+LTS output is not supported by this tool, use the distributed tools instead.
+
+include::inc/pnml.txt[]
+
+== OPTIONS
+
+include::inc/threads-option.txt[]
+
+include::inc/pins2lts-mc-options.txt[]
+
+include::inc/pnml-options.txt[]
+
+include::inc/pins2lts-mc.txt[]

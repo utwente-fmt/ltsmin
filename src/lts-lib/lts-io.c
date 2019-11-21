@@ -151,16 +151,21 @@ static void write_close(lts_file_t file){
         Print(infoShort,"action labeled, detecting silent step");
         int tableno=lts_type_get_edge_label_typeno(file->lts->ltstype,0);
         value_table_t vt=file->lts->values[tableno];
-        int N=VTgetCount(vt);
-        for(int i=0;i<N;i++){
-            chunk c=VTgetChunk(vt,i);
-            if ( (c.len==strlen(LTSMIN_EDGE_VALUE_TAU) && strcmp(c.data,LTSMIN_EDGE_VALUE_TAU)==0)
-              || (c.len==1 && strcmp(c.data,"i")==0)
-               )
-            {
-                Print(infoShort,"invisible label is %s",c.data);
-                if (file->lts->tau>=0) Abort("two silent labels");
-                file->lts->tau=i;
+        int N = vt == NULL ? 0 : VTgetCount(vt);
+
+        if (N > 0) {
+            table_iterator_t it = VTiterator (vt);
+            while (IThasNext(it)) {
+                chunk c = ITnext (it);
+                if ( (c.len==strlen(LTSMIN_EDGE_VALUE_TAU) &&
+                             strcmp(c.data,LTSMIN_EDGE_VALUE_TAU)==0)
+                  || (c.len==1 && strcmp(c.data,"i")==0)
+                   )
+                {
+                    Print(infoShort,"invisible label is %s",c.data);
+                    if (file->lts->tau>=0) Abort("two silent labels");
+                    file->lts->tau = VTputChunk(vt, c);
+                }
             }
         }
         if (file->lts->tau<0) {

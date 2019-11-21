@@ -1,3 +1,4 @@
+#include <hre/config.h>
 
 //#include "Ddlts.h"
 #include <stdlib.h>
@@ -2177,6 +2178,7 @@ void update_destinations(taudlts_t t, int* wscc, int* oscc, char* workers){
  //  for (i = 0 ; i < nodes ; i++)
  //	Warning (1,"%d -> %d: beginto %12d sizeto %12d",
  //					 me, i, begin_to_w[i], size_to_w[i]);
+ wtmp = NULL;
  if (workers[me]){
 	//	Warning(info,"%d : received %d %d %d",
 	//					me, begin_from_w[0], begin_from_w[1], begin_from_w[nodes]);
@@ -2605,6 +2607,7 @@ void taudlts_reduce_some
 	// }
 	// else tcopy=NULL;
 
+ begintrans = beginstates = NULL;
  if (me == manager){
 	begintrans=(int*)calloc(nodes+1, sizeof(int));
 	beginstates=(int*)calloc(nodes+1, sizeof(int));
@@ -2627,7 +2630,7 @@ void taudlts_reduce_some
 #endif
 
 
-
+ gscc = NULL;
  //2. SOME: Manager: find the local components
  if (me==manager){
 	Warning(info,"\nSMALL GRAPH by manager %d: %12d states, %12d transitions \n", 
@@ -3018,6 +3021,7 @@ void taudlts_scc_global(taudlts_t t, int* wscc, int* oscc){
 	if ((oscc[i]==i) && (t->begin[i+1]>t->begin[i]))
 	 NG++;
  // compute "first"
+ count = begin = NULL;
  if ( me == 0) { 
 	MPI_Comm_size(t->comm, &nodes); 
 	count = (int*)calloc(nodes,sizeof(int)); 
@@ -3048,13 +3052,15 @@ void taudlts_scc_global(taudlts_t t, int* wscc, int* oscc){
  oldN = t->N;
  taudlts_global_collapse(t, wmap, omap); // side effect at 0: t->N := begin[nodes]
  free(wmap); free(omap);
- ///// MPI_Barrier(t->comm); 
+ ///// MPI_Barrier(t->comm);
+ gscc = NULL;
  if (me==0){
 	Warning(info,"\nSMALL GRAPH: %d states, %d transitions\n", t->N, t->M);
 	gscc=(int*)calloc(t->N, sizeof(int));
 	taudlts_scc_local(t,gscc);	
  }
  // compute wscc, oscc for the "global" graph
+ wmapback_all = omapback_all = wscc_all = oscc_all = NULL;
  if (me==0){
 	wmapback_all = (int*)calloc(t->N, sizeof(int));
 	omapback_all = (int*)calloc(t->N, sizeof(int));
@@ -3063,6 +3069,7 @@ void taudlts_scc_global(taudlts_t t, int* wscc, int* oscc){
  }
  MPI_Gatherv(omapback, NG, MPI_INT, omapback_all, count, begin, MPI_INT, 0, t->comm);
 
+ begin = NULL;
  if (me==0){
 	// Warning(info,"begin: %d %d %d !!",begin[0],begin[1],begin[2]);
 	aaux = (int*)calloc(nodes, sizeof(int));
@@ -3452,6 +3459,7 @@ void dlts_shuffle(dlts_t lts, int* wmap, int* omap){
 #ifdef DEBUG
  Warning(info,"\n%d: N=%12d, M=%12d",N,M);
 #endif
+ (void) N;
  request_array = (MPI_Request*)calloc(2*nodes, sizeof(MPI_Request));
  status_array = (MPI_Status*)calloc(2*nodes, sizeof(MPI_Status));
  wsrc=(int*)calloc(M+1, sizeof(int));
@@ -3785,6 +3793,7 @@ void dlts_clear_useless_transitions(dlts_t lts){
  ///// MPI_Barrier(lts->comm);
  MPI_Allreduce(&MU, &MU_all, 1, MPI_INT, MPI_SUM, lts->comm);
  if (me==0) Warning(info,"at least %d transitions should be eliminated",MU_all);
+ (void) N;
 }
 
 

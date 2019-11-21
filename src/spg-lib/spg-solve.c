@@ -15,24 +15,8 @@
 #include <bignum/bignum.h>
 #include <util-lib/dfs-stack.h>
 #include <util-lib/treedbs.h>
+#include <util-lib/util.h>
 #include <spg-lib/spg-solve.h>
-
-
-static inline void
-get_vset_size(vset_t set, long *node_count,
-                  char *elem_str, int str_len)
-{
-    {
-        bn_int_t elem_count;
-        int      len;
-        vset_count(set, node_count, &elem_count);
-        len = bn_int2string(elem_str, str_len, &elem_count);
-        if (len >= str_len)
-            Abort("Error converting number to string");
-        bn_clear(&elem_count);
-    }
-}
-
 
 static void report_game(const parity_game* g, const spg_attr_options* options, int indent)
 {
@@ -40,26 +24,26 @@ static void report_game(const parity_game* g, const spg_attr_options* options, i
     {
         RTstopTimer(options->timer);
         long   total_count;
+        double e_count;
         long   n_count;
-        char   elem_str[1024];
-        get_vset_size(g->v, &n_count, elem_str, sizeof(elem_str));
+        vset_count(g->v, &n_count, &e_count);
         total_count = n_count;
-        Print(infoLong, "[%7.3f] " "%*s" "parity_game: g->v has %s elements (%ld nodes)",
-              RTrealTime(options->timer), indent, "", elem_str, n_count);
+        Print(infoLong, "[%7.3f] " "%*s" "parity_game: g->v has %.*g elements (%ld nodes)",
+              RTrealTime(options->timer), indent, "", DBL_DIG, e_count, n_count);
         //Print(infoLong, "parity_game: min_priority = %d, max_priority = %d", g->min_priority, g->max_priority);
         for(int i=g->min_priority; i<= g->max_priority; i++)
         {
-            get_vset_size(g->v_priority[i], &n_count, elem_str, sizeof(elem_str));
+            vset_count(g->v_priority[i], &n_count, &e_count);
             total_count += n_count;
-            Print(infoLong, "[%7.3f] " "%*s" "parity_game: g->v_priority[%d] has %s elements (%ld nodes)",
-                  RTrealTime(options->timer), indent, "", i, elem_str, n_count);
+            Print(infoLong, "[%7.3f] " "%*s" "parity_game: g->v_priority[%d] has %.*g elements (%ld nodes)",
+                  RTrealTime(options->timer), indent, "", i, DBL_DIG, e_count, n_count);
         }
         for(int i=0; i < 2; i++)
         {
-            get_vset_size(g->v_player[i], &n_count, elem_str, sizeof(elem_str));
+            vset_count(g->v_player[i], &n_count, &e_count);
             total_count += n_count;
-            Print(infoLong, "[%7.3f] " "%*s" "parity_game: g->v_player[%d] has %s elements (%ld nodes)",
-                  RTrealTime(options->timer), indent, "", i, elem_str, n_count);
+            Print(infoLong, "[%7.3f] " "%*s" "parity_game: g->v_player[%d] has %.*g elements (%ld nodes)",
+                  RTrealTime(options->timer), indent, "", i, DBL_DIG, e_count, n_count);
         }
         Print(infoLong, "[%7.3f] " "%*s" "parity_game: %ld nodes total",
               RTrealTime(options->timer), indent, "", total_count);

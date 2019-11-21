@@ -11,7 +11,6 @@
 int              dlk_detect = 0;
 char            *act_detect = NULL;
 char            *inv_detect = NULL;
-int              no_exit = 0;
 size_t           max_level = SIZE_MAX;
 
 struct poptOption reach_options[] = {
@@ -46,11 +45,9 @@ handle_error_trace (wctx_t *ctx)
     size_t              level = ctx->counters->level_cur;
 
     if (trc_output) {
-        double uw = cct_finalize (global->tables, "BOGUS, you should not see this string.");
-        Warning (infoLong, "Parallel chunk tables under-water mark: %.2f", uw);
         if (strategy[0] & Strat_TA) {
             dfs_stack_leave (sm->stack);
-            find_and_write_dfs_stack_trace (ctx->model, sm->stack);
+            find_and_write_dfs_stack_trace (ctx->model, sm->stack, false);
         } else {
             trc_env_t  *trace_env = trc_create (ctx->model, get_state, ctx);
             Warning (info, "Writing trace to %s", trc_output);
@@ -58,7 +55,6 @@ handle_error_trace (wctx_t *ctx)
                                 shared->parent_ref, ctx->initial->ref);
         }
     }
-    global->exit_status = LTSMIN_EXIT_COUNTER_EXAMPLE;
 }
 
 size_t
@@ -169,9 +165,8 @@ reach_queue (void *arg, state_info_t *successor, transition_info_t *ti, int new)
         raw_data_t stack_loc = dfs_stack_push (sm->out_stack, NULL);
         state_info_serialize (successor, stack_loc);
         if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref &&
-                          shared->parent_ref[successor->ref] == 0 &&
                           ti != &GB_NO_TRANSITION )) // race, but ok:
-            cas (&shared->parent_ref[successor->ref], 0, ctx->state->ref);
+            atomic_write (&shared->parent_ref[successor->ref], ctx->state->ref);
         loc->proviso |= proviso == Proviso_ClosedSet;
     } else if (proviso == Proviso_Stack) {
         loc->proviso |= !ecd_has_state (loc->cyan, successor);
@@ -207,9 +202,9 @@ reach_fulfil_ignoring_proviso (wctx_t *ctx, size_t successors, perm_cb_f cb)
     counter_t          *cnt = &ctx->local->counters;
     if (proviso != Proviso_None && !loc->proviso && successors > 0) {
         // proviso does not hold, explore all:
-        permute_set_por (ctx->permute, 0);
+        permute_set_por (ctx->permute, 0); // force all in permutor
         successors = permute_trans (ctx->permute, ctx->state, cb, ctx);
-        permute_set_por (ctx->permute, 1);
+        permute_set_por (ctx->permute, 1); // back to default
         cnt->ignoring++;
     }
     return successors;
@@ -347,10 +342,9 @@ pbfs_handle (void *arg, state_info_t *successor, transition_info_t *ti,
 
     if (!seen) {
         pbfs_queue_state (ctx, successor);
-        if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref
-                          &&  shared->parent_ref[successor->ref] == 0
-                          && ti != &GB_NO_TRANSITION )) // race, but ok:
-            cas (&shared->parent_ref[successor->ref], 0, ctx->state->ref);
+        if (EXPECT_FALSE( trc_output && successor->ref != ctx->state->ref &&
+                          ti != &GB_NO_TRANSITION )) // race, but ok:
+            atomic_write (&shared->parent_ref[successor->ref], ctx->state->ref);
         loc->counters.level_size++;
         loc->proviso |= 1;
     }
@@ -439,7 +433,7 @@ reach_reduce  (run_t *run, wctx_t *ctx)
              runtime);
     work_report ("", ctx->counters);
 
-    if (Strat_ECD & strategy[1]) {
+    if ((strategy[0] & Strat_DFS) && proviso == Proviso_Stack) {
         fset_print_statistics (ctx->local->cyan, "ECD set");
     }
 }
@@ -490,24 +484,19 @@ reach_print_stats   (run_t *run, wctx_t *ctx)
 void
 reach_local_setup   (run_t *run, wctx_t *ctx)
 {
-    if ((strategy[0] & Strat_DFS) && Proviso_Stack) {
+    if ((strategy[0] & Strat_DFS) && proviso == Proviso_Stack) {
         ctx->local->cyan = fset_create (sizeof(ref_t), 0, 10, 20);
     }
 
     ctx->local->inv_expr = NULL;
     if (inv_detect) { // local parsing
         ctx->local->env = LTSminParseEnvCreate();
-        ctx->local->inv_expr = parse_file_env (inv_detect, pred_parse_file,
-                                               ctx->model, ctx->local->env);
+        ctx->local->inv_expr = pred_parse_file (inv_detect, ctx->local->env, GBgetLTStype(ctx->model));
+        set_pins_semantics (ctx->model, ctx->local->inv_expr, ctx->local->env, NULL, NULL);
     }
 
-    if (PINS_POR) {
-        if (ctx->local->inv_expr) {
-            mark_visible (ctx->model, ctx->local->inv_expr, ctx->local->env);
-        }
-        if (act_detect) {
-            pins_add_edge_label_visible (ctx->model, act_label, act_index);
-        }
+    if (PINS_POR && act_detect) {
+        pins_add_edge_label_visible (ctx->model, act_label, act_index);
     }
 
     if (files[1]) {
@@ -616,7 +605,7 @@ reach_run (run_t *run, wctx_t *ctx)
     case Strat_BFS:
         bfs (ctx); break;
     case Strat_DFS:
-        if (PINS_POR && (proviso == Proviso_Stack || proviso == Proviso_ClosedSet)) {
+        if (PINS_POR && proviso == Proviso_Stack) {
             dfs_proviso (ctx);
         } else {
             dfs (ctx);
@@ -658,7 +647,7 @@ reach_init_shared (run_t *run)
     run_set_stop (run, reach_stop);
 
     if (trc_output) {
-        run->shared->parent_ref = RTmallocZero (sizeof(ref_t[1UL<<dbs_size]));
+        run->shared->parent_ref = RTmallocZero (sizeof(ref_t[1ULL<<dbs_size]));
     }
 }
 

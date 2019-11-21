@@ -9,6 +9,7 @@
 #include <gperftools/profiler.h>
 #endif
 #include <assert.h>
+#include <time.h>
 
 #include <hre/config.h>
 #include <hre/user.h>
@@ -233,7 +234,7 @@ int get_priority(const parity_game* g, const int* s)
     {
         if (vset_member(g->v_priority[priority], s)) { found = true; break; }
     }
-    assert(found);
+    assert(found); (void) found;
     return priority;
 }
 
@@ -364,10 +365,6 @@ int choose_strategy_move(const parity_game* g, const recursive_result* strategy,
                            *result ? "true" : "false");
         } else if (!*strategy_play) {
             //Print(info, "choose randomly");
-            long int nodes;
-            bn_int_t states;
-            bn_init(&states);
-            vset_count(level, &nodes, &states);
             vset_random(level, dst);
         }
     }
@@ -565,7 +562,7 @@ void check_strategy(const parity_game* g, const recursive_result* strategy, cons
             Print(infoLong, "Player %d, random run %d", p, i);
             bool random_run = random_strategy_play(g, strategy, p);
             if ((p == player && result) || (p != player && !result)) {
-                assert(random_run);
+                assert(random_run); (void) random_run;
             }
         }
     }

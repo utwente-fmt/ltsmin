@@ -71,6 +71,29 @@ lts_file_t lts_get_template(lts_file_t file){
     return USER(lts);
 }
 
+static void no_write_init(lts_file_t lts,int seg,void* state){
+    (void)seg;
+    (void)state;
+    Abort("the file format of %s does not support the write init operation",lts->name);
+}
+
+static void no_write_state(lts_file_t file,int seg,void* state,void*labels){
+    (void)seg;
+    (void)state;
+    (void)labels;
+    Abort("the file format of %s does not support the write state operation",file->name);
+}
+
+static void no_write_edge(lts_file_t file,int src_seg,void* src_state,
+                           int dst_seg,void*dst_state,void* labels){
+    (void)src_seg;
+    (void)src_state;
+    (void)dst_seg;
+    (void)dst_state;
+    (void)labels;
+    Abort("the file format of %s does not support the write edge operation",file->name);
+}
+
 lts_file_t lts_file_bare(const char* name,lts_type_t ltstype,int segments,lts_file_t settings,size_t user_size){
     lts_file_t lts=(lts_file_t)HREmallocZero(hre_heap,system_size+user_size);
     lts->states=(uint32_t*)HREmallocZero(hre_heap,segments*sizeof(uint32_t));
@@ -92,6 +115,9 @@ lts_file_t lts_file_bare(const char* name,lts_type_t ltstype,int segments,lts_fi
         lts->src_mode=settings->src_mode;
         lts->dst_mode=settings->dst_mode;
     }
+    lts->write_init=no_write_init;
+    lts->write_state=no_write_state;
+    lts->write_edge=no_write_edge;
     return USER(lts);
 }
 
@@ -172,7 +198,7 @@ void lts_file_set_pull(lts_file_t file,lts_pull_m method){
 }
 
 int lts_write_supported(lts_file_t file){
-    return SYSTEM(file)->write_init!=NULL;
+    return SYSTEM(file)->write_init!=NULL && SYSTEM(file)->write_init!=no_write_init;
 }
 
 int lts_push_supported(lts_file_t file){

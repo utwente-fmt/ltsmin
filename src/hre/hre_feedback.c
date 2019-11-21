@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include <hre/internal.h>
 #include <hre/provider.h>
@@ -36,7 +37,7 @@ static int HREwhen=0;
 struct runtime_log stats_log={NULL,NULL,LOG_IGNORE,NULL};
 log_t stats=&stats_log;
 struct runtime_log error_log={NULL,"** error **",LOG_PRINT,NULL};
-log_t error=&error_log;
+log_t lerror=&error_log;
 struct runtime_log assert_log={NULL,NULL,LOG_PRINT|LOG_WHERE,NULL};
 log_t assertion=&assert_log;
 struct runtime_log info_log={NULL,NULL,LOG_PRINT,NULL};
@@ -52,6 +53,8 @@ static const char stats_long[]="stats";
 static const char debug_long[]="debug";
 static const char where_long[]="where";
 static const char when_long[]="when";
+static const char timeout_long[]="timeout";
+static int timeout = -1;
 #define incr_short 'v'
 #define quiet_short 'q'
 
@@ -86,6 +89,35 @@ static void segv_handle (int signum)
     HREprintStack ();
     _exit (HRE_EXIT_FAILURE);
 }
+
+#if HAVE_DECL_ALARM
+void timeout_handler (int signum) {
+  struct sigaction sao;
+  memset(&sao, 0, sizeof(sao));
+  sigaction(SIGINT, NULL, &sao);
+  if (timeout == -1 || sao.sa_handler == NULL) {
+      Warning (info, " ");
+      Warning (info, " ");
+      Warning (info, "TIMED OUT (ungraceful exit)!\n");
+      HREexit (HRE_EXIT_TIMEOUT); // ungracefuly
+  } else {
+      killpg (0, SIGINT); // try grace fully
+      Warning (info, " ");
+      Warning (info, " ");
+      Warning (info, "TIMED OUT (%d seconds)!", timeout);
+      Warning (info, " ");
+      Warning (info, " ");
+      struct sigaction sa;
+      memset(&sa, 0, sizeof(sa));
+      sa.sa_handler = timeout_handler;
+      sigaction(SIGALRM, &sa, NULL);
+      alarm(1);
+      timeout = -1;
+  }
+  (void) signum;
+}
+#endif
+
 static void segv_setup(){
     memset(&segv_sa, 0, sizeof(segv_sa));
     segv_sa.sa_handler = segv_handle;
@@ -123,7 +155,7 @@ void popt_callback(
             }
             IF_LONG(where_long) {
                 hre_debug->flags|=LOG_WHERE;
-                error->flags|=LOG_WHERE;
+                lerror->flags|=LOG_WHERE;
                 return;
             }
             IF_LONG(when_long) {
@@ -138,6 +170,19 @@ void popt_callback(
                 infoShort->flags&=~LOG_PRINT;
                 info->flags&=~LOG_PRINT;
                 return;
+            }
+            IF_LONG(timeout_long) {
+#if HAVE_DECL_ALARM
+                Print (infoLong,"setting timeout to %d seconds", timeout);
+                struct sigaction sa;
+                memset(&sa, 0, sizeof(sa));
+                sa.sa_handler = timeout_handler;
+                sigaction(SIGALRM, &sa, NULL);
+                alarm(timeout);
+                return;
+#else
+                Abort("Option --timeout not available on this platform.");
+#endif
             }
             Abort("bad HRE feedback option %s (%c)",opt->longName,opt->shortName);
             return;
@@ -160,6 +205,8 @@ struct poptOption hre_feedback_options[]={
     "include file and line number in debug messages", NULL},
     { when_long , 0 , POPT_ARG_NONE , NULL , 0 ,
     "include the wall time since program start in all messages" , NULL },
+    { timeout_long , 0 , POPT_ARG_INT , &timeout , 0 ,
+    "terminate after the given amount of seconds" , NULL },
     POPT_TABLEEND
 };
 
@@ -248,11 +295,7 @@ void log_message(log_t log,const char*file,int line,int errnum,const char *fmt,.
         errmsg[0]=':';
         errmsg[1]=' ';
         errmsg[2]=0;
-#ifdef STRERROR_R_CHAR_P
-        err_msg=strerror_r(errnum,errmsg+2,126);
-#else
         err_msg=strerror_r(errnum,errmsg+2,126)?NULL:errmsg;
-#endif
         if(!err_msg){
             err_msg=errmsg;
             switch(errno){

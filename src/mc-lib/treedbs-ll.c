@@ -7,14 +7,15 @@
 #include <hre/user.h>
 #include <mc-lib/atomics.h>
 #include <mc-lib/clt_table.h>
+#include <mc-lib/dbs-ll.h>
 #include <mc-lib/treedbs-ll.h>
 #include <util-lib/fast_hash.h>
 #include <util-lib/util.h>
 
 
 static const int        TABLE_SIZE = 26;
-static const uint64_t   EMPTY = 0UL;
-static const uint64_t   EMPTY_1 = -1UL;
+static const uint64_t   EMPTY = 0ULL;
+static const uint64_t   EMPTY_1 = -1ULL;
 static const size_t     CACHE_LINE_64 = (1 << CACHE_LINE) / sizeof (uint64_t);
 static const size_t     CL_MASK = -((1 << CACHE_LINE) / sizeof (uint64_t));
 
@@ -78,13 +79,13 @@ get_local (treedbs_ll_t dbs)
  *
  *      left         right             <-- part
  */
-static inline uint64_t
+static uint64_t
 bit_pos (uint16_t bits, uint16_t index)
 {
     uint16_t            half = (bits + 1) >> 1; // ceil (bits / 2)
     uint16_t            part = (index >= half); // 0 for right, 1 for left
     uint64_t            bit = (32 << part) - (half << part) + index; // see function comment
-    return 1UL << bit;
+    return 1ULL << bit;
 }
 
 static inline uint64_t
@@ -160,17 +161,21 @@ cas_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
 
 int
 TreeDBSLLtry_set_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref,
-                           size_t bits, uint64_t exp, uint64_t new_val)
+                           size_t bits, size_t offs,
+                           uint64_t exp, uint64_t new_val)
 {
     uint64_t            old_val, old_bits, new_v;
     uint64_t            mask = (1ULL << bits) - 1;
-    HREassert (new_val < (1UL << dbs->root.sat_bits), "new_val too high");
+    HREassert (new_val < (1ULL << dbs->root.sat_bits), "new_val too high");
     HREassert ((new_val & mask) == new_val, "new_val too high w.r.t. bits");
 
+    mask <<= offs;
+    exp <<= offs;
     old_bits = atomic_read (dbs->root.table+ref);
     old_val = b2s (dbs, old_bits);
     if ((old_val & mask) != exp) return false;
 
+    new_val <<= offs;
     new_v = (old_val & ~mask) | new_val;
     return cas_sat_bits(dbs, ref, old_bits, new_v);
 }
@@ -182,7 +187,7 @@ TreeDBSLLinc_sat_bits (const treedbs_ll_t dbs, const tree_ref_t ref)
     do {
         bits = atomic_read (dbs->root.table+ref);
         new_val = b2s (dbs, bits);
-        HREassert (new_val < (1UL << dbs->root.sat_bits), "Too many sat bit incs");
+        HREassert (new_val < (1ULL << dbs->root.sat_bits), "Too many sat bit incs");
         new_val += 1;
     } while ( !cas_sat_bits(dbs, ref, bits, new_val) );
     return new_val;
@@ -205,13 +210,13 @@ static inline uint64_t
 prime_rehash (uint64_t h, uint64_t v)
 {
     uint64_t            n = (h + 1) & (~CL_MASK);
-    uint64_t            p = primes[v & PRIME_MASK];
+    uint64_t            p = odd_primes[v & PRIME_MASK];
     return (h & CL_MASK) + (p << (CACHE_LINE-3)) + n;
 }
 
 static inline int
 lookup (node_table_t *nodes,
-        uint64_t data, int index, uint64_t *res, loc_t *loc)
+        uint64_t data, int index, uint64_t *res, loc_t *loc, bool insert)
 {
     stats_t            *stat = &loc->stat;
     uint64_t            mem, hash, a;
@@ -226,10 +231,13 @@ lookup (node_table_t *nodes,
         size_t              line_end = (ref & CL_MASK) + CACHE_LINE_64;
         for (size_t i = 0; i < CACHE_LINE_64; i++) {
             uint64_t           *bucket = &nodes->table[ref];
-            if (EMPTY == atomic_read(bucket) && cas(bucket, EMPTY, data)) {
-                *res = ref;
-                loc->node_count[index]++;
-                return 0;
+            if (EMPTY == atomic_read(bucket)) {
+                if (!insert) return DB_NOT_FOUND;
+                if (cas(bucket, EMPTY, data)) {
+                    *res = ref;
+                    loc->node_count[index]++;
+                    return 0;
+                }
             }
             if (data == (atomic_read(bucket) & nodes->sat_nmask)) {
                 *res = ref;
@@ -267,16 +275,16 @@ concat_n_mix (const treedbs_ll_t dbs, uint64_t a, uint64_t b)
 }
 
 static inline
-int clt_lookup (const treedbs_ll_t dbs, int *next)
+int clt_lookup (const treedbs_ll_t dbs, int *next, bool insert)
 {
-     uint64_t key = concat_n_mix (dbs, next[2], next[3]);
-    int seen = clt_find_or_put (dbs->clt, key);
+    uint64_t key = concat_n_mix (dbs, next[2], next[3]);
+    int seen = clt_find_or_put (dbs->clt, key, insert);
     ((uint64_t*)next)[0] = ((uint64_t*)next)[1];
     return seen;
 }
 
 int
-TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
+TreeDBSLLfop (const treedbs_ll_t dbs, const int *vector, bool insert)
 {
     loc_t              *loc = get_local (dbs);
     size_t              n = dbs->nNodes;
@@ -285,15 +293,18 @@ TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
     int                *next = loc->storage;
     memcpy (next + n, vector, sizeof (int[n]));
     for (size_t i = n - 1; seen >= 0 && i > 1; i--) {
-        seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
+        seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc, insert);
+        if (!insert && seen == DB_NOT_FOUND) return DB_NOT_FOUND;
         next[i] = res;
     }
     if (seen >= 0) {
         if (dbs->slim) {
-            seen = clt_lookup (dbs, next);
+            seen = clt_lookup (dbs, next, insert);
+            if (seen < 0) return seen;
             loc->node_count[0] += 1 - seen;
         } else {
-            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc, insert);
+            if (!insert && seen == DB_NOT_FOUND) return DB_NOT_FOUND;
             //((uint64_t*)next)[0] = -1;
         }
     }
@@ -301,15 +312,15 @@ TreeDBSLLlookup (const treedbs_ll_t dbs, const int *vector)
 }
 
 int
-TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
-                      tree_t next)
+TreeDBSLLfop_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
+                   tree_t next, bool insert)
 {
     loc_t              *loc = get_local (dbs);
     size_t              n = dbs->nNodes;
     uint64_t            res = 0;
     int                 seen = 1;
     if ( NULL == prev ) { //first call
-        int result = TreeDBSLLlookup (dbs, v);
+        int result = TreeDBSLLfop (dbs, v, insert);
         memcpy (next, loc->storage, sizeof(int[n<<1]));
         return result;
     }
@@ -317,16 +328,19 @@ TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
     memcpy (next + n, v, sizeof (int[n]));
     for (size_t i = n - 1; seen >= 0 && i > 1; i--) {
         if ( !cmp_i64(prev, next, i) ) {
-            seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
+            seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc, insert);
+            if (!insert && seen == DB_NOT_FOUND) return DB_NOT_FOUND;
             next[i] = res;
         }
     }
     if ( seen >= 0 && !cmp_i64(prev, next, 1) ) {
         if (dbs->slim) {
-            seen = clt_lookup (dbs, next);
+            seen = clt_lookup (dbs, next, insert);
+            if (seen < 0) return seen;
             loc->node_count[0] += 1 - seen;
         } else {
-            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc, insert);
+            if (!insert && seen == DB_NOT_FOUND) return DB_NOT_FOUND;
             //((uint64_t*)next)[0] = -1;
         }
     }
@@ -334,11 +348,11 @@ TreeDBSLLlookup_incr (const treedbs_ll_t dbs, const int *v, tree_t prev,
 }
 
 int
-TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
-                    tree_t next, int group)
+TreeDBSLLfop_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
+                 tree_t next, int group, bool insert)
 {
     if ( group == -1 || NULL == prev )
-        return TreeDBSLLlookup_incr (dbs, v, prev, next);
+        return TreeDBSLLfop_incr (dbs, v, prev, next, insert);
     loc_t              *loc = get_local (dbs);
     int                 seen = 1;
     int                 i;
@@ -347,17 +361,20 @@ TreeDBSLLlookup_dm (const treedbs_ll_t dbs, const int *v, tree_t prev,
     memcpy (next + dbs->nNodes, v, sizeof (int[dbs->nNodes]));
     for (size_t j = 0; seen >= 0 && (i = dbs->todo[group][j]) != -1; j++) {
         if ( i != 1 && !cmp_i64(prev, next, i) ) {
-            seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc);
+            seen = lookup (&dbs->data, i64(next, i), i-1, &res, loc, insert);
+            if (!insert && seen == DB_NOT_FOUND) return DB_NOT_FOUND;
             next[i] = res;
         }
     }
     if ( seen >= 0 && !cmp_i64(prev, next, 1) ) {
         if (dbs->slim) {
-            seen = clt_lookup (dbs, next);
+            seen = clt_lookup (dbs, next, insert);
+            if (seen < 0) return seen;
             loc->node_count[0] += 1 - seen;
             ((uint64_t*)next)[0] = -1;
         } else {
-            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc);
+            seen = lookup (&dbs->root, i64(next, 1), 0, (uint64_t*)next, loc, insert);
+            if (!insert && seen == DB_NOT_FOUND) return DB_NOT_FOUND;
             //((uint64_t*)next)[0] = -1;
         }
     }
@@ -385,9 +402,9 @@ void
 LOCALfree (void *arg)
 {
     loc_t              *loc=  (loc_t*) arg;
-    RTfree (loc->node_count);
-    RTfree (loc->storage);
-    RTfree (loc);
+    RTalignedFree (loc->node_count);
+    RTalignedFree (loc->storage);
+    RTalignedFree (loc);
 }
 
 treedbs_ll_t
@@ -492,18 +509,18 @@ TreeDBSLLcreate_dm (int nNodes, int size, int ratio, matrix_t * m,
 void
 TreeDBSLLfree (treedbs_ll_t dbs)
 {
-    RTfree (dbs->data.table);
+    RTalignedFree (dbs->data.table);
     if (dbs->slim) {
         clt_free (dbs->clt);
     } else {
-        RTfree (dbs->root.table);
+        RTalignedFree (dbs->root.table);
     }
     if (NULL != dbs->todo) {
         for(int row = 0;row < dbs->k;++row)
-            RTfree (dbs->todo[row]);
-        RTfree (dbs->todo);
+            RTalignedFree (dbs->todo[row]);
+        RTalignedFree (dbs->todo);
     }
-    RTfree (dbs);
+    RTalignedFree (dbs);
 }
 
 stats_t *
