@@ -20,6 +20,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <pthread.h> // for the mutex
+
 #include <hre/feedback.h>
 #include <hre/runtime.h>
 #include <hre/user.h>
@@ -30,9 +32,12 @@ void* RTdlopen(const char *name){
     void *dlHandle;
     char abs_filename[PATH_MAX];
     char *ret_filename = realpath(name, abs_filename);
+    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
     if (ret_filename) {
+    	pthread_mutex_lock(&mutex);
         lt_dlinit();
         dlHandle = lt_dlopen(abs_filename);
+    	pthread_mutex_unlock(&mutex);
         if (dlHandle == NULL)
         {
             Abort("%s, Library \"%s\" is not reachable", lt_dlerror(), name);
