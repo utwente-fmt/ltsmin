@@ -461,7 +461,7 @@ static int next_matching_default(model_t model,int label_idx,int value,int*src,T
 
 
 model_t GBcreateBase(){
-	model_t model=(model_t)RTmalloc(sizeof(struct grey_box_model));
+	model_t model=(model_t)RTmallocZero(sizeof(struct grey_box_model));
     model->parent=NULL;
 	model->ltstype=NULL;
 	model->dm_info=NULL;
