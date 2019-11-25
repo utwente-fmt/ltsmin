@@ -112,7 +112,7 @@ lb_local_init (lb_t *lb, int id, void *arg)
 static inline int
 request_random (lb_t *lb, size_t id)
 {
-    size_t res;
+    size_t res=0;
     do {
         if (random_r(&lb->local[id]->buf, (int*) &res)) {
             Abort("Unable to get random number");
