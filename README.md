@@ -79,10 +79,10 @@ To connect a new language module, one merely needs to implement the PINS next-st
 The PINS interface divides our model checking tools cleanly into the two independent parts discussed above: language modules and model checking algorithms. However it also enables us to create PINS2PINS modules, that reside between the language module and the algorithm, and modify or optimize the next-state function. These PINS2PINS modules can benefit all algorithmic backends and can be turned on and off on demand:
 
 * transition storing/caching speeds up slow language modules,
-* [regrouping](assets/man/dve2lts-sym.html#_pins_options) speeds up the symbolic algorithms by optimizing dependencies, and
+* [regrouping](https://ltsmin.utwente.nl/assets/man/dve2lts-sym.html#_pins_options) speeds up the symbolic algorithms by optimizing dependencies, and
 * [partial order reduction](http://essay.utwente.nl/61036/) reduces the state space by dropping irrelevant transitions.
 
-![PINS-interface](assets/img/pins_modern.png)
+![PINS-interface](https://ltsmin.utwente.nl/assets/img/pins_modern.png)
 
 Furthermore, we implement linear temporal logic (LTL) as a PINS2PINS module, which is automatically turned on when an LTL formula is supplied and transforms the state space on-the-fly by calculating the cross product with the formula.
 
@@ -122,20 +122,20 @@ Ordered by the number of commits (January 2017) LTSmin's contributors are:
 
 ## Selected Documentation
 
-*   [ltsmin](assets/man/ltsmin.html) (LTSmin's main man page)
-*   [lps2lts-sym](assets/man/lps2lts-sym.html) (BDD-based reachability with mCRL2 frontend)
-*   [dve2lts-mc](assets/man/dve2lts-mc.html) (multi-core reachability with DiVinE 2 frontend)
-*   [prom2lts-mc](assets/man/prom2lts-mc.html) (multi-core reachability with Promela SpinS frontend)
-*   [lpo2lts-seq](assets/man/lpo2lts-seq.html) (sequential enumerative reachability with muCRL frontend)
-*   [etf2lts-dist](assets/man/etf2lts-dist.html) (distributed reachability with ETF frontend)
-*   [lps2torx](assets/man/lps2torx.html) (TorX testing tool connector with mCRL2 frontend)
-*   [pbes2lts-sym](assets/man/pbes2lts-sym.html) (Symbolic reachability tool with PBES frontend: [example](http://wwwhome.cs.utwente.nl/~kant/git/))
-*   [pins2lts-sym](assets/man/pins2lts-sym.html) (Symbolic reachability tool using the dlopen API: [tutorial](https://github.com/utwente-fmt/ltsmin-tacas2015/tree/master/sokoban))
-*   [mapa2lts-sym](assets/man/mapa2lts-sym.html) (Symbolic reachability tool with MAPA frontend)
-*   [pnml2lts-sym](assets/man/pnml2lts-sym.html) (Symbolic reachability tool with PNML frontend)
-*   [prob2lts-sym](assets/man/prob2lts-sym.html) (Symbolic reachability tool with ProB frontend)
+*   [ltsmin](https://ltsmin.utwente.nl/assets/man/ltsmin.html) (LTSmin's main man page)
+*   [lps2lts-sym](https://ltsmin.utwente.nl/assets/man/lps2lts-sym.html) (BDD-based reachability with mCRL2 frontend)
+*   [dve2lts-mc](https://ltsmin.utwente.nl/assets/man/dve2lts-mc.html) (multi-core reachability with DiVinE 2 frontend)
+*   [prom2lts-mc](https://ltsmin.utwente.nl/assets/man/prom2lts-mc.html) (multi-core reachability with Promela SpinS frontend)
+*   [lpo2lts-seq](https://ltsmin.utwente.nl/assets/man/lpo2lts-seq.html) (sequential enumerative reachability with muCRL frontend)
+*   [etf2lts-dist](https://ltsmin.utwente.nl/assets/man/etf2lts-dist.html) (distributed reachability with ETF frontend)
+*   [lps2torx](https://ltsmin.utwente.nl/assets/man/lps2torx.html) (TorX testing tool connector with mCRL2 frontend)
+*   [pbes2lts-sym](https://ltsmin.utwente.nl/assets/man/pbes2lts-sym.html) (Symbolic reachability tool with PBES frontend: [example](http://wwwhome.cs.utwente.nl/~kant/git/))
+*   [pins2lts-sym](https://ltsmin.utwente.nl/assets/man/pins2lts-sym.html) (Symbolic reachability tool using the dlopen API: [tutorial](https://github.com/utwente-fmt/ltsmin-tacas2015/tree/master/sokoban))
+*   [mapa2lts-sym](https://ltsmin.utwente.nl/assets/man/mapa2lts-sym.html) (Symbolic reachability tool with MAPA frontend)
+*   [pnml2lts-sym](https://ltsmin.utwente.nl/assets/man/pnml2lts-sym.html) (Symbolic reachability tool with PNML frontend)
+*   [prob2lts-sym](https://ltsmin.utwente.nl/assets/man/prob2lts-sym.html) (Symbolic reachability tool with ProB frontend)
 
-More manpages can be found at [here](assets/man/).
+More manpages can be found at [here](https://ltsmin.utwente.nl/assets/man/).
 
 ## Supported Systems
 
