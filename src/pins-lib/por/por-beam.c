@@ -501,10 +501,11 @@ beam_ensure_invisible_and_key (por_context* ctx)
 
     Debugf ("ADDING KEY <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
     beam_t             *beam = (beam_t *) ctx->alg;
-    search_context_t   *s = beam->search[0];
     bool                need_invisible = (SAFETY || PINS_LTL) &&
                              ctx->visible_enabled != ctx->enabled_list->count;
     while (true) {
+        search_context_t   *s = beam->search[0];
+
         if (emitting_all(ctx)) {
             Debugf ("BEAM %d needs no (invisible) key\n", s->idx);
             break;
@@ -578,7 +579,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
 static inline int
 check_L2_proviso (por_context* ctx, search_context_t *s)
 { // all visible selected: satisfies (the conclusion of) L2
-    return s->score_visible == bms_count(ctx->visible,VISIBLE);
+    return s->score_visible == bms_count(ctx->visible, VISIBLE);
 }
 
 static inline void
