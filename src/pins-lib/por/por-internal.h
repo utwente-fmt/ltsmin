@@ -31,8 +31,6 @@ typedef enum {
 
 typedef enum {
     VISIBLE,            // group or label NES/NDS
-    VISIBLE_NES,        // label NES
-    VISIBLE_NDS,        // label NDS
     VISIBLE_COUNT
 } visible_t;
 

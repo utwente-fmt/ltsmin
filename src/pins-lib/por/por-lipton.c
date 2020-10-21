@@ -166,13 +166,23 @@ lipton_comm_del (lipton_ctx_t *lipton, process_t *proc, int group,
 }
 
 static inline void
-lipton_init_visibles (lipton_ctx_t* lipton, int* src)
+lipton_init_visibles (lipton_ctx_t *lipton, int *src)
 {
     if (lipton->visible_initialized) return;
     lipton->visible_initialized = 1;
 
     por_context        *por = lipton->por;
     por_init_transitions (por->parent, por, src);
+
+    // gather visible groups as labels in order to use NDS / NES
+    for (int i = 0; i < por->ngroups; i++) {
+        if (!por->group_visibility[i]) continue;
+        for (int *l = ci_begin(por->group2guard[i]); l != ci_end(por->group2guard[i]); l++) {
+            bms_push_new (por->visible_labels, 0, *l);
+        }
+    }
+
+    // use NDS / NES
     ci_list            *vis = bms_list (por->visible_labels, 0);
     for (int* l = ci_begin (vis); l != ci_end (vis); l++) {
         for (int* g = ci_begin (por->label_nds[*l]);
@@ -190,8 +200,6 @@ lipton_init_visibles (lipton_ctx_t* lipton, int* src)
             bms_count(lipton->visible, COMMUTE_RGHT), bms_count(lipton->visible, COMMUTE_LEFT), por->nlabels);
     bms_debug_1 (lipton->visible, COMMUTE_RGHT);
     bms_debug_1 (lipton->visible, COMMUTE_LEFT);
-    bms_clear_all (por->visible);
-    bms_clear_all (por->visible_labels);
 }
 
 static bool

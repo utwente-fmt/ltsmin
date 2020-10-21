@@ -333,6 +333,16 @@ tr_init_visibles (tr_ctx_t *tr, int *src)
 
     por_context        *por = tr->por;
     por_init_transitions (por->parent, por, src);
+
+    // gather visible groups as labels in order to use NDS / NES
+    for (int i = 0; i < por->ngroups; i++) {
+        if (!por->group_visibility[i]) continue;
+        for (int *l = ci_begin(por->group2guard[i]); l != ci_end(por->group2guard[i]); l++) {
+            bms_push_new (por->visible_labels, 0, *l);
+        }
+    }
+
+    // use nes / nds
     ci_list            *vis = bms_list (por->visible_labels, 0);
     for (int* l = ci_begin (vis); l != ci_end (vis); l++) {
         for (int* g = ci_begin (por->label_nds[*l]);
