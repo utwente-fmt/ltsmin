@@ -574,7 +574,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
  * Premature check whether L1 and L2 hold, i.e. before ignoring condition is
  * known (the premise of L2).
  * For safety (!PINS_LTL), we limit the proviso to L2. For details see
- * implementation notes in the header.
+ * implementation notes in the header <pins2pins-por.h>.
  */
 static inline int
 check_L2_proviso (por_context* ctx, search_context_t *s)
@@ -590,24 +590,20 @@ beam_enforce_L2 (por_context* ctx)
     while (true) {
         search_context_t   *s = beam->search[0];
         if (check_L2_proviso(ctx, s)) {
-            if (s == s1) {
-                Debugf ("BEAM %d has all visibles and finished search (previously emitted BEAM %d)\n", s->idx, s1->idx);
-                return;
-            } else { // if context changed, it should include emitted transitions:
-                Debugf ("BEAM %d adding previously emitted from BEAM %d: ", s->idx, s1->idx);
-                bool new = select_all(ctx, s, s1->emitted);
-                Debugf (".\n");
-                if (!new) return;
-            }
+            if (s == s1) return;
+            Debugf ("BEAM %d adding previously emitted from BEAM %d: ", s->idx, s1->idx);
+            bool new = select_all(ctx, s, s1->emitted);
+            Debugf (".\n");
+            if (!new) return;
         } else {
             Debugf ("BEAM %d adding all visibles: ", s->idx);
             bool new = select_all (ctx, s, ctx->visible->lists[VISIBLE]);
             Debugf (".\n");
-            HREassert (new);
+            if (!new) return;
         }
         beam_sort (ctx);
         beam_search (ctx); // may switch context
-        beam_ensure_invisible_and_key (ctx);
+        if (s != s1) beam_ensure_invisible_and_key (ctx);
     }
 }
 
