@@ -40,7 +40,7 @@ void* RTdlopen(const char *name){
     	pthread_mutex_unlock(&mutex);
         if (dlHandle == NULL)
         {
-            Abort("%s, Library \"%s\" is not reachable", lt_dlerror(), name);
+            Abort("%s, Library \"%s\" is not readable", lt_dlerror(), name);
         }
     } else {
         Abort("Library \"%s\" is not found", name);
