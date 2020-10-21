@@ -151,27 +151,24 @@ init_visible_labels (por_context* ctx)
 
     for (int i = 0; i < ctx->nlabels; i++)
         bms_push_if (ctx->visible_labels, 0, i, ctx->label_visibility[i]);
-    for (int i = 0; i < ctx->ngroups; i++) {
-        if (!ctx->group_visibility[i]) continue;
-        for (int *l = ci_begin(ctx->group2guard[i]); l != ci_end(ctx->group2guard[i]); l++) {
-            bms_push_new (ctx->visible_labels, 0, *l);
-        }
-    }
-    Print1 (infoLong, "POR visible labels: %d / %d", bms_count(ctx->visible_labels, 0), ctx->nlabels);
+    for (int i = 0; i < ctx->ngroups; i++)
+        bms_push_if (ctx->visible, VISIBLE, i, ctx->group_visibility[i]);
 
     ci_list            *vis = bms_list (ctx->visible_labels, 0);
     for (int *l = ci_begin(vis); l != ci_end(vis); l++) {
         for (int j = 0; j < ctx->label_nes[*l]->count; j++) {
             int             group = ctx->label_nes[*l]->data[j];
-            bms_push_new (ctx->visible, VISIBLE_NES, group);
             bms_push_new (ctx->visible, VISIBLE, group);
         }
         for (int j = 0; j < ctx->label_nds[*l]->count; j++) {
             int group = ctx->label_nds[*l]->data[j];
-            bms_push_new (ctx->visible, VISIBLE_NDS, group);
             bms_push_new (ctx->visible, VISIBLE, group);
         }
     }
+
+    Print1 (infoLong, "POR visible labels: %d / %d", bms_count(ctx->visible_labels, 0), ctx->nlabels);
+    Print1 (infoLong, "POR visible groups: %d / %d", bms_count(ctx->visible, VISIBLE), ctx->ngroups);
+
     SAFETY = bms_count(ctx->visible, VISIBLE) != 0 || NO_L12;
 }
 
