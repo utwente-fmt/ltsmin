@@ -100,17 +100,17 @@ if { "$test_dve" == "yes" } {
     dict set commands test19_mc cmd [subst "$binpaths(dve2lts-mc) --strategy=cndfs \
             --por --check --proviso=cndfs \
             $EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"]
-    dict set commands test19_mc exp "78528 are accepting"
+    dict set commands test19_mc exp "Empty product"
 
     dict set commands test19_seq cmd "$binpaths(dve2lts-seq) --strategy=scc \
             $EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl \
             --por --check"
-    dict set commands test19_seq exp "493859 states"
+    dict set commands test19_seq exp "471510 states"
 
     dict set commands test19_color cmd "$binpaths(dve2lts-seq) --strategy=scc --por --check \
             --proviso=color \
             $EXAMPLES_SRC_PATH/elevator.3.dve --ltl=$EXAMPLES_SRC_PATH/elevator.3.ltl"
-    dict set commands test19_color exp "493735 states"
+    dict set commands test19_color exp "471383 states"
 
 }
 
