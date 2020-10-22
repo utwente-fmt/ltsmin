@@ -442,7 +442,10 @@ identify_procs (por_context *por, size_t *num_procs, int *group2proc)
         bool found = false;
         for (size_t i = 0; i < *num_procs; i++) {
             if (pins_group_is_in_proc_with_name(model, g, procs[i].name, procs[i].pc_slot)) {
-                if (found) Warning (info, "Group %d doubly assigned to an ample-set process %s (chosing first encountered)", g, procs[i].name);
+                if (found) {
+                    Warning (info, "Group %d doubly assigned to an ample-set process %s (chosing first encountered)", g, procs[i].name);
+                    break;
+                }
                 ci_add (procs[i].groups, g);
                 group2proc[g] = i;
                 found = true;
