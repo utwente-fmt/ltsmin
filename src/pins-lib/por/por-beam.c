@@ -67,6 +67,8 @@ typedef struct search_context {
     int             score_visible;  // selected number of visible transitions
     int             score_vis_en;   // selected number of visible and enabled transitions
     key_type_t      has_key;        // key transitions type
+    int             L1_and_key;             // L1 proviso met
+    int             L2;             // L2 proviso met
     int             score_en;       // score of enabled trans (used as comparison in case transitions are excluded)
 } search_context_t;
 
@@ -142,7 +144,8 @@ por_transition_costs (por_context *ctx)
             int group = bms_get (ctx->include, 0, g);
             incr_ns_update (ctx, group, 2);
         }
-    }}
+    }
+}
 
 /**
  * The function update_score is called whenever a new group is added to the stubborn set
@@ -214,6 +217,8 @@ emit_new (por_context *ctx, ci_list *list, prov_t *provctx, int *src)
         int i = list->data[z];
         if (s->emit_status[i] & ES_EMITTED) continue;
         s->emit_status[i] |= ES_EMITTED;
+        s->score_en -= is_excluded(ctx, i) ? ctx->enabled_list->count :
+                       (bms_has(ctx->include, 0, i) ? 0 : 1);
         s->emitted->data[s->emitted->count++] = i;
         c += GBgetTransitionsLong (ctx->parent, i, src, hook_cb, provctx);
     }
@@ -495,7 +500,7 @@ beam_min_invisible_group (por_context* ctx, search_context_t *s)
 }
 
 static inline void
-beam_ensure_invisible_and_key (por_context* ctx)
+beam_enforce_L1_and_key (por_context* ctx)
 {
     if (!POR_WEAK && !(SAFETY || PINS_LTL)) return;
 
@@ -505,6 +510,8 @@ beam_ensure_invisible_and_key (por_context* ctx)
                              ctx->visible_enabled != ctx->enabled_list->count;
     while (true) {
         search_context_t   *s = beam->search[0];
+        if (s->L1_and_key) return;
+        s->L1_and_key = 1;
 
         if (emitting_all(ctx)) {
             Debugf ("BEAM %d needs no (invisible) key\n", s->idx);
@@ -523,7 +530,7 @@ beam_ensure_invisible_and_key (por_context* ctx)
         bool has_invisible = s->score_vis_en != s->enabled->count;
         if (need_invisible && !has_invisible) {
             int i_group = beam_min_invisible_group (ctx, s);
-            Debugf ("BEAM %d adding invisible key: %d", s->idx, i_group);
+            Debugf ("BEAM %d adding invisible key: %d ", s->idx, i_group);
             select_group (ctx, s, i_group);
             if (POR_WEAK) { // make it also key
                 Debugf (" +strong[ ");
@@ -588,13 +595,15 @@ beam_enforce_L2 (por_context* ctx)
     beam_t             *beam = (beam_t *) ctx->alg;
     search_context_t   *s1 = beam->search[0];
     while (true) {
+        beam_enforce_L1_and_key (ctx);
+
         search_context_t   *s = beam->search[0];
+        if (s->L2) return;
+        s->L2 = 1;
+
         if (check_L2_proviso(ctx, s)) {
-            if (s == s1) return;
-            Debugf ("BEAM %d adding previously emitted from BEAM %d: ", s->idx, s1->idx);
-            bool new = select_all(ctx, s, s1->emitted);
-            Debugf (".\n");
-            if (!new) return;
+            Debug ("BEAM %d satisfies L2 proviso", s->idx);
+            return;
         } else {
             Debugf ("BEAM %d adding all visibles: ", s->idx);
             bool new = select_all (ctx, s, ctx->visible->lists[VISIBLE]);
@@ -603,7 +612,6 @@ beam_enforce_L2 (por_context* ctx)
         }
         beam_sort (ctx);
         beam_search (ctx); // may switch context
-        if (s != s1) beam_ensure_invisible_and_key (ctx);
     }
 }
 
@@ -688,6 +696,8 @@ beam_setup (model_t model, por_context *ctx, int *src)
         search->score_visible = 0;
         search->score_vis_en = 0;
         search->score_en = 0;
+        search->L1_and_key = 0;
+        search->L2 = 0;
         search->idx = beam->beam_used;
         search->group = group;
 
@@ -703,7 +713,7 @@ beam_search_all (model_t self, int *src, TransitionCB cb, void *user_context)
     por_context* ctx = ((por_context*)GBgetContext(self));
     beam_setup (self, ctx, src);
     beam_search (ctx);
-    beam_ensure_invisible_and_key (ctx);
+    beam_enforce_L1_and_key (ctx);
     return beam_emit (ctx, src, cb, user_context);
 }
 
