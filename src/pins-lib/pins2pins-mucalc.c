@@ -337,7 +337,9 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                 memcpy(dst, src, ctx->len*sizeof(int));
                 mucalc_proposition_t proposition = ctx->env->propositions[node.expression->value];
                 model_t parent = GBgetParent (self);
-                int src_value_idx = GBchunkPrettyPrint(parent, proposition.state_idx, src[proposition.state_idx]);
+                int src_value_idx = proposition.state_idx < ctx->len ?
+                                        GBchunkPrettyPrint(parent, proposition.state_idx, src[proposition.state_idx])
+                                      : GBgetStateLabelLong(parent, proposition.state_idx - ctx->len, src);
                 if (src_value_idx==proposition.value_idx)
                 { // proposition is true
                     dst[ctx->mu_idx] = ctx->env->true_expr->idx;
@@ -406,7 +408,9 @@ mucalc_long (model_t self, int group, int *src, TransitionCB cb,
                         memcpy(dst, src, ctx->len*sizeof(int));
                         mucalc_proposition_t proposition = ctx->env->propositions[node.expression->value];
                         model_t parent = GBgetParent (self);
-                        int src_value_idx = GBchunkPrettyPrint(parent, proposition.state_idx, src[proposition.state_idx]);
+                        int src_value_idx = proposition.state_idx < ctx->len ?
+                                                GBchunkPrettyPrint(parent, proposition.state_idx, src[proposition.state_idx])
+                                              : GBgetStateLabelLong(parent, proposition.state_idx - ctx->len, src);
                         if (src_value_idx==proposition.value_idx)
                         { // proposition is true, negation is false
                             dst[ctx->mu_idx] = ctx->env->false_expr->idx;
@@ -509,7 +513,9 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
             memcpy(dst, src, ctx->len*sizeof(int));
             mucalc_proposition_t proposition = ctx->env->propositions[node.expression->value];
             model_t parent = GBgetParent (self);
-            int src_value_idx = GBchunkPrettyPrint(parent, proposition.state_idx, src[proposition.state_idx]);
+            int src_value_idx = proposition.state_idx < ctx->len ?
+                                    GBchunkPrettyPrint(parent, proposition.state_idx, src[proposition.state_idx])
+                                  : GBgetStateLabelLong(parent, proposition.state_idx - ctx->len, src);
             if (src_value_idx==proposition.value_idx)
             { // proposition is true
                 dst[ctx->mu_idx] = ctx->env->true_expr->idx;
@@ -578,7 +584,9 @@ mucalc_all (model_t self, int *src, TransitionCB cb, void *user_context)
                     memcpy(dst, src, ctx->len*sizeof(int));
                     mucalc_proposition_t proposition = ctx->env->propositions[node.expression->value];
                     model_t parent = GBgetParent (self);
-                    int src_value_idx = GBchunkPrettyPrint(parent, proposition.state_idx, src[proposition.state_idx]);
+                    int src_value_idx = proposition.state_idx < ctx->len ?
+                                            GBchunkPrettyPrint(parent, proposition.state_idx, src[proposition.state_idx])
+                                          : GBgetStateLabelLong(parent, proposition.state_idx - ctx->len, src);
                     if (src_value_idx==proposition.value_idx)
                     { // proposition is true, negation is false
                         dst[ctx->mu_idx] = ctx->env->false_expr->idx;
@@ -861,48 +869,72 @@ void mucalc_add_proposition_values(model_t model)
     mucalc_context_t *ctx = GBgetContext(model);
     mucalc_parse_env_t env = ctx->env;
     lts_type_t ltstype = GBgetLTStype(model);
+    lts_type_t parent_ltstype = GBgetLTStype(ctx->parent);
 
     for(int p=0; p<env->proposition_count; p++)
     {
         mucalc_proposition_t proposition = env->propositions[p];
         char* id = SIget(env->ids,proposition.id);
         mucalc_value_t value_obj = env->values[proposition.value];
-        for(int i=0; i<ctx->len-1; i++)
+        data_format_t format;
+        // look for id among the state variables
+        for(int i=0; i < ctx->len-1 && env->propositions[p].state_idx == -1; i++)
         {
             char* name = lts_type_get_state_name(ltstype, i);
             if (strlen(id)==strlen(name) && strncmp(id, name, strlen(id))==0)
             {
                 env->propositions[p].state_idx = i;
                 env->propositions[p].state_typeno = lts_type_get_state_typeno(ltstype, i);
-                data_format_t format = lts_type_get_format(ltstype, env->propositions[p].state_typeno);
-                if (value_obj.type==MUCALC_VALUE_STRING)
-                {
-                    if (format != LTStypeChunk && format != LTStypeEnum)
-                    {
-                        Abort("State part %d matches the proposition id %s, but value types do not match.", i, id);
-                    }
-                    char* value = SIget(env->strings,proposition.value);
-                    int len = strlen(value);
-                    char decode[len];
-                    chunk data={.data=decode,.len=len};
-                    string2chunk(value, &data);
-                    env->propositions[p].value_idx = pins_chunk_put (model, env->propositions[p].state_typeno, data);
-                    Print1(infoLong, "State part %d matches the proposition id %s. Value stored at index %d.", i, id, env->propositions[p].value_idx);
-                }
-                else
-                {
-                    if (format == LTStypeChunk || format == LTStypeEnum)
-                    {
-                        Print1(info, "Warning: state part %d matches the proposition id %s, but is a chunk type.", i, id);
-                    }
-                    env->propositions[p].value_idx = value_obj.value;
-                    Print1(infoLong, "State part %d matches the proposition id %s. Value is %d.", i, id, env->propositions[p].value_idx);
-                }
+                format = lts_type_get_format(ltstype, env->propositions[p].state_typeno);
             }
         }
-        if (env->propositions[p].state_idx == -1)
+        // if id is not a state variable, try state labels
+        int state_label_count = lts_type_get_state_label_count(parent_ltstype);
+        for(int i=0; i < state_label_count && env->propositions[p].state_idx == -1; i++)
         {
-            Print1(info, "No state part matches the proposition %s", mucalc_fetch_value(env, MUCALC_PROPOSITION, p));
+            char *name = lts_type_get_state_label_name(parent_ltstype, i);
+            if (strlen(id)==strlen(name) && strncmp(id, name, strlen(id))==0)
+            {
+                env->propositions[p].state_idx = ctx->len + i;
+                env->propositions[p].state_typeno = lts_type_get_state_label_typeno(parent_ltstype, i);
+                format = lts_type_get_format(parent_ltstype, env->propositions[p].state_typeno);
+            }
+        }
+        if (env->propositions[p].state_idx != -1)
+        {
+            bool is_state_part = env->propositions[p].state_idx < ctx->len;
+            int state_idx = env->propositions[p].state_idx - is_state_part ? 0 : ctx->len;
+            if (value_obj.type==MUCALC_VALUE_STRING)
+            {
+                if (format != LTStypeChunk && format != LTStypeEnum)
+                {
+                    Abort("State %s %d matches the proposition id %s, but value types do not match.",
+                          is_state_part ? "part" : "label", state_idx, id);
+                }
+                char* value = SIget(env->strings,proposition.value);
+                int len = strlen(value);
+                char decode[len];
+                chunk data={.data=decode,.len=len};
+                string2chunk(value, &data);
+                env->propositions[p].value_idx = pins_chunk_put (is_state_part ? model : ctx->parent,
+                                                                 env->propositions[p].state_typeno, data);
+                Print1(infoLong, "State %s %d matches the proposition id %s. Value stored at index %d.",
+                       is_state_part ? "part" : "label", state_idx, id, env->propositions[p].value_idx);
+            }
+            else
+            {
+                if (format == LTStypeChunk || format == LTStypeEnum)
+                {
+                    Print1(info, "Warning: state %s %d matches the proposition id %s, but is a chunk type.",
+                           is_state_part ? "part" : "label", state_idx, id);
+                }
+                env->propositions[p].value_idx = value_obj.value;
+                Print1(infoLong, "State %s %d matches the proposition id %s. Value is %d.",
+                       is_state_part ? "part" : "label", state_idx, id, env->propositions[p].value_idx);
+            }
+        }
+        else {
+            Print1(info, "No state part or label matches the proposition %s", mucalc_fetch_value(env, MUCALC_PROPOSITION, p));
         }
     }
 }
@@ -1011,6 +1043,7 @@ GBaddMucalc (model_t model)
     matrix_t *p_dm_r = GBgetDMInfoRead(model);
     matrix_t *p_dm_mw = GBgetDMInfoMayWrite(model);
     matrix_t *p_dm_w = GBgetDMInfoMustWrite(model);
+    matrix_t *p_sli = GBgetStateLabelInfo(model);
 
     // Compute transition groups
     ctx->groupinfo = mucalc_compute_groupinfo(env, parent_groups);
@@ -1052,8 +1085,24 @@ GBaddMucalc (model_t model)
             {
                 mucalc_proposition_t proposition = ctx->env->propositions[expr->value];
                 Print1(infoLong, "Setting read dependency for proposition in group %d: slot %d", i, proposition.state_idx);
-                dm_set(_p_dm, i, proposition.state_idx);
-                dm_set(_p_dm_r, i, proposition.state_idx);
+                if (proposition.state_idx < ctx->len)
+                {
+                    dm_set(_p_dm, i, proposition.state_idx);
+                    dm_set(_p_dm_r, i, proposition.state_idx);
+                }
+                // if a state label was used in the proposition, set the state slots
+                // indicated by the state label info matrix as read dependent
+                else
+                {
+                    for (int j=0; j<ctx->len-1; j++)
+                    {
+                        if (dm_is_set(p_sli, proposition.state_idx - ctx->len, j))
+                        {
+                            dm_set(_p_dm, i, j);
+                            dm_set(_p_dm_r, i, j);
+                        }
+                    }
+                }
             }
         }
         // Set mucalc node as dependent
