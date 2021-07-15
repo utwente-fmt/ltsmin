@@ -33,6 +33,7 @@ static int mcrl2_verbosity = 0;
 using namespace mcrl2;
 using namespace mcrl2::core;
 using namespace mcrl2::data;
+using namespace mcrl2::pbes_system;
 
 
 namespace ltsmin
@@ -488,4 +489,3 @@ void PBESloadGreyboxModel(model_t model, const char*name)
 }
 
 } // end of extern "C"
-

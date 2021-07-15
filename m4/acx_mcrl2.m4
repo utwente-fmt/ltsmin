@@ -60,13 +60,13 @@ AS_IF([test "x$acx_mcrl2" = "xyes"], [
     pbes_cache_var=AS_TR_SH([ac_cv_header_$pbes_header])
     # Check for C++ 11 support; needed for newer mCRL2
     save_CXXFLAGS="$CXXFLAGS"
-    AX_CXX_COMPILE_STDCXX_11([noext], [optional])
-    ac_compile_cxx11=$ac_success
-    CXX11CXXFLAGS="$CXXFLAGS"
+    AX_CXX_COMPILE_STDCXX(17, [noext], [optional])
+    ac_compile_cxx17=$ac_success
+    CXX17CXXFLAGS="$CXXFLAGS"
     CXXFLAGS="$save_CXXFLAGS"
 
-    if test x"$ac_compile_cxx11" = xyes; then
-      AC_SUBST(MCRL2_PINS_CXXFLAGS, ["$MCRL2_PINS_CXXFLAGS $CXX11CXXFLAGS"])
+    if test x"$ac_compile_cxx17" = xyes; then
+      AC_SUBST(MCRL2_PINS_CXXFLAGS, ["$MCRL2_PINS_CXXFLAGS $CXX17CXXFLAGS"])
       $as_unset $mcrl2_pins_cache_var
       $as_unset $pbes_cache_var
       AX_LET([CPPFLAGS], ["$MCRL2_PINS_CPPFLAGS $CPPFLAGS"],
