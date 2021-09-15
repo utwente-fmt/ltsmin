@@ -37,6 +37,9 @@ AS_IF([test "x$acx_mcrl2" = "xyes"], [
     AS_IF([test "x$enable_mcrl2_jittyc" = "xno"], [
         AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -DDISABLE_JITTYC"])
         AC_MSG_NOTICE([disabling mCRL2 jittyc rewriter])
+    ], [
+      AC_SUBST(MCRL2_PINS_CPPFLAGS, ["$MCRL2_PINS_CPPFLAGS -DMCRL2_JITTYC_AVAILABLE"])
+        AC_MSG_NOTICE([enabling mCRL2 jittyc rewriter])
     ])
 
     mcrl2_lib_dir=""
