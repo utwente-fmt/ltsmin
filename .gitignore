@@ -1,8 +1,14 @@
+# Various
 .DS_Store
 TAGS
 \#*\#
 *~
+
+# Compilation Files
 *.exe
+*.o
+*.lo
+*.la
 *.log
 *.sum
 *.plist
@@ -29,11 +35,35 @@ ltdl
 bin/
 share/
 include/
+lib/.deps/
+lib/alloca.h
+lib/glthread/.deps/
+
+
+# Compilation files created from 'h.in' files
+lib/limits.h
+lib/math.h
+lib/signal.h
+lib/stdio.h
+lib/stdlib.h
+lib/string.h
+lib/sys/
+lib/time.h
+lib/unistd.h
+lib/wchar.h
+
+# Compilation files for Wine
+src/tests/wine-wrapper.sh
+testsuite/wine.exp
+
+# MuCalculus files
 /src/ltsmin-lib/mucalc-grammar.c
 /src/ltsmin-lib/mucalc-grammar.h
 /src/ltsmin-lib/mucalc-grammar.out
 /src/ltsmin-lib/mucalc-lexer.c
 /src/ltsmin-lib/mucalc-lexer.h
+
+# Examples
 /examples/*.lps
 /examples/abp.pbes
 nbproject
