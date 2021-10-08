@@ -424,7 +424,7 @@ static void mpi_start(int*argc_p,char**argv_p[],int run_threads){
     } else {
         MPI_Init(argc_p,argv_p);
     }
-    MPI_Errhandler_set(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD,MPI_ERRORS_ARE_FATAL);
     hre_context_t ctx=HREctxMPI(MPI_COMM_WORLD);
     HREmainSet(ctx);
     HREglobalSet(ctx);
