@@ -44,6 +44,7 @@ typedef enum {
     VSET_ListDD64,
     VSET_Sylvan,
     VSET_LDDmc,
+    VSET_SDD,
 } vset_implementation_t;
 
 extern vset_implementation_t vset_default_domain;

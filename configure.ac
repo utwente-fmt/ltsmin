@@ -161,6 +161,9 @@ fi
 ACX_DDD([:],
   [AC_MSG_WARN([No libDDD installation found.])])
 
+ACX_SDD([:],
+  [AC_MSG_WARN([No SDD installation found.])])
+
 AC_ARG_WITH([spot],
     AS_HELP_STRING([--without-spot], [do not include the Spot library for LTL model checking]))
 AS_IF([test "x$with_spot" != "xno"], [
@@ -468,6 +471,7 @@ AM_CONDITIONAL([HAVE_VIENNACL], [test x"$have_viennacl" = xyes])
 AM_CONDITIONAL([HAVE_PNML], [test x"$acx_pnml" = xyes])
 AM_CONDITIONAL([HAVE_PROB], [test x"$acx_prob" = xyes])
 AM_CONDITIONAL([HAVE_SPOT], [test x"$acx_spot" = xyes])
+AM_CONDITIONAL([HAVE_SDD], [test x"$acx_libsdd" = xyes])
 AM_COND_IF([HAVE_SPOT], [AC_DEFINE([HAVE_SPOT],, [Define if using Spot.])])
 AM_CONDITIONAL([HAVE_BUDDY], [test x"$acx_buddy" != x])
 AM_COND_IF([HAVE_BUDDY], [AC_DEFINE([HAVE_BUDDY],, [Define if using BuDDy.])])
@@ -596,6 +600,7 @@ Configuration:
     VIENNACL = ${have_viennacl:-NO, not including advanced variable reordering algorithms}
     PNML     = ${acx_pnml:-NO, not building pnml (Petri net) front-end}
     PROB     = ${acx_prob:-NO, either ProB was disabled or CZMQ could not be found}
+    SDD      = ${acx_libsdd:-NOT FOUND, not including SDDs}
     Sylvan   = ${have_sylvan:-NOT FOUND, not including parallel symbolic algorithms}
 ======================================================================
 EOM

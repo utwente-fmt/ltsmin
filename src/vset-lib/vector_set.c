@@ -41,6 +41,12 @@ vset_implementation_t vset_default_domain = VSET_LDDmc;
 vset_implementation_t vset_default_domain = VSET_ListDD;
 #endif
 
+//#ifdef HAVE_SDDAPI_H
+extern struct poptOption sdd_options[];
+extern vdom_t vdom_create_sdd(int n);
+// extern vdom_t vdom_create_sdd_from_file(FILE* f); TODO
+//#endif
+
 int vset_cache_diff = 0;
 
 static void vset_popt(poptContext con,
@@ -85,6 +91,9 @@ static si_map_entry vset_table[]={
     {"sylvan",VSET_Sylvan},
     {"lddmc",VSET_LDDmc},
 #endif // HAVE_SYLVAN
+#ifdef HAVE_SDDAPI_H
+    {"sdd",VSET_SDD},
+#endif
 	{NULL,0}
 };
 
@@ -109,6 +118,9 @@ struct poptOption vset_options[]={
 #endif
 #ifdef HAVE_SYLVAN
       "Sylvan BDDs, "
+#endif
+#ifdef HAVE_SDDAPI_H
+      "Sisyphus SDD, "
 #endif
       "(default: first available)", "<"
 #ifdef HAVE_SYLVAN
@@ -139,6 +151,9 @@ struct poptOption vset_options[]={
 #ifdef HAVE_SYLVAN
 	{ NULL,0 , POPT_ARG_INCLUDE_TABLE , sylvan_options , 0 , "Sylvan options" , NULL},
 #endif
+#ifdef HAVE_SDDAPI_H
+	{ NULL,0,  POPT_ARG_INCLUDE_TABLE , sdd_options, 0 , "SDD options", NULL  },
+#endif
     { "vset-cache-diff", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &vset_cache_diff , 0 ,
       "Influences size of operations cache when counting precisely with bignums: cache size = (2log('nodes-to-count') + <diff>)^2", "<diff>"},
     POPT_TABLEEND
@@ -166,6 +181,9 @@ vdom_create_domain(int n, vset_implementation_t impl)
 #endif
 #ifdef HAVE_SYLVAN
     case VSET_Sylvan: return vdom_create_sylvan(n);
+#endif
+#ifdef HAVE_SDDAPI_H
+    case VSET_SDD: return vdom_create_sdd(n);
 #endif
     default: return NULL;
     }

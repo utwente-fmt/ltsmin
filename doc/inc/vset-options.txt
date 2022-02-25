@@ -10,6 +10,7 @@
         With 'ddd', libDDD SDDs are used.
         With 'sylvan', the parallel BDD package Sylvan is used.
         With 'lddmc', the parallel LDD package LDDmc is used.
+        With 'sdd', the SDD (Sentential Decision Diagram) package is used
         Defaults to first available type in the list.
 *vset-cache-diff*='diff'::
         Influences the size of operations cache when counting precisely with bignums: 
