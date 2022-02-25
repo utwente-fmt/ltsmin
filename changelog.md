@@ -1,4 +1,10 @@
 # Changelog
+
+## February 25, 2022
+
+- Added support for Sentential Decision Diagrams (SDDs).
+ Use this feature by setting the command line parameter --vset=sdd when running, e.g., dve2lts-sym.
+
 ## Unreleased: 3.1.0
 
 - Improvements to the symbolic back-end (*lts-sym):

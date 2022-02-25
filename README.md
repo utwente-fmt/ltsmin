@@ -491,6 +491,23 @@ options.
 If both versions of BuDDy are installed, LTSmin will use the Spot version
 of BuDDy.
 
+#### SDD
+
+To use SDDs for symbolic state storage, the simplest way is as follows.
+
+1. Download SDD from <http://reasoning.cs.ucla.edu/sdd/> (version 2.0)
+2. Build the SDD package. This produces the file `/sdd/build/libsdd.a`
+3. Move or copy the file `libsdd.a` to `/usr/local/lib/libsdd.a`
+4. Move or copy the file `sddapi.h` to `/usr/local/include/sddapi.h`
+
+Alternatively, the files `libsdd.a` and `sddapi.h` may be put in a different directory `dir`,
+so long as `dir/lib` contains `libsdd.a` and `dir/include` contains `sddapi.h`.
+In this case, add the option `--with-libsdd=/path/to/dir` to the configure call, e.g.,
+
+    ./configure --with-libsdd=/path/to/dir
+
+Alternatively, use `--with-libsdd=no` to configure without SDD.
+
 ## Building from a Git Repository
 
 Before building the software as described above, the following commands
