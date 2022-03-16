@@ -121,8 +121,8 @@ extern int* priority; // priorities of variables
 extern int min_priority;
 extern int max_priority;
 
-ltsmin_expr_t* mu_exprs;
-ltsmin_parse_env_t* mu_parse_env;
+extern ltsmin_expr_t* mu_exprs;
+extern ltsmin_parse_env_t* mu_parse_env;
 
 extern lts_type_t ltstype;
 extern int N;
