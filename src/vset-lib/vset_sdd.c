@@ -965,12 +965,10 @@ static void set_count(vset_t set, long* nodes, double* elements) {
 		*nodes = peak_footprint;
 	}
 	if (elements != NULL) {
-		clock_t before = clock();
-//		SddModelCount mc = set_count_exact(set);
-		SddModelCount mc = 0; // Counting is disabled, because it costs a lot of time, and pollutes the cache
-		count_time += (double)(clock() - before);
+//		clock_t before = clock();
+		SddModelCount mc = set_count_exact(set);
+//		count_time += (double)(clock() - before);
 
-	//	printf("  [Sdd set count] Set contains %llu elements.\n", mc);
 		*elements = (double) mc;
 	}
 	set = set; // to defuse the warning "unused parameter 'set'"
