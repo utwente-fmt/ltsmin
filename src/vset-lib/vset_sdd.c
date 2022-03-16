@@ -531,7 +531,7 @@ void heuristic_vtree_search(Vtree* tree_int, SddManager* manager_int) {
 
 void find_static_vtree() {
     Printf(infoLong, "Finding static vtree.\n");
-	clock_t before = clock();
+//	clock_t before = clock();
 	Vtree* tree_int = initial_integer_tree();
 	SddManager* manager_int = sdd_manager_new(tree_int);
 	// This manager contains one node for each integer variable of the program.
@@ -544,7 +544,7 @@ void find_static_vtree() {
 	// Convert the "draft" tree with integer-labeled leaves to
 	//   a larger one with bit-labeled leaves
 	vtree_from_integer_tree(sdd_manager_vtree(manager_int), manager_int);
-	vtree_setup_time = (double)(clock() - before);
+//	vtree_setup_time = (double)(clock() - before);
 }
 
 /* This function is called once, when the exploration is about to begin
@@ -644,11 +644,11 @@ void sdd_minimize_maybe() {
 
 void sdd_set_and_ref(vset_t set, SddNode* S) {
 //	printf("[sdd set and ref] start  set %u  S=%p\n", set->id, S); fflush(stdout);
-	clock_t before = clock();
+//	clock_t before = clock();
 	sdd_ref(S, sisyphus);
 //	printf("[sdd set and ref] Referenced.\n"); fflush(stdout);
 	sdd_deref(set->sdd, sisyphus);
-	reference_time += (double)(clock() - before);
+//	reference_time += (double)(clock() - before);
 //	printf("[sdd set and ref] Dereferenced.\n"); fflush(stdout);
 	set->sdd = S;
 	unsigned int fp = sdd_memory_live_footprint();
@@ -657,10 +657,10 @@ void sdd_set_and_ref(vset_t set, SddNode* S) {
 }
 
 void sdd_set_rel_and_ref(vrel_t rel, SddNode* R) {
-	clock_t before = clock();
+//	clock_t before = clock();
 	sdd_ref(R, sisyphus);
 	sdd_deref(rel->sdd, sisyphus);
-	reference_time += (double)(clock() - before);
+//	reference_time += (double)(clock() - before);
 	rel->sdd = R;
 	unsigned int fp = sdd_memory_live_footprint();
 	if (fp > peak_footprint) peak_footprint = fp;
@@ -911,17 +911,13 @@ static void set_copy(vset_t dst, vset_t src) {
 }
 
 static void set_enum(vset_t set, vset_element_cb cb, void* context) {
-	if (sdd_node_is_false(set->sdd)) {
-//		Printf(info, "    (empty)\n");
-	}
-	else {
+	if (!sdd_node_is_false(set->sdd)) {
 		int k = set->k == -1 ? set->dom->vectorsize : set->k;
 		int vec[k]; // TODO finish this thought
 		int d, var;
 		SddModelCount i = 0;
 		struct sdd_mit_master mas;
 		for (mas = sdd_get_iterator(set); mas.finished == 0; sdd_next_model(&mas)) {
-//			Printf(info, "    ");
 			// Refactor mas.e to a bit-array
 			for (int i=0; i<k; i++) {
 				vec[i] = 0; // TODO put this in the next loop
@@ -930,11 +926,9 @@ static void set_enum(vset_t set, vset_element_cb cb, void* context) {
 				var = set->k == -1 ? i : set->proj[i];
 				for (int b=0; b<xstatebits; b++) {
 					d = (mas.e[xstatebits*var+b]) << b;
-					//printf("  e[%i] |= %i\n", i, d);
 					vec[i] |= d;
 				}
 			}
-//			Printf(info, "[set enum %u]  Callback...\n", set->id);
 			cb(context, vec);
 			i++;
 		}
@@ -994,20 +988,19 @@ static void set_union(vset_t dst, vset_t src) {
 	}
 	else {
 		if (vset_domains_are_disjoint(dst, src)) {
-			clock_t before = clock();
+//			clock_t before = clock();
 			SddNode* conjoin = sdd_conjoin(dst->sdd, src->sdd, sisyphus);
-			conjoin_time += (double)(clock() - before);
+//			conjoin_time += (double)(clock() - before);
 			sdd_set_and_ref(dst, conjoin);
-//			printf("  [Sdd set union] Uh oh, we should probably write down that the domain has changed.\n");
 			vset_add_to_domain(dst, src);
 		}
 		else {
 //			printf("  [Sdd set union] Computations tells us the vset domains are not disjoint:\n");
 //			vset_exposition(src);
 //			vset_exposition(dst);
-			clock_t before = clock();
+//			clock_t before = clock();
 			SddNode* sdd_union = sdd_disjoin(dst->sdd, src->sdd, sisyphus);
-			union_time += (double)(clock() - before);
+//			union_time += (double)(clock() - before);
 			sdd_set_and_ref(dst, sdd_union);
 		}
 	}
@@ -1015,9 +1008,9 @@ static void set_union(vset_t dst, vset_t src) {
 
 static void set_minus(vset_t dst, vset_t src) {
 	if (dst->sdd != src->sdd) {
-		clock_t before = clock();
+//		clock_t before = clock();
 		SddNode* diff = sdd_conjoin(dst->sdd, sdd_negate(src->sdd, sisyphus), sisyphus);
-		conjoin_time += (double) (clock() - before);
+//		conjoin_time += (double) (clock() - before);
 		sdd_set_and_ref(dst, diff);
 	}
 	else {
@@ -1029,9 +1022,9 @@ static void set_minus(vset_t dst, vset_t src) {
 
 static void set_intersect(vset_t dst, vset_t src) {
 	if (dst->sdd != src->sdd) {
-		clock_t before = clock();
+//		clock_t before = clock();
 		SddNode* conjoined = sdd_conjoin(dst->sdd, src->sdd, sisyphus);
-		conjoin_time += (double)(clock() - before);
+//		conjoin_time += (double)(clock() - before);
 		sdd_set_and_ref(dst, conjoined);
 //		dst->sdd = sdd_conjoin(dst->sdd, src->sdd, sisyphus);
 	}
@@ -1046,9 +1039,9 @@ static void set_next(vset_t dst, vset_t src, vrel_t rel) {
 	}
 
 	//printf("  [Sdd set next] Conjoining...\n");
-	clock_t before = clock();
+//	clock_t before = clock();
 	SddNode* conj = sdd_conjoin(src->sdd, rel->sdd, sisyphus);
-	conjoin_time += (double)(clock() - before);
+//	conjoin_time += (double)(clock() - before);
 //	mcSrc = sdd_model_count(conj, sisyphus);
 //	printf("  [Sdd set next]  Conjoined! #conj=%llu\n", mcSrc);
 	if (sdd_node_is_false(conj)) {
@@ -1075,7 +1068,6 @@ static void set_next(vset_t dst, vset_t src, vrel_t rel) {
 	switch( sdd_exist_config ) {
 	case 0:
 		// Mark variables read by rel
-		//printf("  [Sdd set next]  Quantifying %i read variables:", rel_ll->r_k);
 		for (int v=0; v<rel_ll->r_k; v++) {
 			//printf(" %i:", rel_ll->r_proj[v]);
 			for (int i=0; i<xstatebits; i++) {
@@ -1084,7 +1076,6 @@ static void set_next(vset_t dst, vset_t src, vrel_t rel) {
 				exists_map[sdd_var] = 1;
 			}
 		}
-		//printf("\n  [Sdd set next]  Quantifying %i write variables.\n", rel_ll->w_k);
 		// Mark variables written by rel
 		for (int v=0; v<rel_ll->w_k; v++) {
 			for (int i=0; i<xstatebits; i++) {
@@ -1092,9 +1083,9 @@ static void set_next(vset_t dst, vset_t src, vrel_t rel) {
 				exists_map[sdd_var] = 1;
 			}
 		}
-		before = clock();
+//		before = clock();
 		existed = sdd_exists_multiple(exists_map, conj, sisyphus);
-		exists_time += (double)(clock() - before);
+//		exists_time += (double)(clock() - before);
 		break;
 	case 1: // integer by integer
 		existed = conj;
@@ -1104,9 +1095,9 @@ static void set_next(vset_t dst, vset_t src, vrel_t rel) {
 				sdd_var = 2*(xstatebits*rel_ll->r_proj[v] + i)+1;
 				exists_map[sdd_var] = 1;
 			}
-			before = clock();
+//			before = clock();
 			existed = sdd_exists_multiple(exists_map, existed, sisyphus);
-			exists_time += (double)(clock() - before);
+//			exists_time += (double)(clock() - before);
 			for (int i=0; i<xstatebits; i++) {
 				sdd_var = 2*(xstatebits*rel_ll->r_proj[v] + i)+1;
 				exists_map[sdd_var] = 0;
@@ -1123,9 +1114,9 @@ static void set_next(vset_t dst, vset_t src, vrel_t rel) {
 					exists_map[sdd_var] = 1;
 				}
 			}
-			before = clock();
+//			before = clock();
 			existed = sdd_exists_multiple(exists_map, existed, sisyphus);
-			exists_time += (double)(clock() - before);
+//			exists_time += (double)(clock() - before);
 			for (int w=0; w<2; w++) {
 				for (int i=0; i<xstatebits; i++) {
 					sdd_var = 2*(xstatebits*rel_ll->r_proj[v+w] + i)+1;
@@ -1200,9 +1191,9 @@ static void set_project(vset_t dst, vset_t src) {
 				exists_map[var+1] = 1;
 				var += 2;
 			}
-			clock_t before = clock();
+//			clock_t before = clock();
 			SddNode* proj = sdd_exists_multiple(exists_map, src->sdd, sisyphus); // Replaced by sdd_set_and_ref
-			exists_time += (double)(clock() - before);
+			//exists_time += (double)(clock() - before);
 			sdd_set_and_ref(dst, proj);
 
 		}
@@ -1225,9 +1216,9 @@ static void set_zip(vset_t dst, vset_t src) {
 }
 
 static void rel_add_cpy(vrel_t rel, const int* src, const int* dst, const int* cpy) {
-	nscb_time += (double)(clock() - clock_before_nscb);
+//	nscb_time += (double)(clock() - clock_before_nscb);
 	vrel_ll_t rel_ll = get_vrel(rel->id);
-	clock_t before = clock();
+//	clock_t before = clock();
 	SddNode* srcSdd = sdd_manager_true(sisyphus);
 	SddNode* dstSdd = sdd_manager_true(sisyphus);
 	SddNode* src_and_dst;
@@ -1629,7 +1620,7 @@ static void rel_add_cpy(vrel_t rel, const int* src, const int* dst, const int* c
 		Warning(info ,"Warning: feature vtree-increment=%u is not supported. Please use a number in 1..8.\n", vtree_increment_config);
 		break;
 	}
-	rel_increment_time += (double)(clock() - before);
+//	rel_increment_time += (double)(clock() - before);
 }
 
 static void rel_add_act(vrel_t rel, const int* src, const int* dst, const int* cpy, const int act) {
@@ -1715,7 +1706,7 @@ static void rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
 	//     Add the new states to dst
 	if (sdd_node_is_decision(root)) {
 		//printf("  [rel update] Node is decision node.\n");
-		clock_t before = clock();
+//		clock_t before = clock();
 		int d;
 		rel_update_smart_temp = sdd_manager_false(sisyphus);
 		struct sdd_mit_master mas;
@@ -1732,7 +1723,7 @@ static void rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
 				}
 			}
 			nNextState_cb++;
-			clock_before_nscb = clock();
+//			clock_before_nscb = clock();
 			cb(dst, context, e);
 //			printf("  [rel update] Did the callback. Now relation has %llu models.\n", sdd_model_count(dst->sdd, sisyphus));
 		}
@@ -1741,17 +1732,17 @@ static void rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
 			if (rel_update_smart_i != 0) {
 				// An update has occurred
 				if (rel_update_smart_i == 1) {
-					clock_t before_inc = clock();
+//					clock_t before_inc = clock();
 					rel_update_smart_temp = sdd_disjoin(rel_update_smart_temp, rel_update_smart_cache[0], sisyphus);
 					SddNode* disjoin = sdd_disjoin(dst->sdd, rel_update_smart_temp, sisyphus);
-					clock_t after_inc = clock();
-					rel_increment_time += (double)(after_inc - before_inc);
-					rel_update_time += (double)(after_inc - before);
+//					clock_t after_inc = clock();
+//					rel_increment_time += (double)(after_inc - before_inc);
+//					rel_update_time += (double)(after_inc - before);
 					sdd_set_rel_and_ref(dst, disjoin);
 				} else {
 //					 There is still stuff left over in the cache
 //					 add the list to rel_update_smart_temp
-					clock_t before_inc = clock();
+//					clock_t before_inc = clock();
 					for (int b=0; b<6; b++) {
 						for (unsigned int i=0; i<rel_update_smart_cache_size; i += (1 << (b+1))) {
 							if (sdd_node_is_false(rel_update_smart_cache[i+(1<<b)])) {
@@ -1762,21 +1753,21 @@ static void rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
 					}
 					rel_update_smart_temp = sdd_disjoin(rel_update_smart_temp, rel_update_smart_cache[0], sisyphus);
 					SddNode* disjoin = sdd_disjoin(dst->sdd, rel_update_smart_temp, sisyphus);
-					rel_increment_time += (double)(clock() - before_inc);
-					rel_update_time += (double)(clock() - before);
+//					rel_increment_time += (double)(clock() - before_inc);
+//					rel_update_time += (double)(clock() - before);
 					sdd_set_rel_and_ref(dst, disjoin);
 				}
 			}
 		}
 		else if (!sdd_node_is_false(rel_update_smart_temp)) {
-			clock_t before_inc = clock();
+//			clock_t before_inc = clock();
 			SddNode* disjoin = sdd_disjoin(dst->sdd, rel_update_smart_temp, sisyphus);
-			rel_increment_time += (double)(clock() - before_inc);
-			rel_update_time += (double)(clock() - before);
+//			rel_increment_time += (double)(clock() - before_inc);
+//			rel_update_time += (double)(clock() - before);
 			sdd_set_rel_and_ref(dst, disjoin);
 		}
 		else {
-			rel_update_time += (double)(clock() - before);
+//			rel_update_time += (double)(clock() - before);
 		}
 //		printf("  [rel update] End of models.\n");
 	}
