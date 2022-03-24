@@ -582,6 +582,9 @@ init_ltsmin_buchi_from_hoa(model_t model, const char *hoa_file) {
     HREassert(PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA,
                     "Buchi type %s is not possible with -hoa, please use --buchi-type=spotba", buchi_type);
 
+    // force LTSmin semantics
+    PINS_LTL = PINS_LTL_LTSMIN;
+
 
     if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
         Print(info, "LTL layer using automaton file : %s", hoa_file);
