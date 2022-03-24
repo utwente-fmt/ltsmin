@@ -10,8 +10,12 @@ extern "C" {
 
 #include <ltsmin-lib/ltsmin-buchi.h>
 
+// use spot to build an automaton from a parsed LTL expression
 void ltsmin_ltl2spot(ltsmin_expr_t e, int to_tgba, ltsmin_parse_env_t env);
+// transform the spot::twa automaton built by ltl2spot to an ltsmin_buchi_t
 ltsmin_buchi_t *ltsmin_hoa_buchi(ltsmin_parse_env_t env);
+// directly parse the given HOA file and build an ltsmin_buchi_t
+ltsmin_buchi_t *ltsmin_parse_hoa_buchi(char * hoa_file, ltsmin_parse_env_t env);
 void ltsmin_hoa_destroy();
 
 #ifdef __cplusplus
