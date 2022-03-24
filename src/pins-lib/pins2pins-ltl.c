@@ -26,6 +26,9 @@
 
 uint32_t                HOA_ACCEPTING_SET = 0;
 static char            *ltl_file = NULL;
+#ifdef HAVE_SPOT
+static char            *hoa_file = NULL;
+#endif
 static const char      *ltl_semantics_name = "none";
 static const char      *buchi_type = "ba";
 pins_ltl_type_t         PINS_LTL = PINS_LTL_AUTO;
@@ -93,6 +96,10 @@ struct poptOption ltl_options[] = {
     {NULL, 0, POPT_ARG_CALLBACK | POPT_CBFLAG_POST | POPT_CBFLAG_SKIPOPTION, (void *)ltl_popt, 0, NULL, NULL},
     {"ltl", 0, POPT_ARG_STRING, &ltl_file, 0, "LTL formula or file with LTL formula",
      "<ltl-file>.ltl|<ltl formula>"},
+#ifdef HAVE_SPOT
+	 {"hoa", 0, POPT_ARG_STRING, &hoa_file, 0, "HOA format automaton accepting the negation of a property.",
+	      "<hoa-file>.hoa"},
+#endif
     {"ltl-semantics", 0, POPT_ARG_STRING, &ltl_semantics_name, 0,
      "LTL semantics", "<spin|textbook|ltsmin> (default: \"auto\")"},
     {"buchi-type", 0, POPT_ARG_STRING | POPT_ARGFLAG_SHOW_DEFAULT, &buchi_type, 0,
@@ -561,6 +568,63 @@ static void check_LTL(ltsmin_expr_t e, ltsmin_parse_env_t env,
     }
 }
 
+
+#ifdef HAVE_SPOT
+/*
+ * Consider that we are provided an automaton in HOAF format directly, rather than an LTL formula.
+ */
+ltsmin_buchi_t *
+init_ltsmin_buchi_from_hoa(model_t model, const char *hoa_file) {
+    ltsmin_buchi_t *ba;
+
+	// currently only supporting SPOTBA type.
+	// TODO : integrate TGBA type
+    HREassert(PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA,
+                    "Buchi type %s is not possible with -hoa, please use --buchi-type=spotba", buchi_type);
+
+
+    if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
+        Print(info, "LTL layer using automaton file : %s", hoa_file);
+        ltsmin_parse_env_t env = LTSminParseEnvCreate();
+
+		// load AP from model
+        init_ltl_env(env,GBgetLTStype(model));
+             
+        // hypothesis is that : 
+        // * we are called with partial order flags only if they are legal, i.e. the HOA is stutter-insensitive
+        // * Edge-based labels are not used in the logic
+		// this drops a series of tests w.r.t. the init_ltsmin_buchi function.
+        // e.g. struct LTL_info LTL_info = {0, 0}; check_LTL(ltl, env, &LTL_info); HREAssert...
+
+        ba = ltsmin_parse_hoa_buchi(hoa_file, env);
+
+
+        if (ba == NULL) {
+            Print(info, "Empty buchi automaton.");
+            Print(info, "The property is TRUE.");
+        } else {
+            if (ba->predicate_count > 30) {
+                Abort("more than 30 predicates in buchi automaton are currently not supported");
+            }
+            ba->env = env;
+            print_ltsmin_buchi(ba, env);
+        }
+        atomic_write (&shared_ba, ba);
+        HREbarrier(HREglobal());
+    } else {
+        HREbarrier(HREglobal());
+        ba = atomic_read(&shared_ba);
+    }
+
+    if (ba == NULL) {
+        HREexit(LTSMIN_EXIT_SUCCESS);
+    }
+
+    return ba;
+}
+#endif
+
+
 /* NOTE: this is hack around non-thread-safe ltl2ba
  * In multi-process environment, all processes create their own buchi,
  * which is what we want anyway, because ltsmin_ltl2ba uses strdup.
@@ -722,7 +786,11 @@ ltl_exit (model_t model)
 model_t
 GBaddLTL (model_t model)
 {
+#ifdef HAVE_SPOT
+    if (ltl_file == NULL && hoa_file==NULL) return model;
+#else
     if (ltl_file == NULL) return model;
+#endif
 
     lts_type_t ltstype = GBgetLTStype(model);
     int old_idx = pins_get_accepting_state_label_index (model);
@@ -731,7 +799,16 @@ GBaddLTL (model_t model)
                lts_type_get_state_label_name(ltstype, old_idx));
     }
 
-    ltsmin_buchi_t *ba = init_ltsmin_buchi(model, ltl_file);
+	ltsmin_buchi_t *ba;
+#ifdef HAVE_SPOT
+	if (hoa_file) {
+		ba = init_ltsmin_buchi_from_hoa (model, hoa_file);
+	} else {
+#endif 
+	    ba = init_ltsmin_buchi(model, ltl_file);
+#ifdef HAVE_SPOT
+	}
+#endif
 
     model_t         ltlmodel = GBcreateBase();
     ltl_context_t *ctx = RTmalloc(sizeof *ctx);
