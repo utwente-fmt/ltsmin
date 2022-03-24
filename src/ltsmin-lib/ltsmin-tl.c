@@ -280,9 +280,7 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
 {
     stream_t stream = read_formula (file);
 
-    fill_env (env, ltstype);
-
-    create_ltl_env(env);
+    init_ltl_env(env, ltstype);
 
     ltsmin_parse_stream(TOKEN_EXPR,env,stream);
 
@@ -293,6 +291,13 @@ ltl_parse_file(const char *file, ltsmin_parse_env_t env, lts_type_t ltstype)
     env->expr = ltl_tree_walker(env->expr);
 
     return env->expr;
+}
+
+void
+init_ltl_env(ltsmin_parse_env_t env, lts_type_t ltstype)
+{
+	fill_env(env, ltstype);
+	create_ltl_env(env);
 }
 
 static void
