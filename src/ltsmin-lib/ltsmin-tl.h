@@ -77,6 +77,7 @@ typedef enum {
 } LTL;
 
 extern ltsmin_expr_t ltl_parse_file(const char *,ltsmin_parse_env_t,lts_type_t);
+extern void init_ltl_env(ltsmin_parse_env_t,lts_type_t);
 
 /* Computation Tree logic */
 
