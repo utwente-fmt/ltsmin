@@ -383,3 +383,27 @@ ltsmin_hoa_destroy()
 {
     spot_automaton.reset();
 }
+
+// directly parse the given HOA file and build an ltsmin_buchi_t
+ltsmin_buchi_t *ltsmin_parse_hoa_buchi(char * hoa_file, ltsmin_parse_env_t env) {
+	spot::bdd_dict_ptr dict = spot::make_bdd_dict();
+	spot::parsed_aut_ptr pa = parse_aut(hoa_file, dict);
+	bool parse_errors = pa->format_errors(std::cerr);
+	HREassert(!parse_errors, "Parse errors found in conversion of HOA to Buchi. HOA file = %s", hoa_file);
+
+	spot_automaton = pa->aut;
+
+	// FIXME if is_maybe
+	isTGBA = ! spot_automaton->prop_state_acc().is_true();
+
+
+	for (spot::formula ap: spot_automaton->ap())
+	{
+		std::string ap_name = ap.ap_name();
+		int index = SIlookup(env->state_vars,  ap_name.c_str());
+		ltsmin_expr_t e = LTSminExpr(SVAR, SVAR, index, NULL, NULL);
+		ltl_to_store(e, env);
+	}
+
+	return create_ltsmin_buchi(spot_automaton, env);
+}
