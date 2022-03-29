@@ -577,10 +577,9 @@ ltsmin_buchi_t *
 init_ltsmin_buchi_from_hoa(model_t model, const char *hoa_file) {
     ltsmin_buchi_t *ba;
 
-	// currently only supporting SPOTBA type.
-	// TODO : integrate TGBA type
-    HREassert(PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA,
-                    "Buchi type %s is not possible with -hoa, please use --buchi-type=spotba", buchi_type);
+	// currently only supporting SPOTBA or TGBA type.
+    HREassert(PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_SPOTBA || PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA,
+                    "Buchi type %s is not possible with -hoa, please use --buchi-type=[spotba|tgba]", buchi_type);
 
     // force LTSmin semantics
     PINS_LTL = PINS_LTL_LTSMIN;
@@ -599,7 +598,7 @@ init_ltsmin_buchi_from_hoa(model_t model, const char *hoa_file) {
 		// this drops a series of tests w.r.t. the init_ltsmin_buchi function.
         // e.g. struct LTL_info LTL_info = {0, 0}; check_LTL(ltl, env, &LTL_info); HREAssert...
 
-        ba = ltsmin_parse_hoa_buchi(hoa_file, env);
+        ba = ltsmin_parse_hoa_buchi(hoa_file, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env);
 
 
         if (ba == NULL) {
