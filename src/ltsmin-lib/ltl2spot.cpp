@@ -385,7 +385,7 @@ ltsmin_hoa_destroy()
 }
 
 // directly parse the given HOA file and build an ltsmin_buchi_t
-ltsmin_buchi_t *ltsmin_parse_hoa_buchi(char * hoa_file, ltsmin_parse_env_t env) {
+ltsmin_buchi_t *ltsmin_parse_hoa_buchi(const char * hoa_file, int to_tgba, ltsmin_parse_env_t env) {
 	spot::bdd_dict_ptr dict = spot::make_bdd_dict();
 	spot::parsed_aut_ptr pa = parse_aut(hoa_file, dict);
 	bool parse_errors = pa->format_errors(std::cerr);
@@ -394,7 +394,12 @@ ltsmin_buchi_t *ltsmin_parse_hoa_buchi(char * hoa_file, ltsmin_parse_env_t env) 
 	spot_automaton = pa->aut;
 
 	// FIXME if is_maybe
-	isTGBA = ! spot_automaton->prop_state_acc().is_true();
+	if (to_tgba) {
+		HREassert(! spot_automaton->prop_state_acc().is_true(), "Flag --buchi-type set to tgba, but HOA file %s contains a state based Buchi. Please use --buchi-type=spotba for this input.", hoa_file);
+	} else {
+		HREassert(spot_automaton->prop_state_acc().is_true(), "Flag --buchi-type set to spotbuchi, but HOA file %s contains a transition based Buchi. Please use --buchi-type=tgba for this input.", hoa_file);
+	}
+	isTGBA = to_tgba;
 
 	// linearize expression
 	const int le_size = 64;
