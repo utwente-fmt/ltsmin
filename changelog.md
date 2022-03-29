@@ -1,5 +1,10 @@
 # Changelog
 
+## March 29, 2022
+
+- Added support for input of a Hanoi Omega Automaton (HOA) rather than an LTL formula.
+Use this feature by passing --hoa instead --ltl and providing a TGBA or Buchi automaton in this format.
+
 ## February 25, 2022
 
 - Added support for Sentential Decision Diagrams (SDDs).
