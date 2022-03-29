@@ -121,6 +121,36 @@ ltsmin;;
     to progress independently.
     This option is the default if edge-based atomic predicates are found
     in the LTL formula.
+
+
+*--buchi-type*='ba|spotba|tgba'::
+    Change the way a Buchi automaton is built from an LTL formula, or that the HOA file is parsed in '--hoa' mode.
++
+Three options are available, the default is ba.
+
+ba;;
+    Use embedded version of Oddoux and Gastin's ltl2ba to build the Buchi automaton from the formula. 
+
+spotba;;
+    Use Duret-Lutz et al. Spot library to build a Buchi automaton from the formula. 
+    Note this flag is only available if compiled with Spot support.
+
+tgba;;
+	Use Duret-Lutz et al. Spot library to build a Transition-based Generalized Buchi Automaton  (TGBA) from the formula. 
+    Note this flag is only available if compiled with Spot support.    
+    Use of TGBA triggers different emptiness check algorithms (renault used by default).
+
+*--hoa*='HOAFILE'::
+    Instead of providing a formula with '--ltl' directly provide an automaton using the Hanoi Omega Automata format (HOAF). 
++
+The HOA format is a generic interchange format for Buchi-like automata.
+The automaton should usually represent the negation of the desired property.
+This flag is mutually exclusive of '--ltl' flag.
+This flag is only available if built with Spot support.
+The HOA automaton provided must either be a TGBA (use '--buchi-type=tgba') or a Buchi automaton (use '--buchi-type=spotba'), 
+not a HOA with arbitrary acceptance conditions.
+The '--buchi-type' flag must be consistent with the content of the HOA file.
+
 endif::ltl[]
 
 *--por*='heur|del'::
@@ -146,6 +176,7 @@ del;;
 *--leap*::
     Use leaping partial-order reduction, by combining several disjoint
     stubborn sets sequentially.
+
 
 include::env-vars.txt[]
 
