@@ -147,9 +147,9 @@ PromCompileGreyboxModel(model_t model, const char *filename)
     char *basename = gnu_basename ((char *)filename);
     // check existence of bin file
     char *bin_fname = RTmallocZero(strlen(basename) + strlen(".spins") + 1);
-    strncpy(bin_fname, basename, strlen(basename));
+    strncpy(bin_fname, basename, strlen(basename)+1);
     char *ext = bin_fname + strlen(basename);
-    strncpy(ext, ".spins", strlen(".spins"));
+    strncpy(ext, ".spins", strlen(".spins")+1);
 
     if ((ret = stat (bin_fname, &st)) != 0)
         HREassert(ret >= 0, "File not found: %s", bin_fname);
