@@ -7,7 +7,7 @@
 #define LTL_RPAR ((void*)0x02)
 
 ltsmin_expr_t
-ltsmin_expr_lookup(ltsmin_expr_t e, char *text, ltsmin_expr_list_t **le_list)
+ltsmin_expr_lookup(ltsmin_expr_t e, const char *text, ltsmin_expr_list_t **le_list)
 {
     // lookup expression
     ltsmin_expr_list_t **pp_le_list = le_list;
@@ -24,7 +24,7 @@ ltsmin_expr_lookup(ltsmin_expr_t e, char *text, ltsmin_expr_list_t **le_list)
             if (strcmp((*pp_le_list)->text, text) == 0)
                 return (*pp_le_list)->expr;
         }
-        pp_le_list = (ltsmin_expr_list_t**)&((*pp_le_list)->next);
+        pp_le_list = &((*pp_le_list)->next);
     }
     // alloc room for this predicate expression
     *pp_le_list = (ltsmin_expr_list_t*) RTmalloc(sizeof(ltsmin_expr_list_t));
