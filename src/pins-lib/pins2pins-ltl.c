@@ -589,16 +589,13 @@ init_ltsmin_buchi_from_hoa(model_t model, const char *hoa_file) {
         Print(info, "LTL layer using automaton file : %s", hoa_file);
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
 
-		// load AP from model
-        init_ltl_env(env,GBgetLTStype(model));
-             
         // hypothesis is that : 
         // * we are called with partial order flags only if they are legal, i.e. the HOA is stutter-insensitive
         // * Edge-based labels are not used in the logic
 		// this drops a series of tests w.r.t. the init_ltsmin_buchi function.
         // e.g. struct LTL_info LTL_info = {0, 0}; check_LTL(ltl, env, &LTL_info); HREAssert...
 
-        ba = ltsmin_parse_hoa_buchi(hoa_file, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env);
+        ba = ltsmin_parse_hoa_buchi(hoa_file, PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_TGBA, env, GBgetLTStype(model));
 
 
         if (ba == NULL) {
@@ -638,6 +635,7 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
     if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
         Print(info, "LTL layer: formula: %s", ltl_file);
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
+        init_ltl_env(env, GBgetLTStype(model));
         ltsmin_expr_t ltl = ltl_parse_file (ltl_file, env, GBgetLTStype(model));
         struct LTL_info LTL_info = {0, 0};
         check_LTL(ltl, env, &LTL_info);
