@@ -14,7 +14,7 @@
 typedef struct ltsmin_expr_list_t {
     char* text;
     ltsmin_expr_t expr;
-    struct ltsmin_expr_list* next;
+    struct ltsmin_expr_list_t* next;
 } ltsmin_expr_list_t;
 
 
@@ -24,7 +24,7 @@ typedef struct ltsmin_lin_expr {
     ltsmin_expr_t lin_expr[];
 } ltsmin_lin_expr_t;
 
-ltsmin_expr_t ltsmin_expr_lookup(ltsmin_expr_t e, char* text, ltsmin_expr_list_t **le_list);
+ltsmin_expr_t ltsmin_expr_lookup(ltsmin_expr_t e, const char* text, ltsmin_expr_list_t **le_list);
 void linearize_ltsmin_expr(ltsmin_expr_t e, ltsmin_lin_expr_t **le);
 
 
