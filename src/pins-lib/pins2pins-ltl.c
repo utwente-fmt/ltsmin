@@ -635,7 +635,6 @@ init_ltsmin_buchi(model_t model, const char *ltl_file)
     if (NULL == shared_ba && cas(&grab_ba, 0, 1)) {
         Print(info, "LTL layer: formula: %s", ltl_file);
         ltsmin_parse_env_t env = LTSminParseEnvCreate();
-        init_ltl_env(env, GBgetLTStype(model));
         ltsmin_expr_t ltl = ltl_parse_file (ltl_file, env, GBgetLTStype(model));
         struct LTL_info LTL_info = {0, 0};
         check_LTL(ltl, env, &LTL_info);
