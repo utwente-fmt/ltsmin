@@ -73,7 +73,13 @@ ltl_to_store_helper (char *at, ltsmin_lin_expr_t *le, ltsmin_parse_env_t env, in
       case LTL_SUB: {
         char *buffer = LTSminPrintExpr(le->lin_expr[i], env);
         // store the predicate (only once)
-        if (at) ltsmin_expr_lookup(le->lin_expr[i], buffer, &le_list);
+        if (at) {
+        	// register a whitespace free version
+        	std::string str(buffer);
+        	str.erase(std::remove(str.begin(), str.end(), ' '), str.end());
+        	ltsmin_expr_lookup(le->lin_expr[i], str.c_str(), &le_list);
+        }
+
         // add temporary '#' to mark predicates for Spot
         n += snprintf(at + (at?n:0), max_buffer, "#%s#", buffer);
         RTfree(buffer);
@@ -218,9 +224,13 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
     std::string ap_name = ap.ap_name();
     // Change the single quotation back to a double quote
     replace( ap_name.begin(), ap_name.end(), '\'', '\"');
+    // drop all whitespace from string
+    ap_name.erase(std::remove(ap_name.begin(), ap_name.end(), ' '), ap_name.end());
+
     pred_vec.push_back(ap_name);
-    ltsmin_expr_t e = ltsmin_expr_lookup(NULL, (char*) ap_name.c_str(), &le_list);
-    HREassert(e, "Empty LTL expression");
+    ltsmin_expr_t e = ltsmin_expr_lookup(NULL, ap_name.c_str(), &le_list);
+
+    HREassert(e, "Empty LTL expression. Lookup failed for %s.", ap_name.c_str());
 
     int is_edgevar = check_edgevar(e, env);
     if (is_edgevar != 0) // both 1 and -1 (-1 contains both state and edge vars)
@@ -290,6 +300,8 @@ create_ltsmin_buchi(spot::twa_graph_ptr& aut, ltsmin_parse_env_t env)
                 std::string predicate = cond.substr(pred_start+1, c_i-pred_start-1);
                 // Change the single quotation back to a double quote
                 replace( predicate.begin(), predicate.end(), '\'', '\"');
+                // drop any whitespace
+                predicate.erase(std::remove(predicate.begin(), predicate.end(), ' '), predicate.end());
                 int pred_index = get_predicate_index(pred_vec, predicate);
                 HREassert(pred_index >= 0, "Predicate not found");
                 if (is_neg)
@@ -385,7 +397,7 @@ ltsmin_hoa_destroy()
 }
 
 // directly parse the given HOA file and build an ltsmin_buchi_t
-ltsmin_buchi_t *ltsmin_parse_hoa_buchi(const char * hoa_file, int to_tgba, ltsmin_parse_env_t env) {
+ltsmin_buchi_t *ltsmin_parse_hoa_buchi(const char * hoa_file, int to_tgba, ltsmin_parse_env_t env, lts_type_t ltstype) {
 	spot::bdd_dict_ptr dict = spot::make_bdd_dict();
 	spot::parsed_aut_ptr pa = parse_aut(hoa_file, dict);
 	bool parse_errors = pa->format_errors(std::cerr);
@@ -401,20 +413,20 @@ ltsmin_buchi_t *ltsmin_parse_hoa_buchi(const char * hoa_file, int to_tgba, ltsmi
 	}
 	isTGBA = to_tgba;
 
-	// linearize expression
-	const int le_size = 64;
-	le = (ltsmin_lin_expr_t*) RTmalloc(sizeof(ltsmin_lin_expr_t) + le_size * sizeof(ltsmin_expr_t));
-	le->size = le_size;
-	le->count = 0;
-
+	std::stringstream allAP;
+	bool isFirst = true;
 	for (spot::formula ap: spot_automaton->ap())
 	{
-		std::string ap_name = ap.ap_name();
-		int index = SIlookup(env->state_vars,  ap_name.c_str());
-		ltsmin_expr_t e = LTSminExpr(SVAR, SVAR, index, NULL, NULL);
-		linearize_ltsmin_expr(e, &le);
-		ltl_to_store(e, env);
+		if (isFirst) {
+			isFirst = false;
+		} else {
+			allAP << "&&";
+		}
+		allAP << ap.ap_name();
 	}
+	ltsmin_expr_t e = ltl_parse_file(allAP.str().c_str(), env, ltstype);
+
+	ltl_to_store(e, env);
 
 	return create_ltsmin_buchi(spot_automaton, env);
 }
