@@ -403,14 +403,19 @@ ltsmin_buchi_t *ltsmin_parse_hoa_buchi(const char * hoa_file, int to_tgba, ltsmi
 	bool parse_errors = pa->format_errors(std::cerr);
 	HREassert(!parse_errors, "Parse errors found in conversion of HOA to Buchi. HOA file = %s", hoa_file);
 
-	spot_automaton = pa->aut;
-
-	// FIXME if is_maybe
-	if (to_tgba) {
-		HREassert(! spot_automaton->prop_state_acc().is_true(), "Flag --buchi-type set to tgba, but HOA file %s contains a state based Buchi. Please use --buchi-type=spotba for this input.", hoa_file);
+	// convert to appropriate automaton type
+	spot::postprocessor post;
+	if (! to_tgba) {
+		// convert to basic BA
+		post.set_type(spot::postprocessor::Buchi);
+		post.set_pref(spot::postprocessor::SBAcc | spot::postprocessor::Deterministic);
 	} else {
-		HREassert(spot_automaton->prop_state_acc().is_true(), "Flag --buchi-type set to spotbuchi, but HOA file %s contains a transition based Buchi. Please use --buchi-type=tgba for this input.", hoa_file);
+		// convert to tgba
+		post.set_type(spot::postprocessor::GeneralizedBuchi);
+		post.set_pref(spot::postprocessor::Deterministic);
 	}
+	spot_automaton = post.run(pa->aut);
+
 	isTGBA = to_tgba;
 
 	std::stringstream allAP;
