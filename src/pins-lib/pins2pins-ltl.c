@@ -852,7 +852,7 @@ GBaddLTL (model_t model)
     matrix_t       *p_sl = GBgetStateLabelInfo (model);
     int             sl_count = dm_nrows (p_sl);
 
-    ctx->is_weak = is_weak(ba);
+    ctx->is_weak = PINS_BUCHI_TYPE == PINS_BUCHI_TYPE_BA && is_weak(ba);
     int             new_sl_count;
     if (ctx->is_weak) {
         Print1 (info, "Weak Buchi automaton detected, adding non-accepting as progress label.");
