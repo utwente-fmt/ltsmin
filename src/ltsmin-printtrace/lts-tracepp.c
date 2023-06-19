@@ -462,7 +462,7 @@ output_csv(lts_t trace, FILE* output_file) {
             int edge_lbls[eLbls];
             trc_get_edge_label(trace, i, edge_lbls);
             for(int j=0; j<eLbls; ++j) {
-                if ((i+1)<trace->states) {
+                if ((i+1)<trace->states || i<trace->transitions) {
                     int typeno = lts_type_get_edge_label_typeno(trace->ltstype, j);
                     trace_get_type_str(trace, typeno, edge_lbls[j], BUFLEN, tmp);
                     fprintf(output_file, "%s%s", arg_sep, tmp);
