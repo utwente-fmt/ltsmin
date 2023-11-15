@@ -67,3 +67,7 @@ testsuite/wine.exp
 /examples/*.lps
 /examples/abp.pbes
 nbproject
+
+#Build files
+build/*
+
