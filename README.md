@@ -18,9 +18,9 @@ Ltsmin/...
 
 💀 Doc  
 
-(✓)    Examples [OK – laptop/cmake/ltsmin] 
+✓    Examples 
 
-(✓)    Lemon [OK – laptop/cmake/ltsmin]  
+✓   Lemon [OK – from mxf]
 
 🥺 Lib  [AUTOGEN] 
 
