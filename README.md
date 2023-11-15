@@ -18,13 +18,13 @@ Ltsmin/...
 
 💀 Doc  
 
-✓    Examples 
+💀    Examples 
 
 ✓   Lemon [OK – from mxf]
 
 🥺 Lib  [AUTOGEN] 
 
-✓   Ltl2ba [OK – github] 
+✓   Ltl2ba [OK – ltl2ba github] 
 
 ?     M4 
 
