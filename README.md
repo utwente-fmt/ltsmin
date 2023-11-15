@@ -1,59 +1,111 @@
 conversion status:
+
 💀 = not done
+
 (✓) = done but not integrationtestd
+
 ✓ = done
+
 ? = not sure it needs conversion
 
 💀 ROOT configure.ac & makefile.am 
 
 Ltsmin/... 
+
 ?    Autotools 
+
 ?    Contrib 
+
 💀 Doc  
+
 (✓)    Examples [OK – laptop/cmake/ltsmin] 
+
 (✓)    Lemon [OK – laptop/cmake/ltsmin]  
+
 🥺 Lib  [AUTOGEN] 
+
 ✓   Ltl2ba [OK – github] 
+
 ?     M4 
+
 💀 Scoop [Convert the github] 
+
 ?    Spins [Java project] 
+
 X    Src/.. 
+
 ---andl-lib 
+
 ---bignum 
+
 ---ce 
+
 ---dm 
+
 ---etf-convert 
+
 ---gcf-tool 
+
 ---hre 
+
 ---hre-io 
+
 ---hre-mpi 
+
 ---ldd2bdd 
+
 ---lts-io 
+
 ---lts-lib 
+
 ---ltsmin-compare 
+
 ---ltsmin-convert 
+
 ---ltsmin-lib 
+
 ---ltsmin-printtrace 
+
 ---ltsmin-reduce 
+
 ---ltsmin-reduce-dist 
+
 ---mc-lib 
+
 ---pins2lts-dist 
+
 ---pins2lts-mc 
+
 ---pins2lts-seq 
+
 ---pins2lts-sym 
+
 ---pins-lib 
+
 ---pins-open 
+
 ---pinssim 
+
 ---prob-lib 
+
 ---scripts 
+
 ---spg 
+
 --spg-lib 
+
 ---tests 
+
 ---torx 
+
 ---util-lib 
+
 ---vset-lib 
+
 💀    Testsuite 
+
 ?        Travis 
+
 ?        www 
 
 LTSmin [![Build Status](https://travis-ci.org/utwente-fmt/ltsmin.svg?branch=master)](https://travis-ci.org/utwente-fmt/ltsmin) [![FMT](http://fmt.cs.utwente.nl/images/fmt-logo.png)](http://fmt.cs.utwente.nl/) [![UT](https://www.symbitron.eu/wp-content/uploads/2013/10/UT_Logo_2400_Black_EN1-300x58.png)](https://www.utwente.nl/)
