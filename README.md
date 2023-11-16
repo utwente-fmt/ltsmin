@@ -20,7 +20,7 @@ Ltsmin/...
 
 💀    Examples 
 
-✓   Lemon [OK – from mxf]
+✓   Lemon [OK – from mcf]
 
 🥺 Lib  [AUTOGEN] 
 
