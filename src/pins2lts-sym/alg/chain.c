@@ -33,9 +33,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 
@@ -66,7 +63,6 @@ reach_chain_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
     vset_copy(new_states, visited);
     if (save_sat_levels) vset_minus(new_states, visited_old);
 
-    LACE_ME;
     while (!vset_is_empty(new_states)) {
         stats_and_progress_report(new_states, visited, level);
         level++;
@@ -151,7 +147,6 @@ reach_chain(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         tmp = vset_create(domain, -1, NULL);
     }
 
-    LACE_ME;
     while (!vset_equal(visited, old_vis)) {
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);

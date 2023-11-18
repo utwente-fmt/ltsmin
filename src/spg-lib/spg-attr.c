@@ -213,8 +213,6 @@ spg_attractor_par(const int player, const parity_game* g, recursive_result* resu
     struct reach_par_s *root = attr_par_prepare(g, 0, g->num_groups);
     int l = 0;
 
-    LACE_ME;
-
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
         if (options->compute_strategy) {
@@ -224,18 +222,19 @@ spg_attractor_par(const int player, const parity_game* g, recursive_result* resu
 
         // prev_attr = V \intersect prev(attr^k)
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
-        CALL(attr_par_prev, v_level, root, g);
+        RUN(attr_par_prev, v_level, root, g);
         vset_copy(prev_attr, root->container);
         vset_clear(root->container);
 
         // Compute V_player \intersects prev_attr
         vset_clear(v_level);
         vset_copy(v_level, prev_attr);
-        SPAWN(task_intersect, v_level, g->v_player[player]);
+        // TODO FIXME: this RUN() should be a SPAWN
+        RUN(task_intersect, v_level, g->v_player[player]);
 
         // B = V \intersect next(prev_attr)
         vset_t b = vset_create(g->domain, -1, NULL);
-        CALL(attr_par_next, prev_attr, root, g);
+        RUN(attr_par_next, prev_attr, root, g);
         vset_copy(b, root->container);
         vset_clear(root->container);
 
@@ -244,12 +243,12 @@ spg_attractor_par(const int player, const parity_game* g, recursive_result* resu
 
         // prev_b = V \intersect prev(B)
         vset_t prev_b = vset_create(g->domain, -1, NULL);
-        CALL(attr_par_prev, b, root, g);
+        RUN(attr_par_prev, b, root, g);
         vset_copy(prev_b, root->container);
         vset_clear(root->container);
         vset_destroy(b);
 
-        SYNC(task_intersect);
+        // SYNC(task_intersect);
 
         // Compute V_other_player \intersects (prev_attr - prev_b)
         vset_t attr_other_player = vset_create(g->domain, -1, NULL);
@@ -258,8 +257,6 @@ spg_attractor_par(const int player, const parity_game* g, recursive_result* resu
         vset_minus(attr_other_player, prev_b);
         vset_destroy(prev_b);
         vset_intersect(attr_other_player, g->v_player[1-player]);
-
-        //SYNC(task_intersect);
 
         vset_union(v_level, attr_other_player);
         vset_destroy(attr_other_player);
@@ -387,8 +384,6 @@ spg_attractor_par2(const int player, const parity_game* g, recursive_result* res
     vset_copy(v_level, u);
     int l = 0;
 
-    LACE_ME;
-
     // Compute fixpoint
     while (!vset_is_empty(v_level)) {
         if (options->compute_strategy) {
@@ -399,7 +394,7 @@ spg_attractor_par2(const int player, const parity_game* g, recursive_result* res
         // prev_attr = V \intersect prev(attr^k)
         vset_t prev_attr = vset_create(g->domain, -1, NULL);
         struct reach_par2_s *root = attr_par2_prepare(g, 0, g->num_groups, 0, g->num_groups);
-        CALL(attr_par_step, v_level, u, root, g);
+        RUN(attr_par_step, v_level, u, root, g);
         vset_copy(prev_attr, root->container);
         vset_clear(root->container);
         // B = V \intersect next(prev_attr)
@@ -412,7 +407,7 @@ spg_attractor_par2(const int player, const parity_game* g, recursive_result* res
         // Compute V_player \intersects prev_attr
         vset_clear(v_level);
         vset_copy(v_level, prev_attr);
-        CALL(task_intersect, v_level, g->v_player[player]);
+        RUN(task_intersect, v_level, g->v_player[player]);
         //SYNC(task_intersect);
 
         // Compute V_other_player \intersects (prev_attr - prev_b)

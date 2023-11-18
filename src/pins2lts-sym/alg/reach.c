@@ -34,9 +34,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 void

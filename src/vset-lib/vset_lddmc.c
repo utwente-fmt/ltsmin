@@ -64,8 +64,6 @@ struct vector_relation {
 static vset_t
 set_create(vdom_t dom, int k, int *proj)
 {
-    LACE_ME;
-
     assert(k == -1 || (k >= 0 && k <= dom->shared.size));
     vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set));
 
@@ -122,7 +120,6 @@ set_destroy(vset_t set)
 static void
 set_add(vset_t set, const int* e)
 {
-    LACE_ME;
     set->mdd = lddmc_union_cube(set->mdd, (uint32_t*)e, set->size);
 }
 
@@ -179,7 +176,6 @@ set_member(vset_t set, const int* e)
 static void
 set_count(vset_t set, long *nodes, double *elements)
 {
-    LACE_ME;
     if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
     if (elements != NULL) *elements = lddmc_satcount_cached(set->mdd);
 }
@@ -190,7 +186,6 @@ set_count(vset_t set, long *nodes, double *elements)
 static void
 set_ccount(vset_t set, long *nodes, long double *elements)
 {
-    LACE_ME;
     if (nodes != NULL) *nodes = lddmc_nodecount(set->mdd);
     if (elements != NULL) *elements = lddmc_satcount(set->mdd);
 }
@@ -202,7 +197,6 @@ set_ccount(vset_t set, long *nodes, long double *elements)
 static void
 set_union(vset_t dst, vset_t src)
 {
-    LACE_ME;
     assert(src->meta == dst->meta);
     if (dst != src) {
         MDD cur = dst->mdd;
@@ -226,7 +220,6 @@ set_union(vset_t dst, vset_t src)
 static void
 set_zip(vset_t dst, vset_t src)
 {
-    LACE_ME;
     assert(src->meta == dst->meta);
     dst->mdd = lddmc_zip(dst->mdd, src->mdd, &src->mdd);
 }
@@ -237,7 +230,6 @@ set_zip(vset_t dst, vset_t src)
 static void
 set_minus(vset_t dst, vset_t src)
 {
-    LACE_ME;
     assert(src->meta == dst->meta);
     dst->mdd = lddmc_minus(dst->mdd, src->mdd);
 }
@@ -248,7 +240,6 @@ set_minus(vset_t dst, vset_t src)
 static void
 set_intersect(vset_t dst, vset_t src)
 {
-    LACE_ME;
     assert(src->meta == dst->meta);
     dst->mdd = lddmc_intersect(dst->mdd, src->mdd);
 }
@@ -259,8 +250,6 @@ set_intersect(vset_t dst, vset_t src)
 static void
 set_copy_match(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 {
-    LACE_ME;
-
     assert(dst->meta == src->meta); // for now, require same meta
 
     if (p_len == 0) {
@@ -291,8 +280,6 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int *proj, int *match)
 static void
 set_copy_match_set(vset_t dst, vset_t src, vset_t match, int p_len, int *proj)
 {
-    LACE_ME;
-
     assert(dst->meta == src->meta); // for now, require same meta
 
     if (p_len == 0) {
@@ -337,7 +324,6 @@ VOID_TASK_3(enumer, uint32_t*, values, size_t, count, struct enum_context*, ctx)
 static void
 set_enum(vset_t set, vset_element_cb cb, void* context)
 {
-    LACE_ME;
     struct enum_context ctx = (struct enum_context){cb, context};
     lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
 }
@@ -368,7 +354,6 @@ TASK_3(MDD, set_updater, uint32_t*, values, size_t, count, struct set_update_con
 static void
 set_update(vset_t dst, vset_t set, vset_update_cb cb, void* context)
 {
-    LACE_ME;
     struct set_update_context ctx = (struct set_update_context){dst, cb, context};
     MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(set_updater), &ctx);
     lddmc_refs_push(result);
@@ -398,7 +383,6 @@ set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb,
     }
     meta[j++] = -1; // = rest not in match
 
-    LACE_ME;
     MDD meta_mdd = lddmc_refs_push(lddmc_cube(meta, j));
 
     MDD cube = lddmc_refs_push(lddmc_cube((uint32_t*)match, p_len));
@@ -417,7 +401,6 @@ set_project(vset_t dst, vset_t src)
     if (dst->meta == src->meta) {
         dst->mdd = src->mdd;
     } else if (src->k == -1) {
-        LACE_ME;
         dst->mdd = lddmc_project(src->mdd, dst->meta);
     } else {
         // compute a custom meta
@@ -436,7 +419,6 @@ set_project(vset_t dst, vset_t src)
             }
         }
         meta[i++] = -2; // = quantify rest
-        LACE_ME;
         MDD mdd_meta = lddmc_cube(meta, i);
         lddmc_refs_push(mdd_meta);
         dst->mdd = lddmc_project(src->mdd, mdd_meta);
@@ -453,7 +435,6 @@ set_project_minus(vset_t dst, vset_t src, vset_t minus)
     if (dst->meta == src->meta) {
         set_minus(dst, minus);
     } else if (src->k == -1) {
-        LACE_ME;
         assert(dst->meta == minus->meta);
         dst->mdd = lddmc_project_minus(src->mdd, dst->meta, minus->mdd);
     } else {
@@ -473,7 +454,6 @@ set_project_minus(vset_t dst, vset_t src, vset_t minus)
             }
         }
         meta[i++] = -2; // = quantify rest
-        LACE_ME;
         MDD mdd_meta = lddmc_cube(meta, i);
         lddmc_refs_push(mdd_meta);
         dst->mdd = lddmc_project_minus(src->mdd, mdd_meta, minus->mdd);
@@ -495,7 +475,6 @@ set_example(vset_t set, int *e)
 static void
 set_join(vset_t dst, vset_t left, vset_t right)
 {
-    LACE_ME;
     dst->mdd = lddmc_join(left->mdd, right->mdd, left->meta, right->meta);
 }
 
@@ -505,8 +484,6 @@ set_join(vset_t dst, vset_t left, vset_t right)
 static vrel_t
 rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
 {
-    LACE_ME;
-
     assert(0 <= r_k && r_k <= dom->shared.size);
     assert(0 <= w_k && w_k <= dom->shared.size);
     vrel_t rel = (vrel_t)RTmalloc(sizeof(struct vector_relation));
@@ -644,7 +621,6 @@ rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const in
 
     assert(k == rel->size + 1); // plus 1, because action label
 
-    LACE_ME;
     rel->mdd = lddmc_union_cube_copy(rel->mdd, (uint32_t*)vec, cpy_vec, k);
 }
 
@@ -666,7 +642,6 @@ rel_add(vrel_t rel, const int *src, const int *dst)
 static void
 rel_count(vrel_t rel, long *nodes, double *elements)
 {
-    LACE_ME;
     if (nodes != NULL) *nodes = lddmc_nodecount(rel->mdd);
     if (elements != NULL) *elements = lddmc_satcount(rel->mdd);
 }
@@ -695,7 +670,6 @@ TASK_3(MDD, rel_updater, uint32_t*, values, size_t, count, struct rel_update_con
 static void
 rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void* context)
 {
-    LACE_ME;
     struct rel_update_context ctx = (struct rel_update_context){rel, cb, context};
     MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(rel_updater), &ctx);
 
@@ -717,7 +691,6 @@ rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void* context)
 static void
 set_next(vset_t dst, vset_t src, vrel_t rel)
 {
-    LACE_ME;
     assert(dst->meta == src->meta);
     dst->mdd = lddmc_relprod(src->mdd, rel->mdd, rel->meta);
 }
@@ -728,7 +701,6 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 static void
 set_next_union(vset_t dst, vset_t src, vrel_t rel, vset_t uni)
 {
-    LACE_ME;
     assert(dst->meta == src->meta);
     assert(dst->meta == uni->meta);
     dst->mdd = lddmc_relprod_union(src->mdd, rel->mdd, rel->meta, uni->mdd);
@@ -740,7 +712,6 @@ set_next_union(vset_t dst, vset_t src, vrel_t rel, vset_t uni)
 static void
 set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t universe)
 {
-    LACE_ME;
     assert(dst->meta == src->meta);
     assert(dst->meta == universe->meta);
     dst->mdd = lddmc_relprev(src->mdd, rel->mdd, rel->meta, universe->mdd);
@@ -964,7 +935,6 @@ set_visit_par(vset_t set, vset_visit_callbacks_t* cbs, size_t user_ctx_size, voi
     lddmc_visit_callbacks_t lddmc_cbs;
     set_visit_prepare(set, cbs, user_ctx_size, user_ctx, cache_op, &context, &lddmc_cbs);
 
-    LACE_ME;
     lddmc_visit_par(set->mdd, &lddmc_cbs, sizeof(lddmc_visit_info_t) + user_ctx_size, &context);
 }
 
@@ -977,7 +947,6 @@ set_visit_seq(vset_t set, vset_visit_callbacks_t* cbs, size_t user_ctx_size, voi
     lddmc_visit_callbacks_t lddmc_cbs;
     set_visit_prepare(set, cbs, user_ctx_size, user_ctx, cache_op, &context, &lddmc_cbs);
 
-    LACE_ME;
     lddmc_visit_seq(set->mdd, &lddmc_cbs, sizeof(lddmc_visit_info_t) + user_ctx_size, &context);
 }
 
@@ -1033,7 +1002,7 @@ TASK_5(MDD, lddmc_go_sat, MDD, set, vrel_t*, rels, int, depth, int, count, int, 
         while (prev != set) {
             prev = set;
             // SAT deeper
-            set = CALL(lddmc_go_sat, set, rels+n, depth, count-n, id);
+            set = RUN(lddmc_go_sat, set, rels+n, depth, count-n, id);
             // learn and chain-apply all current level once
             for (int i=0;i<n;i++) {
                 if (rels[i]->expand != NULL) {
@@ -1057,8 +1026,8 @@ TASK_5(MDD, lddmc_go_sat, MDD, set, vrel_t*, rels, int, depth, int, count, int, 
         result = set;
     } else {
         /* Recursive computation */
-        MDD right = lddmc_refs_push(CALL(lddmc_go_sat, lddmc_getright(set), rels, depth, count, id));
-        MDD down = lddmc_refs_push(CALL(lddmc_go_sat, lddmc_getdown(set), rels, depth+1, count, id));
+        MDD right = lddmc_refs_push(RUN(lddmc_go_sat, lddmc_getright(set), rels, depth, count, id));
+        MDD down = lddmc_refs_push(RUN(lddmc_go_sat, lddmc_getdown(set), rels, depth+1, count, id));
         lddmc_refs_pop(1);
         result = lddmc_makenode(lddmc_getvalue(set), down, right);
     }
@@ -1105,7 +1074,7 @@ TASK_5(MDD, lddmc_go_sat_par, MDD, set, vrel_t*, rels, int, depth, int, count, i
         while (prev != set) {
             prev = set;
             // SAT deeper
-            set = CALL(lddmc_go_sat_par, set, rels+n, depth, count-n, id);
+            set = RUN(lddmc_go_sat_par, set, rels+n, depth, count-n, id);
             // learn and chain-apply all current level once
             for (int i=0;i<n;i++) {
                 if (rels[i]->expand != NULL) {
@@ -1130,7 +1099,7 @@ TASK_5(MDD, lddmc_go_sat_par, MDD, set, vrel_t*, rels, int, depth, int, count, i
     } else {
         /* Recursive computation */
         lddmc_refs_spawn(SPAWN(lddmc_go_sat_par, lddmc_getright(set), rels, depth, count, id));
-        MDD down = lddmc_refs_push(CALL(lddmc_go_sat_par, lddmc_getdown(set), rels, depth+1, count, id));
+        MDD down = lddmc_refs_push(RUN(lddmc_go_sat_par, lddmc_getdown(set), rels, depth+1, count, id));
         MDD right = lddmc_refs_sync(SYNC(lddmc_go_sat_par));
         lddmc_refs_pop(1);
         result = lddmc_makenode(lddmc_getvalue(set), down, right);
@@ -1174,8 +1143,7 @@ set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
     int id = init_least_fixpoint(rels, _rels, rel_count);
 
     // Go!
-    LACE_ME;
-    dst->mdd = CALL(lddmc_go_sat, src->mdd, rels, 0, rel_count, id);
+    dst->mdd = RUN(lddmc_go_sat, src->mdd, rels, 0, rel_count, id);
 }
 
 static void
@@ -1185,8 +1153,7 @@ set_least_fixpoint_par(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
     int id = init_least_fixpoint(rels, _rels, rel_count);
 
     // Go!
-    LACE_ME;
-    dst->mdd = CALL(lddmc_go_sat_par, src->mdd, rels, 0, rel_count, id);
+    dst->mdd = RUN(lddmc_go_sat_par, src->mdd, rels, 0, rel_count, id);
 }
 
 static void

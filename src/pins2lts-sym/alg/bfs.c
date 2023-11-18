@@ -32,9 +32,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 #ifdef HAVE_SYLVAN
@@ -51,7 +48,7 @@ VOID_TASK_2(vset_minus_par, vset_t, dst, vset_t, src) { vset_minus(dst, src); }
 #endif
 
 #ifdef HAVE_SYLVAN
-#define reach_bfs_reduce(dummy) CALL(reach_bfs_reduce, dummy)
+#define reach_bfs_reduce(dummy) RUN(reach_bfs_reduce, dummy)
 VOID_TASK_1(reach_bfs_reduce, struct reach_red_s *, dummy)
 #else
 static void reach_bfs_reduce(struct reach_red_s *dummy)
@@ -113,7 +110,7 @@ static void reach_bfs_reduce(struct reach_red_s *dummy)
 }
 
 #ifdef HAVE_SYLVAN
-#define reach_bfs_next(dummy, reach_groups, maybe) CALL(reach_bfs_next, dummy, reach_groups, maybe)
+#define reach_bfs_next(dummy, reach_groups, maybe) RUN(reach_bfs_next, dummy, reach_groups, maybe)
 VOID_TASK_3(reach_bfs_next, struct reach_s *, dummy, bitvector_t *, reach_groups, vset_t*, maybe)
 #else
 static void reach_bfs_next(struct reach_s *dummy, bitvector_t *reach_groups, vset_t *maybe)
@@ -268,7 +265,6 @@ VOID_TASK_1(reach_par_reduce, struct reach_red_s *, dummy)
             vset_join_par(dummy->false_container, dummy->false_container, label_false[guard]);
         }
         vset_join_par(dummy->true_container, dummy->true_container, label_true[guard]);
-        SYNC(vset_join_par);
         if (!no_soundness_check) SYNC(vset_join_par);
     } else { //recursive case
         // send set of states downstream
@@ -344,7 +340,7 @@ VOID_TASK_3(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
         if (dummy->red != NULL) { // we have guard-splitting; reduce the set
             // Reduce current level
             vset_copy(dummy->red->true_container, dummy->container);
-            CALL(reach_par_reduce, dummy->red);
+            RUN(reach_par_reduce, dummy->red);
 
             if (vset_is_empty(dummy->red->true_container)) {
                 dummy->next_count = 0;
@@ -442,6 +438,22 @@ VOID_TASK_3(reach_par_next, struct reach_s *, dummy, bitvector_t *, reach_groups
     }
 }
 
+
+#ifdef HAVE_SYLVAN
+#define vset_minus_part(t, f, n) RUN(vset_minus_part, t, f, n)
+VOID_TASK_3(vset_minus_part, vset_t*, label_true, vset_t*, label_false, int, nGuards)
+{
+    for (int g = 0; g < nGuards; g++) SPAWN(vset_minus_par, label_true[g], label_false[g]);
+    for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
+}
+#else
+void vset_minus_part(vset_t* label_true, vset_t* label_false, int nGuards)
+{
+    for (int g = 0; g < nGuards; g++) SPAWN(vset_minus_par, label_true[g], label_false[g]);
+    for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
+}
+#endif
+
 void
 reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
           long *eg_count, long *next_count, long *guard_count)
@@ -457,7 +469,6 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
     }
 
-    LACE_ME;
     struct reach_s *root = reach_prepare(0, nGrps);
 
     int level = 0;
@@ -483,14 +494,13 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // carry over root->deadlocks from previous iteration
                 // set class and call next function
                 root->class = c;
-                CALL(reach_par_next, root, reach_groups, maybe);
+                RUN(reach_par_next, root, reach_groups, maybe);
                 reach_stop(root);
                 if (!no_soundness_check && PINS_USE_GUARDS) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
-                    for (int g = 0; g < nGuards; g++) vset_minus_par(label_true[g], label_false[g]);
-                    for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
+                    vset_minus_part(label_true, label_false, nGuards);
                 }
                 // update counters
                 *next_count += root->next_count;
@@ -514,14 +524,13 @@ reach_par(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, visited);
             // call next function
-            CALL(reach_par_next, root, reach_groups, maybe);
+            RUN(reach_par_next, root, reach_groups, maybe);
             reach_stop(root);
             if (!no_soundness_check && PINS_USE_GUARDS) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
-                for (int g = 0; g < nGuards; g++) vset_minus_par(label_true[g], label_false[g]);
-                for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
+                vset_minus_part(label_true, label_false, nGuards);
             }
             // update counters
             *next_count += root->next_count;
@@ -571,7 +580,6 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
     }
 
-    LACE_ME;
     struct reach_s *root = reach_prepare(0, nGrps);
 
     int level = 0;
@@ -599,14 +607,13 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
                 // carry over root->deadlocks from previous iteration
                 // set class and call next function
                 root->class = c;
-                CALL(reach_par_next, root, reach_groups, maybe);
+                RUN(reach_par_next, root, reach_groups, maybe);
                 reach_stop(root);
                 if (!no_soundness_check && PINS_USE_GUARDS) {
                     // For the current level the spec is sound.
                     // This means that every maybe is actually false.
                     // We thus remove all maybe's
-                    for (int g = 0; g < nGuards; g++) vset_minus_par(label_true[g], label_false[g]);
-                    for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
+                    vset_minus_part(label_true, label_false, nGuards);
                 }
                 // update counters
                 *next_count += root->next_count;
@@ -628,14 +635,13 @@ reach_par_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
             // set ancestors to container
             if (root->ancestors != NULL) vset_copy(root->ancestors, current_level);
             // call next function
-            CALL(reach_par_next, root, reach_groups, maybe);
+            RUN(reach_par_next, root, reach_groups, maybe);
             reach_stop(root);
             if (!no_soundness_check && PINS_USE_GUARDS) {
                 // For the current level the spec is sound.
                 // This means that every maybe is actually false.
                 // We thus remove all maybe's
-                for (int g = 0; g < nGuards; g++) vset_minus_par(label_true[g], label_false[g]);
-                for (int g = nGuards-1; g >= 0; g--) SYNC(vset_minus_par);
+                vset_minus_part(label_true, label_false, nGuards);
             }
             // update counters
             *next_count += root->next_count;
@@ -690,7 +696,6 @@ reach_bfs_prev(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
     }
 
-    LACE_ME;
     struct reach_s *root = reach_prepare(0, nGrps);
 
     int level = 0;
@@ -808,7 +813,6 @@ reach_bfs(vset_t visited, vset_t visited_old, bitvector_t *reach_groups,
         }
     }
 
-    LACE_ME;
     struct reach_s *root = reach_prepare(0, nGrps);
 
     int level = 0;

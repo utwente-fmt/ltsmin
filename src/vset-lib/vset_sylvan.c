@@ -96,8 +96,6 @@ set_create(vdom_t dom, int k, int* proj)
 {
     vset_t set = (vset_t)RTmalloc(sizeof(struct vector_set));
 
-    LACE_ME;
-
     set->dom = dom;
     set->bdd = sylvan_false; // Initialize with an empty BDD
     set->state_variables = sylvan_false;
@@ -254,8 +252,6 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
         rel->prime_variables = sylvan_set_fromarray(prime_vars, n);
     }
 
-    LACE_ME;
-
     /* Compute all_variables, which are all variables the transition relation is defined on */
     {
         uint32_t all_vars[xstatebits * a_k * 2];
@@ -297,6 +293,7 @@ rel_create_rw(vdom_t dom, int r_k, int *r_proj, int w_k, int *w_proj)
         /* Now build cur_is_next */
         rel->cur_is_next = sylvan_true;
         for (int i=n-1; i>=0; i--) {
+            // FIXME sylvan_makenode is dangerous!! it should run in a Lace thread!!
             BDD low = sylvan_makenode(ro_vars[i]+1, rel->cur_is_next, sylvan_false);
             mtbdd_refs_push(low);
             BDD high = sylvan_makenode(ro_vars[i]+1, sylvan_false, rel->cur_is_next);
@@ -423,7 +420,6 @@ set_add(vset_t set, const int* e)
         check_state(set->dom, -1, NULL, e);
         uint8_t cube[set->dom->vectorsize * xstatebits];
         state_to_cube(set->dom, -1, NULL, e, cube);
-        LACE_ME;
         bdd = sylvan_cube(set->state_variables, cube);
     } else {
         // e is a full state vector; get the short vector
@@ -434,12 +430,10 @@ set_add(vset_t set, const int* e)
         check_state(set->dom, set->k, set->proj, f);
         uint8_t cube[set->k * xstatebits];
         state_to_cube(set->dom, set->k, set->proj, f, cube);
-        LACE_ME;
         bdd = sylvan_cube(set->state_variables, cube);
     }
 
     // add to set
-    LACE_ME;
     mtbdd_refs_push(bdd);
     set->bdd = sylvan_or(set->bdd, bdd);
     mtbdd_refs_pop(1);
@@ -456,7 +450,6 @@ set_member(vset_t set, const int* e)
         check_state(set->dom, -1, NULL, e);
         uint8_t cube[set->dom->shared.size * xstatebits];
         state_to_cube(set->dom, -1, NULL, e, cube);
-        LACE_ME;
         bdd = sylvan_cube(set->dom->state_variables, cube);
     } else {
         // e is a full state vector; get the short vector
@@ -467,12 +460,10 @@ set_member(vset_t set, const int* e)
         check_state(set->dom, set->k, set->proj, f);
         uint8_t cube[set->k * xstatebits];
         state_to_cube(set->dom, set->k, set->proj, f, cube);
-        LACE_ME;
         bdd = sylvan_cube(set->state_variables, cube);
      }
 
     // check if in set
-    LACE_ME;
     mtbdd_refs_push(bdd);
     int res = sylvan_and(set->bdd, bdd) != sylvan_false ? 1 : 0;
     mtbdd_refs_pop(1);
@@ -581,7 +572,6 @@ TASK_2(BDD, bdd_set_updater, void*, _ctx, uint8_t*, arr)
 static void
 set_update(vset_t dst, vset_t src, vset_update_cb cb, void* context)
 {
-    LACE_ME;
     struct set_update_context ctx = (struct set_update_context){dst, src, cb, context};
     BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_set_updater), (void*)&ctx);
     mtbdd_refs_push(result);
@@ -613,8 +603,6 @@ set_example(vset_t set, int *e)
 static void
 set_enum_match(vset_t set, int p_len, int* proj, int* match, vset_element_cb cb, void* context) 
 {
-    LACE_ME;
-
     /* create bdd of 'match' */
     BDD match_bdd = sylvan_true;
     mtbdd_refs_pushptr(&match_bdd);
@@ -667,8 +655,6 @@ set_enum_match(vset_t set, int p_len, int* proj, int* match, vset_element_cb cb,
 static void
 set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int* match)
 {
-    LACE_ME;
-
     /* create bdd of 'match' */
     BDD match_bdd = sylvan_true;
     mtbdd_refs_pushptr(&match_bdd);
@@ -705,7 +691,6 @@ set_copy_match(vset_t dst, vset_t src, int p_len, int* proj, int* match)
 static void
 set_count(vset_t set, long *nodes, double *elements)
 {
-    LACE_ME;
     if (nodes != NULL) *nodes = sylvan_nodecount(set->bdd);
     if (elements != NULL) *elements = (double) sylvan_satcount(set->bdd, set->state_variables);
 }
@@ -713,7 +698,6 @@ set_count(vset_t set, long *nodes, double *elements)
 static void
 rel_count(vrel_t rel, long *nodes, double *elements)
 {
-    LACE_ME;
     if (nodes != NULL) *nodes = sylvan_nodecount(rel->bdd);
     if (elements != NULL) *elements = (double)sylvan_satcount(rel->bdd, rel->all_action_variables);
 }
@@ -725,8 +709,6 @@ rel_count(vrel_t rel, long *nodes, double *elements)
 static void
 set_union(vset_t dst, vset_t src)
 {
-    LACE_ME;
-
     if (dst != src) {
         BDD cur = dst->bdd;
         BDD res = src->bdd;
@@ -748,8 +730,6 @@ set_union(vset_t dst, vset_t src)
 static void
 set_intersect(vset_t dst, vset_t src)
 {
-    LACE_ME;
-
     if (dst != src) {
         dst->bdd = sylvan_and(dst->bdd, src->bdd);
     }
@@ -761,8 +741,6 @@ set_intersect(vset_t dst, vset_t src)
 static void
 set_minus(vset_t dst, vset_t src)
 {
-    LACE_ME;
-
     if (dst != src) {
         dst->bdd = sylvan_diff(dst->bdd, src->bdd);
     } else {
@@ -776,8 +754,6 @@ set_minus(vset_t dst, vset_t src)
 static void
 set_next(vset_t dst, vset_t src, vrel_t rel)
 {
-    LACE_ME;
-
     // check if dst and src are the same projections
     assert(dst->state_variables == src->state_variables);
 
@@ -790,8 +766,6 @@ set_next(vset_t dst, vset_t src, vrel_t rel)
 static void
 set_prev(vset_t dst, vset_t src, vrel_t rel, vset_t univ)
 {
-    LACE_ME;
-
     // defined on same variables?
     assert(dst->state_variables == src->state_variables);
 
@@ -813,7 +787,6 @@ static void
 set_project(vset_t dst, vset_t src)
 {
     if (dst->state_variables != src->state_variables) {
-        LACE_ME;
         dst->bdd = sylvan_project(src->bdd, dst->state_variables);
     } else {
         dst->bdd = src->bdd;
@@ -828,8 +801,6 @@ set_project(vset_t dst, vset_t src)
 static void
 set_zip(vset_t dst, vset_t src)
 {
-    LACE_ME;
-
     if (src == dst) {
         Abort("Do not call set_zip with dst == src");
     }
@@ -849,8 +820,6 @@ set_zip(vset_t dst, vset_t src)
 static void
 rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const int act)
 {
-    LACE_ME;
-
     check_state(rel->dom, rel->r_k, rel->r_proj, src);
     check_state(rel->dom, rel->w_k, rel->w_proj, dst);
 
@@ -887,6 +856,7 @@ rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const in
                 // take copy of read
                 for (int j=sb-1; j>=0; j--) {
                     n--;
+                    // FIXME sylvan_makenode is dangerous!! it should run in a Lace thread!!
                     BDD low = sylvan_makenode(w_vars[n]+1, dst_bdd, sylvan_false);
                     mtbdd_refs_push(low);
                     BDD high = sylvan_makenode(w_vars[n]+1, sylvan_false, dst_bdd);
@@ -940,8 +910,6 @@ rel_add_act(vrel_t rel, const int *src, const int *dst, const int *cpy, const in
 static void
 rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
 {
-    LACE_ME;
-
     check_state(rel->dom, rel->r_k, rel->r_proj, src);
     check_state(rel->dom, rel->w_k, rel->w_proj, dst);
 
@@ -978,6 +946,7 @@ rel_add_cpy(vrel_t rel, const int *src, const int *dst, const int *cpy)
                 // take copy of read
                 for (int j=sb-1; j>=0; j--) {
                     n--;
+                    // FIXME sylvan_makenode is dangerous!! it should run in a Lace thread!!
                     BDD low = sylvan_makenode(w_vars[n]+1, dst_bdd, sylvan_false);
                     mtbdd_refs_push(low);
                     BDD high = sylvan_makenode(w_vars[n]+1, sylvan_false, dst_bdd);
@@ -1061,7 +1030,6 @@ TASK_2(BDD, bdd_rel_updater, void*, _ctx, uint8_t*, arr)
 static void
 rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
 {
-    LACE_ME;
     struct rel_update_context ctx = (struct rel_update_context){dst, src, src->k == -1 ? src->dom->vectorsize : src->k, cb, context};
     BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_rel_updater), (void*)&ctx);
 
@@ -1113,7 +1081,7 @@ TASK_4(BDD, go_sat, BDD, set, vrel_t*, rels, int, count, int, id)
         while (prev != set) {
             prev = set;
             // SAT deeper
-            set = CALL(go_sat, set, rels+n, count-n, id);
+            set = RUN(go_sat, set, rels+n, count-n, id);
             // learn and chain-apply all current level once
             for (int i=0;i<n;i++) {
                 if (rels[i]->expand != NULL) {
@@ -1138,8 +1106,8 @@ TASK_4(BDD, go_sat, BDD, set, vrel_t*, rels, int, count, int, id)
         result = set;
     } else {
         /* Recursive computation */
-        BDD low = mtbdd_refs_push(CALL(go_sat, sylvan_low(set), rels, count, id));
-        BDD high = mtbdd_refs_push(CALL(go_sat, sylvan_high(set), rels, count, id));
+        BDD low = mtbdd_refs_push(RUN(go_sat, sylvan_low(set), rels, count, id));
+        BDD high = mtbdd_refs_push(RUN(go_sat, sylvan_high(set), rels, count, id));
         mtbdd_refs_pop(1);
         result = sylvan_makenode(sylvan_var(set), low, high);
     }
@@ -1255,8 +1223,7 @@ set_least_fixpoint(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
     int id = init_least_fixpoint(rels, _rels, rel_count);
 
     // Go!
-    LACE_ME;
-    dst->bdd = CALL(go_sat, src->bdd, rels, rel_count, id);
+    dst->bdd = RUN(go_sat, src->bdd, rels, rel_count, id);
 }
 
 static void
@@ -1268,8 +1235,7 @@ set_least_fixpoint_par(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
     int id = init_least_fixpoint(rels, _rels, rel_count);
 
     // Go!
-    LACE_ME;
-    dst->bdd = CALL(go_sat_par, src->bdd, rels, rel_count, id);
+    dst->bdd = RUN(go_sat_par, src->bdd, rels, rel_count, id);
 }
 
 static void
@@ -1296,7 +1262,6 @@ set_save(FILE* f, vset_t set)
 {
     fwrite(&set->k, sizeof(int), 1, f);
     if (set->k != -1) fwrite(set->proj, sizeof(int), set->k, f);
-    LACE_ME;
     mtbdd_writer_tobinary(f, &set->bdd, 1);
 }
 
@@ -1312,7 +1277,6 @@ rel_save_proj(FILE* f, vrel_t rel)
 static void
 rel_save(FILE* f, vrel_t rel)
 {
-    LACE_ME;
     mtbdd_writer_tobinary(f, &rel->bdd, 1);
     // TODO also write all_variables...
 }
@@ -1333,7 +1297,6 @@ set_load(FILE* f, vdom_t dom)
         set = set_create(dom, k, proj);
     }
     
-    LACE_ME;
     if (mtbdd_reader_frombinary(f, &set->bdd, 1) != 0) Abort("Invalid file format.");
 
     return set;
@@ -1354,7 +1317,6 @@ rel_load_proj(FILE* f, vdom_t dom)
 static void
 rel_load(FILE* f, vrel_t rel)
 {
-    LACE_ME;
     if (mtbdd_reader_frombinary(f, &rel->bdd, 1) != 0) Abort("Invalid file format.");
 }
 
@@ -1526,7 +1488,6 @@ dom_create(int vectorsize, int *_statebits, int actionbits)
         }
     }
 
-    LACE_ME;
     dom->state_variables = sylvan_set_fromarray(state_vars, k);
     sylvan_protect(&dom->state_variables);
     dom->prime_variables = sylvan_set_fromarray(prime_vars, k);

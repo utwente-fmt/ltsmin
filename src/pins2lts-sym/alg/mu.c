@@ -34,9 +34,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 vset_t
@@ -549,7 +546,7 @@ init_mu_calculus()
 }
 
 #ifdef HAVE_SYLVAN
-#define check_mu_go(v, i, s) CALL(check_mu_go, (v), (i), (s))
+#define check_mu_go(v, i, s) RUN(check_mu_go, (v), (i), (s))
 VOID_TASK_3(check_mu_go, vset_t, visited, int, i, int*, init)
 #else
 static void check_mu_go(vset_t visited, int i, int *init)
@@ -594,17 +591,14 @@ check_mu(vset_t visited, int* init)
         Print(infoLong, "Starting mu-calculus model checking.");
         learn_labels(visited);
         for (int i = 0; i < num_total; i++) {
-            LACE_ME;
             check_mu_go(visited, i, init);
         }
     }
 }
 
 #ifdef HAVE_SYLVAN
-void
-check_mu_par(vset_t visited, int* init)
+VOID_TASK_2(check_mu_part, vset_t, visited, int*, init)
 {
-    LACE_ME;
     if (num_total > 0) {
         Print(infoLong, "Starting parallel mu-calculus model checking.");
         learn_labels_par(visited);
@@ -614,6 +608,12 @@ check_mu_par(vset_t visited, int* init)
 
         for (int i = 0; i < num_total; i++) SYNC(check_mu_go);
     }
+}
+
+void
+check_mu_par(vset_t visited, int* init)
+{
+    RUN(check_mu_part, visited, init);
 }
 #endif
 

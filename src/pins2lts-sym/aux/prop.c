@@ -32,9 +32,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 
@@ -628,11 +625,12 @@ eval_predicate_set(ltsmin_expr_t e, ltsmin_parse_env_t env, vset_t states)
                  * set projection of a projected set. */
                 vset_join(svar, c->container, states);
 #ifdef HAVE_SYLVAN
-                LACE_ME;
                 if (inv_par) {
+                    // TODO FIXME using volatile is a bad approach given C11 exists
                     volatile int* ptr = &label_locks[e->idx - N];
                     while (!cas(ptr, 0, 1)) {
-                        lace_steal_random();
+                        // You can only do this if you are in a Lace task!!!
+                        // RUN(lace_steal_random);
                         ptr = &label_locks[e->idx - N];
                     }
                 }
@@ -801,10 +799,9 @@ TASK_3(int, check_inv_par_go, vset_t, states, int, i, int, level)
     return res;
 }
 
-static inline void
-check_inv_par(vset_t states, const int level)
+#define check_inv_par(states, level) RUN(check_inv_par, states, level)
+VOID_TASK_2(check_inv_par, vset_t, states, int, level)
 {
-    LACE_ME;
     if (num_inv_violated != num_inv && !vset_is_empty(states)) {
         if (inv_bin_par) learn_labels_par(states);
         int iv = 0;
@@ -880,7 +877,6 @@ deadlock_check(vset_t deadlocks, bitvector_t *reach_groups)
         tmp = vset_create(domain, -1, NULL);
     }
 
-    LACE_ME;
     for (int i = 0; i < nGrps; i++) {
         if (bitvector_is_set(reach_groups, i)) continue;
         vset_copy(new_reduced[i], deadlocks);

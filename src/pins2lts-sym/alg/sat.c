@@ -33,9 +33,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 void
@@ -53,7 +50,6 @@ reach_sat_fix(reach_proc_t reach_proc, vset_t visited,
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
     vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
 
-    LACE_ME;
     while (!vset_equal(visited, old_vis)) {
         if (trc_output != NULL) save_level(visited);
         vset_copy(old_vis, visited);
