@@ -32,9 +32,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 static inline vset_t
@@ -166,7 +163,7 @@ explore_cb(vrel_t rel, void *context, int *src)
 }
 
 #ifdef HAVE_SYLVAN
-#define do_expand_group_next(g, s) CALL(do_expand_group_next, (g), (s))
+#define do_expand_group_next(g, s) RUN(do_expand_group_next, (g), (s))
 VOID_TASK_2(do_expand_group_next, int, group, vset_t, set)
 #else
 static void do_expand_group_next(int group, vset_t set)
@@ -199,7 +196,6 @@ static void do_expand_group_next(int group, vset_t set)
 void
 expand_group_next (int group, vset_t set)
 {
-    LACE_ME;
     do_expand_group_next (group, set);
 }
 
@@ -228,7 +224,6 @@ void
 learn_guards_reduce(vset_t true_states, int t, long *guard_count,
                     vset_t *guard_maybe, vset_t false_states, vset_t maybe_states, vset_t tmp)
 {
-    LACE_ME;
     if (PINS_USE_GUARDS) {
         guard_t* guards = GBgetGuard(model, t);
         for (int g = 0; g < guards->count && !vset_is_empty(true_states); g++) {
@@ -306,7 +301,7 @@ eval_cb (vset_t set, void *context, int *src)
 }
 
 #ifdef HAVE_SYLVAN
-#define do_eval_label(l, s) CALL(do_eval_label, (l), (s))
+#define do_eval_label(l, s) RUN(do_eval_label, (l), (s))
 VOID_TASK_2(do_eval_label, int, label, vset_t, set)
 #else
 static void do_eval_label(int label, vset_t set)
@@ -357,7 +352,6 @@ static void do_eval_label(int label, vset_t set)
 void
 eval_label (int label, vset_t set)
 {
-    LACE_ME;
     do_eval_label (label, set);
 }
 
@@ -377,17 +371,14 @@ learn_guards(vset_t states, long *guard_count) {
     if (PINS_USE_GUARDS) {
         for (int g = 0; g < nGuards; g++) {
             if (guard_count != NULL) (*guard_count)++;
-            LACE_ME;
             do_eval_label(g, states);
         }
     }
 }
 
 #ifdef HAVE_SYLVAN
-void
-learn_guards_par(vset_t states, long *guard_count)
+VOID_TASK_2(learn_guards_part, vset_t, states, long*, guard_count)
 {
-    LACE_ME;
     if (PINS_USE_GUARDS) {
         for (int g = 0; g < nGuards; g++) {
             if (guard_count != NULL) (*guard_count)++;
@@ -398,28 +389,37 @@ learn_guards_par(vset_t states, long *guard_count)
         for (int g = 0; g < nGuards; g++) SYNC(do_eval_label);
     }
 }
+
+void
+learn_guards_par(vset_t states, long *guard_count)
+{
+    RUN(learn_guards_part, states, guard_count);
+}
 #endif
 
 void
 learn_labels(vset_t states)
 {
     for (int i = 0; i < sLbls; i++) {
-        LACE_ME;
         if (bitvector_is_set(&state_label_used, i)) do_eval_label(i, states);
     }
 }
 
 #ifdef HAVE_SYLVAN
-void
-learn_labels_par(vset_t states)
+VOID_TASK_1(learn_labels_part, vset_t, states)
 {
-    LACE_ME;
     for (int i = 0; i < sLbls; i++) {
         if (bitvector_is_set(&state_label_used, i)) SPAWN(do_eval_label, i, states);
     }
     for (int i = 0; i < sLbls; i++) {
         if (bitvector_is_set(&state_label_used, i)) SYNC(do_eval_label);
     }
+}
+
+void
+learn_labels_par(vset_t states)
+{
+    RUN(learn_labels_part, states);
 }
 #endif
 

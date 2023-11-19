@@ -38,7 +38,7 @@ int* totsize;
 
 #endif
 
-int me, nodes;
+extern int me, nodes;
 
 // the number of vertices and arcs ..
 // final

@@ -47,11 +47,11 @@ main (int argc, char *argv[])
 
 #ifdef HAVE_SYLVAN
     if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
-        lace_init(lace_n_workers, lace_dqsize);
+        size_t stacksize = 256*1024*1024; // 256 megabytes
+        lace_set_stacksize(stacksize);
+        lace_start(lace_n_workers, lace_dqsize);
         size_t n_workers = lace_workers();
         Warning(info, "Using %zu CPUs", n_workers);
-        size_t stacksize = 256*1024*1024; // 256 megabytes
-        lace_startup(stacksize, 0, 0);
     }
 #endif
 
