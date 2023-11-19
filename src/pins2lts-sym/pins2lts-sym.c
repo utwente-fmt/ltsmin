@@ -47,9 +47,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 hre_context_t ctx;
@@ -403,7 +400,9 @@ static void actual_main(void *arg)
 #endif
 
     /* turn off Lace for now to speed up while not using parallelism */
+#ifdef HAVE_SYLVAN
     lace_suspend();
+#endif
 
     /* initialize the model and PINS wrappers */
     init_model(files[0]);
@@ -424,9 +423,11 @@ static void actual_main(void *arg)
     init_maxsum(ltstype);
 
     /* turn on Lace again (for Sylvan) */
+#ifdef HAVE_SYLVAN
     if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
         lace_resume();
     }
+#endif
 
     if (next_union) vset_next_fn = vset_next_union_src;
 
@@ -541,8 +542,9 @@ main (int argc, char *argv[])
     while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
     poptFreeContext(optCon);
 
-    lace_init(lace_n_workers, lace_dqsize);
-    lace_startup(lace_stacksize, TASK(actual_main), (void*)&args);
+    lace_set_stacksize(lace_stacksize);
+    lace_start(lace_n_workers, lace_dqsize);
+    RUN(actual_main, &args);
 #else
     actual_main((void*)&args);
 #endif

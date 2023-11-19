@@ -6,9 +6,6 @@
 #ifdef HAVE_SYLVAN
 #include <sylvan.h>
 #else
-#define LACE_ME
-#define lace_suspend()
-#define lace_resume()
 #endif
 
 struct args_t
@@ -390,9 +387,8 @@ main(int argc, char *argv[])
     while(poptGetNextOpt(optCon) != -1 ) { /* ignore errors */ }
     poptFreeContext(optCon);
 
-
-    lace_init(lace_n_workers, lace_dqsize);
-    lace_startup(lace_stacksize, NULL, (void*)&args);
+    lace_set_stacksize(lace_stacksize);
+    lace_start(lace_n_workers, lace_dqsize);
 #endif
 
     HREinitBegin(argv[0]); // the organizer thread is called after the binary

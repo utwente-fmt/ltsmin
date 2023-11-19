@@ -23,7 +23,7 @@ libhre_io_la_SOURCES += hre_stream_rle32.c
 libhre_io_la_SOURCES += hre_struct_io.c struct_io.h
 libhre_io_la_SOURCES += hre_zip_io.c
 
-libhre_io_la_CFLAGS   = $(ZLIB_CFLAGS) $(AM_CFLAGS)
-libhre_io_la_LIBADD   = $(ZLIB_LIBS)
+libhre_io_la_CFLAGS   = ${ZLIB_CFLAGS} $(LIBZIP_CFLAGS) $(AM_CFLAGS)
+libhre_io_la_LIBADD   = ${ZLIB_LIBS} $(LIBZIP_LIBS)
 libhre_io_la_LIBADD  += $(top_builddir)/lib/libgnu.la
 

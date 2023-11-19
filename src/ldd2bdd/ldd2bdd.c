@@ -800,8 +800,9 @@ main (int argc, char *argv[])
     poptFreeContext(optCon);
 
     struct args_t args = (struct args_t){argc, argv};
-    lace_init(lace_n_workers, lace_dqsize);
-    lace_startup(lace_stacksize, TASK(actual_main), (void*)&args);
+    lace_set_stacksize(lace_stacksize);
+    lace_start(lace_n_workers, lace_dqsize);
+    RUN(actual_main, &args);
 
     return 0;
 }
