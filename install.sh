@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Update
-sudo apt update
-sudo apt upgrade
+sudo apt update -y
+sudo apt upgrade -y
 
-# Required installs from github:
+# Required dependencies when installing from github:
 sudo apt install git -y
 sudo apt install make -y
 sudo apt install automake -y
@@ -14,17 +14,17 @@ sudo apt install bison -y
 sudo apt install pkgconf -y
 sudo apt install cmake -y
 
-# 
+# Required dependencies
 sudo apt install libpopt-dev -y
 sudo apt install zlib1g-dev -y
-sudo apt install openjdk-11-jre -y
+sudo apt install openjdk-11-jdk -y
 sudo apt install ant -y
 
-
-########################### install sylvan   TODO OUTCOMMENT WHEN IT WORKS #############################
+########################### install sylvan & sylvan dependencies #############################
+#TODO: make sylvan a submodule
 sudo apt install libgmp-dev -y
 sudo apt install libhwloc-dev -y
-git clone https://github.com/trolando/sylvan.git
+git clone https://github.com/Codermann63/sylvan.git
 cd sylvan
 mkdir build
 cd build
@@ -33,38 +33,15 @@ make
 sudo make install
 cd ../..
 
-# spins? [OK]
-# DVE 					TODO [OK - dve2lts-mc]
-# PNML 					TODO [OK - pnml2lts-sym]
-# pins2lts-sym [ok]
-# pins2lts-mc [ok]
-# sylvan 				[okish]
-# ltl2ba [ok]
-
-########################## PNML ##############################
+########################## PNML dependencies ##############################
 sudo apt install xml2 -y
 sudo apt install libxml2-dev -y
 
-
-
-
-################################# LTSMIN  #################################
-
-
-# Get ltsmin from github, configure and intall
+################################# install LTSMIN from github #################################
 git clone https://github.com/utwente-fmt/ltsmin.git
 cd ltsmin
 git submodule update --init
-	# Hack to fix error in ltl2ba TODO: fix it in git-submodule
-	#rm -r ./ltl2ba
-	#git clone https://github.com/utwente-fmt/ltl2ba.git	
-./ltsminreconf	
-
-	########################## SPINS INITIALIZE  ##########################
-	cd spins/src
-	ant
-	cd ../..
-
-./configure --disable-dependency-tracking --with-spins
+./ltsminreconf
+./configure
 make
 sudo make install
