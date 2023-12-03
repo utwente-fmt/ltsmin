@@ -13,12 +13,14 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
 #Dependencies
 #TODO get sylvan(?), ltl2ba, scoop, spins via FetchContent
 
-#TODO add_subdirectory(src)
+add_subdirectory(src)
 #TODO LATER add_subdirectory(spins)
 #TODO LATER add_subdirectory(scoop)
 add_subdirectory(lemon)
 #TODO LATER add_subdirectory(ltl2ba)
-#TODO add_subdirectory(lib)
+
+
+#TODO add_subdirectory(lib) #TODO not done target_include_directories(ltl2ba PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
 
 
 #TODO add options for examples, tests and documentation
