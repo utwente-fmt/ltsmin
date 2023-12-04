@@ -30,7 +30,7 @@ jobs:
           #
           sudo apt install libpopt-dev -y
           sudo apt install zlib1g-dev -y
-          sudo apt install openjdk-11-jre -y
+          sudo apt install openjdk-11-jdk -y
           sudo apt install ant -y
       - name: Install Sylvan
         run: |
@@ -50,14 +50,9 @@ jobs:
           sudo apt install libxml2-dev -y
       - name: Configure LTSMin
         run: ./ltsminreconf
-      - name: Intialize SPINS
-        run: |
-          cd spins/src
-          ant
-          cd ../..
       - name: Run tests
         run: |
-          ./configure --disable-dependency-tracking --with-spins
+          ./configure --disable-dependency-tracking
           make
           make check
 
