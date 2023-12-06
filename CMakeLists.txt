@@ -7,6 +7,9 @@ project(ltsmin
     LANGUAGES C CXX
 )
 
+Set(CMAKE_CXX_STANDARD 11)
+Set(CMAKE_CXX_STANDARD_REQUIRED True)
+
 # Add CMake modules path
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
 
@@ -16,11 +19,16 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
 add_subdirectory(src)
 #TODO LATER add_subdirectory(spins)
 #TODO LATER add_subdirectory(scoop)
-add_subdirectory(lemon)
+#add_subdirectory(lemon)
 #TODO LATER add_subdirectory(ltl2ba)
 
 
-#TODO add_subdirectory(lib) #TODO not done target_include_directories(ltl2ba PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib)
+add_executable(${PROJECT_NAME} REMOVEWHENDONE.c)
+
+target_link_libraries(${PROJECT_NAME} PUBLIC ce)
+target_link_libraries(${PROJECT_NAME} PUBLIC hre)
+
+
 
 
 #TODO add options for examples, tests and documentation

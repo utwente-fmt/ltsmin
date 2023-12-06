@@ -1,0 +1,11 @@
+---------------src/hre----------------
+    Note: hre_malloc has compiler error, does not seem to be necessary for autotools to configure the whole project. The error is in the "RTalign" function. You just need to declare ret in the start of the function.
+    TODO: Check if other sources are necessary for making of project.
+    TODO: Have a way to generate git_version.h 
+    TODO: Right now __linux__ is hard coded: make a way to dynamically check and set operating system version. I don't know where it is done in the automake version
+    TODO: check hre_run_time.c. On linux i get "CPU_SETSIZE is undeclared". is fixed by putting #define _GNU_SOURCE on top of the file (line 2). RIGHT NOT IT IS UNCOMMENTED, NOT IN THE hre LIBRARY
+    
+---------------src/ce----------------
+    Note: bufs.c: can't find mpi.h
+    Note: Ddlts.c: can't find mpi.h
+    Note: I don't know what mpi.h is or where to find/generate it. I cannot find it in the automake build version. A LOT OF FILES DEPEND ON mpi.h in ce
