@@ -53,5 +53,6 @@ configure_file(${PROJECT_SOURCE_DIR}/src/hre/config.h.in ${PROJECT_SOURCE_DIR}/s
 
 # Include directories
 target_include_directories(hre PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-                            "${CMAKE_CURRENT_SOURCE_DIR}/..")
+                            "${CMAKE_CURRENT_SOURCE_DIR}/.."
+                            ${CMAKE_CURRENT_BINARY_DIR}/..)
 

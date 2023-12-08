@@ -1,3 +1,6 @@
+GENERAL NOTES:
+remove config.h.in from gitignore??
+
 ---------------src/hre----------------
     Note: hre_malloc has compiler error, does not seem to be necessary for autotools to configure the whole project. The error is in the "RTalign" function. You just need to declare ret in the start of the function.
     TODO: Check if other sources are necessary for making of project.
@@ -19,6 +22,11 @@
     Lemon is used to generate files from .lemon files (eg. src/ltsmin-libs/ltsmin-grammar.lemon)
     It uses lempar.c to generate these files, BUT not a compiled version of lempar.c. Therefore lempar.c is copied into the binary directory. I'm unsure if this is the best approach
         
+---------------ltl2ba--------------------
+When making with cmake it needs a config.h that was created by autotools  (i suggest to create it with configue_file(config.h.in config.h) and manually create a config.h.in)    
+       also remove config.h.in from gitignore
+TODO: in gitmodules change from url = https://github.com/codermann63/ltl2ba.git to url = https://github.com/utwente-fmt/ltl2ba.git 
        
        
+-------------------------------------------------
 CURRENTLY WORKING src/pins-lib -> src/ltsmin-libs
