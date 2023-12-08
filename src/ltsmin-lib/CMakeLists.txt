@@ -1,0 +1,76 @@
+
+
+#OLD AUTOMAKE CODE for generating with lemon:
+#%.c %.h: %.lemon lempar.c
+#	$(MAKE) $(MAKE_AMFLAGS) -C $(top_builddir)/lemon
+#	$(top_builddir)/lemon/lemon$(BUILD_EXEEXT) $(LEMON_FLAGS) $<
+#	@if test -f $@; then touch $@; fi
+#
+
+#Generate files with lemon
+add_custom_command(
+    OUTPUT ltsmin-grammar.h ltsmin-grammar.c ltsmin-grammar.out
+    COMMAND ${CMAKE_BINARY_DIR}/lemon/lemon${BUILD_EXEEXT} ${LEMON_FLAGS} ${CMAKE_CURRENT_SOURCE_DIR}/ltsmin-grammar.lemon
+    COMMENT "Generating ltsmin-grammer files"
+    DEPENDS lemon
+)
+
+#Generate files with flex
+    #OLD AUTOMAKE CODE FOR generating with lex:
+    #%.c %.h: %.l
+    #	$(am__skiplex) $(LEX) $<
+#TODO it looks like it is optional in the old automake code. Look into this
+FIND_PACKAGE(FLEX REQUIRED)
+FLEX_TARGET(LTSMINLEXER ltsmin-lexer.l ${CMAKE_CURRENT_BINARY_DIR}/ltsmin-lexer.c
+             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/ltsmin-lexer.h)
+
+
+
+add_library(ltsmin-lib STATIC )
+set(LTSMINLIB_HDRS
+    etf-internal.h
+    etf-objects.h
+    etf-util.h
+    ltl2ba-lex.h
+    ltl2ba-lex-helper.h
+    ltl2spot.h
+    ltsmin-buchi.h
+    ltsmin-grammar.h
+    ltsmin-parse-env.h
+    ltsmin-standard.h
+    ltsmin-syntax.h
+    ltsmin-tl.h
+    ltsmin-type-system.h
+    lts-type.h
+    mucalc-parse-env.h
+    mucalc-syntax.h
+
+)
+    
+target_sources(ltsmin-lib
+    PRIVATE
+    etf-objects.c
+    etf-parser.c
+    etf-util.c
+    ltl2ba-lex.c
+    ltl2ba-lex-helper.c
+    ltsmin-syntax.c
+    ltsmin-tl.c
+    ltsmin-type-system.c
+    lts-type.c
+    mucalc-syntax.c
+    ltl2spot.cpp
+    ${LTSMINLIB_HDRS}
+    ${FLEX_LTSMINLEXER_OUTPUTS}
+)
+
+target_link_libraries(ltsmin-lib ${FLEX_LIBRARIES})
+
+
+
+
+target_include_directories(ltsmin-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+                            ${CMAKE_CURRENT_BINARY_DIR}/..                         
+                            ${CMAKE_CURRENT_SOURCE_DIR}/..)
+
+

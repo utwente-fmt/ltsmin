@@ -9,3 +9,16 @@
     Note: bufs.c: can't find mpi.h
     Note: Ddlts.c: can't find mpi.h
     Note: I don't know what mpi.h is or where to find/generate it. I cannot find it in the automake build version. A LOT OF FILES DEPEND ON mpi.h in ce
+    
+---------------src/ltmin-libs----------------
+    .lemon and .l files are used for generation of .c and .h files with lemon and flex
+    TODO: It looks like on the old automake code that generating lex files is optional. Look into this.
+        
+        
+---------------lemon---------------------
+    Lemon is used to generate files from .lemon files (eg. src/ltsmin-libs/ltsmin-grammar.lemon)
+    It uses lempar.c to generate these files, BUT not a compiled version of lempar.c. Therefore lempar.c is copied into the binary directory. I'm unsure if this is the best approach
+        
+       
+       
+CURRENTLY WORKING src/pins-lib -> src/ltsmin-libs

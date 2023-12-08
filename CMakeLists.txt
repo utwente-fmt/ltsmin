@@ -19,7 +19,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
 add_subdirectory(src)
 #TODO LATER add_subdirectory(spins)
 #TODO LATER add_subdirectory(scoop)
-#add_subdirectory(lemon)
+add_subdirectory(lemon)
 #TODO LATER add_subdirectory(ltl2ba)
 
 
@@ -27,8 +27,8 @@ add_executable(${PROJECT_NAME} REMOVEWHENDONE.c)
 
 target_link_libraries(${PROJECT_NAME} PUBLIC ce)
 target_link_libraries(${PROJECT_NAME} PUBLIC hre)
-
-
+target_link_libraries(${PROJECT_NAME} PUBLIC ltsmin-lib)
+target_link_libraries(${PROJECT_NAME} PUBLIC pins-lib)
 
 
 #TODO add options for examples, tests and documentation
