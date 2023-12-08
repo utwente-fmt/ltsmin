@@ -1,6 +1,1 @@
-#include <stdio.h>
-int main() {
-   // printf() displays the string inside quotation
-   printf("Hello, World!");
-   return 0;
-}
+//This files is created for developments of the cmake version
