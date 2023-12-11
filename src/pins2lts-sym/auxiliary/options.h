@@ -13,7 +13,7 @@
 #include <ltsmin-lib/ltsmin-tl.h>
 #include <mc-lib/bitvector-ll.h>
 #include <pins2lts-sym/maxsum/maxsum.h>
-#include <pins2lts-sym/aux/options.h>
+#include <pins2lts-sym/auxiliary/options.h>
 #include <pins-lib/pins-impl.h>
 #include <spg-lib/spg-options.h>
 #include <vset-lib/vector_set.h>

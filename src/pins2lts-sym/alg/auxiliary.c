@@ -16,9 +16,9 @@
 #include <pins-lib/pins-impl.h>
 #include <pins-lib/pins-util.h>
 #include <pins-lib/pins2pins-group.h>
-#include <pins2lts-sym/alg/aux.h>
-#include <pins2lts-sym/aux/options.h>
-#include <pins2lts-sym/aux/prop.h>
+#include <pins2lts-sym/alg/auxiliary.h>
+#include <pins2lts-sym/auxiliary/options.h>
+#include <pins2lts-sym/auxiliary/prop.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
