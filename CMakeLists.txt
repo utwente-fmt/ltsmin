@@ -48,11 +48,15 @@ add_subdirectory(ltl2ba)
 
 add_executable(${PROJECT_NAME} REMOVEWHENDONE.c)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC ce)
-target_link_libraries(${PROJECT_NAME} PUBLIC hre)
-target_link_libraries(${PROJECT_NAME} PUBLIC ltsmin-lib)
-target_link_libraries(${PROJECT_NAME} PUBLIC pins-lib)
-target_link_libraries(${PROJECT_NAME} PUBLIC ltl2ba)
+target_include_directories(ltsmin PUBLIC ${CMAKE_SOURCE_DIR}/src
+                ${CMAKE_SOURCE_DIR}/ltl2ba)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE ce)
+target_link_libraries(${PROJECT_NAME} PRIVATE hre)
+target_link_libraries(${PROJECT_NAME} PRIVATE ltsmin-lib)
+target_link_libraries(${PROJECT_NAME} PRIVATE pins-lib)
+target_link_libraries(${PROJECT_NAME} PRIVATE ltl2ba)
+
 
 
 

@@ -1,6 +1,10 @@
 GENERAL NOTES:
 remove config.h.in from gitignore??
 
+----------------root-----------------
+Unsure what ltsmin should be build as? a library needs sources, and an excecutable creates an executable (which automake does not do)
+
+
 ---------------src/hre----------------
     Note: hre_malloc has compiler error, does not seem to be necessary for autotools to configure the whole project. The error is in the "RTalign" function. You just need to declare ret in the start of the function.
     TODO: Check if other sources are necessary for making of project.
@@ -16,6 +20,7 @@ remove config.h.in from gitignore??
 ---------------src/ltmin-libs----------------
     .lemon and .l files are used for generation of .c and .h files with lemon and flex
     TODO: It looks like on the old automake code that generating lex files is optional. Look into this.
+    TODO: uncomment ltl2spot.cpp and make it depend if spot is enabled or disabled
         
         
 ---------------lemon---------------------
@@ -29,4 +34,5 @@ TODO: in gitmodules change from url = https://github.com/codermann63/ltl2ba.git 
        
        
 -------------------------------------------------
-CURRENTLY WORKING src/pins-lib -> src/ltsmin-libs
+CURRENTLY WORKING src/pins-lib:
+    in src/ltsmin-lib make_custom_coman -> make_custom_target and make ltsmin-lib depend on it
