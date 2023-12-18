@@ -34,7 +34,7 @@ target_sources(hre
     hre_dir_ops.c
     hre_feedback.c
     hre_main.c
-    #hre_malloc.c #Might not be necessary, automake makes without this file ALSO COMPILEERROR
+    #hre_malloc.c #Might not be necessary, automake makes without this file: ALSO COMPILEERROR
     hre_messaging.c
     hre_popt.c
     hre_pthread.c
