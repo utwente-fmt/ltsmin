@@ -6,16 +6,16 @@ Unsure what ltsmin should be build as? a library needs sources, and an excecutab
 
 
 ---------------src/hre----------------
-    Note: hre_malloc has compiler error, does not seem to be necessary for autotools to configure the whole project. The error is in the "RTalign" function. You just need to declare ret in the start of the function.
-    TODO: Check if other sources are necessary for making of project.
-    TODO: Have a way to generate git_version.h 
-    TODO: Right now __linux__ is hard coded: make a way to dynamically check and set operating system version. I don't know where it is done in the automake version
-    TODO: check hre_run_time.c. On linux i get "CPU_SETSIZE is undeclared". is fixed by putting #define _GNU_SOURCE on top of the file (line 2). RIGHT NOT IT IS UNCOMMENTED, NOT IN THE hre LIBRARY
+    Note: FILE:hre_malloc has compiler error, does not seem to be necessary for autotools to configure the whole project. The error is in the "RTalign" function. You just need to declare ret in the start of the function.
+    TODO: Check if other sources can be left out for making of project.
+    TODO: FILE:git_version.h is generated. Figure our how
+    TODO: FILE:config.h.in Right now __linux__ is hard coded: make a way to dynamically check and set operating system version. I don't know where it is done in the automake version
+    TODO: FILE:hre_run_time.c. (compile-error)On linux i get "CPU_SETSIZE is undeclared". is fixed by putting #define _GNU_SOURCE on top of the file (line 2). RIGHT NOW hre_run_time.c IS NOT INCLUDED IN CMAKEMAKELISTS.
     
----------------src/ce----------------
+---------------src/ce---------------- OPTIONAL
     Note: bufs.c: can't find mpi.h
     Note: Ddlts.c: can't find mpi.h
-    Note: I don't know what mpi.h is or where to find/generate it. I cannot find it in the automake build version. A LOT OF FILES DEPEND ON mpi.h in ce
+    Note: I don't know what mpi.h is or where to find/generate it. I cannot find it in the automake build version. A LOT OF FILES DEPEND ON mpi.h in ce: https://stackoverflow.com/questions/26920083/fatal-error-mpi-h-no-such-file-or-directory-include-mpi-h
     
 ---------------src/ltmin-libs----------------
     .lemon and .l files are used for generation of .c and .h files with lemon and flex
@@ -30,9 +30,14 @@ Unsure what ltsmin should be build as? a library needs sources, and an excecutab
 ---------------ltl2ba--------------------
 When making with cmake it needs a config.h that was created by autotools  (i suggest to create it with configue_file(config.h.in config.h) and manually create a config.h.in)    
        also remove config.h.in from gitignore
-TODO: in gitmodules change from url = https://github.com/codermann63/ltl2ba.git to url = https://github.com/utwente-fmt/ltl2ba.git 
+TODO: GITERROR:"ltl2ba cannot be made with cmake" in gitmodules change from "url = https://github.com/codermann63/ltl2ba.git" to u"rl = https://github.com/utwente-fmt/ltl2ba.git"
        
-       
+
+
+---------------src/pins-lib: --------------------
+      Note: is dependend on generated files from ltsmin-lib
 -------------------------------------------------
-CURRENTLY WORKING src/pins-lib:
+
+
+CURRENTLY WORKING 
     in src/ltsmin-lib make_custom_coman -> make_custom_target and make ltsmin-lib depend on it
