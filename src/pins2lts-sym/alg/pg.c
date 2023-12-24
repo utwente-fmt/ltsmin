@@ -21,7 +21,7 @@
 #include <pins-lib/pins2pins-mucalc.h>
 #include <pins-lib/property-semantics.h>
 #include <pins2lts-sym/alg/pg.h>
-#include <pins2lts-sym/aux/options.h>
+#include <pins2lts-sym/auxiliary/options.h>
 #include <ltsmin-lib/ltsmin-standard.h>
 #include <ltsmin-lib/ltsmin-syntax.h>
 #include <ltsmin-lib/ltsmin-tl.h>
