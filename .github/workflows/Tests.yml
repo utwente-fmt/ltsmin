@@ -9,50 +9,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+        image: pbbach/lts_min:WC
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Update and upgrade
-        run: |
-          sudo apt update
-      - name: Install dependencies
-        run: |
-          # Required installs from github:
-          sudo apt install make -y
-          sudo apt install automake -y
-          sudo apt install libtool -y
-          sudo apt install flex -y
-          sudo apt install bison -y
-          sudo apt install pkgconf -y
-          sudo apt install cmake -y
-
-          #
-          sudo apt install libpopt-dev -y
-          sudo apt install zlib1g-dev -y
-          sudo apt install openjdk-11-jdk -y
-          sudo apt install ant -y
-      - name: Install Sylvan
-        run: |
-          sudo apt install libgmp-dev -y
-          sudo apt install libhwloc-dev -y
-          git clone https://github.com/trolando/sylvan.git
-          cd sylvan
-          mkdir build
-          cd build
-          cmake ..
-          make
-          sudo make install
-          cd ../..
-      - name: Install PNML
-        run: |
-          sudo apt install xml2 -y
-          sudo apt install libxml2-dev -y
       - name: Configure LTSMin
-        run: ./ltsminreconf
-      - name: Run tests
         run: |
+          chmod +x ./ltsminreconf
+          ./ltsminreconf
           ./configure --disable-dependency-tracking
-          make
-          make check
-
+      - name: Run tests
+        run: make check
