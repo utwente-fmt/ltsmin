@@ -13,7 +13,7 @@ TAGS
 *.sum
 *.plist
 *.dSYM
-config.h.in
+# config.h.in Removed for cmake compilation
 .libs/
 .metadata/
 .project
