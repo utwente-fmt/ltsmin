@@ -45,6 +45,7 @@ add_subdirectory(src)
 add_subdirectory(lemon)
 add_subdirectory(ltl2ba)
 
+configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_SOURCE_DIR}/ltl2ba/config.h)
 
 add_executable(${PROJECT_NAME} REMOVEWHENDONE.c)
 

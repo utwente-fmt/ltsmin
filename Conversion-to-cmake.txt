@@ -1,5 +1,5 @@
 GENERAL NOTES:
-remove config.h.in from gitignore??
+- Check if flex installation in install script is good enough. Maybe a make error? If no error when running make, delete this note.
 
 ----------------root-----------------
 Unsure what ltsmin should be build as? a library needs sources, and an excecutable creates an executable (which automake does not do)

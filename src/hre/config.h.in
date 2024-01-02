@@ -1,0 +1,19 @@
+
+/* Define maximal length of pathnames */
+#define LTSMIN_PATHNAME_MAX 1024
+
+/* Define to the address where bug reports for this package should be sent. */
+#define PACKAGE_BUGREPORT "ltsmin-support@lists.utwente.nl"
+
+/* Define to the full name and version of this package. */
+#define PACKAGE_STRING "ltsmin 3.1.0"
+
+/* Log2 size of the machine's cache line */
+#define CACHE_LINE 6
+
+/* Size of the machine's cache line */
+#define CACHE_LINE_SIZE 64
+
+/* Hard coded that we are on linux*/
+/* Other variables are __APPLE__ _WIN32*/
+#define __linux__ 1
