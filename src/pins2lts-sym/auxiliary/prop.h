@@ -1,7 +1,7 @@
 #ifndef AUX_PROP_H
 #define AUX_PROP_H
 
-#include <pins2lts-sym/aux/options.h>
+#include <pins2lts-sym/auxiliary/options.h>
 #include <vset-lib/vector_set.h>
 
 

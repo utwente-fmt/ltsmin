@@ -2,7 +2,7 @@
 
 #include <popt.h>
 
-#include <pins2lts-sym/aux/options.h>
+#include <pins2lts-sym/auxiliary/options.h>
 
 #if !SPEC_MT_SAFE || defined(PROB)
 int USE_PARALLELISM = 0;
