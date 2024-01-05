@@ -17,7 +17,8 @@ target_link_libraries(pins2lts-sym PRIVATE
                        ltsmin-lib
                        hre
                        vset-lib
-                       util-lib)
+                       util-lib
+                       )
 #mc-lib?
 #lts-io
 #dm  

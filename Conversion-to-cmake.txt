@@ -42,4 +42,9 @@ TODO: GITERROR:"ltl2ba cannot be made with cmake" in gitmodules change from "url
 
 ---------------src/vset-lib---------------------
     Note: a lot of optional content. I've tried to copy the options from the automake script
+    TODO: vset_listdd64.c could not find config.h. I've changed the include to hre/config.h (because vset_listdd has and include for hre/config.h). CHECK IF CORRECT
+---------------src/util-lib---------------------
+    QUESTION: fast_set.c has an include to config.h. Automake does not generate one with its make and fast_hash.c has an include to hre/config.h. I've changed the include to hre/config.h. TODO check if correct
+            ADDITIONAL INFO: fast_set.h has include of hre/config.h
+            TODO: the same problem with simplemap.h 
 
