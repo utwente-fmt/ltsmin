@@ -36,10 +36,12 @@ target_sources(pins-lib
 )
 
 target_include_directories(pins-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-                            "${CMAKE_CURRENT_SOURCE_DIR}/.."
+                            ${CMAKE_CURRENT_SOURCE_DIR}/..
                             ${CMAKE_CURRENT_BINARY_DIR}/..)
 
-add_dependencies(pins-lib ltsmin-lib)
+add_dependencies(pins-lib 
+                    ltsmin-lib 
+                    hre)
 
 #add_subdirectory(modules)
 #add_subdirectory(por)

@@ -36,8 +36,10 @@ TODO: GITERROR:"ltl2ba cannot be made with cmake" in gitmodules change from "url
 
 ---------------src/pins-lib: --------------------
       Note: is dependend on generated files from ltsmin-lib
--------------------------------------------------
 
+---------------src/pins2lts-sym---------------------
+    Note: Automake generates .la and .lo files it uses to link libraries. It is recommended to use pkgconf to link libraries instead.
 
-CURRENTLY WORKING 
-    in src/ltsmin-lib make_custom_coman -> make_custom_target and make ltsmin-lib depend on it
+---------------src/vset-lib---------------------
+    Note: a lot of optional content. I've tried to copy the options from the automake script
+
