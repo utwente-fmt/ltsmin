@@ -11,24 +11,75 @@
 #    ../mc-lib/libmc.la
 #    $(top_builddir)/lib/libgnu.la)
 
-add_executable( pins2lts-sym pins2lts-sym.c )
-target_link_libraries(pins2lts-sym PRIVATE
+add_library( libpins2lts-sym pins2lts-sym.c )
+
+target_sources(libpins2lts-sym PRIVATE
+            auxiliary/options.h
+            alg/bfs.c alg/bfs.h
+            alg/chain.c alg/chain.h
+            alg/pg.c alg/pg.h
+            alg/mu.c alg/mu.h
+            alg/reach.c alg/reach.h
+            alg/sat.c alg/sat.h
+            auxiliary/output.c auxiliary/output.h
+            auxiliary/prop.c auxiliary/prop.h)
+target_link_libraries(libpins2lts-sym PRIVATE
                        pins-lib
                        ltsmin-lib
                        hre
                        vset-lib
                        util-lib
+                       lts-io
+                       dm
+                       maxsum
+                       mc-lib
                        )
 #mc-lib?
-#lts-io
-#dm  
-                       
-target_include_directories(pins2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-                            ${CMAKE_CURRENT_SOURCE_DIR}/..
-                            ${CMAKE_CURRENT_BINARY_DIR}/..)
 
+                       
+target_include_directories(libpins2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+                            ${CMAKE_CURRENT_SOURCE_DIR}/..
+                            ${CMAKE_CURRENT_BINARY_DIR}/..
+                            ${CMAKE_SOURCE_DIR}/src
+                            ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
+                            ${CMAKE_CURRENT_SOURCE_DIR}/alg)
+target_compile_options(libpins2lts-sym 
+    PUBLIC -DPINS_DLL#UNSURE IF THIS SHOULD BE PUBLIC
+    
+) 
+add_subdirectory(maxsum)
+################### EXECUTABLES:  pins2lts-sym####################
+#add_executable(pins2lts-sym
+#    auxiliary/options.c
+#    ../pins-lib/modules/dlopen-pins.c ../pins-lib/modules/dlopen-pins.h
+#)
+#target_link_libraries(pins2lts-sym PRIVATE
+#                       libpins2lts-sym
+#                       LTDL-lib
+#                       )
+#target_include_directories(pins2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+#                            ${CMAKE_CURRENT_SOURCE_DIR}/..
+#                            ${CMAKE_CURRENT_BINARY_DIR}/..
+#                            ${CMAKE_SOURCE_DIR}/src
+#                            ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
+#                            ${CMAKE_CURRENT_SOURCE_DIR}/alg)
+################### EXECUTABLES:  eft2lts-sym####################
+add_executable(eft2lts-sym
+    auxiliary/options.c
+    ../pins-lib/modules/etf-pins.c ../pins-lib/modules/etf-pins.h
+)
+target_link_libraries(eft2lts-sym PRIVATE
+                       libpins2lts-sym
+                       )
+target_include_directories(eft2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+                            ${CMAKE_CURRENT_SOURCE_DIR}/..
+                            ${CMAKE_CURRENT_BINARY_DIR}/..
+                            ${CMAKE_SOURCE_DIR}/src
+                            ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
+                            ${CMAKE_CURRENT_SOURCE_DIR}/alg)
 
 #################Required NOT included yet###################3
+
 #eft: eft2lts-sym
 
 
