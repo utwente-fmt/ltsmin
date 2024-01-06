@@ -43,6 +43,6 @@ add_dependencies(pins-lib
                     ltsmin-lib 
                     hre)
 
-#add_subdirectory(modules)
-#add_subdirectory(por)
+
+#TODO: add_subdirectory(por)
 

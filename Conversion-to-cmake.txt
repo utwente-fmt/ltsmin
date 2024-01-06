@@ -35,10 +35,11 @@ TODO: GITERROR:"ltl2ba cannot be made with cmake" in gitmodules change from "url
 
 
 ---------------src/pins-lib: --------------------
-      Note: is dependend on generated files from ltsmin-lib
+      Note: is dependend on generated files from ltsmin-lib¨
+        TODO: convert subdirectory por and add it as subdirectory to CMakeLists.txt
 
 ---------------src/pins2lts-sym---------------------
-    Note: Automake generates .la and .lo files it uses to link libraries. It is recommended to use pkgconf to link libraries instead.
+    TODO: check if all compiler flags are given like the automake version
 
 ---------------src/vset-lib---------------------
     Note: a lot of optional content. I've tried to copy the options from the automake script
@@ -47,4 +48,7 @@ TODO: GITERROR:"ltl2ba cannot be made with cmake" in gitmodules change from "url
     QUESTION: fast_set.c has an include to config.h. Automake does not generate one with its make and fast_hash.c has an include to hre/config.h. I've changed the include to hre/config.h. TODO check if correct
             ADDITIONAL INFO: fast_set.h has include of hre/config.h
             TODO: the same problem with simplemap.h 
+---------------src/dm---------------------
+    TODO: In the Makefile.am there is specified a debug and nonddebug library. MAYBE CHANGE SO CMAKE HAS DEBUG AND NON-DEBUG
 
+---------------src/---------------------

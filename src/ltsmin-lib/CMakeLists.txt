@@ -1,11 +1,5 @@
 
 
-#OLD AUTOMAKE CODE for generating with lemon:
-#%.c %.h: %.lemon lempar.c
-#	$(MAKE) $(MAKE_AMFLAGS) -C $(top_builddir)/lemon
-#	$(top_builddir)/lemon/lemon$(BUILD_EXEEXT) $(LEMON_FLAGS) $<
-#	@if test -f $@; then touch $@; fi
-#
 
 #Generate files with lemon
 set(LEMONFILES ltsmin-grammar mucalc-grammar)
