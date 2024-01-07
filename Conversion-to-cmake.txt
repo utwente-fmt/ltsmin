@@ -10,7 +10,7 @@ Unsure what ltsmin should be build as? a library needs sources, and an excecutab
     TODO: Check if other sources can be left out for making of project.
     TODO: FILE:git_version.h is generated. Figure our how
     TODO: FILE:config.h.in Right now __linux__ is hard coded: make a way to dynamically check and set operating system version. I don't know where it is done in the automake version
-    TODO: FILE:hre_run_time.c. (compile-error)On linux i get "CPU_SETSIZE is undeclared". is fixed by putting #define _GNU_SOURCE on top of the file (line 2). RIGHT NOW hre_run_time.c IS NOT INCLUDED IN CMAKEMAKELISTS.
+    TODO: FILE:config.h.in check if  _GNU_SOURCE is defined correctly 
     
 ---------------src/ce---------------- OPTIONAL
     Note: bufs.c: can't find mpi.h

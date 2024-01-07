@@ -34,13 +34,13 @@ target_sources(hre
     hre_dir_ops.c
     hre_feedback.c
     hre_main.c
-    #hre_malloc.c #Might not be necessary, automake makes without this file: ALSO COMPILEERROR
+    hre_malloc.c
     hre_messaging.c
     hre_popt.c
     hre_pthread.c
     hre_queue.c
     hre_reduce.c
-    #hre_runtime.c #See root/Conversion-to-cmake.txt for more info. (under src/hre)
+    hre_runtime.c
     hre_table.c
     hre_timer.c
     hre_utils.c
@@ -48,11 +48,17 @@ target_sources(hre
     ${HRE_HDRS}
 )
 
+SET(HAVE_POSIX_MEMALIGN "system has posix memalign" ON)
+SET(_GNU_SOURCE "System uses GNU" ON)
+
 configure_file(${PROJECT_SOURCE_DIR}/src/hre/config.h.in ${PROJECT_SOURCE_DIR}/src/hre/config.h)
 
+target_compile_options(hre
+    PUBLIC -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_SOURCE_DIR}/lib
+) 
 
 # Include directories
 target_include_directories(hre PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
-                            "${CMAKE_CURRENT_SOURCE_DIR}/.."
+                            ${CMAKE_CURRENT_SOURCE_DIR}/..
                             ${CMAKE_CURRENT_BINARY_DIR}/..)
 
