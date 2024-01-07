@@ -50,5 +50,6 @@ TODO: GITERROR:"ltl2ba cannot be made with cmake" in gitmodules change from "url
             TODO: the same problem with simplemap.h 
 ---------------src/dm---------------------
     TODO: In the Makefile.am there is specified a debug and nonddebug library. MAYBE CHANGE SO CMAKE HAS DEBUG AND NON-DEBUG
-
+----------------src/bignum
+    TODO: variablity in #if defined(HAVE_GMP_H) and #elif defined(HAVE_TOMMATH_H)
 ---------------src/---------------------

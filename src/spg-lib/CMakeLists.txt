@@ -25,4 +25,5 @@ target_include_directories(spg-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..
                             ${CMAKE_CURRENT_BINARY_DIR}/..)
 
+target_link_libraries(spg-lib bignum)
 
