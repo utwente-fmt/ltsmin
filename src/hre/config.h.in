@@ -17,3 +17,16 @@
 /* Hard coded that we are on linux*/
 /* Other variables are __APPLE__ _WIN32*/
 #define __linux__ 1
+
+/* Enable GNU extensions on systems that have them.  */
+/* FAKE IT CODE */
+/*#cmakedefine _GNU_SOURCE*/
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE 1
+#endif
+
+/* Define to 1 if you have the `posix_memalign' function. */
+#cmakedefine HAVE_POSIX_MEMALIGN
+
+/* Define to 1 if you have the `_aligned_malloc' function. */
+#cmakedefine HAVE__ALIGNED_MALLOC
