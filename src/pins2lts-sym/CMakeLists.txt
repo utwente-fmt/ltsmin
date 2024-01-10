@@ -84,9 +84,34 @@ target_include_directories(eft2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
 target_compile_options(eft2lts-sym
     PRIVATE -DETF -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
 ) 
-#################Required NOT included yet###################3
 
-#eft: eft2lts-sym
+
+################### OPTIONAL XECUTABLES:  eft2lts-sym####################
+set(HAVE_PNML ON) #TODO remove this when pnml check is implemented
+if (HAVE_PNML)
+    add_executable(pnml2lts-sym
+        auxiliary/options.c
+        ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
+    )
+    find_package(LibXml2 REQUIRED)
+    target_link_libraries(pnml2lts-sym PRIVATE
+                           libpins2lts-sym
+                           hre
+                           general-lib
+                           andl-lib
+                           LibXml2::LibXml2
+                           )
+    target_include_directories(pnml2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+                                ${CMAKE_CURRENT_SOURCE_DIR}/..
+                                ${CMAKE_CURRENT_BINARY_DIR}/..
+                                ${CMAKE_SOURCE_DIR}/src
+                                ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
+                                ${CMAKE_CURRENT_SOURCE_DIR}/alg)
+    target_compile_options(pnml2lts-sym
+        PRIVATE -DPNML -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
+    ) 
+endif()
+#PNML: pnml2lts-sym
 
 
 #################Optional NOT included yet################
@@ -96,6 +121,6 @@ target_compile_options(eft2lts-sym
 #libpbes: pbes2lts-sym
 #DVE: dve2lts-sym
 #SPINS: prom2lts-sym
-#PNML: pnml2lts-sym
+
 #PROB: prob2lts-sym
 
