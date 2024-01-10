@@ -20,6 +20,8 @@ target_sources(lts-io
     ${LTSIO_HDRS}
 )
 
+target_link_libraries(lts-io hre-io util-lib hre)
+
 # Include directories
 target_include_directories(lts-io PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..

@@ -54,6 +54,10 @@ if(HAVE_LIBDDD)
                         vset_ddd.cpp)
 endif()
 
+target_link_libraries(vset-lib PUBLIC
+    util-lib
+    hre-io)
+
 target_include_directories(vset-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..
                             ${CMAKE_CURRENT_BINARY_DIR}/..)

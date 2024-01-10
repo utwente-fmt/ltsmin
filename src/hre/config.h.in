@@ -30,3 +30,7 @@
 
 /* Define to 1 if you have the `_aligned_malloc' function. */
 #cmakedefine HAVE__ALIGNED_MALLOC
+
+/* Provide a hint to the optimizer */
+#define __assume(cond) do { if (!(cond)) __builtin_unreachable(); } while (0)
+

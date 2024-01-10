@@ -40,6 +40,7 @@ endif()
 #TODO get sylvan(?) via FetchContent? or make it a submodule
 
 add_subdirectory(src)
+add_subdirectory(lib)
 #TODO LATER add_subdirectory(spins)
 #TODO LATER add_subdirectory(scoop)
 add_subdirectory(lemon)
