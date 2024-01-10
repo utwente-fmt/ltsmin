@@ -86,7 +86,7 @@ target_compile_options(eft2lts-sym
 ) 
 
 
-################### OPTIONAL XECUTABLES:  eft2lts-sym####################
+################### OPTIONAL EXECUTABLES:  pnml2lts-sym####################
 set(HAVE_PNML ON) #TODO remove this when pnml check is implemented
 if (HAVE_PNML)
     add_executable(pnml2lts-sym
@@ -111,9 +111,41 @@ if (HAVE_PNML)
         PRIVATE -DPNML -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
     ) 
 endif()
-#PNML: pnml2lts-sym
 
 
+################### OPTIONAL EXECUTABLES:  dve2lts-sym####################
+set(HAVE_DVE ON) #TODO remove this when pnml check is implemented
+if (HAVE_DVE)
+    add_executable(dve2lts-sym
+        auxiliary/options.c
+        ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
+    )
+    find_package(LibXml2 REQUIRED)
+    target_link_libraries(dve2lts-sym PRIVATE
+                           libpins2lts-sym
+                           hre
+                           general-lib
+                           )
+    target_include_directories(dve2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+                                ${CMAKE_CURRENT_SOURCE_DIR}/..
+                                ${CMAKE_CURRENT_BINARY_DIR}/..
+                                ${CMAKE_SOURCE_DIR}/src
+                                ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
+                                ${CMAKE_CURRENT_SOURCE_DIR}/alg)
+    target_compile_options(dve2lts-sym
+        PRIVATE -DDIVINE -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
+    ) 
+endif()
+
+
+# dve2lts-sym
+#dve2lts_sym_SOURCES   = auxiliary/options.c
+#dve2lts_sym_SOURCES  += ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
+#dve2lts_sym_LDADD     = $(LIBZZZ) $(DVE_LIBS) $(LIBLTDL)
+#dve2lts_sym_CFLAGS    = $(SYM_C_FLAGS)
+#dve2lts_sym_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(LTDLINCL) $(SYM_CPP_FLAGS)
+#dve2lts_sym_LDFLAGS   = $(DIVINE_LDFLAGS) $(SYM_LD_FLAGS)
+#nodist_EXTRA_dve2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 #################Optional NOT included yet################
 #libstep: lpo2lts-sym
 #libmcrl2: lps2lts-sym
