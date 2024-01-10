@@ -53,6 +53,7 @@ add_executable(pins2lts-sym
 target_link_libraries(pins2lts-sym PUBLIC
                        libpins2lts-sym
                        hre
+                       general-lib
                        )
 target_include_directories(pins2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -60,8 +61,9 @@ target_include_directories(pins2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_SOURCE_DIR}/src
                             ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
                             ${CMAKE_CURRENT_SOURCE_DIR}/alg)
+                            
 target_compile_options(pins2lts-sym 
-    PRIVATE -DPINS_DLL
+    PRIVATE -DPINS_DLL -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
 ) 
 ################### EXECUTABLES:  eft2lts-sym####################
 add_executable(eft2lts-sym

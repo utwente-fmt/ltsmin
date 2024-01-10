@@ -24,6 +24,7 @@ FIND_PACKAGE(FLEX REQUIRED)
 foreach(FLEXFILE ${FLEXFILES})
     FLEX_TARGET(LTSMINLEXER ${FLEXFILE}.l ${CMAKE_CURRENT_BINARY_DIR}/${FLEXFILE}.c
                  DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/${FLEXFILE}.h)
+    list(APPEND FLEXOUTPUTLIST ${FLEX_LTSMINLEXER_OUTPUTS})    
 endforeach()
 
 
@@ -66,10 +67,13 @@ target_sources(ltsmin-lib
     mucalc-syntax.c
     #ltl2spot.cpp
     ${LTSMINLIB_HDRS}
-    ${FLEX_LTSMINLEXER_OUTPUTS}
+    ${FLEXOUTPUTLIST}
 )
 
-target_link_libraries(ltsmin-lib ${FLEX_LIBRARIES})
+
+
+target_link_libraries(ltsmin-lib ${FLEX_LIBRARIES}
+    ltl2ba)
 
 
 

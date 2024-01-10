@@ -48,13 +48,21 @@ target_sources(hre
     ${HRE_HDRS}
 )
 
+# hre uses popt
+find_library(POPT_LIB popt REQUIRED)
+target_link_libraries(hre ${POPT_LIB})
+
+# hre uses LTDL.
+find_library(LTDL_LIB ltdl REQUIRED)
+target_link_libraries(hre ${LTDL_LIB})
+
 SET(HAVE_POSIX_MEMALIGN "system has posix memalign" ON)
 SET(_GNU_SOURCE "System uses GNU" ON)
 
 configure_file(${PROJECT_SOURCE_DIR}/src/hre/config.h.in ${PROJECT_SOURCE_DIR}/src/hre/config.h)
 
 target_compile_options(hre
-    PUBLIC -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_SOURCE_DIR}/lib
+    PUBLIC -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
 ) 
 
 # Include directories

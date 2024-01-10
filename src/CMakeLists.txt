@@ -41,3 +41,5 @@ add_subdirectory(dm)
 add_subdirectory(mc-lib)
 add_subdirectory(spg-lib)
 add_subdirectory(bignum)
+add_subdirectory(hre-io)
+
