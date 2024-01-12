@@ -10,7 +10,7 @@ project(ltsmin
 Set(CMAKE_CXX_STANDARD 11)
 Set(CMAKE_CXX_STANDARD_REQUIRED True)
 
-# Add CMake modules path
+# Add CMake modules path | TODO don't think this is necessary
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
 
 # update submodules:
@@ -41,24 +41,10 @@ endif()
 
 add_subdirectory(src)
 add_subdirectory(lib)
-#TODO LATER add_subdirectory(spins)
-#TODO LATER add_subdirectory(scoop)
 add_subdirectory(lemon)
 add_subdirectory(ltl2ba)
 
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_SOURCE_DIR}/ltl2ba/config.h)
-
-#add_executable(${PROJECT_NAME} REMOVEWHENDONE.c)
-
-#target_include_directories(ltsmin PUBLIC ${CMAKE_SOURCE_DIR}/src
-#                ${CMAKE_SOURCE_DIR}/ltl2ba)
-
-#target_link_libraries(${PROJECT_NAME} PRIVATE ce)
-#target_link_libraries(${PROJECT_NAME} PRIVATE hre)
-#target_link_libraries(${PROJECT_NAME} PRIVATE ltsmin-lib)
-#target_link_libraries(${PROJECT_NAME} PRIVATE pins-lib)
-#target_link_libraries(${PROJECT_NAME} PRIVATE ltl2ba)
-
 
 
 

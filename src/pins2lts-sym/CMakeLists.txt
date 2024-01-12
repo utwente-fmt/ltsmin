@@ -1,17 +1,5 @@
 add_subdirectory(maxsum)
-############REQUIRED##################
-#pins2ltsmin-sym
-
-
-#set(LIBZZZ
-#    libpins2lts_sym.la
-#    ../pins-lib/libpins.la
-#    ../vset-lib/libvset.la
-#    maxsum/libmaxsum.la
-#    ../spg-lib/libspg.la
-#    ../mc-lib/libmc.la
-#    $(top_builddir)/lib/libgnu.la)
-
+################### LIBRARY:  pins2lts-sym####################
 add_library( libpins2lts-sym pins2lts-sym.c )
 
 target_sources(libpins2lts-sym INTERFACE
@@ -24,6 +12,7 @@ target_sources(libpins2lts-sym INTERFACE
             alg/sat.c alg/sat.h
             auxiliary/output.c auxiliary/output.h
             auxiliary/prop.c auxiliary/prop.h)
+            
 target_link_libraries(libpins2lts-sym PUBLIC
                        pins-lib
                        ltsmin-lib
@@ -44,7 +33,6 @@ target_include_directories(libpins2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
                             ${CMAKE_CURRENT_SOURCE_DIR}/alg)
 
-
 ################### EXECUTABLES:  pins2lts-sym####################
 add_executable(pins2lts-sym
     auxiliary/options.c auxiliary/options.h
@@ -63,7 +51,7 @@ target_include_directories(pins2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/alg)
                             
 target_compile_options(pins2lts-sym 
-    PRIVATE -DPINS_DLL -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
+    PRIVATE -DPINS_DLL -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib #include of lib might not be necessary
 ) 
 ################### EXECUTABLES:  eft2lts-sym####################
 add_executable(eft2lts-sym
@@ -108,8 +96,9 @@ if (HAVE_PNML)
                                 ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
                                 ${CMAKE_CURRENT_SOURCE_DIR}/alg)
     target_compile_options(pnml2lts-sym
-        PRIVATE -DPNML -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
-    ) 
+        PRIVATE -DPNML -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib #include of lib might not be necessary
+) 
+     
 endif()
 
 
@@ -133,25 +122,16 @@ if (HAVE_DVE)
                                 ${CMAKE_CURRENT_SOURCE_DIR}/auxiliary
                                 ${CMAKE_CURRENT_SOURCE_DIR}/alg)
     target_compile_options(dve2lts-sym
-        PRIVATE -DDIVINE -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib
-    ) 
+        PRIVATE -DDIVINE -I${CMAKE_SOURCE_DIR}/lib -I${CMAKE_BINARY_DIR}/lib #include of lib might not be necessary
+) 
+     
 endif()
 
-
-# dve2lts-sym
-#dve2lts_sym_SOURCES   = auxiliary/options.c
-#dve2lts_sym_SOURCES  += ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h
-#dve2lts_sym_LDADD     = $(LIBZZZ) $(DVE_LIBS) $(LIBLTDL)
-#dve2lts_sym_CFLAGS    = $(SYM_C_FLAGS)
-#dve2lts_sym_CPPFLAGS  = -DDIVINE $(DIVINE_CPPFLAGS) $(LTDLINCL) $(SYM_CPP_FLAGS)
-#dve2lts_sym_LDFLAGS   = $(DIVINE_LDFLAGS) $(SYM_LD_FLAGS)
-#nodist_EXTRA_dve2lts_sym_SOURCES = automake-force-linker.cxx # req. by vset
 #################Optional NOT included yet################
 #libstep: lpo2lts-sym
 #libmcrl2: lps2lts-sym
 #scoop: mapa2lts-sym
 #libpbes: pbes2lts-sym
-#DVE: dve2lts-sym
 #SPINS: prom2lts-sym
 
 #PROB: prob2lts-sym

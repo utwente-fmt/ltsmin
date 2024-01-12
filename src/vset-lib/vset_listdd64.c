@@ -1,4 +1,4 @@
-#include <hre/config.h>
+#include <config.h>
 
 #include <assert.h>
 #include <inttypes.h>

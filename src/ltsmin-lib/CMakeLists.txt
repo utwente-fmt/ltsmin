@@ -65,10 +65,15 @@ target_sources(ltsmin-lib
     lts-type.c
     mucalc-grammar.c
     mucalc-syntax.c
-    #ltl2spot.cpp
     ${LTSMINLIB_HDRS}
     ${FLEXOUTPUTLIST}
 )
+
+if(HAVE_SPOT)
+    target_sources(ltsmin-lib
+        PRIVATE
+        ltl2spot.cpp)
+endif()
 
 
 

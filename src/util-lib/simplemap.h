@@ -8,7 +8,7 @@
 #ifndef SIMPLEMAP_H_
 #define SIMPLEMAP_H_
 
-#include <hre/config.h>
+#include <config.h>
 
 #include <stdint.h>
 #include <stdbool.h>
