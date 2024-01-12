@@ -56,6 +56,8 @@ target_link_libraries(hre ${POPT_LIB})
 find_library(LTDL_LIB ltdl REQUIRED)
 target_link_libraries(hre ${LTDL_LIB})
 
+target_link_libraries(hre util-lib)
+
 SET(HAVE_POSIX_MEMALIGN "system has posix memalign" ON)
 SET(_GNU_SOURCE "System uses GNU" ON)
 

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
+
+
 project(ltsmin 
     VERSION 3.0.3
     DESCRIPTION "TODO"
@@ -9,6 +11,8 @@ project(ltsmin
 
 Set(CMAKE_CXX_STANDARD 11)
 Set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+include(CTest)
 
 # Add CMake modules path | TODO don't think this is necessary
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
