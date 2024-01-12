@@ -3,7 +3,8 @@ add_dependencies(util-lib hre)
 
 target_include_directories(util-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..
-                            ${CMAKE_CURRENT_BINARY_DIR}/..)
+                            ${CMAKE_CURRENT_BINARY_DIR}/..
+                            ${CMAKE_SOURCE_DIR}/src/hre)
 
 set(UTILLIB_HDRS
     balloc.h

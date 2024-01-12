@@ -1,30 +1,26 @@
 GENERAL NOTES:
-- Check if flex installation in install script is good enough. Maybe a make error? If no error when running make, delete this note.
+- TODO: Check if flex installation in install script (install.sh) is good enough. Maybe a make error? If no error when running make, delete this note.
 - root/lib should not be necessary with cmake, as it is used to increase portability between systems. Cmake should be able to do that itself. https://cmake.org/pipermail/cmake/2018-January/066885.html
     - Files that might be needed from root/lib: verify.h
 NEW DEPENDENCIES?
     - LTDL was given with automake in src/m4/ltdl.m4. cmake can't use this. an other dependency is needed. As standard i think linux comes with an ltdl library
 
 ----------------root-----------------
-Unsure what ltsmin should be build as? a library needs sources, and an excecutable creates an executable (which automake does not do)
 
 
 ---------------src/hre----------------
-    Note: FILE:hre_malloc has compiler error, does not seem to be necessary for autotools to configure the whole project. The error is in the "RTalign" function. You just need to declare ret in the start of the function.
-    TODO: Check if other sources can be left out for making of project.
     TODO: FILE:git_version.h is generated. Figure our how
+    config.h.in need to use #cmakedefine in order for cmake to create the config.h dynamically. You need to SET(__linux__ ON) at some point in order for __linux__ to be defined.
     TODO: FILE:config.h.in Right now __linux__ is hard coded: make a way to dynamically check and set operating system version. I don't know where it is done in the automake version
     TODO: FILE:config.h.in check if  _GNU_SOURCE is defined correctly 
     
+    
 ---------------src/ce---------------- OPTIONAL
-    Note: bufs.c: can't find mpi.h
-    Note: Ddlts.c: can't find mpi.h
-    Note: I don't know what mpi.h is or where to find/generate it. I cannot find it in the automake build version. A LOT OF FILES DEPEND ON mpi.h in ce: https://stackoverflow.com/questions/26920083/fatal-error-mpi-h-no-such-file-or-directory-include-mpi-h
+    TODO: this is not done. is an optional modules that only is create if HAVE_CE is ON.
     
 ---------------src/ltmin-libs----------------
     .lemon and .l files are used for generation of .c and .h files with lemon and flex
     TODO: It looks like on the old automake code that generating lex files is optional. Look into this.
-    TODO: uncomment ltl2spot.cpp and make it depend if spot is enabled or disabled
         
         
 ---------------lemon---------------------
@@ -32,28 +28,30 @@ Unsure what ltsmin should be build as? a library needs sources, and an excecutab
     It uses lempar.c to generate these files, BUT not a compiled version of lempar.c. Therefore lempar.c is copied into the binary directory. I'm unsure if this is the best approach
         
 ---------------ltl2ba--------------------
-When making with cmake it needs a config.h that was created by autotools  (i suggest to create it with configue_file(config.h.in config.h) and manually create a config.h.in)    
-       also remove config.h.in from gitignore
-TODO: GITERROR:"ltl2ba cannot be made with cmake" in gitmodules change from "url = https://github.com/codermann63/ltl2ba.git" to u"rl = https://github.com/utwente-fmt/ltl2ba.git"
-       
-
+    NOTE: root/ltl2ba/config.h file is created with the root/config.h.in. This file is currently empty. Unsure if it's needed.
+        SUGGESTION: this config.h should maybe be the same as root/src/hre/config.h
 
 ---------------src/pins-lib: --------------------
-      Note: is dependend on generated files from ltsmin-lib¨
-        TODO: convert subdirectory por and add it as subdirectory to CMakeLists.txt
 
 ---------------src/pins2lts-sym---------------------
-    TODO: check if all compiler flags are given like the automake version
-
+    TODO MISSING IMPLEMENTATION: lpo2lts-sym
+    TODO MISSING IMPLEMENTATION: lps2lts-sym
+    TODO MISSING IMPLEMENTATION: mapa2lts-sym
+    TODO MISSING IMPLEMENTATION: pbe2lts-sym
+    TODO MISSING IMPLEMENTATION: prom2lts-sym
+    TODO MISSING IMPLEMENTATION: prob2lts-sym
+    
 ---------------src/vset-lib---------------------
     Note: a lot of optional content. I've tried to copy the options from the automake script
-    TODO: vset_listdd64.c could not find config.h. I've changed the include to hre/config.h (because vset_listdd has and include for hre/config.h). CHECK IF CORRECT
+
 ---------------src/util-lib---------------------
-    QUESTION: fast_set.c has an include to config.h. Automake does not generate one with its make and fast_hash.c has an include to hre/config.h. I've changed the include to hre/config.h. TODO check if correct
-            ADDITIONAL INFO: fast_set.h has include of hre/config.h
-            TODO: the same problem with simplemap.h 
+
 ---------------src/dm---------------------
     TODO: In the Makefile.am there is specified a debug and nonddebug library. MAYBE CHANGE SO CMAKE HAS DEBUG AND NON-DEBUG
 ----------------src/bignum
-    TODO: variablity in #if defined(HAVE_GMP_H) and #elif defined(HAVE_TOMMATH_H)
+    TODO: implement variablity in #if defined(HAVE_GMP_H) and #elif defined(HAVE_TOMMATH_H)
 ---------------src/---------------------
+
+
+
+
