@@ -1,5 +1,5 @@
 add_library(util-lib STATIC)
-add_dependencies(util-lib hre)
+target_link_libraries(util-lib hre)
 
 target_include_directories(util-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..

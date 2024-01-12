@@ -45,7 +45,7 @@ NEW DEPENDENCIES?
     Note: a lot of optional content. I've tried to copy the options from the automake script
 
 ---------------src/util-lib---------------------
-
+    TODO: Unsure if util-lib should link to hre
 ---------------src/dm---------------------
     TODO: In the Makefile.am there is specified a debug and nonddebug library. MAYBE CHANGE SO CMAKE HAS DEBUG AND NON-DEBUG
 ----------------src/bignum
