@@ -56,7 +56,8 @@ endif()
 
 target_link_libraries(vset-lib PUBLIC
     util-lib
-    hre-io)
+    hre-io
+    bignum)
 
 target_include_directories(vset-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..
