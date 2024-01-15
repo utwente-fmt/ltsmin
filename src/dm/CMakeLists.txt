@@ -13,6 +13,8 @@ target_sources(dm
     ${DM_HDRS}
 )
 
+target_link_libraries(dm general-lib)
+
 OPTION(HAVE_BOOST off)
 OPTION(HAVE_VIENNACL off)
 if (HAVE_BOOST)

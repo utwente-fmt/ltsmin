@@ -1,3 +1,7 @@
+TODO make hint about:
+    vector_set.c:(.text+0x1199): undefined reference to `bn_init'
+    ./src/bignum/bignum.h:35:extern void         bn_init_copy (bn_int_t *a, bn_int_t *b);
+
 GENERAL NOTES:
 - TODO: Check if flex installation in install script (install.sh) is good enough. Maybe a make error? If no error when running make, delete this note.
 - root/lib should not be necessary with cmake, as it is used to increase portability between systems. Cmake should be able to do that itself. https://cmake.org/pipermail/cmake/2018-January/066885.html

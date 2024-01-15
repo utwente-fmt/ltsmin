@@ -29,7 +29,10 @@ else()
         PRIVATE
         bignum-ll.c
         )
+    target_link_libraries(bignum
+        general-lib) # maybe this link needs to be outside the if statement
 endif()
+
 
 target_include_directories(bignum PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..
