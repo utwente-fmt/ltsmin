@@ -1,9 +1,4 @@
 
-
-
-#BISON_TARGET(MyParser parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp
-#             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/parser.h)
-
 FIND_PACKAGE(FLEX REQUIRED)
 
 FLEX_TARGET(ANDLLEXER andl-lexer.l ${CMAKE_CURRENT_BINARY_DIR}/andl-lexer.c

@@ -1,6 +1,3 @@
-
-cmake_minimum_required(VERSION 3.21)
-
 add_library(bignum STATIC)
 
 set(HAVE_GMP_H on)

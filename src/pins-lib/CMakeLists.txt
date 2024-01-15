@@ -1,6 +1,3 @@
-
-cmake_minimum_required(VERSION 3.21)
-
 add_library(pins-lib STATIC)
 
 set(PINSLIB_HDRS
