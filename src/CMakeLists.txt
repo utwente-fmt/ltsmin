@@ -24,9 +24,7 @@
 #    
 #
 
-cmake_minimum_required(VERSION 3.21)
-
-Option(HAVE_CE OFF)
+Option(HAVE_CE OFF) # TODO change when actual variability management has been made
 if (HAVE_CE)
     add_subdirectory(ce)
 endif()

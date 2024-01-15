@@ -14,11 +14,6 @@ foreach(LEMONFILE ${LEMONFILES})
 endforeach()
 
 #Generate files with flex
-    #OLD AUTOMAKE CODE FOR generating with lex:
-    #%.c %.h: %.l
-    #	$(am__skiplex) $(LEX) $<
-#TODO it looks like it is optional in the old automake code. Look into this
-
 set(FLEXFILES ltsmin-lexer mucalc-lexer) 
 FIND_PACKAGE(FLEX REQUIRED)
 foreach(FLEXFILE ${FLEXFILES})

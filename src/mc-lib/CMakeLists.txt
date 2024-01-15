@@ -1,6 +1,3 @@
-
-cmake_minimum_required(VERSION 3.21)
-
 add_library(mc-lib STATIC)
 
 set(MCLIB_HDRS
@@ -45,8 +42,4 @@ target_sources(mc-lib
 target_include_directories(mc-lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..
                             ${CMAKE_CURRENT_BINARY_DIR}/..)
-
-#add_dependencies(pins-lib 
-#                    ltsmin-lib 
-#                    hre)
 
