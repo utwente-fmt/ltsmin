@@ -16,7 +16,7 @@
 
 /* Hard coded that we are on linux*/
 /* Other variables are __APPLE__ _WIN32*/
-#define __linux__ 1
+#cmakedefine __linux__
 
 /* Enable GNU extensions on systems that have them.  */
 /* FAKE IT CODE */

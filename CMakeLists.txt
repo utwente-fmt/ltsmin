@@ -51,5 +51,28 @@ add_subdirectory(ltl2ba)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_SOURCE_DIR}/ltl2ba/config.h)
 
 
+###### OPTIONS ######
+
+#check OS https://gitlab.kitware.com/cmake/community/-/wikis/doc/tutorials/How-To-Write-Platform-Checks
+    if (WIN32)
+        message("WIN32")
+    endif (WIN32)
+
+    if (UNIX)
+        message("UNIX")
+        set(__linux__ ON)
+    endif (UNIX)
+
+    if (MSVC)
+        message("MSVC")
+    endif (MSVC) 
+
+if(qwer)
+    message("qwer is defined")
+else()
+    message("qwer is not defined")
+endif()
+
+
 
 #TODO add options for examples, tests and documentation
