@@ -11,11 +11,9 @@ project(ltsmin
 
 Set(CMAKE_CXX_STANDARD 11)
 Set(CMAKE_CXX_STANDARD_REQUIRED True)
-
+set(PACKAGE_STRING "${CMAKE_PROJECT_NAME} ${CMAKE_PROJECT_VERSION}")
+set(PACKAGE_BUGREPORT "ltsmin-support@lists.utwente.nl")
 include(CTest)
-
-# Add CMake modules path | TODO don't think this is necessary
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/")
 
 # update submodules:
 find_package(Git QUIET)
@@ -51,28 +49,49 @@ add_subdirectory(ltl2ba)
 configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_SOURCE_DIR}/ltl2ba/config.h)
 
 
-###### OPTIONS ######
+###### CONFIGURATION ######
 
 #check OS https://gitlab.kitware.com/cmake/community/-/wikis/doc/tutorials/How-To-Write-Platform-Checks
     if (WIN32)
-        message("WIN32")
-    endif (WIN32)
-
-    if (UNIX)
-        message("UNIX")
+        set(_WIN32)
+    elseif (UNIX)
         set(__linux__ ON)
-    endif (UNIX)
+    elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        set(_APPLE_ ON)
+    else ()
+        message(FATAL_ERROR "OS not accounted for in this program")
+    endif()
 
-    if (MSVC)
-        message("MSVC")
-    endif (MSVC) 
+option(with_bignum off)
 
-if(qwer)
-    message("qwer is defined")
-else()
-    message("qwer is not defined")
-endif()
-
+####### cmake configuration output ######
+#This will output which modules are active when executing the cmake command 
+message("cmake configuration:")
+message("====================")
+#ASCIIDOC
+message(BIGNUM = ${with_bignum})
+#BUDDY
+#CADP
+#CC
+#CXX
+#LIBDDD
+#MCRL
+#MCRL2
+#MPICC
+#MPICXX
+#OPAAL
+#PBES
+#SCOOP
+#SPINS
+#SPOT
+#XMLTO
+#BOOST
+#VIENNACL
+#PNML
+#PROB
+#SDD
+#SYLVAN
+message("====================")
 
 
 #TODO add options for examples, tests and documentation

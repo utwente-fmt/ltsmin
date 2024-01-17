@@ -6,6 +6,9 @@ GENERAL NOTES:
 - TODO: Check if flex installation in install script (install.sh) is good enough. Maybe a make error? If no error when running make, delete this note.
 - root/lib should not be necessary with cmake, as it is used to increase portability between systems. Cmake should be able to do that itself. https://cmake.org/pipermail/cmake/2018-January/066885.html
     - Files that might be needed from root/lib: verify.h
+- TODO: find a way to get CACHE_LINE_SIZE, CACHE_LINE & LTSMIN_PATHNAME_MAX and specify it in src/hre/config.h.in
+    -TODO in src/hre/config.h.in figure out a way "__assume(cond)" should be define with cmakedefine
+    - TODO in src/hre/config.h.in what to do with /* Enable GNU extensions on systems that have them.  */
 NEW DEPENDENCIES?
     - LTDL was given with automake in src/m4/ltdl.m4. cmake can't use this. an other dependency is needed. As standard i think linux comes with an ltdl library
 - CMAKE TUTORIAL: to configure the project you can define cmake variables in the command line. Example: "cmake .. -DWITH_SPINS=1" defines the WITH_SPINS variable to be 1.
