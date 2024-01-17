@@ -38,15 +38,13 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/ltl2ba/CMakeLists.txt" OR
 endif()
 
 
-#Dependencies
 #TODO get sylvan(?) via FetchContent? or make it a submodule
-
 add_subdirectory(src)
 add_subdirectory(lib)
 add_subdirectory(lemon)
 add_subdirectory(ltl2ba)
 
-configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_SOURCE_DIR}/ltl2ba/config.h)
+
 
 
 ###### CONFIGURATION ######
@@ -63,6 +61,8 @@ configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_SOURCE_DIR}/ltl2ba/co
     endif()
 
 option(with_bignum off)
+
+configure_file(${PROJECT_SOURCE_DIR}/config.h.in ${PROJECT_SOURCE_DIR}/ltl2ba/config.h)
 
 ####### cmake configuration output ######
 #This will output which modules are active when executing the cmake command 
