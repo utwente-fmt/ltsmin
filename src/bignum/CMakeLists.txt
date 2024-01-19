@@ -6,16 +6,16 @@ target_sources(bignum
   PRIVATE
     bignum.h
 )
-option(HAVE_LIBGMP off)
-if(HAVE_LIBGMP)
+option(have_libgmp "does the project have libgmp?" off) #TODO implement actually checking for libgmp
+if(${HAVE_LIBGMP})
     target_sources(bignum
         PRIVATE
         bignum-gmp.c
         #add lib -lgmp
         )
 
-option(HAVE_LIBTOMMATH off)
-elseif(HAVE_LIBTOMMATH)
+option(HAVE_LIBTOMMATH "does the project have tommath?" off)#TODO implement actually checking for tommath 
+elseif(${HAVE_LIBTOMMATH})
     target_sources(bignum
         PRIVATE
         bignum-tommath.c
