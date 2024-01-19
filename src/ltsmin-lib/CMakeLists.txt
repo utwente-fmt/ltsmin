@@ -64,7 +64,7 @@ target_sources(ltsmin-lib
     ${FLEXOUTPUTLIST}
 )
 
-if(HAVE_SPOT)
+if(${have_spot})
     target_sources(ltsmin-lib
         PRIVATE
         ltl2spot.cpp)

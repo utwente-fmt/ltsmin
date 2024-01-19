@@ -15,8 +15,8 @@ target_sources(dm
 
 target_link_libraries(dm general-lib)
 
-OPTION(HAVE_BOOST off)
-OPTION(HAVE_VIENNACL off)
+OPTION(have_boost "does the project have boost?" off)#TODO: check for boost
+OPTION(have_viennacl "does the project have viennaCL?" off) #TODO check for viennacl
 if (HAVE_BOOST)
     target_sources(dm PRIVATE
         dm_boost.cpp dm_boost.h)

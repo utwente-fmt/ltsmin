@@ -78,7 +78,7 @@ install(TARGETS etf2lts-sym)
 
 ################### OPTIONAL EXECUTABLES:  pnml2lts-sym####################
 set(HAVE_PNML ON) #TODO remove this when pnml check is implemented
-if (HAVE_PNML)
+if (${HAVE_PNML})
     add_executable(pnml2lts-sym
         auxiliary/options.c
         ../pins-lib/modules/pnml-pins.c ../pins-lib/modules/pnml-pins.h
@@ -106,7 +106,7 @@ endif()
 
 ################### OPTIONAL EXECUTABLES:  dve2lts-sym####################
 set(HAVE_DVE ON) #TODO remove this when pnml check is implemented
-if (HAVE_DVE)
+if (${HAVE_DVE})
     add_executable(dve2lts-sym
         auxiliary/options.c
         ../pins-lib/modules/dve-pins.c ../pins-lib/modules/dve-pins.h

@@ -12,6 +12,8 @@ GENERAL NOTES:
 NEW DEPENDENCIES?
     - LTDL was given with automake in src/m4/ltdl.m4. cmake can't use this. an other dependency is needed. As standard i think linux comes with an ltdl library
 - CMAKE TUTORIAL: to configure the project you can define cmake variables in the command line. Example: "cmake .. -DWITH_SPINS=1" defines the WITH_SPINS variable to be 1.
+    - It saves the definition in a cache. That means if you in the future do not want WITH_SPINS defined, then you need to delete the build folder
+- CMAKE find_package(X): the mcr project has multiple findX files in the cmake folder (https://github.com/alaarman/mcf)
 ----------------root-----------------
 
 

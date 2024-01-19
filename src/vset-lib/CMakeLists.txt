@@ -16,32 +16,27 @@ target_sources(vset-lib PRIVATE
     ${VSET_HDRS}
 )
 
-OPTION(HAVE_BUDDY off)
-OPTION(HAVE_SYLVAN off)
-OPTION(HAVE_LIBMCRL off)
-OPTION(HAVE_SDD off)
-OPTION(HAVE_LIBDDD off)
 
-if(HAVE_SDD)
+if(${have_buddy})
     target_sources(vset-lib PRIVATE
                     vset_buddy.c)
 endif()
 
 
-if(HAVE_SDD)
+if(${have_sylvan})
     target_sources(vset-lib PRIVATE
                     vset_sylvan.c
                     vset_lddmc.c)
 endif()
 
 
-if(HAVE_SDD)
+if(${have_libmcrl})
     target_sources(vset-lib PRIVATE
                     vset_atermdd.c)
 endif()
 
 
-if(HAVE_SDD)
+if(${have_sdd})
     target_sources(vset-lib PRIVATE
                     sdd_utils.c     sdd_utils.h
                     vset_sdd.c    vset_sdd.h
@@ -49,7 +44,7 @@ if(HAVE_SDD)
                     vtree_utils.c   vtree_utils.h)
 endif()
 
-if(HAVE_LIBDDD)
+if(${have_libddd})
     target_sources(vset-lib PRIVATE
                         vset_ddd.cpp)
 endif()

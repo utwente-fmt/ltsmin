@@ -24,8 +24,8 @@
 #    
 #
 
-Option(HAVE_CE OFF) # TODO change when actual variability management has been made
-if (HAVE_CE)
+Option(have_ce "variable to check if CE is enabled" OFF) # TODO change when actual variability management has been made
+if (have_ce)
     add_subdirectory(ce)
 endif()
 add_subdirectory(hre)
