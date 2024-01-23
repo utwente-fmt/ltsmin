@@ -39,11 +39,6 @@ if(NOT EXISTS "${PROJECT_SOURCE_DIR}/ltl2ba/CMakeLists.txt" OR
 endif()
 
 
-#TODO get sylvan(?) via FetchContent? or make it a submodule
-add_subdirectory(src)
-add_subdirectory(lib)
-add_subdirectory(lemon)
-add_subdirectory(ltl2ba)
 
 
 
@@ -52,7 +47,7 @@ add_subdirectory(ltl2ba)
 
 #check OS https://gitlab.kitware.com/cmake/community/-/wikis/doc/tutorials/How-To-Write-Platform-Checks
     if (WIN32)
-        set(_WIN32)
+        set(_WIN32 ON)
     elseif (UNIX)
         set(__linux__ ON)
     elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -129,11 +124,12 @@ message("====================")
     else()
         find_package(LACE)
         find_package(SYLVAN)
+        #set( ON)
     endif()
     
     if(${SYLVAN_FOUND})
-        set(have_sylvan ON)
-        message("SYLVAN = ON. (override with -Dwithout-sylvan)")
+        set(HAVE_SYLVAN ON)
+        message("SYLVAN = ON. (override with -Dwithout-sylvan=1)")
     else()
         message("SYLVAN = OFF. SYLVAN not found, or disabled")
     endif()
@@ -141,3 +137,13 @@ message("====================")
 
 
 #TODO add options for examples, tests and documentation
+
+
+##### MAKE PROJECT
+#TODO get sylvan(?) via FetchContent? or make it a submodule
+add_subdirectory(src)
+add_subdirectory(lib)
+add_subdirectory(lemon)
+add_subdirectory(ltl2ba)
+
+

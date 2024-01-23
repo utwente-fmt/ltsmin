@@ -133,5 +133,3 @@ target_link_libraries(vset_test
                 vset-lib)
 add_test(NAME vset_test
          COMMAND vset_test)
-
-

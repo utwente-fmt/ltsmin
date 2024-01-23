@@ -23,10 +23,13 @@ if(${have_buddy})
 endif()
 
 
-if(${have_sylvan})
+if(${HAVE_SYLVAN})
     target_sources(vset-lib PRIVATE
                     vset_sylvan.c
                     vset_lddmc.c)
+    target_link_libraries(vset-lib PUBLIC
+    	sylvan
+   	lace)
 endif()
 
 

@@ -26,6 +26,12 @@ target_link_libraries(libpins2lts-sym PUBLIC
                        spg-lib
                        )
                        
+if (${HAVE_SYLVAN})
+	target_link_libraries(libpins2lts-sym PUBLIC
+		sylvan
+		lace)
+endif()
+                       
 target_include_directories(libpins2lts-sym PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
                             ${CMAKE_CURRENT_SOURCE_DIR}/..
                             ${CMAKE_CURRENT_BINARY_DIR}/..
