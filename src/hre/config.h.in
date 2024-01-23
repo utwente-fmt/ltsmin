@@ -1,0 +1,39 @@
+
+/* Define maximal length of pathnames */
+#define LTSMIN_PATHNAME_MAX 1024
+
+/* Define to the address where bug reports for this package should be sent. */
+#cmakedefine PACKAGE_BUGREPORT "@PACKAGE_BUGREPORT@"
+
+/* Define to the full name and version of this package. */
+#cmakedefine PACKAGE_STRING "@PACKAGE_STRING@"
+
+/* Log2 size of the machine's cache line */
+#define CACHE_LINE 6
+
+/* Size of the machine's cache line */
+#define CACHE_LINE_SIZE 64
+
+/* Variables for OS*/
+#cmakedefine __linux__
+#cmakedefine __APPLE__
+#cmakedefine _WIN32
+
+/* Enable GNU extensions on systems that have them.  */
+/* FAKE IT CODE */
+/*#cmakedefine _GNU_SOURCE*/
+#ifndef _GNU_SOURCE
+# define _GNU_SOURCE 1
+#endif
+
+/* Define to 1 if you have the `posix_memalign' function. */
+#cmakedefine HAVE_POSIX_MEMALIGN
+
+/* Define to 1 if you have the `_aligned_malloc' function. */
+#cmakedefine HAVE__ALIGNED_MALLOC
+
+#cmakedefine HAVE_SYLVAN
+
+/* Provide a hint to the optimizer */
+#define __assume(cond) do { if (!(cond)) __builtin_unreachable(); } while (0)
+

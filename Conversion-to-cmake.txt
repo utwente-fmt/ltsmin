@@ -1,0 +1,66 @@
+TODO make hint about:
+    vector_set.c:(.text+0x1199): undefined reference to `bn_init'
+    ./src/bignum/bignum.h:35:extern void         bn_init_copy (bn_int_t *a, bn_int_t *b);
+
+GENERAL NOTES:
+- TODO: Check if flex installation in install script (install.sh) is good enough. Maybe a make error? If no error when running make, delete this note.
+- root/lib should not be necessary with cmake, as it is used to increase portability between systems. Cmake should be able to do that itself. https://cmake.org/pipermail/cmake/2018-January/066885.html
+    - Files that might be needed from root/lib: verify.h
+- TODO: find a way to get CACHE_LINE_SIZE, CACHE_LINE & LTSMIN_PATHNAME_MAX and specify it in src/hre/config.h.in
+    -TODO in src/hre/config.h.in figure out a way "__assume(cond)" should be define with cmakedefine
+    - TODO in src/hre/config.h.in what to do with /* Enable GNU extensions on systems that have them.  */
+NEW DEPENDENCIES?
+    - LTDL was given with automake in src/m4/ltdl.m4. cmake can't use this. an other dependency is needed. As standard i think linux comes with an ltdl library
+- CMAKE TUTORIAL: to configure the project you can define cmake variables in the command line. Example: "cmake .. -DWITH_SPINS=1" defines the WITH_SPINS variable to be 1.
+    - It saves the definition in a cache. That means if you in the future do not want WITH_SPINS defined, then you need to delete the build folder
+- CMAKE find_package(X): the mcr project has multiple findX files in the cmake folder (https://github.com/alaarman/mcf)
+----------------root-----------------
+
+
+---------------src/hre----------------
+    TODO: FILE:git_version.h is generated. Figure our how
+    config.h.in need to use #cmakedefine in order for cmake to create the config.h dynamically. You need to SET(__linux__ ON) at some point in order for __linux__ to be defined.
+    TODO: FILE:config.h.in Right now __linux__ is hard coded: make a way to dynamically check and set operating system version. I don't know where it is done in the automake version
+    TODO: FILE:config.h.in check if  _GNU_SOURCE is defined correctly 
+    
+    
+---------------src/ce---------------- OPTIONAL
+    TODO: this is not done. is an optional modules that only is create if HAVE_CE is ON.
+    
+---------------src/ltmin-libs----------------
+    .lemon and .l files are used for generation of .c and .h files with lemon and flex
+    TODO: It looks like on the old automake code that generating lex files is optional. Look into this.
+        
+        
+---------------lemon---------------------
+    Lemon is used to generate files from .lemon files (eg. src/ltsmin-libs/ltsmin-grammar.lemon)
+    It uses lempar.c to generate these files, BUT not a compiled version of lempar.c. Therefore lempar.c is copied into the binary directory. I'm unsure if this is the best approach
+        
+---------------ltl2ba--------------------
+    NOTE: root/ltl2ba/config.h file is created with the root/config.h.in. This file is currently empty. Unsure if it's needed.
+        SUGGESTION: this config.h should maybe be the same as root/src/hre/config.h
+
+---------------src/pins-lib: --------------------
+
+---------------src/pins2lts-sym---------------------
+    TODO MISSING IMPLEMENTATION: lpo2lts-sym
+    TODO MISSING IMPLEMENTATION: lps2lts-sym
+    TODO MISSING IMPLEMENTATION: mapa2lts-sym
+    TODO MISSING IMPLEMENTATION: pbe2lts-sym
+    TODO MISSING IMPLEMENTATION: prom2lts-sym
+    TODO MISSING IMPLEMENTATION: prob2lts-sym
+    
+---------------src/vset-lib---------------------
+    Note: a lot of optional content. I've tried to copy the options from the automake script
+
+---------------src/util-lib---------------------
+    TODO: Unsure if util-lib should link to hre
+---------------src/dm---------------------
+    TODO: In the Makefile.am there is specified a debug and nonddebug library. MAYBE CHANGE SO CMAKE HAS DEBUG AND NON-DEBUG
+----------------src/bignum
+    TODO: implement variablity in #if defined(HAVE_GMP_H) and #elif defined(HAVE_TOMMATH_H)
+---------------src/---------------------
+
+
+
+

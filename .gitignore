@@ -13,7 +13,7 @@ TAGS
 *.sum
 *.plist
 *.dSYM
-config.h.in
+# config.h.in Removed for cmake compilation
 .libs/
 .metadata/
 .project
@@ -67,3 +67,20 @@ testsuite/wine.exp
 /examples/*.lps
 /examples/abp.pbes
 nbproject
+
+#Build files
+build/*
+
+# Cmake files
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
