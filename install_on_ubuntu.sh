@@ -23,7 +23,7 @@ sudo apt install ant -y
 ########################### install sylvan & sylvan dependencies #############################
 sudo apt install libgmp-dev -y
 sudo apt install libhwloc-dev -y
-git clone https://github.com/Codermann63/sylvan.git
+git clone https://github.com/trolando/sylvan.git
 cd sylvan
 mkdir build
 cd build
