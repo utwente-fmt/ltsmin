@@ -23,7 +23,7 @@ extern "C" {
 
 } // end of extern "C"
 
-#if defined(MCRL2_JITTYC_AVAILABLE) && !defined(DISABLE_JITTYC)
+#if defined(MCRL2_ENABLE_JITTYC) && !defined(DISABLE_JITTYC)
 static const char* mcrl2_rewriter = "jittyc";
 #else
 static const char* mcrl2_rewriter = "jitty";
@@ -284,8 +284,8 @@ static void pbes_popt(poptContext con, enum poptCallbackReason reason,
             GBregisterLoader("pbes", PBESloadGreyboxModel);
             if (mcrl2_verbosity > 0) {
                 Warning(info, "increasing mcrl2 verbosity level by %d", mcrl2_verbosity);
-                log::log_level_t log_level = static_cast<log::log_level_t>(static_cast<size_t>(log::mcrl2_logger::get_reporting_level()) + mcrl2_verbosity);
-                log::mcrl2_logger::set_reporting_level(log_level);
+                log::log_level_t log_level = static_cast<log::log_level_t>(static_cast<size_t>(log::logger::get_reporting_level()) + mcrl2_verbosity);
+                log::logger::set_reporting_level(log_level);
             }
 #ifdef DISABLE_JITTYC
             if (strcmp(mcrl2_rewriter, "jittyc") == 0) {
@@ -401,7 +401,7 @@ void PBESloadGreyboxModel(model_t model, const char*name)
     GBsetContext(model, ctx);
 
     log::log_level_t log_level = log_active(infoLong) ? log::verbose : log::error;
-    log::mcrl2_logger::set_reporting_level(log_level);
+    log::logger::set_reporting_level(log_level);
 
     bool reset = (reset_flag==1);
     bool always_split = (always_split_flag==1);
