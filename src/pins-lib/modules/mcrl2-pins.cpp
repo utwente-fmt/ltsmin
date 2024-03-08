@@ -32,7 +32,7 @@ extern "C" {
 #include <ltsmin-lib/ltsmin-standard.h>
 }
 
-#if defined(MCRL2_JITTYC_AVAILABLE) && !defined(DISABLE_JITTYC)
+#if defined(MCRL2_ENABLE_JITTYC) && !defined(DISABLE_JITTYC)
 static const char* mcrl2_rewriter = "jittyc";
 #else
 static const char* mcrl2_rewriter = "jitty";
@@ -361,8 +361,8 @@ mcrl2_popt (poptContext con, enum poptCallbackReason reason,
         GBregisterLoader("txt", MCRL2CompileGreyboxModel);
         if (mcrl2_verbosity > 0) {
             Warning(info, "increasing mcrl2 verbosity level by %d", mcrl2_verbosity);
-            mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(mcrl2_logger::get_reporting_level()) + mcrl2_verbosity);
-            mcrl2_logger::set_reporting_level(level);
+            mcrl2_log_level_t level = static_cast<mcrl2_log_level_t>(static_cast<size_t>(logger::get_reporting_level()) + mcrl2_verbosity);
+            logger::set_reporting_level(level);
         }
 #ifdef DISABLE_JITTYC
         if (strcmp(mcrl2_rewriter, "jittyc") == 0) {
