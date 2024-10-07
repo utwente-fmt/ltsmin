@@ -1,0 +1,24 @@
+name: Run Tests
+
+on: 
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+        image: pbbach/lts_min:WC
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Configure LTSMin
+        run: |
+          chmod +x ./ltsminreconf
+          ./ltsminreconf
+          ./configure --disable-dependency-tracking
+      - name: Run tests
+        run: make check
