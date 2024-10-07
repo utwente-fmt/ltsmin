@@ -165,6 +165,9 @@ in Section [Build Dependencies](#build-dependencies) below.
     # Configure
     $ ./configure --disable-dependency-tracking --prefix /path/
 
+### Installing in ubuntu
+The easiest way to build and install the software in ubuntu is downloading the git repository and running the script file "install_on_ubuntu.sh". This file takes care of getting all dependencies and running the necessary commands.
+
 ### Building a Windows target
 
 If you are building a Windows target with MinGW you need to pass additional variables and flags to `./configure`:
