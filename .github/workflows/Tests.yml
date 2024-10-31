@@ -20,5 +20,7 @@ jobs:
           chmod +x ./ltsminreconf
           ./ltsminreconf
           ./configure --disable-dependency-tracking
+      - name: Build LTSmin
+        run: make
       - name: Run tests
         run: make check
