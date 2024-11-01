@@ -1506,6 +1506,91 @@ dm_expand_vector(matrix_t* m, int row, int* s0, int* src, int* tgt)
     return k;
 }
 
+/* REVIEW: I added the following three transformation functions:
+ * - dm_expand_vector_default
+ * - dm_transform_vector_via
+ * - dm_transform_vector_via_short_default
+ * maybe they do something that can be achieved otherwise,
+ * i.e., maybe I duplicated some code?
+ * maybe you would only need one or two of these?
+ * (pk, 03.04.2018) */
+
+int
+dm_expand_vector_default(matrix_t* m, int row, int default_value, int* src, int* tgt)
+{
+    int k = 0;
+    for (int i = 0; i < dm_ncols(m); i++) {
+        if (dm_is_set(m, row, i)) {
+            // copy from source
+            tgt[i] = src[k++];
+        } else {
+            // copy initial state
+            tgt[i] = default_value;
+        }
+    }
+    // return number of copied items from src
+    return k;
+}
+
+void
+dm_transform_vector_via(matrix_t* to, matrix_t* from, int row, int* s0, int* src, int* tgt)
+{
+    int tgt_idx = 0;
+    int src_idx = 0;
+    for (int i = 0; i < dm_ncols(to); i++) {
+        int set_in_to = dm_is_set(to, row, i);
+        int set_in_from = dm_is_set(from, row, i);
+
+        if (set_in_to && set_in_from) {
+            // both the original state and the target shall retain the variable
+            // copy from source
+            tgt[tgt_idx] = src[src_idx];
+            tgt_idx++; src_idx++;
+        } else if (set_in_to && !set_in_from) {
+            // the original state did not have the variable,
+            // need to add from initial state
+            tgt[tgt_idx] = s0[i];
+            tgt_idx++;
+        } else if (!set_in_to && set_in_from) {
+            // the original state had the variable but the target shall not contain it
+            src_idx++;
+        } else {
+            // neither state had the variable, drop it
+            continue;
+        }
+    }
+}
+
+void
+dm_transform_vector_via_short_default(matrix_t* to, matrix_t* from, int row, int* s0, int* src, int* tgt)
+{
+    int tgt_idx = 0;
+    int src_idx = 0;
+    int s0_idx = 0;
+    for (int i = 0; i < dm_ncols(to); i++) {
+        int set_in_to = dm_is_set(to, row, i);
+        int set_in_from = dm_is_set(from, row, i);
+
+        if (set_in_to && set_in_from) {
+            // both the original state and the target shall retain the variable
+            // copy from source
+            tgt[tgt_idx] = src[src_idx];
+            tgt_idx++; src_idx++; s0_idx++;
+        } else if (set_in_to && !set_in_from) {
+            // the original state did not have the variable,
+            // need to add from initial state
+            tgt[tgt_idx] = ((size_t) s0 == 1 ? 1 : s0[s0_idx]);
+            tgt_idx++; s0_idx++;
+        } else if (!set_in_to && set_in_from) {
+            // the original state had the variable but the target shall not contain it
+            src_idx++;
+        } else {
+            // neither state had the variable, drop it
+            continue;
+        }
+    }
+}
+
 void
 dm_row_union(bitvector_t* bv, const matrix_t* m, int row)
 {

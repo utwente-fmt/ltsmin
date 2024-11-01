@@ -15,8 +15,7 @@
 #include <hre/user.h>
 
 struct prob_client {
-    zctx_t* ctx;
-    void* zocket;
+    zsock_t* zocket;
     uint32_t id_count;
     char* file;
 };
@@ -47,21 +46,16 @@ prob_client_destroy(prob_client_t pc)
 void
 prob_connect(prob_client_t pc, const char* file)
 {
-    pc->ctx = zctx_new();
-    if (pc->ctx == NULL) Abort("Could not create zctx");
-    pc->zocket = zsocket_new(pc->ctx, ZMQ_REQ);
-    if (pc->zocket == NULL) Abort("Could not create zsocket");
     pc->file = strdup(file);
-
-    if (zsocket_connect(pc->zocket, "%s", pc->file) != 0) Abort("Could not connect to zocket %s", pc->file);
+    pc->zocket = zsock_new_req(pc->file);
+    if (pc->zocket == NULL) Abort("Could not connect to zocket %s", pc->file);
 }
 
 void
 prob_disconnect(prob_client_t pc)
 {
-    if (zsocket_disconnect(pc->zocket, "%s", pc->file) != 0) Warning(info, "Could not disconnect from zocket %s", pc->file);
-    zsocket_destroy(pc->ctx, pc->zocket);
-    zctx_destroy(&(pc->ctx));
+    if (zsock_disconnect(pc->zocket, "%s", pc->file) != 0) Warning(info, "Could not disconnect from zocket %s", pc->file);
+    zsock_destroy(&pc->zocket);
 }
 
 const char*
@@ -203,16 +197,27 @@ prob_next_state(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
 }
 
 ProBState *
+prob_next_state_short_R2W(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
+{
+    return prob_next_x(pc, s, transitiongroup, size, "X"); // next short R2W
+}
+
+ProBState *
 prob_next_action(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
 {
     return prob_next_x(pc, s, transitiongroup, size, "next-update");
 }
 
-int
-prob_get_state_label(prob_client_t pc, ProBState s, char *label)
+ProBState *
+prob_next_action_short_R2W(prob_client_t pc, ProBState s, char *transitiongroup, int *size)
 {
+    return prob_next_x(pc, s, transitiongroup, size, "A"); // next action R2W
+}
+
+static int
+prob_get_label(prob_client_t pc, ProBState s, char *label, char *header) {
     zmsg_t *request = zmsg_new();
-    zmsg_addstr(request, "get-state-label");
+    zmsg_addstr(request, header);
     zmsg_addstrf(request, "%d", pc->id_count);
     zmsg_addstrf(request, "DA%s", label);
     prob_put_state(request, s);
@@ -229,6 +234,18 @@ prob_get_state_label(prob_client_t pc, ProBState s, char *label)
     RTfree(result_s);
     zmsg_destroy(&response);
     return res;
+}
+
+int
+prob_get_state_label(prob_client_t pc, ProBState s, char *label)
+{
+    return prob_get_label(pc, s, label, "get-state-label");
+}
+
+int
+prob_get_state_label_short(prob_client_t pc, ProBState s, char *label)
+{
+    return prob_get_label(pc, s, label, "LBLs");
 }
 
 void prob_get_label_group(prob_client_t pc, ProBState s, int group, int *res) {
