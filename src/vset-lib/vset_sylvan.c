@@ -1108,7 +1108,7 @@ TASK_4(BDD, go_sat, BDD, set, vrel_t*, rels, int, count, int, id)
         /* Recursive computation */
         BDD low = mtbdd_refs_push(RUN(go_sat, sylvan_low(set), rels, count, id));
         BDD high = mtbdd_refs_push(RUN(go_sat, sylvan_high(set), rels, count, id));
-        mtbdd_refs_pop(1);
+        mtbdd_refs_pop(2);
         result = sylvan_makenode(sylvan_var(set), low, high);
     }
     // Store in cache

@@ -1028,7 +1028,7 @@ TASK_5(MDD, lddmc_go_sat, MDD, set, vrel_t*, rels, int, depth, int, count, int, 
         /* Recursive computation */
         MDD right = lddmc_refs_push(RUN(lddmc_go_sat, lddmc_getright(set), rels, depth, count, id));
         MDD down = lddmc_refs_push(RUN(lddmc_go_sat, lddmc_getdown(set), rels, depth+1, count, id));
-        lddmc_refs_pop(1);
+        lddmc_refs_pop(2);
         result = lddmc_makenode(lddmc_getvalue(set), down, right);
     }
     // Store in cache
