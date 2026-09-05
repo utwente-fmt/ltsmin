@@ -289,3 +289,93 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
         vset_destroy(dlk_temp);
     }
 }
+
+/**
+ * ReachDD (Alg. 4): one recursive decision diagram operation over the whole
+ * list of local relations, splitting each relation at every level of its span
+ * instead of applying it whole at its entry level.
+ *
+ * On-the-fly learning.  Unlike reach_sat, this driver installs NO
+ * vrel_set_expand callbacks, and that is a correctness requirement, not a
+ * policy.  ReachDD splits a relation into residuals, which are nodes
+ * *inside* the relation diagram reached by pointer chasing from its root; a
+ * residual is a snapshot that a transition learned afterwards invalidates, and
+ * the operation cache is keyed on those residuals, so a stale answer would
+ * also be memoised.  Nor could the callback be called from inside: explore_cb()
+ * needs a complete short vector over the group's whole read projection, while
+ * below the entry level the recursion holds only a sub-diagram over the levels
+ * beneath it, with the bits above ell absent and the prefix deliberately
+ * forgotten (it is what the cache abstracts over).
+ *
+ * Learning is therefore hoisted into an outer chaotic fixpoint, exactly as
+ * reach_sat_fix does around vset_least_fixpoint: learn every group over all of
+ * `visited`, then close `visited` under the now-fixed relations with one
+ * ReachDD call, and repeat until a whole round adds nothing.  This
+ * terminates because `visited` grows monotonically in a finite domain, and it
+ * is a fixpoint of the real transition relation because the loop exits only
+ * after a round in which every state of `visited` was expanded for every group
+ * and the closure still added nothing.
+ */
+void
+reach_dd(reach_proc_t reach_proc, vset_t visited,
+           bitvector_t *reach_groups, long *eg_count, long *next_count, long *guard_count)
+{
+    (void) reach_proc;   /* ReachDD replaces the exploration order entirely */
+    (void) guard_count;
+
+    if (PINS_USE_GUARDS)
+        Abort("guard-splitting not supported with saturation=reachdd");
+
+    if (act_detect != NULL && trc_output != NULL)
+        Abort("Action detection with trace generation not supported");
+
+    if (!vdom_supports_reach_dd(domain))
+        Abort("--saturation=reachdd requires a decision diagram package that "
+              "implements ReachDD; use --vset=sylvan");
+
+    int level = 0;
+    vset_t old_vis = vset_create(domain, -1, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+
+    while (!vset_equal(visited, old_vis)) {
+        if (trc_output != NULL) save_level(visited);
+        vset_copy(old_vis, visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+        /* Learn every selected relation over ALL of `visited`, so that every
+         * relation ReachDD splits is complete for every state it will see.
+         * expand_group_next is incremental (it subtracts group_explored), so
+         * re-running it each round is cheap after the first. */
+        for(int i = 0; i < nGrps; i++){
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            expand_group_next(i, visited);
+            reach_chain_stop();
+            (*eg_count)++;
+        }
+        /* AFTER the expand loop: every state in `deadlocks` has now been
+         * expanded for every group, so the successor test below cannot report
+         * a spurious deadlock caused by a half-learned relation. */
+        if (dlk_detect) vset_copy(deadlocks, visited);
+        if (USE_PARALLELISM) vset_reach_dd_par(visited, visited, group_next, nGrps);
+        else vset_reach_dd(visited, visited, group_next, nGrps);
+        (*next_count)++;
+        check_invariants(visited, level);
+        if (dlk_detect) {
+            for (int i = 0; i < nGrps; i++) {
+                vset_prev(dlk_temp, visited, group_next[i],deadlocks);
+                reduce(i, dlk_temp);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+            deadlock_check(deadlocks, reach_groups);
+        }
+        vset_reorder(domain);
+    }
+
+    vset_destroy(old_vis);
+    if (dlk_detect) {
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
+    }
+}

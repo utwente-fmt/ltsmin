@@ -303,6 +303,9 @@ static void run_reachability(vset_t states, char *etf_output)
     case SAT:
         sat_proc = reach_sat;
         break;
+    case REACH_DD:
+        sat_proc = reach_dd;
+        break;
     }
 
     switch (guide_strategy) {

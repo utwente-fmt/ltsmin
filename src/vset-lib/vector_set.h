@@ -357,6 +357,32 @@ void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
 
 void vset_least_fixpoint_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
 
+/**
+\brief Compute the states reachable from src under rels with the ReachDD
+operation (Alg. 4): one recursive decision diagram operation over the whole
+list of local relations, splitting each relation at every level of its span
+rather than applying it whole at its entry level.
+
+Both dst and src must be defined over the complete domain (k == -1), as for
+vset_least_fixpoint.
+
+Unlike vset_least_fixpoint, the relations are NOT expanded on the fly: any
+expand callback set with vrel_set_expand is ignored.  A residual of a split
+relation is a node inside that relation's diagram, so a transition learned
+after the split would leave the recursion holding a stale snapshot, and the
+operation cache would serve it again.  The caller must therefore learn each
+relation over all of src before the call and iterate to a fixpoint itself; see
+reach_dd() in pins2lts-sym/alg/sat.c.
+*/
+void vset_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
+
+void vset_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
+
+/**
+\brief Whether the decision diagram package implements vset_reach_dd.
+*/
+extern int vdom_supports_reach_dd(vdom_t dom);
+
 void vset_dot(FILE* fp, vset_t src);
 
 void vrel_dot(FILE* fp, vrel_t src);

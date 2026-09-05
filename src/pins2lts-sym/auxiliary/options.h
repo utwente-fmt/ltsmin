@@ -43,7 +43,7 @@ typedef enum {
 
 extern strategy_t strategy;
 
-typedef enum { NO_SAT, SAT_LIKE, SAT_LOOP, SAT_FIX, SAT } sat_strategy_t;
+typedef enum { NO_SAT, SAT_LIKE, SAT_LOOP, SAT_FIX, SAT, REACH_DD } sat_strategy_t;
 
 extern sat_strategy_t sat_strategy;
 

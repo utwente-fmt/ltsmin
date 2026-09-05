@@ -1156,6 +1156,21 @@ set_least_fixpoint_par(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
     dst->mdd = RUN(lddmc_go_sat_par, src->mdd, rels, 0, rel_count, id);
 }
 
+/**
+ * ReachDD (Alg. 4) is implemented for the Sylvan BDD back-end only.
+ */
+static void
+set_reach_dd(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
+{
+    (void)dst; (void)src; (void)_rels; (void)rel_count;
+
+    Abort("--saturation=reachdd is not implemented for the LDD back-end. "
+          "ReachDDMdd (Alg. 6) needs the level split to consume one or two "
+          "entries of the LDD 'meta' description per level -- the number cannot "
+          "be read off the diagram -- and the two back-ends do not agree on "
+          "where copy nodes are admitted. Use --vset=sylvan.");
+}
+
 static void
 set_function_pointers(vdom_t dom)
 {
@@ -1193,6 +1208,10 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_prev=set_prev;
     dom->shared.set_least_fixpoint=set_least_fixpoint;
     dom->shared.set_least_fixpoint_par=set_least_fixpoint_par;
+    /* Both hooks get the same aborting function, so that the message does not
+     * depend on which branch USE_PARALLELISM takes. */
+    dom->shared.set_reach_dd=set_reach_dd;
+    dom->shared.set_reach_dd_par=set_reach_dd;
 
     dom->shared.rel_create_rw=rel_create_rw;
     dom->shared.rel_destroy=rel_destroy;
