@@ -309,7 +309,10 @@ wrapper library for `mman`, which can be downloaded from: https://github.com/wit
 #### Sylvan
 
 To build the parallel symbolic algorithms, [Sylvan](https://github.com/trolando/sylvan)
-(>=1.4) is required.
+(>=1.11.0, <1.12) is required.
+Since Sylvan 1.10, [Lace](https://github.com/trolando/lace) is a separate package;
+Sylvan 1.11 requires Lace (>=1.7.0). Install it first, and make sure both
+`sylvan.pc` and `lace.pc` are on `PKG_CONFIG_PATH`.
 If Sylvan is installed in a non-standard location please refer to
 [this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
 and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).

@@ -13,8 +13,8 @@
 #include <mc-lib/atomics.h>
 #include <util-lib/fast_hash.h>
 
-#include <sylvan_cache.h>
 #include <sylvan.h>
+#include <sylvan_cache.h>
 
 struct vector_domain {
     struct vector_domain_shared shared;
@@ -325,7 +325,7 @@ static void
 set_enum(vset_t set, vset_element_cb cb, void* context)
 {
     struct enum_context ctx = (struct enum_context){cb, context};
-    lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
+    lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)enumer_CALL, &ctx);
 }
 
 struct set_update_context
@@ -355,7 +355,7 @@ static void
 set_update(vset_t dst, vset_t set, vset_update_cb cb, void* context)
 {
     struct set_update_context ctx = (struct set_update_context){dst, cb, context};
-    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(set_updater), &ctx);
+    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)set_updater_CALL, &ctx);
     lddmc_refs_push(result);
     dst->mdd = lddmc_union(dst->mdd, result);
     lddmc_refs_pop(1);
@@ -387,7 +387,7 @@ set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb,
 
     MDD cube = lddmc_refs_push(lddmc_cube((uint32_t*)match, p_len));
     struct enum_context ctx = (struct enum_context){.cb=cb, .context=context};
-    lddmc_match_sat_par(set->mdd, cube, meta_mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
+    lddmc_match_sat_par(set->mdd, cube, meta_mdd, (lddmc_enum_cb)enumer_CALL, &ctx);
     lddmc_refs_pop(2);
 }
 
@@ -671,7 +671,7 @@ static void
 rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void* context)
 {
     struct rel_update_context ctx = (struct rel_update_context){rel, cb, context};
-    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(rel_updater), &ctx);
+    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)rel_updater_CALL, &ctx);
 
     MDD cur = rel->mdd;
     lddmc_refs_pushptr(&cur);
@@ -921,9 +921,9 @@ set_visit_prepare(vset_t set, vset_visit_callbacks_t* cbs, size_t user_ctx_size,
     context->proj = set->meta;
     context->user_context = user_ctx;
 
-    lddmc_cbs->lddmc_visit_pre = TASK(lddmc_visit_pre);
-    lddmc_cbs->lddmc_visit_init_context = TASK(lddmc_visit_init_context);
-    lddmc_cbs->lddmc_visit_post = TASK(lddmc_visit_post);
+    lddmc_cbs->lddmc_visit_pre = lddmc_visit_pre_CALL;
+    lddmc_cbs->lddmc_visit_init_context = lddmc_visit_init_context_CALL;
+    lddmc_cbs->lddmc_visit_post = lddmc_visit_post_CALL;
 }
 
 static void

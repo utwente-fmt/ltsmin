@@ -573,7 +573,7 @@ static void
 set_update(vset_t dst, vset_t src, vset_update_cb cb, void* context)
 {
     struct set_update_context ctx = (struct set_update_context){dst, src, cb, context};
-    BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_set_updater), (void*)&ctx);
+    BDD result = sylvan_collect(src->bdd, src->state_variables, bdd_set_updater_CALL, (void*)&ctx);
     mtbdd_refs_push(result);
     dst->bdd = sylvan_or(dst->bdd, result);
     mtbdd_refs_pop(1);
@@ -1031,7 +1031,7 @@ static void
 rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
 {
     struct rel_update_context ctx = (struct rel_update_context){dst, src, src->k == -1 ? src->dom->vectorsize : src->k, cb, context};
-    BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_rel_updater), (void*)&ctx);
+    BDD result = sylvan_collect(src->bdd, src->state_variables, bdd_rel_updater_CALL, (void*)&ctx);
 
     BDD cur = dst->bdd;
     mtbdd_refs_pushptr(&cur);
@@ -1447,8 +1447,8 @@ ltsmin_initialize_sylvan()
     sylvan_set_sizes(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
     sylvan_init_package();
     sylvan_set_granularity(granularity);
-    sylvan_gc_hook_pregc(TASK(gc_start));
-    sylvan_gc_hook_postgc(TASK(gc_end));
+    sylvan_gc_hook_pregc(gc_start_CALL);
+    sylvan_gc_hook_postgc(gc_end_CALL);
 }
 
 /**
