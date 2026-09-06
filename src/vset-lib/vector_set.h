@@ -366,16 +366,36 @@ rather than applying it whole at its entry level.
 Both dst and src must be defined over the complete domain (k == -1), as for
 vset_least_fixpoint.
 
-Unlike vset_least_fixpoint, the relations are NOT expanded on the fly: any
-expand callback set with vrel_set_expand is ignored.  A residual of a split
-relation is a node inside that relation's diagram, so a transition learned
-after the split would leave the recursion holding a stale snapshot, and the
-operation cache would serve it again.  The caller must therefore learn each
-relation over all of src before the call and iterate to a fixpoint itself; see
-reach_dd() in pins2lts-sym/alg/sat.c.
+Expand callbacks set with vrel_set_expand are honoured: each relation is
+expanded at its entry level, which is the lowest level of its domain and hence
+the last place its whole read projection is available -- the same place
+saturation expands it.  The caller does not need an outer fixpoint to learn.
+
+One caveat.  The operation may return a set containing a full cube that it
+never expanded (a full cube is closed under any relation whose domain lies
+inside it, so the answer is right, but enumerating it would hand the front end
+the entire short-vector space).  A caller that needs the explored sets to cover
+the result -- deadlock detection does -- must therefore still make one expand
+pass of its own over the answer; see reach_dd() in pins2lts-sym/alg/sat.c.
 */
 void vset_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
 
+/**
+\brief As vset_reach_dd, under the parallel schedule of Alg. 5 (ReachDDPar).
+
+Alg. 5 reorders one loop body of Alg. 4 -- the two recursions, then the two
+cross images, then the two unions each become a spawn/call/sync pair, and every
+ImageAll becomes a balanced reduction over its writer list -- and changes
+nothing else.  Both are chaotic iterations of the same monotone statements with
+the same exit test, so the RESULT IS IDENTICAL; only the number of rounds can
+differ.  Everything said about vset_reach_dd, including the expand callbacks
+and the unexpanded-full-cube caveat, holds unchanged.
+
+Requires that the expand callbacks be safe to invoke from several Lace workers
+at once, exactly as vset_least_fixpoint_par does.  The implementation may fall
+back to the sequential schedule (with one worker, or where the relations are
+pinned to the apply-whole schedule), which is always answer-equivalent.
+*/
 void vset_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
 
 /**

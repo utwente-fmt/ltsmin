@@ -135,9 +135,10 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
         sat_strategy = res;
 
         if (sat_strategy == REACH_DD && HREme(HREglobal()) == 0) {
-            Warning(info, "ReachDD does not learn transitions inside the operation: "
-                          "relations are expanded over all visited states before each "
-                          "call, and the driver iterates to a fixpoint.");
+            Warning(info, "ReachDD expands each relation at its entry level, inside "
+                          "the operation, as saturation does; the driver keeps one "
+                          "outer round to confirm the fixpoint. Use --reachdd-no-learn "
+                          "to expand outside the operation instead.");
             if (strategy != BFS_P)
                 Warning(info, "ReachDD ignores --order: it replaces the exploration "
                               "order entirely.");

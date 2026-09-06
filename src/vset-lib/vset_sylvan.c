@@ -23,6 +23,7 @@ static int maxcachesize = 27; // maximum size of operation cache
 static int granularity = 1;   // caching granularity for Sylvan
 static char* sizes = NULL;    // for setting table sizes in command line
 static int reachdd_pin_all = 0; // ReachDD: use the apply-whole schedule
+static int reachdd_learn = 1;   // ReachDD: learn transitions inside the operation
 
 struct poptOption sylvan_options[] = {
     { "sylvan-bits", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &xstatebits, 0, "set number of bits per integer in the state vector", "<bits>"},
@@ -33,6 +34,7 @@ struct poptOption sylvan_options[] = {
     { "sylvan-maxcachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "set maximum size of operation cache to 1<<cachesize", "<maxcachesize>"},
     { "sylvan-granularity", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "only use operation cache every <granularity> BDD levels", "<granularity>"},
     { "reachdd-pin-all", 0, POPT_ARG_VAL, &reachdd_pin_all, 1, "with --saturation=reachdd, apply every relation whole at its entry level (the saturation schedule of Cor. 5) instead of splitting it; for debugging", NULL},
+    { "reachdd-no-learn", 0, POPT_ARG_VAL, &reachdd_learn, 0, "with --saturation=reachdd, do not expand relations inside the operation; the driver then has to learn over all visited states and iterate, as it did before on-the-fly learning; for A/B testing", NULL},
     POPT_TABLEEND
 };
 
@@ -1259,13 +1261,48 @@ set_least_fixpoint_par(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
  * residual is a suffix of that existing set.  Rd_rho is not passed separately:
  * the operation needs it only through Dom (see vset_sylvan_reachdd.h).
  *
- * Expand callbacks are deliberately NOT invoked: a split residual is a node
- * inside the relation diagram and a transition learned afterwards would leave
- * the recursion holding a stale snapshot.  reach_dd() in
- * pins2lts-sym/alg/sat.c hoists the learning into an outer fixpoint.
+ * Expand callbacks ARE honoured, through rl_learn_cb below: ReachDD expands a
+ * relation at its entry level, which is where its whole read projection is
+ * still available and where saturation expands it too.  --reachdd-no-learn
+ * suppresses that and leaves the learning to the caller's own fixpoint.
+ */
+
+/**
+ * The rl_relspec_t::learn callback: expand one relation over the read
+ * projection of S, and hand ReachDD the relation's new diagram.  This is
+ * go_sat's expand block (above), and it is here rather than in
+ * vset_sylvan_reachdd.c because it is the only place that may know what a
+ * struct vector_relation looks like.
+ *
+ * S is rooted by ReachDD (it is the node the call is about to return);
+ * dummy.bdd is rooted across the callback, which allocates.  vset_minus inside
+ * expand_group_next_projected() mutates dummy.bdd, which is why the projection
+ * is a fresh stack set rather than the relation's own.
+ */
+static BDD
+rl_learn_cb(void *self, BDD S)
+{
+    vrel_t rel = (vrel_t)self;
+    struct vector_set dummy;
+    dummy.dom             = rel->dom;
+    dummy.k               = rel->r_k;
+    dummy.proj            = rel->r_proj;
+    dummy.state_variables = rel->state_variables;
+    dummy.bdd             = sylvan_project(S, dummy.state_variables);
+    mtbdd_refs_pushptr(&dummy.bdd);
+    rel->expand(rel, &dummy, rel->expand_ctx);
+    mtbdd_refs_popptr(1);
+    return rel->bdd;
+}
+
+/**
+ * The body of both ReachDD entry points.  par selects Alg. 5's loop schedule
+ * over Alg. 4's; everything else -- the projections, the learn callbacks, the
+ * safety valve, the context -- is identical, because the two schedules differ
+ * only in the order of one loop body's statements.
  */
 static void
-set_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+reachdd_run(vset_t dst, vset_t src, vrel_t rels[], int rel_count, int par)
 {
     vdom_t dom = src->dom;
     const int n = dom->totalbits;
@@ -1303,6 +1340,13 @@ set_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
         specs[m].all_variables = rels[m]->all_variables;
         specs[m].dombits       = dombits;
         specs[m].wbits         = wbits;
+        if (reachdd_learn && rels[m]->expand != NULL) {
+            specs[m].learn      = rl_learn_cb;
+            specs[m].learn_self = rels[m];
+        } else {
+            specs[m].learn      = NULL;
+            specs[m].learn_self = NULL;
+        }
     }
 
     rl_gc_hooks_install();
@@ -1312,39 +1356,76 @@ set_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
     /* ctx == NULL means Reduce emptied the list at the root: every relation is
      * zero or writes nothing, so [[L]] is empty and S.[[L]]* = S. */
     const uint64_t cells_before = rl_cells_created();
-    dst->bdd = (ctx == NULL) ? src->bdd : rl_run(ctx, src->bdd);
-    Warning(infoLong, "ReachDD: %d relations over %d levels, %u interned residual "
-                      "projections, %"PRIu64" residual cells consed",
+    const uint64_t calls_before = rl_calls_made();
+    const uint64_t hits_before  = rl_cache_hits();
+    const uint64_t waive_before = rl_cube_waivers();
+    dst->bdd = (ctx == NULL) ? src->bdd
+             : (par ? rl_run_par(ctx, src->bdd) : rl_run(ctx, src->bdd));
+    Warning(infoLong, "ReachDD: %s schedule, %d relations over %d levels, "
+                      "%u interned residual "
+                      "projections, %"PRIu64" residual cells consed, "
+                      "%"PRIu64" calls of which %"PRIu64" cache hits, "
+                      "%"PRIu64" unexpanded full cubes (Alg. 4 line 5)",
+            par ? "parallel (Alg. 5)" : "sequential (Alg. 4)",
             rl_ctx_relations(ctx), n, rl_ctx_projections(ctx),
-            rl_cells_created() - cells_before);
+            rl_cells_created() - cells_before,
+            rl_calls_made() - calls_before,
+            rl_cache_hits() - hits_before,
+            rl_cube_waivers() - waive_before);
     rl_ctx_destroy(ctx);
 
     RTfree(specs);
     RTfree(bits);
 }
 
-/**
- * The parallel loop schedule of Alg. 5 is not implemented.  Note that the
- * sequential schedule is *not* single threaded: it runs inside Lace and its
- * sylvan_relnext / sylvan_or / sylvan_exists sub-operations still fan out over
- * every worker, exactly as go_sat (sequential saturation) does.
- */
+static void
+set_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    reachdd_run(dst, src, rels, rel_count, 0);
+}
+
 static int
 reach_dd_supported()
 {
     return 1;
 }
 
+/**
+ * ReachDDPar (Alg. 5): the same operation with the loop body of Alg. 4
+ * reordered so that the two recursions, then the two cross ImageAlls, then the
+ * two unions each run as a spawn/call/sync pair, and each ImageAll is a
+ * balanced reduction over its writer list.  It computes the same fixpoint (see
+ * vset_sylvan_reachdd.c); only the number of rounds can differ.
+ *
+ * The sequential schedule stays reachable on three routes, and all three are
+ * deliberate.
+ *
+ * (1) --reachdd-pin-all.  Cor. th:sat-special is an ordering claim as much as
+ *     a scheduling one: a pinned relation is applied whole, at its entry
+ *     level, in sequence, which is exactly what saturation does.  That switch
+ *     exists to assert precisely this, so it must not run under a reordered
+ *     loop -- and the operation additionally forces Alg. 4's body at any level
+ *     with pinned relations entering, because the GC safety valve can turn
+ *     pinning on in the middle of a run.
+ *
+ * (2) One worker.  SPAWN/SYNC then degenerate to inline execution, which is
+ *     correct but pays a deque push, a fence and a leapfrog test per level for
+ *     nothing.
+ *
+ * (3) MT-unsafe front ends.  pins2lts-sym calls this entry point only when
+ *     USE_PARALLELISM is set, i.e. for a SPEC_MT_SAFE language module.  Under
+ *     learning ReachDD does invoke expand from inside the operation, on
+ *     several workers at once, exactly as parallel saturation's go_sat_par
+ *     does, so honouring that flag matters.
+ *
+ * And a deterministic single-threaded reference run is the first thing one
+ * wants when a state count comes out wrong.
+ */
 static void
 set_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
-    static volatile int warned = 0;
-    if (__sync_bool_compare_and_swap(&warned, 0, 1)) {
-        Warning(info, "ReachDD: the parallel loop schedule (Alg. 5) is not implemented; "
-                      "running the sequential schedule (Alg. 4). Its Sylvan sub-operations "
-                      "still use all Lace workers.");
-    }
-    set_reach_dd(dst, src, rels, rel_count);
+    reachdd_run(dst, src, rels, rel_count,
+                lace_workers() > 1 && !reachdd_pin_all);
 }
 
 static void

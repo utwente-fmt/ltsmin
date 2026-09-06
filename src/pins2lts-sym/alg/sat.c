@@ -295,26 +295,28 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
  * list of local relations, splitting each relation at every level of its span
  * instead of applying it whole at its entry level.
  *
- * On-the-fly learning.  Unlike reach_sat, this driver installs NO
- * vrel_set_expand callbacks, and that is a correctness requirement, not a
- * policy.  ReachDD splits a relation into residuals, which are nodes
- * *inside* the relation diagram reached by pointer chasing from its root; a
- * residual is a snapshot that a transition learned afterwards invalidates, and
- * the operation cache is keyed on those residuals, so a stale answer would
- * also be memoised.  Nor could the callback be called from inside: explore_cb()
- * needs a complete short vector over the group's whole read projection, while
- * below the entry level the recursion holds only a sub-diagram over the levels
- * beneath it, with the bits above ell absent and the prefix deliberately
- * forgotten (it is what the cache abstracts over).
+ * On-the-fly learning.  Like reach_sat, this driver installs vrel_set_expand
+ * callbacks, and ReachDD expands each relation at its ENTRY level, on the node
+ * it is about to return there.  That is the same place saturation expands, and
+ * for the same reason: the entry level is min Dom, so the whole read
+ * projection is still available, while below it the read bits are gone.  A
+ * learned transition changes only the relation's root, and the residual chain
+ * is hash-consed on residual handles, so it re-keys itself; the argument that
+ * the operation cache needs no invalidation either is invariant (E), written
+ * out in vset-lib/vset_sylvan_reachdd.c.
  *
- * Learning is therefore hoisted into an outer chaotic fixpoint, exactly as
- * reach_sat_fix does around vset_least_fixpoint: learn every group over all of
- * `visited`, then close `visited` under the now-fixed relations with one
- * ReachDD call, and repeat until a whole round adds nothing.  This
- * terminates because `visited` grows monotonically in a finite domain, and it
- * is a fixpoint of the real transition relation because the loop exits only
- * after a round in which every state of `visited` was expanded for every group
- * and the closure still added nothing.
+ * The outer chaotic fixpoint is nevertheless KEPT, for three reasons that all
+ * still hold once learning has moved inside.  (1) Alg. 4 line 5 returns a full
+ * cube without expanding it -- correct as an answer, since a full cube is
+ * closed under any relation living inside it, but it leaves the explored sets
+ * possibly short of pi(visited), which deadlock detection needs.  (2) Groups
+ * that ReachDD's Reduce drops at the root (an empty write projection: they are
+ * the identity) are never expanded from inside at all.  (3) The extra round is
+ * a runtime check of exactly the failure mode this schedule has, a silently
+ * missing transition: if the closure were not (E)-closed, the round would
+ * learn something and `visited` would grow.  With learning inside, that
+ * fixpoint converges in two rounds -- one that does the work, one that
+ * confirms -- instead of once per relation diameter.
  */
 void
 reach_dd(reach_proc_t reach_proc, vset_t visited,
@@ -333,6 +335,20 @@ reach_dd(reach_proc_t reach_proc, vset_t visited,
         Abort("--saturation=reachdd requires a decision diagram package that "
               "implements ReachDD; use --vset=sylvan");
 
+    /* Exactly reach_sat's installation: ReachDD calls these at each relation's
+     * entry level.  --reachdd-no-learn makes vset_reach_dd ignore them again,
+     * leaving all the learning to the loop below. */
+    for (int i = 0; i < nGrps; i++) {
+        if (bitvector_is_set(reach_groups, i)) {
+            struct expand_info *ctx = RTmalloc(sizeof(struct expand_info));
+            ctx->group = i;
+            ctx->group_explored = group_explored[i];
+            ctx->eg_count = eg_count;
+
+            vrel_set_expand(group_next[i], expand_group_next_projected, ctx);
+        }
+    }
+
     int level = 0;
     vset_t old_vis = vset_create(domain, -1, NULL);
     vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
@@ -343,10 +359,12 @@ reach_dd(reach_proc_t reach_proc, vset_t visited,
         vset_copy(old_vis, visited);
         stats_and_progress_report(NULL, visited, level);
         level++;
-        /* Learn every selected relation over ALL of `visited`, so that every
-         * relation ReachDD splits is complete for every state it will see.
-         * expand_group_next is incremental (it subtracts group_explored), so
-         * re-running it each round is cheap after the first. */
+        /* Learn every selected relation over ALL of `visited`.  With learning
+         * inside the operation this pass has nothing left to find except the
+         * two gaps listed above; it is kept because those gaps are real, and
+         * because a round that does find something is the signal that the
+         * closure was not (E)-closed.  expand_group_next is incremental (it
+         * subtracts group_explored), so a round that finds nothing is cheap. */
         for(int i = 0; i < nGrps; i++){
             if (!bitvector_is_set(reach_groups, i)) continue;
             expand_group_next(i, visited);
