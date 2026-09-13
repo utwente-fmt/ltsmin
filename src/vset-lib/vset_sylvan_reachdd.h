@@ -153,6 +153,34 @@ extern uint64_t rl_cache_hits(void);
 extern uint64_t rl_cube_waivers(void);
 
 /**
+ * \brief How many times the level-fixpoint loop (line 11) has run its body,
+ *        summed over every level (diagnostic).  Alg. 5's Jacobi schedule can
+ *        need more rounds per level than Alg. 4's Gauss-Seidel one; this is
+ *        where that shows.
+ */
+extern uint64_t rl_rounds_run(void);
+
+/**
+ * \brief How many calls reached that loop, i.e. how many level fixpoints were
+ *        run (diagnostic).  rl_rounds_run() / rl_fixpoints_run() is the mean
+ *        number of rounds a level fixpoint needs; the round total on its own
+ *        is pinned to the call total, one rl_run satisfying
+ *        rl_calls_made() == 1 + 2 * rl_rounds_run() exactly.
+ */
+extern uint64_t rl_fixpoints_run(void);
+
+/**
+ * \brief Histogram of |A|, the number of relations handed to one ImageAll,
+ *        over every ImageAll of lines 13 and 15 (diagnostic).  Buckets 0..4
+ *        are |A| = 0..4 exactly, 5 is 5-8, 6 is 9-16, 7 is 17 or more.
+ *
+ * The balanced spawn tree of rl_imageall only branches at |A| >= 2, so this
+ * says whether the parallelism Sec. 4 claims saturation cannot expose is
+ * present in a given model at all.  Exact at one worker, indicative above.
+ */
+extern uint64_t rl_imageall_arity(int bucket);
+
+/**
  * \brief Number of interned residual projections in this context.
  */
 extern uint32_t rl_ctx_projections(const rl_ctx_t *ctx);

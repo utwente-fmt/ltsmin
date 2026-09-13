@@ -261,6 +261,57 @@ static volatile uint64_t rl_hits_global  = 0;   /* of those, cache hits       */
  * one place the operation returns states it has not expanded for.  Zero means
  * the explored sets provably cover the answer. */
 static volatile uint64_t rl_waive_global = 0;
+/* Executions of the level-fixpoint loop body (Alg. 4 line 11, Alg. 5 line 11),
+ * summed over every level.  Alg. 5 breaks the dependency of line 14 on line 13
+ * -- its recursion on S1 reads the pre-round S1, where Alg. 4's reads the one
+ * line 13 has just enriched -- so the loop is Jacobi where Alg. 4's is
+ * Gauss-Seidel and one round of it can propagate less.  This is where that
+ * costs something. */
+static volatile uint64_t rl_rounds_global = 0;
+/* Calls that reached that loop at all, i.e. level fixpoints actually run.
+ * Every round makes exactly two recursive calls and every call but the root
+ * of an rl_run comes from a round, so over one run the round total is pinned
+ * to the call total by calls == 1 + 2*rounds and carries nothing of its own.
+ * The quotient rl_rounds_global / rl_fixp_global is what it adds: the mean
+ * number of rounds one level fixpoint needs, which separates "the recursion
+ * tree grew" from "a level needed another pass". */
+static volatile uint64_t rl_fixp_global = 0;
+
+/* Histogram of |A|: how many relations one ImageAll is handed.
+ *
+ * Sec. 4 "Parallelism" makes the |A| images inside one ImageAll the source of
+ * parallelism saturation cannot expose, and rl_imageall spends a balanced
+ * spawn tree of depth O(log|A|) on them.  That tree only branches at |A| >= 2:
+ * |A| = 1 is one relnext and |A| = 0 a terminal, and at both the claimed
+ * parallelism is simply not there.  Whether a model exercises the claim at all
+ * is therefore a property of the model's split, and this is where it is read
+ * off.  Counted per round at the two ImageAll invocations of lines 13 and 15,
+ * on both schedules alike -- Alg. 4 guards them on na != 0 where Alg. 5 lets
+ * rl_imageall answer from its terminal, but the algorithm has both either way.
+ *
+ * NOT ATOMIC, deliberately.  This is one increment per ImageAll on the hot
+ * path; a contended cache line here would perturb the very scaling it exists
+ * to explain.  It is exact at one worker -- which is where |A| is a property
+ * of the split rather than of the schedule -- and indicative only above that.
+ *
+ * OFF BY DEFAULT, and that is not tidiness.  A single shared histogram written
+ * a few million times per run is a false-shared cache line on the hot path,
+ * which at 64 workers would cost more than the effect any scaling sweep is
+ * trying to see -- the instrument would perturb the measurement it exists to
+ * explain.  Set REACHDD_ARITY=1 to collect it, which is a one-worker activity
+ * anyway; leave it unset for timing runs, where the cost is one predictable
+ * branch on a read-only global. */
+#define RL_NA_BUCKETS 8
+static uint64_t rl_na_hist[RL_NA_BUCKETS] = { 0 };
+/* Read once in rl_ctx_create, before any worker can reach rl_note_na. */
+static int rl_arity_on = 0;
+
+static inline void
+rl_note_na(int na)
+{
+    if (!rl_arity_on) return;
+    rl_na_hist[na <= 4 ? na : na <= 8 ? 5 : na <= 16 ? 6 : 7]++;
+}
 
 static inline int
 rl_pinning(void)
@@ -296,6 +347,24 @@ uint64_t
 rl_cube_waivers(void)
 {
     return rl_waive_global;
+}
+
+uint64_t
+rl_rounds_run(void)
+{
+    return rl_rounds_global;
+}
+
+uint64_t
+rl_fixpoints_run(void)
+{
+    return rl_fixp_global;
+}
+
+uint64_t
+rl_imageall_arity(int bucket)
+{
+    return (bucket >= 0 && bucket < RL_NA_BUCKETS) ? rl_na_hist[bucket] : 0;
 }
 
 uint32_t
@@ -469,6 +538,8 @@ rl_ctx_create(int n, const rl_relspec_t *specs, int k)
         Abort("reachdd: state vector of %d bits is too wide for the reserved "
               "cell variable range; use --saturation=sat", n);
     }
+
+    rl_arity_on = (getenv("REACHDD_ARITY") != NULL);
 
     rl_ctx_t *ctx = (rl_ctx_t*)RTmalloc(sizeof(rl_ctx_t));
     memset(ctx, 0, sizeof(rl_ctx_t));
@@ -1307,7 +1378,9 @@ TASK_5(BDD, rl_reach, BDD, S, MTBDD, L, uint32_t, lvl, rl_ctx_t*, ctx, int, par)
     const int par_here = par && npin == 0;
 
     int na01 = 0, na10 = 0, stale = 1;
+    __sync_fetch_and_add(&rl_fixp_global, 1u);   /* diagnostic only */
     for (;;) {                                                     /* line 11 */
+        __sync_fetch_and_add(&rl_rounds_global, 1u); /* diagnostic only */
         if (learn_here) {
             cur = sylvan_makenode(2u * lvl, s0, s1);
             rl_learn_level(ctx, pending, enter_end, cur);
@@ -1349,6 +1422,10 @@ TASK_5(BDD, rl_reach, BDD, S, MTBDD, L, uint32_t, lvl, rl_ctx_t*, ctx, int, par)
         }
         p0 = s0;
         p1 = s1;
+        /* diagnostic only: the |A| of this round's two ImageAlls (lines 13,
+         * 15), counted on both schedules so the two are comparable. */
+        rl_note_na(na01);
+        rl_note_na(na10);
         if (par_here) {
             /* Alg. 5 phase A: both recursions on the pre-round pair.  s0 and
              * L00 are the spawned task's arguments and neither is touched

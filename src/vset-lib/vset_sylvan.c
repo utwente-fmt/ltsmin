@@ -24,6 +24,7 @@ static int granularity = 1;   // caching granularity for Sylvan
 static char* sizes = NULL;    // for setting table sizes in command line
 static int reachdd_pin_all = 0; // ReachDD: use the apply-whole schedule
 static int reachdd_learn = 1;   // ReachDD: learn transitions inside the operation
+static int reachdd_force_par = 0; // ReachDD: Alg. 5's schedule even at one worker
 
 struct poptOption sylvan_options[] = {
     { "sylvan-bits", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &xstatebits, 0, "set number of bits per integer in the state vector", "<bits>"},
@@ -35,6 +36,7 @@ struct poptOption sylvan_options[] = {
     { "sylvan-granularity", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "only use operation cache every <granularity> BDD levels", "<granularity>"},
     { "reachdd-pin-all", 0, POPT_ARG_VAL, &reachdd_pin_all, 1, "with --saturation=reachdd, apply every relation whole at its entry level (the saturation schedule of Cor. 5) instead of splitting it; for debugging", NULL},
     { "reachdd-no-learn", 0, POPT_ARG_VAL, &reachdd_learn, 0, "with --saturation=reachdd, do not expand relations inside the operation; the driver then has to learn over all visited states and iterate, as it did before on-the-fly learning; for A/B testing", NULL},
+    { "reachdd-force-par", 0, POPT_ARG_VAL, &reachdd_force_par, 1, "with --saturation=reachdd, run the loop schedule of Alg. 5 even at one worker, where SPAWN/SYNC degenerate to inline calls; this isolates the Jacobi/Gauss-Seidel round-count difference from any effect of the hardware; for measurement", NULL},
     POPT_TABLEEND
 };
 
@@ -1359,19 +1361,31 @@ reachdd_run(vset_t dst, vset_t src, vrel_t rels[], int rel_count, int par)
     const uint64_t calls_before = rl_calls_made();
     const uint64_t hits_before  = rl_cache_hits();
     const uint64_t waive_before = rl_cube_waivers();
+    const uint64_t round_before = rl_rounds_run();
+    const uint64_t fixp_before  = rl_fixpoints_run();
     dst->bdd = (ctx == NULL) ? src->bdd
              : (par ? rl_run_par(ctx, src->bdd) : rl_run(ctx, src->bdd));
     Warning(infoLong, "ReachDD: %s schedule, %d relations over %d levels, "
                       "%u interned residual "
                       "projections, %"PRIu64" residual cells consed, "
                       "%"PRIu64" calls of which %"PRIu64" cache hits, "
+                      "%"PRIu64" rounds (line 11) over %"PRIu64" level "
+                      "fixpoints, "
                       "%"PRIu64" unexpanded full cubes (Alg. 4 line 5)",
             par ? "parallel (Alg. 5)" : "sequential (Alg. 4)",
             rl_ctx_relations(ctx), n, rl_ctx_projections(ctx),
             rl_cells_created() - cells_before,
             rl_calls_made() - calls_before,
             rl_cache_hits() - hits_before,
+            rl_rounds_run() - round_before,
+            rl_fixpoints_run() - fixp_before,
             rl_cube_waivers() - waive_before);
+    Warning(infoLong, "ReachDD: |A| over ImageAll (cumulative, exact at one "
+                      "worker): 0:%"PRIu64" 1:%"PRIu64" 2:%"PRIu64" 3:%"PRIu64
+                      " 4:%"PRIu64" 5-8:%"PRIu64" 9-16:%"PRIu64" 17+:%"PRIu64,
+            rl_imageall_arity(0), rl_imageall_arity(1), rl_imageall_arity(2),
+            rl_imageall_arity(3), rl_imageall_arity(4), rl_imageall_arity(5),
+            rl_imageall_arity(6), rl_imageall_arity(7));
     rl_ctx_destroy(ctx);
 
     RTfree(specs);
@@ -1410,7 +1424,10 @@ reach_dd_supported()
  *
  * (2) One worker.  SPAWN/SYNC then degenerate to inline execution, which is
  *     correct but pays a deque push, a fence and a leapfrog test per level for
- *     nothing.
+ *     nothing.  --reachdd-force-par overrides just this one, because that
+ *     degenerate execution is the way to see Alg. 5's round count without any
+ *     of the hardware: at one worker both schedules do the same work per
+ *     round, so whatever differs in the totals is the broken dependency edge.
  *
  * (3) MT-unsafe front ends.  pins2lts-sym calls this entry point only when
  *     USE_PARALLELISM is set, i.e. for a SPEC_MT_SAFE language module.  Under
@@ -1425,7 +1442,7 @@ static void
 set_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
 {
     reachdd_run(dst, src, rels, rel_count,
-                lace_workers() > 1 && !reachdd_pin_all);
+                (lace_workers() > 1 || reachdd_force_par) && !reachdd_pin_all);
 }
 
 static void
