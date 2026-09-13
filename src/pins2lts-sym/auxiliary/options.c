@@ -224,7 +224,7 @@ struct poptOption options[] = {
 #endif
     { "mu-opt", 0, POPT_ARG_VAL, &mu_opt, 1, "optimize fix-point calculations in mu-calculus", NULL },
 
-    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy; reachdd is the recursive ReachDD operation over the relation list (--vset=sylvan only, ignores --order)" , "<none|sat-like|sat-loop|sat-fix|sat|reachdd>" },
+    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy; reachdd is the recursive ReachDD operation over the relation list (--vset=sylvan or --vset=lddmc, ignores --order)" , "<none|sat-like|sat-loop|sat-fix|sat|reachdd>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
     { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },

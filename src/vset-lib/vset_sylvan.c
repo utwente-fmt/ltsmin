@@ -40,6 +40,15 @@ struct poptOption sylvan_options[] = {
     POPT_TABLEEND
 };
 
+/**
+ * The --reachdd-* switches live in this file because sylvan_options is this
+ * file's table and vector_set.c includes it once for both Sylvan back-ends.
+ * vset_lddmc.c's ReachDDMdd needs the same switches, so they are readable
+ * through these accessors; nothing else about the BDD path changes.
+ */
+int reachdd_opt_pin_all(void)   { return reachdd_pin_all; }
+int reachdd_opt_learn(void)     { return reachdd_learn; }
+
 struct vector_domain
 {
     struct vector_domain_shared shared;

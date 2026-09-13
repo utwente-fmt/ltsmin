@@ -333,7 +333,8 @@ reach_dd(reach_proc_t reach_proc, vset_t visited,
 
     if (!vdom_supports_reach_dd(domain))
         Abort("--saturation=reachdd requires a decision diagram package that "
-              "implements ReachDD; use --vset=sylvan");
+              "implements ReachDD; use --vset=sylvan (Alg. 4) or "
+              "--vset=lddmc (Alg. 6)");
 
     /* Exactly reach_sat's installation: ReachDD calls these at each relation's
      * entry level.  --reachdd-no-learn makes vset_reach_dd ignore them again,

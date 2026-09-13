@@ -26,6 +26,7 @@ if HAVE_SYLVAN
 libvset_la_SOURCES  += vset_sylvan.c
 libvset_la_SOURCES  += vset_sylvan_reachdd.c vset_sylvan_reachdd.h
 libvset_la_SOURCES  += vset_lddmc.c
+libvset_la_SOURCES  += vset_lddmc_reachdd.c vset_lddmc_reachdd.h
 libvset_la_CFLAGS   += $(SYLVAN_CFLAGS)
 libvset_la_LIBADD   += $(SYLVAN_LIBS)
 endif
