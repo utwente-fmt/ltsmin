@@ -131,6 +131,23 @@ extern void rl_gc_hooks_install(void);
 extern void rl_set_pin_all(int pin);
 
 /**
+ * \brief Bump the diagnostic counters below in one shared cache line with
+ *        atomic read-modify-writes (1), as they were before they were made
+ *        per-worker, or in per-worker blocks (0, the default).
+ *
+ * Diagnostic only, in both settings: the counters are read by nothing but the
+ * accessors below, so neither invariant (E) nor the expand contract is
+ * involved and no answer can change.  What does change is the cost, which on
+ * an 8-core laptop was 12-23% of the wall clock at 8 workers and zero at one,
+ * so every ReachDD scaling number ever taken with the shared path carries an
+ * instrument artifact that grows with worker count.  The switch exists so the
+ * two can be compared in one binary; the totals reported are identical either
+ * way.  Call it once per invocation, before running the operation, with Lace
+ * already started.
+ */
+extern void rl_set_shared_counters(int shared);
+
+/**
  * \brief Number of residual cells consed so far.
  */
 extern uint64_t rl_cells_created(void);

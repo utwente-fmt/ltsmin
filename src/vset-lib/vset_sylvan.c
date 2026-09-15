@@ -25,6 +25,7 @@ static char* sizes = NULL;    // for setting table sizes in command line
 static int reachdd_pin_all = 0; // ReachDD: use the apply-whole schedule
 static int reachdd_learn = 1;   // ReachDD: learn transitions inside the operation
 static int reachdd_force_par = 0; // ReachDD: Alg. 5's schedule even at one worker
+static int reachdd_shared_counters = 0; // ReachDD: one shared line for the counters
 
 struct poptOption sylvan_options[] = {
     { "sylvan-bits", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &xstatebits, 0, "set number of bits per integer in the state vector", "<bits>"},
@@ -37,6 +38,7 @@ struct poptOption sylvan_options[] = {
     { "reachdd-pin-all", 0, POPT_ARG_VAL, &reachdd_pin_all, 1, "with --saturation=reachdd, apply every relation whole at its entry level (the saturation schedule of Cor. 5) instead of splitting it; for debugging", NULL},
     { "reachdd-no-learn", 0, POPT_ARG_VAL, &reachdd_learn, 0, "with --saturation=reachdd, do not expand relations inside the operation; the driver then has to learn over all visited states and iterate, as it did before on-the-fly learning; for A/B testing", NULL},
     { "reachdd-force-par", 0, POPT_ARG_VAL, &reachdd_force_par, 1, "with --saturation=reachdd, run the loop schedule of Alg. 5 even at one worker, where SPAWN/SYNC degenerate to inline calls; this isolates the Jacobi/Gauss-Seidel round-count difference from any effect of the hardware; for measurement", NULL},
+    { "reachdd-shared-counters", 0, POPT_ARG_VAL, &reachdd_shared_counters, 1, "with --saturation=reachdd, bump the diagnostic counters in one shared cache line with atomic read-modify-writes, as they were before they were made per-worker; the counters report the same totals either way, so this measures the cost of the instrument itself (12-23% of the wall clock at 8 workers, nothing at one); for measurement", NULL},
     POPT_TABLEEND
 };
 
@@ -1362,6 +1364,9 @@ reachdd_run(vset_t dst, vset_t src, vrel_t rels[], int rel_count, int par)
 
     rl_gc_hooks_install();
     rl_set_pin_all(reachdd_pin_all);
+    /* Before the counters are read below, and before any worker can bump one:
+     * this also sizes the per-worker table, and Lace is started by now. */
+    rl_set_shared_counters(reachdd_shared_counters);
 
     rl_ctx_t *ctx = rl_ctx_create(n, specs, rel_count);
     /* ctx == NULL means Reduce emptied the list at the root: every relation is

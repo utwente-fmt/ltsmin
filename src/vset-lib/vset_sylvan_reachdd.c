@@ -249,33 +249,147 @@ static volatile int      rl_pin_forced   = 0;   /* set by rl_set_pin_all()    */
 static volatile int      rl_active       = 0;   /* only measure while running */
 static volatile int      rl_starved      = 0;
 static volatile size_t   rl_gc_occupied  = 0;
-static volatile uint64_t rl_cells_global = 0;
 
-/* Diagnostics only, but atomic: under the parallel schedule of Alg. 5 every
- * worker runs rl_reach, so a plain increment would be a data race and would
- * also lose counts.  They are bumped a few hundred thousand times per run,
- * which is far too rarely for the contention to be measurable. */
-static volatile uint64_t rl_calls_global = 0;   /* rl_reach entries           */
-static volatile uint64_t rl_hits_global  = 0;   /* of those, cache hits       */
-/* Alg. 4 line 5 taken with a relation still pending and still learning: the
- * one place the operation returns states it has not expanded for.  Zero means
- * the explored sets provably cover the answer. */
-static volatile uint64_t rl_waive_global = 0;
-/* Executions of the level-fixpoint loop body (Alg. 4 line 11, Alg. 5 line 11),
- * summed over every level.  Alg. 5 breaks the dependency of line 14 on line 13
- * -- its recursion on S1 reads the pre-round S1, where Alg. 4's reads the one
- * line 13 has just enriched -- so the loop is Jacobi where Alg. 4's is
- * Gauss-Seidel and one round of it can propagate less.  This is where that
- * costs something. */
-static volatile uint64_t rl_rounds_global = 0;
-/* Calls that reached that loop at all, i.e. level fixpoints actually run.
- * Every round makes exactly two recursive calls and every call but the root
- * of an rl_run comes from a round, so over one run the round total is pinned
- * to the call total by calls == 1 + 2*rounds and carries nothing of its own.
- * The quotient rl_rounds_global / rl_fixp_global is what it adds: the mean
- * number of rounds one level fixpoint needs, which separates "the recursion
- * tree grew" from "a level needed another pass". */
-static volatile uint64_t rl_fixp_global = 0;
+/**
+ * ------------------------------------------------------------------------
+ * Diagnostic counters
+ * ------------------------------------------------------------------------
+ *
+ * Six counters on rl_reach's hot path.  Nothing reads them but the infoLong
+ * line reachdd_run prints once per invocation, and the safety valve's warning.
+ *
+ * THEY USED TO BE SIX SHARED WORDS BUMPED WITH __sync_fetch_and_add, and the
+ * comment that stood here justified that with "they are bumped a few hundred
+ * thousand times per run, which is far too rarely for the contention to be
+ * measurable".  The premise was wrong by two to three orders of magnitude.
+ * RL_C_CALLS is bumped once per rl_reach entry, and the call totals the very
+ * line that prints these counters reports are 14-62 MILLION per run on
+ * at.3 / elevator2.3 / public_subscribe.2; with RL_C_ROUNDS and RL_C_FIXP
+ * that is three to four atomic read-modify-writes per call.  Worse, the six
+ * words were 48 consecutive bytes of one object file, hence ONE cache line,
+ * so every counter contended with every other.  Measured on an 8-core laptop,
+ * 3 repeats back to back on a quiet machine, wall clock at 8 workers:
+ * elevator2.3 12.80 s -> 9.82 s, at.3 16.01 -> 12.53, public_subscribe
+ * 7.47 -> 6.54 -- 12-23% of the run spent inside the instrument.  At one
+ * worker it costs nothing, and a microbenchmark of exactly this pattern on
+ * that machine has the aggregate throughput of one such line falling from
+ * 134.7 Mops/s at one thread to 6.28 at eight, so the artifact GROWS with
+ * worker count.  Saturation has no per-node atomic at all, so the bias was
+ * entirely against ReachDD, by more the wider the machine.  This is the
+ * argument the |A| histogram below already makes against ITSELF, three
+ * paragraphs down; it simply was never applied here.
+ *
+ * So each worker bumps its own block, padded so that no two workers share a
+ * line, and the accessors sum.  A bump is then a private load-add-store
+ * instead of a contended read-modify-write.
+ *
+ * SOUNDNESS.  Nothing here is part of the algorithm, and that is the whole
+ * argument.  Invariant (E) is a statement about the node a call returns and
+ * the explored sets standing behind it; the expand contract is a statement
+ * about what rl_learn_level hands the front end.  Neither quantifies over a
+ * counter, no counter is read by any control flow -- the only readers are the
+ * six accessors below and the valve's warning string -- and no counter
+ * participates in any happens-before edge the operation relies on (the
+ * orderings that matter are Sylvan's cache_put3/cache_get3, the llmsset
+ * hash-cons, the CAS in rl_learn_one's publish, and Lace's own SPAWN/SYNC).
+ * Dropping the atomic therefore cannot change an answer, a cache entry, a
+ * schedule, a split or a learn call.  It changes what the counters cost, and
+ * nothing else.
+ *
+ * AND THE TOTALS ARE IDENTICAL, not merely close.  A block is written by one
+ * worker and no other, so no increment can be lost and none needs an atomic;
+ * the accessors run in reachdd_run, before RUN(rl_reach) and after it has
+ * returned, where no rl_reach is in flight and Lace's task-completion
+ * protocol has already ordered every worker's stores before the reader's
+ * loads.  rl_count sums the shared array in as well, so a run made with
+ * --reachdd-shared-counters and one made without report the same way, and
+ * even flipping the switch between two invocations in one process keeps the
+ * totals exact.
+ *
+ * --reachdd-shared-counters puts the old contended path back, in the same
+ * binary, so the cost of the instrument can be measured rather than assumed.
+ */
+enum {
+    /* Residual cells consed.  Also what the safety valve quotes. */
+    RL_C_CELLS = 0,
+    /* rl_reach entries, and of those, the ones answered from the cache. */
+    RL_C_CALLS,
+    RL_C_HITS,
+    /* Alg. 4 line 5 taken with a relation still pending and still learning:
+     * the one place the operation returns states it has not expanded for.
+     * Zero means the explored sets provably cover the answer. */
+    RL_C_WAIVE,
+    /* Executions of the level-fixpoint loop body (Alg. 4 line 11, Alg. 5
+     * line 11), summed over every level.  Alg. 5 breaks the dependency of
+     * line 14 on line 13 -- its recursion on S1 reads the pre-round S1, where
+     * Alg. 4's reads the one line 13 has just enriched -- so the loop is
+     * Jacobi where Alg. 4's is Gauss-Seidel and one round of it can propagate
+     * less.  This is where that costs something. */
+    RL_C_ROUNDS,
+    /* Calls that reached that loop at all, i.e. level fixpoints actually run.
+     * Every round makes exactly two recursive calls and every call but the
+     * root of an rl_run comes from a round, so over one run the round total is
+     * pinned to the call total by calls == 1 + 2*rounds and carries nothing of
+     * its own.  The quotient RL_C_ROUNDS / RL_C_FIXP is what it adds: the mean
+     * number of rounds one level fixpoint needs, which separates "the
+     * recursion tree grew" from "a level needed another pass". */
+    RL_C_FIXP,
+    RL_C_MAX
+};
+
+/* A cache line is 64 bytes on x86 and 128 on Apple silicon, and both prefetch
+ * the neighbour; 1024 is simply wide enough that no two workers can collide
+ * however the allocator lands the array.  At 256 workers the table is 256 KiB,
+ * allocated once and touched one line per worker. */
+#define RL_CTR_PAD 1024
+
+typedef union {
+    uint64_t v[RL_C_MAX];
+    char     pad[RL_CTR_PAD];
+} rl_ctrs_t;
+
+/* The shared fallback, still atomic because it really is shared: used when
+ * --reachdd-shared-counters asks for it, when the table could not be
+ * allocated, and when a worker id falls outside the table.  Exactness of the
+ * totals never rests on the bound.
+ *
+ * It gets a block of its own, aligned, for a reason that is about measurement
+ * rather than about speed: --reachdd-shared-counters has to be a FAIR stand-in
+ * for the six-words-in-one-line original, and the three control words below
+ * are read on every bump.  Left to the linker they land in the same 64-byte
+ * line as rl_ctr_sh.v[0] -- a hot read falsely sharing with a hot write, which
+ * the original did not have -- and the control arm would then be slower than
+ * the code it stands in for, flattering the per-worker path by the difference.
+ */
+static union {
+    volatile uint64_t v[RL_C_MAX];
+    char              pad[RL_CTR_PAD];
+} rl_ctr_sh __attribute__((aligned(128)));
+
+static rl_ctrs_t *rl_ctr       = NULL;  /* per-worker blocks                  */
+static unsigned   rl_ctr_alloc = 0;     /* blocks allocated; always summed    */
+/* Blocks the hot path may use.  Zero -- which is what rl_set_shared_counters
+ * writes for --reachdd-shared-counters, and what it is before any table
+ * exists -- routes every bump to the shared array, so the switch costs no
+ * branch of its own: the bound test IS the switch.  Written once per
+ * invocation from reachdd_run, before any worker can reach rl_bump, and
+ * read-only thereafter, exactly as rl_arity_on is. */
+static unsigned   rl_ctr_n     = 0;
+
+static inline void
+rl_bump(unsigned w, int which, uint64_t n)
+{
+    if (w < rl_ctr_n) rl_ctr[w].v[which] += n;
+    else __sync_fetch_and_add(&rl_ctr_sh.v[which], n);
+}
+
+static uint64_t
+rl_count(int which)
+{
+    uint64_t t = rl_ctr_sh.v[which];
+    for (unsigned w = 0; w < rl_ctr_alloc; w++) t += rl_ctr[w].v[which];
+    return t;
+}
 
 /* Histogram of |A|: how many relations one ImageAll is handed.
  *
@@ -325,40 +439,72 @@ rl_set_pin_all(int pin)
     rl_pin_forced = pin ? 1 : 0;
 }
 
+/**
+ * Select the per-worker counter blocks (shared == 0) or the single shared
+ * cache line they replaced (shared == 1), and make sure the table exists.
+ *
+ * Called once per invocation from reachdd_run, on the thread that is about to
+ * RUN the operation, so Lace is up and lace_workers() is final; no worker can
+ * be inside rl_bump, because rl_active is 0 and no rl_run is in flight.  If
+ * the table has to be (re)allocated, what the old one holds is folded into the
+ * shared array first, so the running totals the accessors report survive the
+ * resize -- reachdd_run reads them as before/after deltas and a lost block
+ * would make a delta negative.
+ */
+void
+rl_set_shared_counters(int shared)
+{
+    unsigned n = lace_workers();
+    if (n == 0) n = 1;              /* not started: one caller, one slot      */
+    if (rl_ctr == NULL || n > rl_ctr_alloc) {
+        rl_ctr_n = 0;               /* nobody may index the table while we    */
+                                    /* replace it (belt and braces: nobody is) */
+        for (unsigned w = 0; w < rl_ctr_alloc; w++) {
+            for (int c = 0; c < RL_C_MAX; c++) rl_ctr_sh.v[c] += rl_ctr[w].v[c];
+        }
+        free(rl_ctr);
+        rl_ctr       = (rl_ctrs_t*)calloc(n, sizeof(rl_ctrs_t));
+        rl_ctr_alloc = (rl_ctr == NULL) ? 0 : n;
+    }
+    /* calloc failing leaves rl_ctr_alloc at 0, which routes every bump to the
+     * shared array: the counters get slower, never wrong. */
+    rl_ctr_n = shared ? 0 : rl_ctr_alloc;
+}
+
 uint64_t
 rl_cells_created(void)
 {
-    return rl_cells_global;
+    return rl_count(RL_C_CELLS);
 }
 
 uint64_t
 rl_calls_made(void)
 {
-    return rl_calls_global;
+    return rl_count(RL_C_CALLS);
 }
 
 uint64_t
 rl_cache_hits(void)
 {
-    return rl_hits_global;
+    return rl_count(RL_C_HITS);
 }
 
 uint64_t
 rl_cube_waivers(void)
 {
-    return rl_waive_global;
+    return rl_count(RL_C_WAIVE);
 }
 
 uint64_t
 rl_rounds_run(void)
 {
-    return rl_rounds_global;
+    return rl_count(RL_C_ROUNDS);
 }
 
 uint64_t
 rl_fixpoints_run(void)
 {
-    return rl_fixp_global;
+    return rl_count(RL_C_FIXP);
 }
 
 uint64_t
@@ -417,7 +563,7 @@ VOID_TASK_0(rl_postgc)
                           "at the maximum table size (about %"PRIu64" residual cells consed); "
                           "pinning all relations to the apply-whole (saturation) schedule "
                           "for the rest of this run.",
-                    freed, before, rl_cells_global);
+                    freed, before, rl_count(RL_C_CELLS));
 #endif
         }
     } else {
@@ -767,7 +913,7 @@ rl_sort_dedup(rl_entry_t *e, int m)
  * discipline, and costs nothing.
  */
 static MTBDD
-rl_build(const rl_entry_t *e, int m)
+rl_build(const rl_entry_t *e, int m, unsigned w)
 {
     MTBDD acc = RL_EPS;
     mtbdd_refs_pushptr(&acc);
@@ -776,8 +922,11 @@ rl_build(const rl_entry_t *e, int m)
         acc = rl_cons(e[i].pid, e[i].R, acc);
     }
     mtbdd_refs_popptr(1);
-    /* Diagnostic only, but atomic: Alg. 5 conses from every worker. */
-    if (m > 0) __sync_fetch_and_add(&rl_cells_global, (uint64_t)m);
+    /* Diagnostic only.  rl_build is not a TASK, so it cannot read
+     * LACE_WORKER_ID itself; w is its caller's, threaded down rather than
+     * re-derived through lace_get_worker(), whose TLS access is a function
+     * call on this platform and would cost more than the counter. */
+    if (m > 0) rl_bump(w, RL_C_CELLS, (uint64_t)m);
     return acc;
 }
 
@@ -1047,7 +1196,7 @@ rl_split_cross(MTBDD Lx, uint32_t lvl, const rl_ctx_t *ctx,
  */
 static MTBDD
 rl_insert_entering(MTBDD L, const rl_ctx_t *ctx, int from, int to,
-                   rl_entry_t *buf, BDD *built)
+                   rl_entry_t *buf, BDD *built, unsigned w)
 {
     int cnt = 0, pushed = 0;
     for (MTBDD c = L; c != RL_EPS; c = rl_tail(c)) {
@@ -1079,7 +1228,7 @@ rl_insert_entering(MTBDD L, const rl_ctx_t *ctx, int from, int to,
         cnt++;
     }
     cnt = rl_sort_dedup(buf, cnt);
-    MTBDD res = rl_build(buf, cnt);
+    MTBDD res = rl_build(buf, cnt, w);
     mtbdd_refs_pop(pushed);          /* no allocation before the caller roots */
     return res;
 }
@@ -1246,7 +1395,11 @@ rl_advance(BDD S, MTBDD L, uint32_t lvl, const rl_ctx_t *ctx)
  */
 TASK_5(BDD, rl_reach, BDD, S, MTBDD, L, uint32_t, lvl, rl_ctx_t*, ctx, int, par)
 {
-    __sync_fetch_and_add(&rl_calls_global, 1u);        /* diagnostic only */
+    /* This worker's private counter block, read once: LACE_WORKER_ID is
+     * __lace_worker->worker, which the TASK macro already has in a register.
+     * Also handed to rl_build, which is not a TASK of its own. */
+    const unsigned rl_w = LACE_WORKER_ID;
+    rl_bump(rl_w, RL_C_CALLS, 1);                      /* diagnostic only */
 
     /* line 2 */
     if (S == sylvan_false) return sylvan_false;
@@ -1269,7 +1422,7 @@ TASK_5(BDD, rl_reach, BDD, S, MTBDD, L, uint32_t, lvl, rl_ctx_t*, ctx, int, par)
      * the operation" at the top of this file -- but a client that needs the
      * explored sets to cover the answer must make its own expand pass. */
     if (S == sylvan_true) {
-        if (ctx->learning && pending < ctx->k) __sync_fetch_and_add(&rl_waive_global, 1u);
+        if (ctx->learning && pending < ctx->k) rl_bump(rl_w, RL_C_WAIVE, 1);
         return sylvan_true;
     }
 
@@ -1288,7 +1441,7 @@ TASK_5(BDD, rl_reach, BDD, S, MTBDD, L, uint32_t, lvl, rl_ctx_t*, ctx, int, par)
      * root, so a chain built from a changed relation is a different chain and
      * the key changes by itself where it must. */
     if (cache_get3(RL_OPID, S, L, key3, &res)) {
-        __sync_fetch_and_add(&rl_hits_global, 1u);     /* diagnostic only */
+        rl_bump(rl_w, RL_C_HITS, 1);                   /* diagnostic only */
         return res;
     }
 
@@ -1378,9 +1531,9 @@ TASK_5(BDD, rl_reach, BDD, S, MTBDD, L, uint32_t, lvl, rl_ctx_t*, ctx, int, par)
     const int par_here = par && npin == 0;
 
     int na01 = 0, na10 = 0, stale = 1;
-    __sync_fetch_and_add(&rl_fixp_global, 1u);   /* diagnostic only */
+    rl_bump(rl_w, RL_C_FIXP, 1);                 /* diagnostic only */
     for (;;) {                                                     /* line 11 */
-        __sync_fetch_and_add(&rl_rounds_global, 1u); /* diagnostic only */
+        rl_bump(rl_w, RL_C_ROUNDS, 1);           /* diagnostic only */
         if (learn_here) {
             cur = sylvan_makenode(2u * lvl, s0, s1);
             rl_learn_level(ctx, pending, enter_end, cur);
@@ -1399,10 +1552,10 @@ TASK_5(BDD, rl_reach, BDD, S, MTBDD, L, uint32_t, lvl, rl_ctx_t*, ctx, int, par)
              * built[], which is what the staleness test above compares. */
             Lx = (nent == 0) ? L
                              : rl_insert_entering(L, ctx, pending, enter_end,
-                                                  ebuf, built);
+                                                  ebuf, built, rl_w);
             rl_split_cross(Lx, lvl, ctx, a01, &na01, a10, &na10);  /* line 7  */
-            L00 = rl_build(tmp, rl_split_diag(Lx, lvl, ctx, 0, tmp));
-            L11 = rl_build(tmp, rl_split_diag(Lx, lvl, ctx, 1, tmp));
+            L00 = rl_build(tmp, rl_split_diag(Lx, lvl, ctx, 0, tmp), rl_w);
+            L11 = rl_build(tmp, rl_split_diag(Lx, lvl, ctx, 1, tmp), rl_w);
             stale = 0;
         }
         if (!learn_here && na01 == 0 && na10 == 0 && npin == 0) {
