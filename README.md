@@ -317,6 +317,20 @@ If Sylvan is installed in a non-standard location please refer to
 [this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
 and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).
 
+If you intend to run `--saturation=reachdd` on many cores, apply
+`contrib/sylvan-1.11.0-refs-cacheline.patch` to the Sylvan sources before
+building them.  Sylvan 1.11.0 allocates each Lace worker's 72-byte
+reference-stack control block with a plain `malloc`, so several workers'
+stack cursors end up in one cache line; the cursors are written on every
+`refs_push`/`refs_pop`/`refs_spawn`/`refs_sync`, which is the single hottest
+write ReachDD makes.  The patch gives each worker its own cache line.  It is
+worth 1.16x wall clock (geomean over three models) at 8 workers on an Apple
+M1 Pro, 1.08x at 4, 1.01x at 2 and 0.99x at one worker, and it applies to
+64-byte-line x86 as well, since the blocks collide there too.
+Saturation benefits less, because it issues the same stores at roughly half
+ReachDD's rate.  The patch has been sent upstream; it is not required for
+correctness.
+
 #### muCRL
 
 Download muCRL (>= 2.18.5) from <http://www.cwi.nl/~mcrl/mutool.html>.
