@@ -199,11 +199,73 @@ expand_group_next (int group, vset_t set)
     do_expand_group_next (group, set);
 }
 
+/* One expand_info per group, each in a cache line of its own.
+ *
+ * Under --saturation=reachdd the expand callback runs INSIDE the operation:
+ * vset_sylvan_reachdd.c's rl_learn_one calls it at a relation's entry level,
+ * from whichever Lace worker got there, and that function's CAS-publish loop
+ * is written for two workers arriving at once.  So the call count cannot be
+ * `(*eg_count)++` on one long shared by every group.  That is a data race,
+ * and it does lose updates.  Measured on public_subscribe.2, three runs per
+ * point, reported group checks shared vs per group:
+ *
+ *      w=1   10430482        10430482        identical, bit-exact
+ *      w=2   11.04-11.09 M   11.23-11.27 M   +1.7%
+ *      w=4   11.06-11.14 M   11.85-11.94 M   +7.1%
+ *      w=8   11.35-11.63 M   13.71-13.79 M   +19.5%
+ *
+ * The ranges are disjoint from four workers up and the gap grows with the
+ * worker count, which is what lost updates look like.  At eight workers the
+ * shared counter was dropping about a sixth of them.  A statistic the tool
+ * prints should not depend on how the workers interleaved -- and it should
+ * not be low under reachdd while it is exact under sat, which is a
+ * difference in the wrong direction for a table that compares the two.
+ *
+ * Per group rather than per worker on purpose: it needs no worker id on a
+ * path that is not Lace's to begin with, nGrps is small, and it keeps the
+ * bump a plain increment.  The counters are summed once, after the fixpoint,
+ * by expand_info_collect; nothing reads my_eg_count in between and no
+ * control flow depends on it, so no synchronisation is required beyond the
+ * fixpoint's own barrier.
+ *
+ * 128 and not 64: x86 fetches cache lines in 128-byte aligned pairs and
+ * Apple silicon's lines are 128 bytes, so 128 is the smallest stride that
+ * isolates two writers on both.
+ *
+ * This is a correctness fix, not a speed one.  A 24-run A/B at 1, 2, 4 and 8
+ * workers measured no time difference either way -- geomean 1.004, 1.000,
+ * 1.012, 0.949 -- because the callback does a projection and a set union,
+ * which dwarf one store.  The reason to do it is that the number is now
+ * right, not that anything got faster. */
+#define EXPAND_INFO_PAD 128
+
+struct expand_info *
+expand_info_create(int group, vset_t group_explored, long *eg_count)
+{
+    HREassert(sizeof(struct expand_info) <= EXPAND_INFO_PAD);
+    struct expand_info *ctx = RTalign(EXPAND_INFO_PAD, EXPAND_INFO_PAD);
+    ctx->group = group;
+    ctx->group_explored = group_explored;
+    ctx->eg_count = eg_count;
+    ctx->my_eg_count = 0;
+    return ctx;
+}
+
+void
+expand_info_collect(struct expand_info **ctx, int n)
+{
+    for (int i = 0; i < n; i++) {
+        if (ctx[i] == NULL) continue;
+        *ctx[i]->eg_count += ctx[i]->my_eg_count;
+        ctx[i]->my_eg_count = 0;
+    }
+}
+
 void
 expand_group_next_projected(vrel_t rel, vset_t set, void *context)
 {
     struct expand_info *expand_ctx = (struct expand_info*)context;
-    (*expand_ctx->eg_count)++;
+    expand_ctx->my_eg_count++;
 
     vset_t group_explored = expand_ctx->group_explored;
     vset_minus(set, group_explored);

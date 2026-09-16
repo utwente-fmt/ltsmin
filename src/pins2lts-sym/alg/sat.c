@@ -255,14 +255,11 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     if (act_detect != NULL && trc_output != NULL)
         Abort("Action detection with trace generation not supported");
 
+    struct expand_info **ectx = RTmallocZero(nGrps * sizeof(struct expand_info *));
     for (int i = 0; i < nGrps; i++) {
         if (bitvector_is_set(reach_groups, i)) {
-            struct expand_info *ctx = RTmalloc(sizeof(struct expand_info));
-            ctx->group = i;
-            ctx->group_explored = group_explored[i];
-            ctx->eg_count = eg_count;
-
-            vrel_set_expand(group_next[i], expand_group_next_projected, ctx);
+            ectx[i] = expand_info_create(i, group_explored[i], eg_count);
+            vrel_set_expand(group_next[i], expand_group_next_projected, ectx[i]);
         }
     }
 
@@ -271,6 +268,8 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     if (USE_PARALLELISM) vset_least_fixpoint_par(visited, visited, group_next, nGrps);
     else vset_least_fixpoint(visited, visited, group_next, nGrps);
     stats_and_progress_report(NULL, visited, 1);
+    expand_info_collect(ectx, nGrps);
+    RTfree(ectx);
 
     check_invariants(visited, -1);
 
@@ -339,14 +338,11 @@ reach_dd(reach_proc_t reach_proc, vset_t visited,
     /* Exactly reach_sat's installation: ReachDD calls these at each relation's
      * entry level.  --reachdd-no-learn makes vset_reach_dd ignore them again,
      * leaving all the learning to the loop below. */
+    struct expand_info **ectx = RTmallocZero(nGrps * sizeof(struct expand_info *));
     for (int i = 0; i < nGrps; i++) {
         if (bitvector_is_set(reach_groups, i)) {
-            struct expand_info *ctx = RTmalloc(sizeof(struct expand_info));
-            ctx->group = i;
-            ctx->group_explored = group_explored[i];
-            ctx->eg_count = eg_count;
-
-            vrel_set_expand(group_next[i], expand_group_next_projected, ctx);
+            ectx[i] = expand_info_create(i, group_explored[i], eg_count);
+            vrel_set_expand(group_next[i], expand_group_next_projected, ectx[i]);
         }
     }
 
@@ -392,6 +388,8 @@ reach_dd(reach_proc_t reach_proc, vset_t visited,
         vset_reorder(domain);
     }
 
+    expand_info_collect(ectx, nGrps);
+    RTfree(ectx);
     vset_destroy(old_vis);
     if (dlk_detect) {
         vset_destroy(deadlocks);
