@@ -480,7 +480,8 @@ worth 1.16x wall clock (geomean over three models) at 8 workers on an Apple
 M1 Pro, 1.08x at 4, 1.01x at 2 and 0.99x at one worker, and it applies to
 64-byte-line x86 as well, since the blocks collide there too.
 Saturation benefits less, because it issues the same stores at roughly half
-ReachDD's rate.  The patch has been sent upstream; it is not required for
+ReachDD's rate.  The patch has been sent upstream
+([trolando/sylvan#58](https://github.com/trolando/sylvan/pull/58)); it is not required for
 correctness, and note that it is not shipped in the release tarball -- take it
 from the Git repository.
 
