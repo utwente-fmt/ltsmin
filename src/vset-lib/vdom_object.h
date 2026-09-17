@@ -65,8 +65,13 @@ struct vector_domain_shared {
     /* ReachDD (Alg. 4): one recursive operation over the whole list of local
      * relations, splitting each relation at every level of its span instead of
      * applying it whole at its entry level.  Same argument shape as
-     * set_least_fixpoint, but the relations are used as they stand: expand
-     * callbacks are NOT called (see vector_set.h). */
+     * set_least_fixpoint, and like it an implementation MUST honour the expand
+     * callbacks, calling each relation's at its entry level, from inside the
+     * operation; a back-end that skips them silently under-approximates on
+     * every on-the-fly model.  set_reach_dd_par may fall back to the
+     * sequential schedule, which is always answer-equivalent -- the lddmc
+     * back-end always does.  vector_set.h documents the contract in full,
+     * including the caveat about a returned full cube that was not expanded. */
     void (*set_reach_dd)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
     void (*set_reach_dd_par)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
     void (*set_dot)(FILE* fp, vset_t src);

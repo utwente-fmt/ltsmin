@@ -751,7 +751,7 @@ void vset_least_fixpoint_par(vset_t dst, vset_t src, vrel_t rels[], int rel_coun
 void vset_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
     if (src->dom->shared.set_reach_dd == NULL) {
         Abort("The current decision diagram package does not implement ReachDD; "
-              "use --vset=sylvan")
+              "use --vset=sylvan (Alg. 4) or --vset=lddmc (Alg. 6)")
     }
     src->dom->shared.set_reach_dd(dst, src, rels, rel_count);
 }
@@ -759,7 +759,7 @@ void vset_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
 void vset_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
     if (src->dom->shared.set_reach_dd_par == NULL) {
         Abort("The current decision diagram package does not implement ReachDD; "
-              "use --vset=sylvan")
+              "use --vset=sylvan (Alg. 4) or --vset=lddmc (Alg. 6)")
     }
     src->dom->shared.set_reach_dd_par(dst, src, rels, rel_count);
 }

@@ -51,3 +51,16 @@ libvset_la_CPPFLAGS += $(DDD_CPPFLAGS)
 libvset_la_LDFLAGS  += $(DDD_LDFLAGS)
 libvset_la_LIBADD   += $(DDD_LIBS)
 endif
+
+if HAVE_SYLVAN
+# Unit test for the ReachDD operation on LDDs (Alg. 6).  It #includes
+# vset_lddmc_reachdd.c directly, with RLM_NO_HRE and its own shims for
+# Abort/RTmalloc/RTfree, so that it can reach the static split and interning
+# functions; that is why it links against Sylvan alone and not against libvset.
+check_PROGRAMS  = test-lddmc-reachdd$(EXEEXT)
+TESTS           = test-lddmc-reachdd$(EXEEXT)
+
+test_lddmc_reachdd_SOURCES  = vset_lddmc_reachdd_test.c
+test_lddmc_reachdd_CFLAGS   = $(AM_CFLAGS) $(SYLVAN_CFLAGS)
+test_lddmc_reachdd_LDADD    = $(SYLVAN_LIBS)
+endif

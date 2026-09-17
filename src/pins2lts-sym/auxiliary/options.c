@@ -145,7 +145,13 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
             if (save_sat_levels)
                 Warning(info, "ReachDD ignores --save-sat-levels: it has no "
                               "saturation levels.");
-            Warning(infoLong, "ReachDD ignores --sat-granularity.");
+            /* Only when the user actually set it; the other three notices in
+             * this block are conditional for the same reason, and an
+             * unconditional line on every run is why this one used to be
+             * hidden at infoLong. */
+            if (sat_granularity != 10)
+                Warning(info, "ReachDD ignores --sat-granularity: it has no "
+                              "saturation levels to group.");
         }
 
         res = linear_search(GUIDED, guidance);

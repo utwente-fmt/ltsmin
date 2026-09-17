@@ -1,9 +1,11 @@
 /*
  * Standalone unit test for vset_lddmc_reachdd.c (ReachDDMdd, Alg. 6).
  *
- * NOT part of the build: it #includes the .c directly, with RLM_NO_HRE and its
- * own shims for Abort/RTmalloc/RTfree, so that it can reach the static split
- * and interning functions.  Build and run it by hand, e.g.
+ * It #includes the .c directly, with RLM_NO_HRE and its own shims for
+ * Abort/RTmalloc/RTfree, so that it can reach the static split and interning
+ * functions; that is why it links against Sylvan alone and not against
+ * libvset.  Built and run by `make check` when Sylvan is present; to build it
+ * by hand instead, e.g.
  *
  *   clang -g -O1 -std=gnu11 -Wall -Wextra \
  *       -I <ltsmin>/src -I <ltsmin>/src/vset-lib -I <sylvan-prefix>/include \

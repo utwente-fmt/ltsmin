@@ -48,12 +48,158 @@ linear temporal logic.
 
 LTSmin offers different analysis algorithms covering four disciplines (algorithmic backends):
 
-* Symbolic CTL/mu-calculus model checking using different BDD/MDD packages, including the parallel BDD package Sylvan,
+* Symbolic CTL/mu-calculus model checking using different BDD/MDD packages, including the parallel BDD package Sylvan, with saturation and with the ReachDD fixpoint operation (see [ReachDD](#reachdd)),
 * Multi-core LTL model checking using tree compression,
 * Sequential LTL model checking, with partial-order reduction and optional BDD-based state storage, and
 * Distributed LTS instantiation, export, and minimization modulo branching/strong bisimulation.
 
 The PINS interface divides our model checking tools cleanly into the two These algorithms each have their own strength, depending on the input model's structure and verification problem. For models with combinatorial state structure, the symbolic tools can process **billions of states per second** using only few memory. Models that exhibit much concurrency can be reduced significantly using partial-order reduction. Models with more dependencies can be explored with LTSmin's multi-core algorithms, which employ aggressive lossless state compression using a concurrent tree data structure. Finally, our distributed minimization techniques can aid the verification of multiple properties on a single state space.
+
+#### ReachDD
+
+`--saturation=reachdd` selects **ReachDD**, a single recursive decision diagram
+operation that computes the least fixpoint over the *whole list* of PINS
+transition relations at once.  Saturation applies one relation at a time, whole,
+at its entry level, and needs the relations to be partitioned so that it can
+order them by that level.  ReachDD instead descends the state diagram and all
+relations in lockstep and *splits* each relation at every level of its span into
+the block matrix its own read/write projections dictate, so no relations are
+merged, nothing is rebuilt, and there is no exploration order left to choose.
+Transitions are learned on-the-fly at each relation's entry level from inside
+the operation, which is the same place saturation learns them.
+
+    # BDDs: the sequential operation, or its parallel schedule on >1 worker
+    $ dve2lts-sym --vset=sylvan --saturation=reachdd --lace-workers=8 model.dve
+
+    # LDDs: the m-ary form, sequential only (see the limitations below)
+    $ dve2lts-sym --vset=lddmc --saturation=reachdd model.dve
+
+It requires `--vset=sylvan` or `--vset=lddmc`; every other decision diagram
+package aborts with a message naming those two.  Because it replaces the
+exploration strategy outright, it ignores `--order`, `--save-sat-levels` and
+`--sat-granularity` (it says so at default verbosity), and it rejects
+guard-splitting (`--pins-guards`, `-g`) and the combination of `--action` with
+`--trace`.  Run with `-v` to see per-invocation statistics:
+interned residual projections, residual cells consed, calls, cache hits, rounds
+and level fixpoints.
+
+##### Options
+
+These four switches exist for A/B measurement and debugging; the default needs
+none of them.  They are listed under *Sylvan options* in `--help` because they
+are declared in the Sylvan table, but the first two apply to both back-ends.
+
+* `--reachdd-pin-all` -- apply every relation whole at its entry level, i.e.
+  compute saturation's schedule with ReachDD's operation, instead of splitting
+  the relation.  It is all-or-nothing, and it also forces the *fully sequential*
+  schedule, so it cannot be combined with the parallel one.
+* `--reachdd-no-learn` -- do not expand relations inside the operation.  The
+  driver then learns over the whole visited set and iterates, as it did before
+  on-the-fly learning; expect many more outer rounds (39 instead of 2 on
+  `examples/gear.1.etf`).
+* `--reachdd-force-par` -- run the parallel schedule even at one worker, where
+  `SPAWN`/`SYNC` degenerate to inline calls.  This isolates the extra rounds
+  that the parallel schedule's Jacobi-style iteration costs from any effect of
+  the hardware; it is 1.13x--1.78x slower than the sequential schedule at one
+  worker on the five models of the scaling sweep.  `--vset=sylvan` only, silently
+  ignored on `--vset=lddmc`.
+* `--reachdd-shared-counters` -- bump the diagnostic counters in one shared
+  cache line, as they were before they were made per-worker.  The totals are the
+  same either way, so what this measures is the cost of the instrument itself,
+  which was large enough at 8 workers to be worth removing.  `--vset=sylvan`
+  only, silently ignored on `--vset=lddmc`, whose counters are always the shared
+  kind.
+
+Setting the environment variable `REACHDD_ARITY=1` additionally collects a
+histogram of how many images each `ImageAll` had to combine (`--vset=sylvan`,
+`-v`).  It is off by default because a shared histogram on the hot path
+perturbs the scaling it exists to explain; with it unset the histogram line
+prints zeros.
+
+##### What is not implemented
+
+* **The parallel schedule has no LDD form.**  `--vset=lddmc` always runs the
+  sequential m-ary operation and says so at default verbosity; its Sylvan
+  sub-operations still use every Lace worker.  The obstacle is concrete: the
+  m-ary walk carries one mutable cursor array per level that a pass advances
+  left to right, which a spawned sibling recursion would race on.
+* **`--reachdd-pin-all` is all-or-nothing and sequential.**  Pinning only the
+  relations that learn -- the per-relation escape the paper names as the remedy
+  for its main expected loss -- is not implemented, and neither is a parallel
+  apply-whole schedule, so saturation's schedule can only be computed by this
+  operation at one worker.
+* **Merging relations is not a knob.**  ReachDD is defined over a partition of
+  the relation list, of which merging everything into one relation and keeping
+  them all separate are the two extremes, but there is no switch that partitions
+  the list before the operation runs, and no way to run the merged extreme at
+  all.  `--regroup=rn` (nub rows with identical dependencies) and `--regroup=ru`
+  (subsume rows) are the nearest approximation, but they merge PINS transition
+  groups for the whole tool rather than relations inside the operation.
+* **Retiring two relations with equal projections into one cell** is done for
+  LDDs and not for BDDs, so equal-projection relations ride the BDD residual
+  chain as separate cells.
+* A **garbage-collection safety valve** switches the run to the apply-whole
+  schedule when two consecutive collections recover little at the maximum table
+  size.  It warns at default verbosity, but a run in which it fires is not a
+  measurement of the split schedule, and the `-v` schedule line still reports
+  the schedule that was requested.
+* The `Exploration took N group checks` line is **not comparable** between
+  `--saturation=reachdd` and its ablations: under `reachdd` the expand callback
+  fires once per relation per entry-level visit inside the operation, under
+  `--reachdd-no-learn` once per group per outer round.  `next state calls`
+  counts ReachDD invocations, not images.
+
+##### Performance
+
+The figures below come from the paper's benchmark sweeps over BEEM models, via
+the DVE and Promela (SpinS) front-ends, with a 900 s time limit unless stated.
+Answers agree everywhere: over the 767 runs that completed there is not one
+disagreement on the state count or on the final node count between `reachdd`,
+`sat`, `sat-fix`, `none` and the two ReachDD ablations.  Each figure below
+states the filter it was computed under, because the filter matters.
+
+At **one worker with `--vset=sylvan`**, over the 31 models on which saturation
+needs at least 1.5 s, ReachDD is faster on 24 and slower on 7, with a geometric
+mean speed-up of **1.59x** (best `lamport.6` 3.90x, `iprotocol.4` 3.86x).  The
+losses matter, and one is bad: on `lann.4` ReachDD takes 861 s against
+saturation's 436 s, and on `krebs.4` 1339 s against 1098 s -- both figures from
+a re-run at a 3600 s limit, which these two models need.  `lann.4` is worth
+naming, because within 900 s `--reachdd-pin-all` (475 s) and `--reachdd-no-learn`
+(760 s) both finish where the shipped default does not: the loss is attributable
+to splitting and learning inside the operation *together*, which is exactly the
+combination the default selects.  Counting instead all 52 models that complete
+under both strategies within 900 s, sub-second ones included, the geometric mean
+is 1.31x.
+
+At one worker with **`--vset=lddmc`** the m-ary form is weaker: on the 23 models
+where saturation needs at least 1.5 s it is faster on 16 and slower on 7,
+geometric mean **1.29x**; over all 57 models that complete under both, 1.05x.
+
+**Parallel scaling is ReachDD's weak point**, and it is the split schedule that
+does not scale rather than the implementation.  Over five models from 1 to 64
+Lace workers (median of three repeats, on an otherwise idle 256-core machine),
+ReachDD's own speed-up at 64 workers is 3.80x at best and 1.77x in the
+geometric mean, where parallel saturation reaches 13.40x and 4.22x; one model
+(`rether.3`) gets *slower* under both.  In absolute wall clock ReachDD is still
+ahead on all five models up to 4 workers, but at 64 workers only on three of
+five -- `rether.3` 3.64x and `lamport.6` 2.70x ahead, `public_subscribe.2` level
+at 1.06x, `elevator2.3` 0.91x and `at.4` 0.36x behind.  Learning inside the
+operation is implicated: `--reachdd-no-learn` scales to 3.84x in the geometric
+mean, close to saturation's, at the cost of being slower in absolute terms on
+most models at one worker.
+
+If you intend to run `--saturation=reachdd` on many cores, also apply the Sylvan
+cache-line patch described under [Sylvan](#sylvan) in the optional dependencies;
+it is worth 1.16x at 8 workers.
+
+##### Reference
+
+Sebastiaan Brand, Thomas Bäck and Alfons Laarman.
+*A Decision Diagram Operation for Reachability*.  FM 2023, LNCS 14000,
+pp. 514--532.  <https://doi.org/10.1007/978-3-031-27481-7_29>
+(preprint: <https://arxiv.org/abs/2212.03684>).
+Algorithm, definition and corollary numbers in the source comments refer to the
+preprint.
 
 ### Language Front-ends
 
@@ -317,9 +463,15 @@ If Sylvan is installed in a non-standard location please refer to
 [this note on aclocal and pkgconf](#a-note-on-aclocal-and-pkgconf),
 and [this note on configuring pkgconf](#some-notes-on-configuring-pkgconf).
 
-If you intend to run `--saturation=reachdd` on many cores, apply
+If you intend to run [`--saturation=reachdd`](#reachdd) on many cores, apply
 `contrib/sylvan-1.11.0-refs-cacheline.patch` to the Sylvan sources before
-building them.  Sylvan 1.11.0 allocates each Lace worker's 72-byte
+building them:
+
+    $ tar xf v1.11.0.tar.gz
+    $ cd sylvan-1.11.0
+    $ patch -p1 < /path/to/ltsmin/contrib/sylvan-1.11.0-refs-cacheline.patch
+
+Sylvan 1.11.0 allocates each Lace worker's 72-byte
 reference-stack control block with a plain `malloc`, so several workers'
 stack cursors end up in one cache line; the cursors are written on every
 `refs_push`/`refs_pop`/`refs_spawn`/`refs_sync`, which is the single hottest
@@ -329,7 +481,8 @@ M1 Pro, 1.08x at 4, 1.01x at 2 and 0.99x at one worker, and it applies to
 64-byte-line x86 as well, since the blocks collide there too.
 Saturation benefits less, because it issues the same stores at roughly half
 ReachDD's rate.  The patch has been sent upstream; it is not required for
-correctness.
+correctness, and note that it is not shipped in the release tarball -- take it
+from the Git repository.
 
 #### muCRL
 
@@ -586,6 +739,7 @@ See above.
  - And subscribe to our mailing list: <ltsmin-users-subscribe-request@lists.utwente.nl>.
 
 ## Related papers
+*   Sebastiaan Brand, Thomas Bäck and [Alfons Laarman](http://alfons.laarman.com/) _[A Decision Diagram Operation for Reachability](https://doi.org/10.1007/978-3-031-27481-7_29)_ . FM 2023
 *   [Jeroen Meijer](http://jmeijer.nl), and [Jaco van de Pol](http://wwwhome.cs.utwente.nl/vdpol/) _[Bandwidth and Wavefront Reduction for Static Variable Ordering in Symbolic Reachability Analysis](http://eprints.eemcs.utwente.nl/27067/01/main.pdf)_ . NFM 2016
 *   [Jens Bendisposto](http://www.cs.hhu.de/lehrstuehle-und-arbeitsgruppen/softwaretechnik-und-programmiersprachen/unser-team/team/bendisposto.html), [Philipp Körner](http://www.cs.hhu.de/en/research-groups/software-engineering-and-programming-languages/our-team/team/philipp-koerner.html), [Michael Leuschel](http://www.cs.hhu.de/lehrstuehle-und-arbeitsgruppen/softwaretechnik-und-programmiersprachen/unser-team/team/leuschel.html), [Jeroen Meijer](http://jmeijer.nl), [Jaco van de Pol](http://wwwhome.cs.utwente.nl/vdpol/), [Helen Treharne](http://www.surrey.ac.uk/cs/people/helen_treharne/), and [Jorden Whitefield](http://www.surrey.ac.uk/cs/people/jorden_whitefield/) _[Symbolic Reachability Analysis of B through ProB and LTSmin](http://eprints.eemcs.utwente.nl/27071/01/main.pdf)_  . iFM 2016
 *   [Tom van Dijk](http://wwwhome.cs.utwente.nl/dijkt/) and [Jaco van de Pol](http://wwwhome.cs.utwente.nl/vdpol/) _[Sylvan: Multi-core Decision Diagrams](http://www.tvandijk.nl/wp-content/uploads/2015/01/sylvan_tacas15.pdf)_ . TACAS 2015
