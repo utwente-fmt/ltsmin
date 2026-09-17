@@ -303,6 +303,9 @@ static void run_reachability(vset_t states, char *etf_output)
     case SAT:
         sat_proc = reach_sat;
         break;
+    case REACH_DD:
+        sat_proc = reach_dd;
+        break;
     }
 
     switch (guide_strategy) {
@@ -399,11 +402,6 @@ static void actual_main(void *arg)
     }
 #endif
 
-    /* turn off Lace for now to speed up while not using parallelism */
-#ifdef HAVE_SYLVAN
-    lace_suspend();
-#endif
-
     /* initialize the model and PINS wrappers */
     init_model(files[0]);
 
@@ -421,13 +419,6 @@ static void actual_main(void *arg)
     }
 
     init_maxsum(ltstype);
-
-    /* turn on Lace again (for Sylvan) */
-#ifdef HAVE_SYLVAN
-    if (vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc) {
-        lace_resume();
-    }
-#endif
 
     if (next_union) vset_next_fn = vset_next_union_src;
 
@@ -522,10 +513,8 @@ static void actual_main(void *arg)
     }
 
 #ifdef HAVE_SYLVAN
-    /* in case other Lace threads were still suspended... */
-    if (vset_default_domain!=VSET_Sylvan && vset_default_domain!=VSET_LDDmc) {
-        lace_resume();
-    } else if (SYLVAN_STATS) {
+    if ((vset_default_domain==VSET_Sylvan || vset_default_domain==VSET_LDDmc)
+            && SYLVAN_STATS) {
         sylvan_stats_report(stderr);
     }
 #endif

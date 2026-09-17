@@ -16,10 +16,29 @@ Use this feature by passing --hoa instead --ltl and providing a TGBA or Buchi au
     - The ProB front-end now allows low level parallel decision diagram
       operations when using Sylvan.
     - A parallel saturation algorithm is now available.
+    - Add the ReachDD reachability strategy: --saturation=reachdd computes
+      the least fixpoint with a single recursive decision diagram operation
+      over the whole list of transition relations, splitting each relation
+      at every level of its span instead of applying it whole at its entry
+      level as saturation does. Requires --vset=sylvan or --vset=lddmc, and
+      replaces the exploration order, so it ignores --order,
+      --save-sat-levels and --sat-granularity; it does not support
+      guard-splitting. Four switches (--reachdd-pin-all, --reachdd-no-learn,
+      --reachdd-force-par, --reachdd-shared-counters) exist for A/B
+      measurement. With --vset=lddmc only the sequential schedule is
+      implemented. See the README and
+      https://doi.org/10.1007/978-3-031-27481-7_29.
+    - Fix a reference-stack leak in the sequential saturation strategy
+      (--saturation=sat), and fix the build on non-x86 hosts.
     - Great refactor of the symbolic back-end to make it more
       accessible to developers.
     - Build completely static Linux binaries.
     - Add support for Windows.
+
+- Dependency change: Sylvan (>=1.11.0, <1.12) is now required instead of
+  the previous 1.x, and Lace (>=1.7.0) is a separate package that must be
+  installed first, with both sylvan.pc and lace.pc on PKG_CONFIG_PATH. This
+  breaks existing build environments.
 
 ## July 3, 2018: 3.0.2
 

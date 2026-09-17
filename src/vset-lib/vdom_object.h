@@ -62,6 +62,18 @@ struct vector_domain_shared {
     void (*set_destroy)(vset_t set);
     void (*set_least_fixpoint)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
     void (*set_least_fixpoint_par)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
+    /* ReachDD (Alg. 4): one recursive operation over the whole list of local
+     * relations, splitting each relation at every level of its span instead of
+     * applying it whole at its entry level.  Same argument shape as
+     * set_least_fixpoint, and like it an implementation MUST honour the expand
+     * callbacks, calling each relation's at its entry level, from inside the
+     * operation; a back-end that skips them silently under-approximates on
+     * every on-the-fly model.  set_reach_dd_par may fall back to the
+     * sequential schedule, which is always answer-equivalent -- the lddmc
+     * back-end always does.  vector_set.h documents the contract in full,
+     * including the caveat about a returned full cube that was not expanded. */
+    void (*set_reach_dd)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
+    void (*set_reach_dd_par)(vset_t dst,vset_t src,vrel_t rels[],int rel_count);
     void (*set_dot)(FILE* fp, vset_t src);
     void (*rel_dot)(FILE* fp, vrel_t src);
     void (*set_join)(vset_t dst,vset_t left,vset_t right);
@@ -77,6 +89,11 @@ struct vector_domain_shared {
 
     int (*separates_rw)();
     int (*supports_precise_counting)();
+    /* Non-NULL and returning 1 only on back-ends that really implement
+     * set_reach_dd. A back-end may install an aborting set_reach_dd stub in
+     * order to give a better message than the generic one, so the hook being
+     * non-NULL does not by itself mean the operation exists. */
+    int (*supports_reach_dd)();
     char **names;
 
     int (*dom_next_cache_op)(vdom_t dom);

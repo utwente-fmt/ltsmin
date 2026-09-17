@@ -13,8 +13,15 @@
 #include <mc-lib/atomics.h>
 #include <util-lib/fast_hash.h>
 
-#include <sylvan_cache.h>
 #include <sylvan.h>
+#include <sylvan_cache.h>
+
+#include <vset-lib/vset_lddmc_reachdd.h>
+
+/* The --reachdd-* switches; defined in vset_sylvan.c, which owns the shared
+ * sylvan_options table. */
+extern int reachdd_opt_pin_all(void);
+extern int reachdd_opt_learn(void);
 
 struct vector_domain {
     struct vector_domain_shared shared;
@@ -325,7 +332,7 @@ static void
 set_enum(vset_t set, vset_element_cb cb, void* context)
 {
     struct enum_context ctx = (struct enum_context){cb, context};
-    lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
+    lddmc_sat_all_nopar(set->mdd, (lddmc_enum_cb)enumer_CALL, &ctx);
 }
 
 struct set_update_context
@@ -355,7 +362,7 @@ static void
 set_update(vset_t dst, vset_t set, vset_update_cb cb, void* context)
 {
     struct set_update_context ctx = (struct set_update_context){dst, cb, context};
-    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(set_updater), &ctx);
+    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)set_updater_CALL, &ctx);
     lddmc_refs_push(result);
     dst->mdd = lddmc_union(dst->mdd, result);
     lddmc_refs_pop(1);
@@ -387,7 +394,7 @@ set_enum_match(vset_t set, int p_len, int *proj, int *match, vset_element_cb cb,
 
     MDD cube = lddmc_refs_push(lddmc_cube((uint32_t*)match, p_len));
     struct enum_context ctx = (struct enum_context){.cb=cb, .context=context};
-    lddmc_match_sat_par(set->mdd, cube, meta_mdd, (lddmc_enum_cb)TASK(enumer), &ctx);
+    lddmc_match_sat_par(set->mdd, cube, meta_mdd, (lddmc_enum_cb)enumer_CALL, &ctx);
     lddmc_refs_pop(2);
 }
 
@@ -671,7 +678,7 @@ static void
 rel_update(vrel_t rel, vset_t set, vrel_update_cb cb, void* context)
 {
     struct rel_update_context ctx = (struct rel_update_context){rel, cb, context};
-    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)TASK(rel_updater), &ctx);
+    MDD result = lddmc_collect(set->mdd, (lddmc_collect_cb)rel_updater_CALL, &ctx);
 
     MDD cur = rel->mdd;
     lddmc_refs_pushptr(&cur);
@@ -921,9 +928,9 @@ set_visit_prepare(vset_t set, vset_visit_callbacks_t* cbs, size_t user_ctx_size,
     context->proj = set->meta;
     context->user_context = user_ctx;
 
-    lddmc_cbs->lddmc_visit_pre = TASK(lddmc_visit_pre);
-    lddmc_cbs->lddmc_visit_init_context = TASK(lddmc_visit_init_context);
-    lddmc_cbs->lddmc_visit_post = TASK(lddmc_visit_post);
+    lddmc_cbs->lddmc_visit_pre = lddmc_visit_pre_CALL;
+    lddmc_cbs->lddmc_visit_init_context = lddmc_visit_init_context_CALL;
+    lddmc_cbs->lddmc_visit_post = lddmc_visit_post_CALL;
 }
 
 static void
@@ -1028,7 +1035,7 @@ TASK_5(MDD, lddmc_go_sat, MDD, set, vrel_t*, rels, int, depth, int, count, int, 
         /* Recursive computation */
         MDD right = lddmc_refs_push(RUN(lddmc_go_sat, lddmc_getright(set), rels, depth, count, id));
         MDD down = lddmc_refs_push(RUN(lddmc_go_sat, lddmc_getdown(set), rels, depth+1, count, id));
-        lddmc_refs_pop(1);
+        lddmc_refs_pop(2);
         result = lddmc_makenode(lddmc_getvalue(set), down, right);
     }
     // Store in cache
@@ -1156,6 +1163,156 @@ set_least_fixpoint_par(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
     dst->mdd = RUN(lddmc_go_sat_par, src->mdd, rels, 0, rel_count, id);
 }
 
+/**
+ * ReachDDMdd (Alg. 6): one recursive operation over the whole list of local
+ * relations, splitting each relation at every level of its span into the m x m
+ * block matrix its projections dictate, instead of applying it whole at its
+ * entry level as saturation does.  The operation itself is in
+ * vset_lddmc_reachdd.c; all this does is hand it Def. 1's triples.
+ *
+ * For LDDs a triple <R_rho, Rd_rho, W_rho> is just <rel->mdd, rel->meta>: the
+ * meta is the positional description of both projections, so unlike the BDD
+ * side there is no expansion of state-vector slots to state bits and no
+ * bit set of any kind.  The relation root is handed over BY POINTER, not by
+ * value: rel_update publishes a grown diagram into that slot under its own
+ * compare-and-swap and lddmc_protect keeps it rooted, so ReachDDMdd can read
+ * the newest version at any moment without a mirror of its own.
+ *
+ * Expand callbacks ARE honoured, through rlm_learn_cb below: ReachDDMdd
+ * expands a relation at its entry level (rel->topvar), which is exactly where
+ * lddmc_go_sat expands it and for exactly the same reason -- the whole read
+ * projection is still available there.  --reachdd-no-learn suppresses that and
+ * leaves the learning to the caller's own fixpoint.
+ */
+
+/**
+ * The rlm_relspec_t::learn callback: expand one relation over the read
+ * projection of S.  This is lddmc_go_sat's expand block, statement for
+ * statement, and it is here rather than in vset_lddmc_reachdd.c because it is
+ * the only place that may know what a struct vector_relation looks like.
+ *
+ * S is rooted by ReachDDMdd (it is the level node it is about to descend);
+ * dummy.mdd is rooted across the callback, which allocates.  The relation's
+ * new root lands in rel->mdd, which ReachDDMdd re-reads through the pointer it
+ * was given.
+ */
+static void
+rlm_learn_cb(void *self, MDD S)
+{
+    vrel_t rel = (vrel_t)self;
+    struct vector_set dummy;
+    dummy.dom  = rel->dom;
+    dummy.size = rel->r_k;
+    dummy.meta = rel->r_meta;
+    dummy.k    = rel->r_k;
+    dummy.proj = rel->r_proj;
+    dummy.mdd  = lddmc_project(S, rel->topread);
+    lddmc_refs_pushptr(&dummy.mdd);
+    rel->expand(rel, &dummy, rel->expand_ctx);
+    lddmc_refs_popptr(1);
+}
+
+static void
+reachdd_run(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    const int n = src->dom->shared.size;
+    const int nrel = rel_count > 0 ? rel_count : 1;
+    rlm_relspec_t *specs = (rlm_relspec_t*)RTmalloc(sizeof(rlm_relspec_t[nrel]));
+
+    for (int m = 0; m < rel_count; m++) {
+        specs[m].mdd     = &rels[m]->mdd;
+        specs[m].meta    = rels[m]->meta;
+        specs[m].topmeta = rels[m]->topmeta;
+        if (reachdd_opt_learn() && rels[m]->expand != NULL) {
+            specs[m].learn      = rlm_learn_cb;
+            specs[m].learn_self = rels[m];
+        } else {
+            specs[m].learn      = NULL;
+            specs[m].learn_self = NULL;
+        }
+    }
+
+    rlm_gc_hooks_install();
+    rlm_set_pin_all(reachdd_opt_pin_all());
+
+    /* copies_before is read BEFORE the context is built: that is where the
+     * copy-node convention walk runs and where copy nodes are counted. */
+    const uint64_t copies_before = rlm_copy_nodes();
+    rlm_ctx_t *ctx = rlm_ctx_create(n, specs, rel_count);
+    /* ctx == NULL means Reduce emptied the list at the root: every relation is
+     * zero or writes nothing, so [[L]] is empty and S.[[L]]* = S. */
+    const uint64_t cells_before  = rlm_cells_created();
+    const uint64_t calls_before  = rlm_calls_made();
+    const uint64_t hits_before   = rlm_cache_hits();
+    const uint64_t round_before  = rlm_rounds_run();
+    const uint64_t fixp_before   = rlm_fixpoints_run();
+    const uint64_t blocks_before = rlm_blocks_seen();
+    dst->mdd = (ctx == NULL) ? src->mdd : rlm_run(ctx, src->mdd);
+    Warning(infoLong, "ReachDDMdd: sequential schedule (Alg. 6), %d relations "
+                      "over %d levels, %u interned residual projections, "
+                      "%"PRIu64" residual cells consed, "
+                      "%"PRIu64" calls of which %"PRIu64" cache hits, "
+                      "%"PRIu64" rounds over %"PRIu64" level fixpoints, "
+                      "%"PRIu64" off-diagonal blocks enumerated, "
+                      "%"PRIu64" copy nodes at written levels",
+            rlm_ctx_relations(ctx), n, rlm_ctx_projections(ctx),
+            rlm_cells_created()  - cells_before,
+            rlm_calls_made()     - calls_before,
+            rlm_cache_hits()     - hits_before,
+            rlm_rounds_run()     - round_before,
+            rlm_fixpoints_run()  - fixp_before,
+            rlm_blocks_seen()    - blocks_before,
+            rlm_copy_nodes()     - copies_before);
+    rlm_ctx_destroy(ctx);
+
+    RTfree(specs);
+}
+
+static void
+set_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    reachdd_run(dst, src, rels, rel_count);
+}
+
+/**
+ * ReachDDPar (Alg. 5) IS NOT IMPLEMENTED FOR THIS BACK-END, and this entry
+ * point runs the sequential schedule of Alg. 6 instead.  Said plainly because
+ * the alternative -- quietly running something else under the name of Alg. 5 --
+ * is how a false claim gets into a paper.
+ *
+ * What is missing is specific: Alg. 5's fan-out would spawn the per-value
+ * recursions of one level against each other, and rlm_walk carries ONE mutable
+ * cursor array per level which the pass advances strictly left to right.
+ * Spawning the right-recursion while the parent is still inside the down-recursion
+ * would race on it, so a parallel schedule needs a per-value copy of the
+ * cursors (or the cursors moved into the chain, where the cache key can see
+ * them).  That is a design change, not a scheduling flag, and it is not made
+ * here.
+ *
+ * The sequential schedule is nevertheless not single threaded: every
+ * lddmc_relprod and lddmc_union it calls is a Lace task that fans out over all
+ * the workers by itself, exactly as it does for --saturation=sat.
+ */
+static void
+set_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    static int warned = 0;
+    if (!warned) {
+        warned = 1;
+        Warning(info, "ReachDDMdd: the parallel schedule of Alg. 5 is not "
+                      "implemented for --vset=lddmc; running the sequential "
+                      "schedule of Alg. 6 (its Sylvan sub-operations still use "
+                      "every Lace worker).");
+    }
+    reachdd_run(dst, src, rels, rel_count);
+}
+
+static int
+reach_dd_supported()
+{
+    return 1;
+}
+
 static void
 set_function_pointers(vdom_t dom)
 {
@@ -1193,6 +1350,9 @@ set_function_pointers(vdom_t dom)
     dom->shared.set_prev=set_prev;
     dom->shared.set_least_fixpoint=set_least_fixpoint;
     dom->shared.set_least_fixpoint_par=set_least_fixpoint_par;
+    dom->shared.set_reach_dd=set_reach_dd;
+    dom->shared.set_reach_dd_par=set_reach_dd_par;
+    dom->shared.supports_reach_dd=reach_dd_supported;
 
     dom->shared.rel_create_rw=rel_create_rw;
     dom->shared.rel_destroy=rel_destroy;

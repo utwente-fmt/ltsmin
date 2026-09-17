@@ -748,6 +748,27 @@ void vset_least_fixpoint_par(vset_t dst, vset_t src, vrel_t rels[], int rel_coun
     src->dom->shared.set_least_fixpoint_par(dst, src, rels, rel_count);
 }
 
+void vset_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
+    if (src->dom->shared.set_reach_dd == NULL) {
+        Abort("The current decision diagram package does not implement ReachDD; "
+              "use --vset=sylvan (Alg. 4) or --vset=lddmc (Alg. 6)")
+    }
+    src->dom->shared.set_reach_dd(dst, src, rels, rel_count);
+}
+
+void vset_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count) {
+    if (src->dom->shared.set_reach_dd_par == NULL) {
+        Abort("The current decision diagram package does not implement ReachDD; "
+              "use --vset=sylvan (Alg. 4) or --vset=lddmc (Alg. 6)")
+    }
+    src->dom->shared.set_reach_dd_par(dst, src, rels, rel_count);
+}
+
+int vdom_supports_reach_dd(vdom_t dom) {
+    return dom->shared.supports_reach_dd != NULL
+        && dom->shared.supports_reach_dd();
+}
+
 void vset_dot(FILE* fp, vset_t src) {
     if (src->dom->shared.set_dot==NULL){
         Abort("Exporting sets to dot not supported by the current BDD implementation.")

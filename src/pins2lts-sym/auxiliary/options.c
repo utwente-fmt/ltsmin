@@ -86,6 +86,7 @@ static si_map_entry SATURATION[] = {
     {"sat-loop", SAT_LOOP},
     {"sat-fix", SAT_FIX},
     {"sat", SAT},
+    {"reachdd", REACH_DD},
     {NULL, 0}
 };
 
@@ -132,6 +133,26 @@ reach_popt(poptContext con, enum poptCallbackReason reason,
             Warning(info, "Saturation strategy is %s", saturation);
         }
         sat_strategy = res;
+
+        if (sat_strategy == REACH_DD && HREme(HREglobal()) == 0) {
+            Warning(info, "ReachDD expands each relation at its entry level, inside "
+                          "the operation, as saturation does; the driver keeps one "
+                          "outer round to confirm the fixpoint. Use --reachdd-no-learn "
+                          "to expand outside the operation instead.");
+            if (strategy != BFS_P)
+                Warning(info, "ReachDD ignores --order: it replaces the exploration "
+                              "order entirely.");
+            if (save_sat_levels)
+                Warning(info, "ReachDD ignores --save-sat-levels: it has no "
+                              "saturation levels.");
+            /* Only when the user actually set it; the other three notices in
+             * this block are conditional for the same reason, and an
+             * unconditional line on every run is why this one used to be
+             * hidden at infoLong. */
+            if (sat_granularity != 10)
+                Warning(info, "ReachDD ignores --sat-granularity: it has no "
+                              "saturation levels to group.");
+        }
 
         res = linear_search(GUIDED, guidance);
         if (res < 0) {
@@ -209,7 +230,7 @@ struct poptOption options[] = {
 #endif
     { "mu-opt", 0, POPT_ARG_VAL, &mu_opt, 1, "optimize fix-point calculations in mu-calculus", NULL },
 
-    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy" , "<none|sat-like|sat-loop|sat-fix|sat>" },
+    { "saturation" , 0, POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &saturation , 0 , "select the saturation strategy; reachdd is the recursive ReachDD operation over the relation list (--vset=sylvan or --vset=lddmc, ignores --order)" , "<none|sat-like|sat-loop|sat-fix|sat|reachdd>" },
     { "sat-granularity" , 0 , POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &sat_granularity , 0 , "set saturation granularity","<number>" },
     { "save-sat-levels", 0, POPT_ARG_VAL, &save_sat_levels, 1, "save previous states seen at saturation levels", NULL },
     { "guidance", 0 , POPT_ARG_STRING|POPT_ARGFLAG_SHOW_DEFAULT , &guidance, 0 , "select the guided search strategy" , "<unguided|directed>" },

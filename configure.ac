@@ -413,11 +413,13 @@ AC_ARG_WITH([sylvan],
     [AS_HELP_STRING([--without-sylvan], [do not include Sylvan multi-core decision diagram packages])])
 
 AS_IF([test "x$with_sylvan" != "xno"], [
-    PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.8.1 sylvan < 1.9],[
+    PKG_CHECK_MODULES([SYLVAN], [sylvan >= 1.11.0 sylvan < 1.12],[
         have_sylvan=yes
         AC_SUBST([TEST_SYLVAN], [yes]) dnl to make sure dejagnu tests with Sylvan
     ], [
-        AC_MSG_WARN([Sylvan >= 1.8.1, < 1.9 is not installed.])
+        AC_MSG_WARN([Sylvan >= 1.11.0, < 1.12 is not installed.])
+        AC_MSG_WARN([[Since Sylvan 1.10, Lace is a separate package; Sylvan 1.11 needs Lace >= 1.7.0.]])
+        AC_MSG_WARN([[Both sylvan.pc and lace.pc must be on PKG_CONFIG_PATH.]])
     ])
 ])
 

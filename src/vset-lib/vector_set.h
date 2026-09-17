@@ -357,6 +357,52 @@ void vset_least_fixpoint(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
 
 void vset_least_fixpoint_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
 
+/**
+\brief Compute the states reachable from src under rels with the ReachDD
+operation (Alg. 4): one recursive decision diagram operation over the whole
+list of local relations, splitting each relation at every level of its span
+rather than applying it whole at its entry level.
+
+Both dst and src must be defined over the complete domain (k == -1), as for
+vset_least_fixpoint.
+
+Expand callbacks set with vrel_set_expand are honoured: each relation is
+expanded at its entry level, which is the lowest level of its domain and hence
+the last place its whole read projection is available -- the same place
+saturation expands it.  The caller does not need an outer fixpoint to learn.
+
+One caveat.  The operation may return a set containing a full cube that it
+never expanded (a full cube is closed under any relation whose domain lies
+inside it, so the answer is right, but enumerating it would hand the front end
+the entire short-vector space).  A caller that needs the explored sets to cover
+the result -- deadlock detection does -- must therefore still make one expand
+pass of its own over the answer; see reach_dd() in pins2lts-sym/alg/sat.c.
+*/
+void vset_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
+
+/**
+\brief As vset_reach_dd, under the parallel schedule of Alg. 5 (ReachDDPar).
+
+Alg. 5 reorders one loop body of Alg. 4 -- the two recursions, then the two
+cross images, then the two unions each become a spawn/call/sync pair, and every
+ImageAll becomes a balanced reduction over its writer list -- and changes
+nothing else.  Both are chaotic iterations of the same monotone statements with
+the same exit test, so the RESULT IS IDENTICAL; only the number of rounds can
+differ.  Everything said about vset_reach_dd, including the expand callbacks
+and the unexpanded-full-cube caveat, holds unchanged.
+
+Requires that the expand callbacks be safe to invoke from several Lace workers
+at once, exactly as vset_least_fixpoint_par does.  The implementation may fall
+back to the sequential schedule (with one worker, or where the relations are
+pinned to the apply-whole schedule), which is always answer-equivalent.
+*/
+void vset_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count);
+
+/**
+\brief Whether the decision diagram package implements vset_reach_dd.
+*/
+extern int vdom_supports_reach_dd(vdom_t dom);
+
 void vset_dot(FILE* fp, vset_t src);
 
 void vrel_dot(FILE* fp, vrel_t src);

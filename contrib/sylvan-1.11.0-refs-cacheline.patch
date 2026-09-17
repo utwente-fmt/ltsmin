@@ -1,0 +1,204 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: LTSmin <ltsmin@lists.utwente.nl>
+Date: Tue, 16 Sep 2026 10:00:00 +0200
+Subject: [PATCH] Give each worker's reference-stack cursors their own cache line
+
+Every Lace worker gets a struct {mtbdd,lddmc,zdd}_refs_internal holding the
+three reference-stack cursors pcur, rcur and scur.  The struct is 72 bytes
+and is allocated with a plain malloc from inside TOGETHER(), so all workers
+allocate in one burst and land in one contiguous run.  Measured on macOS at
+8 workers the blocks come back on an 80-byte stride; 7 of 8 workers then
+share a 64-byte cache line with a neighbour, and 7 of 8 share a 128-byte
+line.  glibc rounds a 72-byte request to the same 80-byte chunk, so the
+collision is not platform-specific.
+
+Those three cursors are stored to out-of-line by every refs_push, refs_pop,
+refs_pushptr, refs_popptr, refs_spawn and refs_sync, which makes them the
+hottest written words in the library for a workload built out of many small
+decision-diagram operations.  LTSmin's ReachDD strategy issues them on the
+order of 1e9 times in a 12-second run.  Removing the collision is worth,
+over at.3, elevator2.3 and public_subscribe.2 at 3 repeats each (median,
+geomean over models): 1.158x at 8 workers, 1.078x at 4, 1.013x at 2 and
+0.992x at 1, on an Apple M1 Pro.  Monotone in worker count, with the
+one-worker control landing on 1.00, which is the signature of a contended
+line rather than of a cheaper code path.  Saturation issues the same stores
+at roughly half the rate and pays proportionally less.
+
+Allocate the block cache-line aligned and cache-line sized instead, so no
+two workers -- and no unrelated malloc landing in the tail of the line --
+can touch the same line.  The padding is 128 rather than
+SYLVAN_CACHE_LINE_SIZE: a 64-byte-line x86 fetches lines in 128-byte
+aligned pairs, and 128 is the line size on Apple silicon, so 128 is the
+smallest stride that isolates two writers on both.
+
+The new sylvan_alloc_padded deliberately does not go through
+sylvan_alloc_aligned: that one mmaps when SYLVAN_USE_MMAP is set, and a
+page per 128-byte block would be pure TLB pressure at high worker counts.
+---
+--- a/src/sylvan_platform.h
++++ b/src/sylvan_platform.h
+@@ -188,6 +188,33 @@
+ 
+ void sylvan_clear_aligned(void* ptr, size_t size);
+ 
++/**
++ * Granularity at which two writers stop interfering with each other.
++ *
++ * This is deliberately at least 128 and not simply SYLVAN_CACHE_LINE_SIZE.
++ * A 64-byte-line x86 fetches lines in 128-byte aligned pairs (the
++ * adjacent-line / spatial prefetcher), and 128 is the line size on Apple
++ * silicon and on several ARM server parts, so 128 is the smallest stride
++ * that isolates two writers on every machine Sylvan targets.
++ */
++#if SYLVAN_CACHE_LINE_SIZE > 128
++#define SYLVAN_SHARING_PAD SYLVAN_CACHE_LINE_SIZE
++#else
++#define SYLVAN_SHARING_PAD 128
++#endif
++
++/**
++ * Allocate <size> bytes that no other allocation can share a cache line
++ * with: the result is SYLVAN_SHARING_PAD-aligned and <size> is rounded up
++ * to a multiple of SYLVAN_SHARING_PAD, so the tail of the last line cannot
++ * be handed out to anybody else.  The memory is zeroed.  Use this for small
++ * per-worker structures whose fields are written on a hot path; use
++ * sylvan_alloc_aligned for the big tables.  Free with sylvan_free_padded.
++ */
++void* sylvan_alloc_padded(size_t size);
++
++void sylvan_free_padded(void* ptr);
++
+ #ifdef __cplusplus
+ } /* namespace */
+ #endif
+--- a/src/sylvan_platform.c
++++ b/src/sylvan_platform.c
+@@ -51,6 +51,44 @@
+     "SYLVAN_CACHE_LINE_SIZE must be power of two");
+ 
+ void*
++sylvan_alloc_padded(size_t size)
++{
++    if (size == 0) return NULL;
++
++    // Round up, so that no later allocation lands in the tail of our last line.
++    size = (size + SYLVAN_SHARING_PAD - 1) & ~(size_t)(SYLVAN_SHARING_PAD - 1);
++
++    // Never mmap here: these allocations are one or two cache lines and a
++    // page each would be pure TLB pressure at high worker counts.
++#if defined(__MINGW32__)
++    void* res = __mingw_aligned_malloc(size, SYLVAN_SHARING_PAD);
++#elif defined(_MSC_VER) || defined(__MINGW64_VERSION_MAJOR)
++    void* res = _aligned_malloc(size, SYLVAN_SHARING_PAD);
++#else
++    void* res = NULL;
++    if (posix_memalign(&res, SYLVAN_SHARING_PAD, size) != 0) return NULL;
++#endif
++    if (res != NULL) memset(res, 0, size);
++    return res;
++}
++
++
++void
++sylvan_free_padded(void* ptr)
++{
++    if (ptr == NULL) return;
++
++#if defined(__MINGW32__)
++    __mingw_aligned_free(ptr);
++#elif defined(_MSC_VER) || defined(__MINGW64_VERSION_MAJOR)
++    _aligned_free(ptr);
++#else
++    free(ptr);
++#endif
++}
++
++
++void*
+ sylvan_alloc_aligned(size_t size)
+ {
+     if (size == 0) return NULL;
+--- a/src/sylvan_mtbdd.c
++++ b/src/sylvan_mtbdd.c
+@@ -266,7 +266,14 @@
+ mtbdd_refs_init_key(void)
+ {
+     assert(lace_is_worker()); // only use inside Lace workers
+-    mtbdd_refs_internal_t s = (mtbdd_refs_internal_t)malloc(sizeof(struct mtbdd_refs_internal));
++    /* The cursors pcur/rcur/scur in this struct are stored to by every
++     * push, pop, pushptr, popptr, spawn and sync -- on the order of 10^9
++     * times per run for a workload that makes many small BDD operations.
++     * The struct is 72 bytes, so a plain malloc packs several workers'
++     * cursors into one cache line and every worker's push invalidates its
++     * neighbours'.  Give each worker a line of its own. */
++    mtbdd_refs_internal_t s = (mtbdd_refs_internal_t)sylvan_alloc_padded(sizeof(struct mtbdd_refs_internal));
++    if (s == NULL) { fprintf(stderr, "sylvan: out of memory in mtbdd_refs_init_key\n"); exit(1); }
+     s->pcur = s->pbegin = (const MTBDD**)malloc(sizeof(MTBDD*) * 1024);
+     s->pend = s->pbegin + 1024;
+     s->rcur = s->rbegin = (MTBDD*)malloc(sizeof(MTBDD) * 1024);
+@@ -281,7 +288,7 @@
+     free(mtbdd_refs_key->pbegin);
+     free(mtbdd_refs_key->rbegin);
+     free(mtbdd_refs_key->sbegin);
+-    free(mtbdd_refs_key);
++    sylvan_free_padded(mtbdd_refs_key);
+ }
+ 
+ VOID_TASK_0(mtbdd_refs_init_task)
+--- a/src/sylvan_ldd.c
++++ b/src/sylvan_ldd.c
+@@ -207,7 +207,14 @@
+ lddmc_refs_init_key(void)
+ {
+     assert(lace_is_worker()); // only use inside Lace workers
+-    lddmc_refs_internal_t s = (lddmc_refs_internal_t)malloc(sizeof(struct lddmc_refs_internal));
++    /* The cursors pcur/rcur/scur in this struct are stored to by every
++     * push, pop, pushptr, popptr, spawn and sync -- on the order of 10^9
++     * times per run for a workload that makes many small BDD operations.
++     * The struct is 72 bytes, so a plain malloc packs several workers'
++     * cursors into one cache line and every worker's push invalidates its
++     * neighbours'.  Give each worker a line of its own. */
++    lddmc_refs_internal_t s = (lddmc_refs_internal_t)sylvan_alloc_padded(sizeof(struct lddmc_refs_internal));
++    if (s == NULL) { fprintf(stderr, "sylvan: out of memory in lddmc_refs_init_key\n"); exit(1); }
+     s->pcur = s->pbegin = (const MDD**)malloc(sizeof(MDD*) * 1024);
+     s->pend = s->pbegin + 1024;
+     s->rcur = s->rbegin = (MDD*)malloc(sizeof(MDD) * 1024);
+@@ -222,7 +229,7 @@
+     free(lddmc_refs_key->pbegin);
+     free(lddmc_refs_key->rbegin);
+     free(lddmc_refs_key->sbegin);
+-    free(lddmc_refs_key);
++    sylvan_free_padded(lddmc_refs_key);
+ }
+ 
+ VOID_TASK_0(lddmc_refs_init_task)
+--- a/src/sylvan_zdd.c
++++ b/src/sylvan_zdd.c
+@@ -259,7 +259,14 @@
+ 
+ VOID_TASK_0(zdd_refs_init_task)
+ {
+-    zdd_refs_internal_t s = (zdd_refs_internal_t)malloc(sizeof(struct zdd_refs_internal));
++    /* The cursors pcur/rcur/scur in this struct are stored to by every
++     * push, pop, pushptr, popptr, spawn and sync -- on the order of 10^9
++     * times per run for a workload that makes many small BDD operations.
++     * The struct is 72 bytes, so a plain malloc packs several workers'
++     * cursors into one cache line and every worker's push invalidates its
++     * neighbours'.  Give each worker a line of its own. */
++    zdd_refs_internal_t s = (zdd_refs_internal_t)sylvan_alloc_padded(sizeof(struct zdd_refs_internal));
++    if (s == NULL) { fprintf(stderr, "sylvan: out of memory in zdd_refs_init_key\n"); exit(1); }
+     s->pcur = s->pbegin = (ZDD**)malloc(sizeof(ZDD*) * 1024);
+     s->pend = s->pbegin + 1024;
+     s->rcur = s->rbegin = (ZDD*)malloc(sizeof(ZDD) * 1024);
+@@ -274,7 +281,7 @@
+     free(zdd_refs_key->pbegin);
+     free(zdd_refs_key->rbegin);
+     free(zdd_refs_key->sbegin);
+-    free(zdd_refs_key);
++    sylvan_free_padded(zdd_refs_key);
+ }
+ 
+ VOID_TASK_0(zdd_refs_init)
+-- 
+2.39.0
+

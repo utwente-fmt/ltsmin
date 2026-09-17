@@ -29,13 +29,23 @@
 #define sub_fetch(a, b)     __sync_sub_and_fetch(a,b)
 #define prefetch(a)         __builtin_prefetch(a)
 
+#if defined(__x86_64__) || defined(__i386__)
 #define mfence() { asm volatile("mfence" ::: "memory"); }
+#else
+#define mfence() { __sync_synchronize(); }
+#endif
 
 /* Compile read-write barrier */
 #define compile_barrier() asm volatile("": : :"memory")
 
 /* Pause instruction to prevent excess processor bus usage */
+#if defined(__x86_64__) || defined(__i386__)
 #define cpu_relax() asm volatile("pause\n": : :"memory")
+#elif defined(__aarch64__) || defined(__arm64__)
+#define cpu_relax() asm volatile("yield": : :"memory")
+#else
+#define cpu_relax() compile_barrier()
+#endif
 
 
 

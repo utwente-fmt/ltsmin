@@ -10,6 +10,7 @@
 #include <hre/user.h>
 #include <hre-io/user.h>
 #include <vset-lib/vdom_object.h>
+#include <vset-lib/vset_sylvan_reachdd.h>
 #include <sylvan.h>
 #include <sylvan_int.h>
 
@@ -21,6 +22,10 @@ static int cachesize = 23;    // initial size of operation cache
 static int maxcachesize = 27; // maximum size of operation cache
 static int granularity = 1;   // caching granularity for Sylvan
 static char* sizes = NULL;    // for setting table sizes in command line
+static int reachdd_pin_all = 0; // ReachDD: use the apply-whole schedule
+static int reachdd_learn = 1;   // ReachDD: learn transitions inside the operation
+static int reachdd_force_par = 0; // ReachDD: Alg. 5's schedule even at one worker
+static int reachdd_shared_counters = 0; // ReachDD: one shared line for the counters
 
 struct poptOption sylvan_options[] = {
     { "sylvan-bits", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &xstatebits, 0, "set number of bits per integer in the state vector", "<bits>"},
@@ -30,8 +35,21 @@ struct poptOption sylvan_options[] = {
     { "sylvan-cachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &cachesize , 0 , "set initial size of operation cache to 1<<cachesize", "<cachesize>"},
     { "sylvan-maxcachesize", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &maxcachesize , 0 , "set maximum size of operation cache to 1<<cachesize", "<maxcachesize>"},
     { "sylvan-granularity", 0, POPT_ARG_INT|POPT_ARGFLAG_SHOW_DEFAULT, &granularity , 0 , "only use operation cache every <granularity> BDD levels", "<granularity>"},
+    { "reachdd-pin-all", 0, POPT_ARG_VAL, &reachdd_pin_all, 1, "with --saturation=reachdd, apply every relation whole at its entry level (the saturation schedule of Cor. 5) instead of splitting it; for debugging", NULL},
+    { "reachdd-no-learn", 0, POPT_ARG_VAL, &reachdd_learn, 0, "with --saturation=reachdd, do not expand relations inside the operation; the driver then has to learn over all visited states and iterate, as it did before on-the-fly learning; for A/B testing", NULL},
+    { "reachdd-force-par", 0, POPT_ARG_VAL, &reachdd_force_par, 1, "with --saturation=reachdd, run the loop schedule of Alg. 5 even at one worker, where SPAWN/SYNC degenerate to inline calls; this isolates the Jacobi/Gauss-Seidel round-count difference from any effect of the hardware; for measurement", NULL},
+    { "reachdd-shared-counters", 0, POPT_ARG_VAL, &reachdd_shared_counters, 1, "with --saturation=reachdd, bump the diagnostic counters in one shared cache line with atomic read-modify-writes, as they were before they were made per-worker; the counters report the same totals either way, so this measures the cost of the instrument itself (12-23% of the wall clock at 8 workers, nothing at one); for measurement", NULL},
     POPT_TABLEEND
 };
+
+/**
+ * The --reachdd-* switches live in this file because sylvan_options is this
+ * file's table and vector_set.c includes it once for both Sylvan back-ends.
+ * vset_lddmc.c's ReachDDMdd needs the same switches, so they are readable
+ * through these accessors; nothing else about the BDD path changes.
+ */
+int reachdd_opt_pin_all(void)   { return reachdd_pin_all; }
+int reachdd_opt_learn(void)     { return reachdd_learn; }
 
 struct vector_domain
 {
@@ -573,7 +591,7 @@ static void
 set_update(vset_t dst, vset_t src, vset_update_cb cb, void* context)
 {
     struct set_update_context ctx = (struct set_update_context){dst, src, cb, context};
-    BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_set_updater), (void*)&ctx);
+    BDD result = sylvan_collect(src->bdd, src->state_variables, bdd_set_updater_CALL, (void*)&ctx);
     mtbdd_refs_push(result);
     dst->bdd = sylvan_or(dst->bdd, result);
     mtbdd_refs_pop(1);
@@ -1031,7 +1049,7 @@ static void
 rel_update(vrel_t dst, vset_t src, vrel_update_cb cb, void* context)
 {
     struct rel_update_context ctx = (struct rel_update_context){dst, src, src->k == -1 ? src->dom->vectorsize : src->k, cb, context};
-    BDD result = sylvan_collect(src->bdd, src->state_variables, TASK(bdd_rel_updater), (void*)&ctx);
+    BDD result = sylvan_collect(src->bdd, src->state_variables, bdd_rel_updater_CALL, (void*)&ctx);
 
     BDD cur = dst->bdd;
     mtbdd_refs_pushptr(&cur);
@@ -1108,7 +1126,7 @@ TASK_4(BDD, go_sat, BDD, set, vrel_t*, rels, int, count, int, id)
         /* Recursive computation */
         BDD low = mtbdd_refs_push(RUN(go_sat, sylvan_low(set), rels, count, id));
         BDD high = mtbdd_refs_push(RUN(go_sat, sylvan_high(set), rels, count, id));
-        mtbdd_refs_pop(1);
+        mtbdd_refs_pop(2);
         result = sylvan_makenode(sylvan_var(set), low, high);
     }
     // Store in cache
@@ -1236,6 +1254,209 @@ set_least_fixpoint_par(vset_t dst, vset_t src, vrel_t _rels[], int rel_count)
 
     // Go!
     dst->bdd = RUN(go_sat_par, src->bdd, rels, rel_count, id);
+}
+
+/**
+ * ReachDD (Alg. 4): one recursive operation over the whole list of local
+ * relations, splitting each relation at every level of its span instead of
+ * applying it whole at its entry level, as saturation does.  The operation
+ * itself is in vset_sylvan_reachdd.c; all this does is hand it Def. 1's
+ * triples <R_rho, Rd_rho, W_rho>.
+ *
+ * ReachDD needs the projections as *state bit* level sets, where LTSmin
+ * declares them as state-vector slots, so r_proj/w_proj are expanded here
+ * using dom->statebits.  Slot i owns the contiguous bit range [base[i],
+ * base[i+1]), and level b has variables 2b (unprimed) and 2b+1 (primed), as
+ * dom_create numbers them.
+ *
+ * Dom_rho = Rd_rho union W_rho is exactly LTSmin's a_proj, which is what
+ * rel->all_variables is built from, so the cube handed to sylvan_relnext for a
+ * residual is a suffix of that existing set.  Rd_rho is not passed separately:
+ * the operation needs it only through Dom (see vset_sylvan_reachdd.h).
+ *
+ * Expand callbacks ARE honoured, through rl_learn_cb below: ReachDD expands a
+ * relation at its entry level, which is where its whole read projection is
+ * still available and where saturation expands it too.  --reachdd-no-learn
+ * suppresses that and leaves the learning to the caller's own fixpoint.
+ */
+
+/**
+ * The rl_relspec_t::learn callback: expand one relation over the read
+ * projection of S, and hand ReachDD the relation's new diagram.  This is
+ * go_sat's expand block (above), and it is here rather than in
+ * vset_sylvan_reachdd.c because it is the only place that may know what a
+ * struct vector_relation looks like.
+ *
+ * S is rooted by ReachDD (it is the node the call is about to return);
+ * dummy.bdd is rooted across the callback, which allocates.  vset_minus inside
+ * expand_group_next_projected() mutates dummy.bdd, which is why the projection
+ * is a fresh stack set rather than the relation's own.
+ */
+static BDD
+rl_learn_cb(void *self, BDD S)
+{
+    vrel_t rel = (vrel_t)self;
+    struct vector_set dummy;
+    dummy.dom             = rel->dom;
+    dummy.k               = rel->r_k;
+    dummy.proj            = rel->r_proj;
+    dummy.state_variables = rel->state_variables;
+    dummy.bdd             = sylvan_project(S, dummy.state_variables);
+    mtbdd_refs_pushptr(&dummy.bdd);
+    rel->expand(rel, &dummy, rel->expand_ctx);
+    mtbdd_refs_popptr(1);
+    return rel->bdd;
+}
+
+/**
+ * The body of both ReachDD entry points.  par selects Alg. 5's loop schedule
+ * over Alg. 4's; everything else -- the projections, the learn callbacks, the
+ * safety valve, the context -- is identical, because the two schedules differ
+ * only in the order of one loop body's statements.
+ */
+static void
+reachdd_run(vset_t dst, vset_t src, vrel_t rels[], int rel_count, int par)
+{
+    vdom_t dom = src->dom;
+    const int n = dom->totalbits;
+    /* Must match rl_ctx_create's RL_WORDS(n < 1 ? 1 : n), or a zero-bit domain
+     * sizes the bitsets here at 0 words and is read at 1. */
+    const int words = (n < 1) ? 1 : (n + 63) / 64;
+
+    /* Def. 2 needs the action variables ordered below every state variable;
+     * dom_create puts them at 1000000+j. */
+    if (2 * n + 1 >= 1000000) Abort("reachdd: state variables overlap the action variables");
+
+    int base[dom->vectorsize + 1];
+    base[0] = 0;
+    for (int i = 0; i < dom->vectorsize; i++) base[i+1] = base[i] + dom->statebits[i];
+
+    const int nrel = rel_count > 0 ? rel_count : 1;
+    uint64_t *bits = (uint64_t*)RTmallocZero(sizeof(uint64_t[2 * words * nrel]));
+    rl_relspec_t *specs = (rl_relspec_t*)RTmalloc(sizeof(rl_relspec_t[nrel]));
+
+    for (int m = 0; m < rel_count; m++) {
+        uint64_t *dombits = bits + (size_t)(2*m) * words;
+        uint64_t *wbits   = bits + (size_t)(2*m+1) * words;
+        for (int j = 0; j < rels[m]->r_k; j++) {
+            const int i = rels[m]->r_proj[j];
+            for (int b = base[i]; b < base[i+1]; b++) dombits[b>>6] |= 1ULL << (b&63);
+        }
+        for (int j = 0; j < rels[m]->w_k; j++) {
+            const int i = rels[m]->w_proj[j];
+            for (int b = base[i]; b < base[i+1]; b++) {
+                dombits[b>>6] |= 1ULL << (b&63);
+                wbits[b>>6]   |= 1ULL << (b&63);
+            }
+        }
+        specs[m].bdd           = rels[m]->bdd;
+        specs[m].all_variables = rels[m]->all_variables;
+        specs[m].dombits       = dombits;
+        specs[m].wbits         = wbits;
+        if (reachdd_learn && rels[m]->expand != NULL) {
+            specs[m].learn      = rl_learn_cb;
+            specs[m].learn_self = rels[m];
+        } else {
+            specs[m].learn      = NULL;
+            specs[m].learn_self = NULL;
+        }
+    }
+
+    rl_gc_hooks_install();
+    rl_set_pin_all(reachdd_pin_all);
+    /* Before the counters are read below, and before any worker can bump one:
+     * this also sizes the per-worker table, and Lace is started by now. */
+    rl_set_shared_counters(reachdd_shared_counters);
+
+    rl_ctx_t *ctx = rl_ctx_create(n, specs, rel_count);
+    /* ctx == NULL means Reduce emptied the list at the root: every relation is
+     * zero or writes nothing, so [[L]] is empty and S.[[L]]* = S. */
+    const uint64_t cells_before = rl_cells_created();
+    const uint64_t calls_before = rl_calls_made();
+    const uint64_t hits_before  = rl_cache_hits();
+    const uint64_t waive_before = rl_cube_waivers();
+    const uint64_t round_before = rl_rounds_run();
+    const uint64_t fixp_before  = rl_fixpoints_run();
+    dst->bdd = (ctx == NULL) ? src->bdd
+             : (par ? rl_run_par(ctx, src->bdd) : rl_run(ctx, src->bdd));
+    Warning(infoLong, "ReachDD: %s schedule, %d relations over %d levels, "
+                      "%u interned residual "
+                      "projections, %"PRIu64" residual cells consed, "
+                      "%"PRIu64" calls of which %"PRIu64" cache hits, "
+                      "%"PRIu64" rounds (line 11) over %"PRIu64" level "
+                      "fixpoints, "
+                      "%"PRIu64" unexpanded full cubes (Alg. 4 line 5)",
+            par ? "parallel (Alg. 5)" : "sequential (Alg. 4)",
+            rl_ctx_relations(ctx), n, rl_ctx_projections(ctx),
+            rl_cells_created() - cells_before,
+            rl_calls_made() - calls_before,
+            rl_cache_hits() - hits_before,
+            rl_rounds_run() - round_before,
+            rl_fixpoints_run() - fixp_before,
+            rl_cube_waivers() - waive_before);
+    Warning(infoLong, "ReachDD: |A| over ImageAll (cumulative, exact at one "
+                      "worker): 0:%"PRIu64" 1:%"PRIu64" 2:%"PRIu64" 3:%"PRIu64
+                      " 4:%"PRIu64" 5-8:%"PRIu64" 9-16:%"PRIu64" 17+:%"PRIu64,
+            rl_imageall_arity(0), rl_imageall_arity(1), rl_imageall_arity(2),
+            rl_imageall_arity(3), rl_imageall_arity(4), rl_imageall_arity(5),
+            rl_imageall_arity(6), rl_imageall_arity(7));
+    rl_ctx_destroy(ctx);
+
+    RTfree(specs);
+    RTfree(bits);
+}
+
+static void
+set_reach_dd(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    reachdd_run(dst, src, rels, rel_count, 0);
+}
+
+static int
+reach_dd_supported()
+{
+    return 1;
+}
+
+/**
+ * ReachDDPar (Alg. 5): the same operation with the loop body of Alg. 4
+ * reordered so that the two recursions, then the two cross ImageAlls, then the
+ * two unions each run as a spawn/call/sync pair, and each ImageAll is a
+ * balanced reduction over its writer list.  It computes the same fixpoint (see
+ * vset_sylvan_reachdd.c); only the number of rounds can differ.
+ *
+ * The sequential schedule stays reachable on three routes, and all three are
+ * deliberate.
+ *
+ * (1) --reachdd-pin-all.  Cor. th:sat-special is an ordering claim as much as
+ *     a scheduling one: a pinned relation is applied whole, at its entry
+ *     level, in sequence, which is exactly what saturation does.  That switch
+ *     exists to assert precisely this, so it must not run under a reordered
+ *     loop -- and the operation additionally forces Alg. 4's body at any level
+ *     with pinned relations entering, because the GC safety valve can turn
+ *     pinning on in the middle of a run.
+ *
+ * (2) One worker.  SPAWN/SYNC then degenerate to inline execution, which is
+ *     correct but pays a deque push, a fence and a leapfrog test per level for
+ *     nothing.  --reachdd-force-par overrides just this one, because that
+ *     degenerate execution is the way to see Alg. 5's round count without any
+ *     of the hardware: at one worker both schedules do the same work per
+ *     round, so whatever differs in the totals is the broken dependency edge.
+ *
+ * (3) MT-unsafe front ends.  pins2lts-sym calls this entry point only when
+ *     USE_PARALLELISM is set, i.e. for a SPEC_MT_SAFE language module.  Under
+ *     learning ReachDD does invoke expand from inside the operation, on
+ *     several workers at once, exactly as parallel saturation's go_sat_par
+ *     does, so honouring that flag matters.
+ *
+ * And a deterministic single-threaded reference run is the first thing one
+ * wants when a state count comes out wrong.
+ */
+static void
+set_reach_dd_par(vset_t dst, vset_t src, vrel_t rels[], int rel_count)
+{
+    reachdd_run(dst, src, rels, rel_count,
+                (lace_workers() > 1 || reachdd_force_par) && !reachdd_pin_all);
 }
 
 static void
@@ -1369,6 +1590,9 @@ dom_set_function_pointers(vdom_t dom)
     dom->shared.set_prev=set_prev;
     dom->shared.set_least_fixpoint=set_least_fixpoint;
     dom->shared.set_least_fixpoint_par=set_least_fixpoint_par;
+    dom->shared.set_reach_dd=set_reach_dd;
+    dom->shared.set_reach_dd_par=set_reach_dd_par;
+    dom->shared.supports_reach_dd=reach_dd_supported;
 
     dom->shared.reorder=set_reorder;
     dom->shared.set_dot=set_dot;
@@ -1447,8 +1671,8 @@ ltsmin_initialize_sylvan()
     sylvan_set_sizes(1LL<<tablesize, 1LL<<maxtablesize, 1LL<<cachesize, 1LL<<maxcachesize);
     sylvan_init_package();
     sylvan_set_granularity(granularity);
-    sylvan_gc_hook_pregc(TASK(gc_start));
-    sylvan_gc_hook_postgc(TASK(gc_end));
+    sylvan_gc_hook_pregc(gc_start_CALL);
+    sylvan_gc_hook_postgc(gc_end_CALL);
 }
 
 /**

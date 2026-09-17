@@ -255,14 +255,11 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     if (act_detect != NULL && trc_output != NULL)
         Abort("Action detection with trace generation not supported");
 
+    struct expand_info **ectx = RTmallocZero(nGrps * sizeof(struct expand_info *));
     for (int i = 0; i < nGrps; i++) {
         if (bitvector_is_set(reach_groups, i)) {
-            struct expand_info *ctx = RTmalloc(sizeof(struct expand_info));
-            ctx->group = i;
-            ctx->group_explored = group_explored[i];
-            ctx->eg_count = eg_count;
-
-            vrel_set_expand(group_next[i], expand_group_next_projected, ctx);
+            ectx[i] = expand_info_create(i, group_explored[i], eg_count);
+            vrel_set_expand(group_next[i], expand_group_next_projected, ectx[i]);
         }
     }
 
@@ -271,6 +268,8 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
     if (USE_PARALLELISM) vset_least_fixpoint_par(visited, visited, group_next, nGrps);
     else vset_least_fixpoint(visited, visited, group_next, nGrps);
     stats_and_progress_report(NULL, visited, 1);
+    expand_info_collect(ectx, nGrps);
+    RTfree(ectx);
 
     check_invariants(visited, -1);
 
@@ -285,6 +284,114 @@ reach_sat(reach_proc_t reach_proc, vset_t visited,
             vset_clear(dlk_temp);
         }
         deadlock_check(deadlocks, reach_groups);
+        vset_destroy(deadlocks);
+        vset_destroy(dlk_temp);
+    }
+}
+
+/**
+ * ReachDD (Alg. 4): one recursive decision diagram operation over the whole
+ * list of local relations, splitting each relation at every level of its span
+ * instead of applying it whole at its entry level.
+ *
+ * On-the-fly learning.  Like reach_sat, this driver installs vrel_set_expand
+ * callbacks, and ReachDD expands each relation at its ENTRY level, on the node
+ * it is about to return there.  That is the same place saturation expands, and
+ * for the same reason: the entry level is min Dom, so the whole read
+ * projection is still available, while below it the read bits are gone.  A
+ * learned transition changes only the relation's root, and the residual chain
+ * is hash-consed on residual handles, so it re-keys itself; the argument that
+ * the operation cache needs no invalidation either is invariant (E), written
+ * out in vset-lib/vset_sylvan_reachdd.c.
+ *
+ * The outer chaotic fixpoint is nevertheless KEPT, for three reasons that all
+ * still hold once learning has moved inside.  (1) Alg. 4 line 5 returns a full
+ * cube without expanding it -- correct as an answer, since a full cube is
+ * closed under any relation living inside it, but it leaves the explored sets
+ * possibly short of pi(visited), which deadlock detection needs.  (2) Groups
+ * that ReachDD's Reduce drops at the root (an empty write projection: they are
+ * the identity) are never expanded from inside at all.  (3) The extra round is
+ * a runtime check of exactly the failure mode this schedule has, a silently
+ * missing transition: if the closure were not (E)-closed, the round would
+ * learn something and `visited` would grow.  With learning inside, that
+ * fixpoint converges in two rounds -- one that does the work, one that
+ * confirms -- instead of once per relation diameter.
+ */
+void
+reach_dd(reach_proc_t reach_proc, vset_t visited,
+           bitvector_t *reach_groups, long *eg_count, long *next_count, long *guard_count)
+{
+    (void) reach_proc;   /* ReachDD replaces the exploration order entirely */
+    (void) guard_count;
+
+    if (PINS_USE_GUARDS)
+        Abort("guard-splitting not supported with saturation=reachdd");
+
+    if (act_detect != NULL && trc_output != NULL)
+        Abort("Action detection with trace generation not supported");
+
+    if (!vdom_supports_reach_dd(domain))
+        Abort("--saturation=reachdd requires a decision diagram package that "
+              "implements ReachDD; use --vset=sylvan (Alg. 4) or "
+              "--vset=lddmc (Alg. 6)");
+
+    /* Exactly reach_sat's installation: ReachDD calls these at each relation's
+     * entry level.  --reachdd-no-learn makes vset_reach_dd ignore them again,
+     * leaving all the learning to the loop below. */
+    struct expand_info **ectx = RTmallocZero(nGrps * sizeof(struct expand_info *));
+    for (int i = 0; i < nGrps; i++) {
+        if (bitvector_is_set(reach_groups, i)) {
+            ectx[i] = expand_info_create(i, group_explored[i], eg_count);
+            vrel_set_expand(group_next[i], expand_group_next_projected, ectx[i]);
+        }
+    }
+
+    int level = 0;
+    vset_t old_vis = vset_create(domain, -1, NULL);
+    vset_t deadlocks = dlk_detect?vset_create(domain, -1, NULL):NULL;
+    vset_t dlk_temp = dlk_detect?vset_create(domain, -1, NULL):NULL;
+
+    while (!vset_equal(visited, old_vis)) {
+        if (trc_output != NULL) save_level(visited);
+        vset_copy(old_vis, visited);
+        stats_and_progress_report(NULL, visited, level);
+        level++;
+        /* Learn every selected relation over ALL of `visited`.  With learning
+         * inside the operation this pass has nothing left to find except the
+         * two gaps listed above; it is kept because those gaps are real, and
+         * because a round that does find something is the signal that the
+         * closure was not (E)-closed.  expand_group_next is incremental (it
+         * subtracts group_explored), so a round that finds nothing is cheap. */
+        for(int i = 0; i < nGrps; i++){
+            if (!bitvector_is_set(reach_groups, i)) continue;
+            expand_group_next(i, visited);
+            reach_chain_stop();
+            (*eg_count)++;
+        }
+        /* AFTER the expand loop: every state in `deadlocks` has now been
+         * expanded for every group, so the successor test below cannot report
+         * a spurious deadlock caused by a half-learned relation. */
+        if (dlk_detect) vset_copy(deadlocks, visited);
+        if (USE_PARALLELISM) vset_reach_dd_par(visited, visited, group_next, nGrps);
+        else vset_reach_dd(visited, visited, group_next, nGrps);
+        (*next_count)++;
+        check_invariants(visited, level);
+        if (dlk_detect) {
+            for (int i = 0; i < nGrps; i++) {
+                vset_prev(dlk_temp, visited, group_next[i],deadlocks);
+                reduce(i, dlk_temp);
+                vset_minus(deadlocks, dlk_temp);
+                vset_clear(dlk_temp);
+            }
+            deadlock_check(deadlocks, reach_groups);
+        }
+        vset_reorder(domain);
+    }
+
+    expand_info_collect(ectx, nGrps);
+    RTfree(ectx);
+    vset_destroy(old_vis);
+    if (dlk_detect) {
         vset_destroy(deadlocks);
         vset_destroy(dlk_temp);
     }

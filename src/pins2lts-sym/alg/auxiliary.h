@@ -7,8 +7,14 @@
 typedef struct expand_info {
     int group;
     vset_t group_explored;
-    long *eg_count;
+    long *eg_count;     /* where my_eg_count is folded in, once, at the end  */
+    long my_eg_count;   /* private to this group; see expand_info_create     */
 } expand_info_t;
+
+extern struct expand_info *expand_info_create(int group, vset_t group_explored,
+                                              long *eg_count);
+
+extern void expand_info_collect(struct expand_info **ctx, int n);
 
 extern void save_level(vset_t visited);
 
